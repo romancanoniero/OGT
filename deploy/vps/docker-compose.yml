@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: ogt-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: onlygoodthings
+      POSTGRES_USER: ${OGT_DB_USER:-ogt}
+      POSTGRES_PASSWORD: ${OGT_DB_PASSWORD}
+    volumes:
+      - ogt_pg_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ogt -d onlygoodthings"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - ogt
+
+  redis:
+    image: redis:7-alpine
+    container_name: ogt-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ogt_redis_data:/data
+    networks:
+      - ogt
+
+  api:
+    build: .
+    image: ogt-backend:local
+    container_name: ogt-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PORT: "8080"
+      OGT_JDBC_URL: jdbc:postgresql://postgres:5432/onlygoodthings
+      OGT_REDIS_URL: redis://redis:6379
+    ports:
+      - "19080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - ogt
+
+volumes:
+  ogt_pg_data:
+  ogt_redis_data:
+
+networks:
+  ogt:
+    name: ogt

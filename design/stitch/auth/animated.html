@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+    }
+  </style>
+</head>
+<body>
+<!-- STITCH_SVG_START:ANIMATION_81 class="fixed inset-0 w-full h-full" --><div class="fixed inset-0 w-full h-full" id="animated-svg-ANIMATION_81" style="display:block;"><svg height="100%" viewbox="0 0 400 400" width="100%" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<lineargradient id="sunGrad" x1="0%" x2="100%" y1="0%" y2="100%">
+<stop offset="0%" stop-color="#fde047"></stop>
+<stop offset="60%" stop-color="#f59e0b"></stop>
+<stop offset="100%" stop-color="#ea580c"></stop>
+</lineargradient>
+<lineargradient id="handLeftGrad" x1="0%" x2="100%" y1="0%" y2="100%">
+<stop offset="0%" stop-color="#34d399"></stop>
+<stop offset="100%" stop-color="#059669"></stop>
+</lineargradient>
+<lineargradient id="handRightGrad" x1="0%" x2="100%" y1="0%" y2="100%">
+<stop offset="0%" stop-color="#10b981"></stop>
+<stop offset="100%" stop-color="#047857"></stop>
+</lineargradient>
+<lineargradient id="heartGrad" x1="0%" x2="100%" y1="0%" y2="100%">
+<stop offset="0%" stop-color="#fb7185"></stop>
+<stop offset="100%" stop-color="#e11d48"></stop>
+</lineargradient>
+<radialgradient cx="50%" cy="50%" id="sunGlow" r="50%">
+<stop offset="0%" stop-color="#fef08a" stop-opacity="0.6"></stop>
+<stop offset="100%" stop-color="#fbbf24" stop-opacity="0"></stop>
+</radialgradient>
+<filter height="140%" id="softShadow" width="140%" x="-20%" y="-20%">
+<fedropshadow dx="0" dy="6" flood-color="#059669" flood-opacity="0.22" stddeviation="8"></fedropshadow>
+</filter>
+</defs>
+<style>
+    @keyframes rotateRays {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes pulseGlow {
+      0%, 100% { transform: scale(0.92); opacity: 0.4; }
+      50% { transform: scale(1.18); opacity: 0.8; }
+    }
+    @keyframes bounceSun {
+      0%, 100% { transform: translateY(0px) scale(1); }
+      50% { transform: translateY(-7px) scale(1.04); }
+    }
+    @keyframes handsLift {
+      0%, 100% { transform: translateY(0px) scale(1); }
+      50% { transform: translateY(-3px) scale(1.02); }
+    }
+    @keyframes heartBeat {
+      0%, 100% { transform: scale(1); }
+      15% { transform: scale(1.22); }
+      30% { transform: scale(0.96); }
+      45% { transform: scale(1.15); }
+    }
+    @keyframes starTwinkle {
+      0%, 100% { transform: scale(0.6) rotate(0deg); opacity: 0.3; }
+      50% { transform: scale(1.25) rotate(45deg); opacity: 1; }
+    }
+    @keyframes orbitDot {
+      0% { transform: rotate(0deg) translateX(110px) rotate(0deg); }
+      100% { transform: rotate(360deg) translateX(110px) rotate(-360deg); }
+    }
+
+    .sun-glow {
+      transform-origin: 200px 150px;
+      animation: pulseGlow 4s ease-in-out infinite;
+    }
+    .sun-rays {
+      transform-origin: 200px 150px;
+      animation: rotateRays 22s linear infinite;
+    }
+    .sun-core {
+      transform-origin: 200px 150px;
+      animation: bounceSun 3.6s ease-in-out infinite;
+    }
+    .hands-group {
+      transform-origin: 200px 240px;
+      animation: handsLift 3.6s ease-in-out infinite;
+    }
+    .heart-core {
+      transform-origin: 200px 155px;
+      animation: heartBeat 2s ease-in-out infinite;
+    }
+    .twinkle-star1 {
+      transform-origin: 295px 95px;
+      animation: starTwinkle 2.4s ease-in-out infinite;
+    }
+    .twinkle-star2 {
+      transform-origin: 105px 115px;
+      animation: starTwinkle 2.8s ease-in-out 0.8s infinite;
+    }
+    .orbit-particle1 {
+      transform-origin: 200px 180px;
+      animation: orbitDot 12s linear infinite;
+    }
+  </style>
+<!-- Pulsing Sun & Hope Glow -->
+<circle class="sun-glow" cx="200" cy="150" fill="url(#sunGlow)" r="105"></circle>
+<!-- Orbiting Good Deed Spark -->
+<circle class="orbit-particle1" cx="200" cy="180" fill="#38bdf8" r="4.5"></circle>
+<!-- Radiating Sun Rays (Spreading Good News) -->
+<g class="sun-rays">
+<line stroke="#f59e0b" stroke-linecap="round" stroke-width="6" x1="200" x2="200" y1="65" y2="45"></line>
+<line stroke="#f59e0b" stroke-linecap="round" stroke-width="6" x1="260" x2="275" y1="90" y2="75"></line>
+<line stroke="#f59e0b" stroke-linecap="round" stroke-width="6" x1="285" x2="305" y1="150" y2="150"></line>
+<line stroke="#f59e0b" stroke-linecap="round" stroke-width="6" x1="260" x2="275" y1="210" y2="225"></line>
+<line stroke="#f59e0b" stroke-linecap="round" stroke-width="6" x1="140" x2="125" y1="90" y2="75"></line>
+<line stroke="#f59e0b" stroke-linecap="round" stroke-width="6" x1="115" x2="95" y1="150" y2="150"></line>
+<line stroke="#f59e0b" stroke-linecap="round" stroke-width="6" x1="140" x2="125" y1="210" y2="225"></line>
+</g>
+<!-- Central Rising Sun with Warm Radiance -->
+<g class="sun-core" filter="url(#softShadow)">
+<circle cx="200" cy="150" fill="url(#sunGrad)" r="62"></circle>
+<!-- Joyful Smile inside the Sun -->
+<path d="M 174 154 Q 200 178 226 154" fill="none" stroke="#ffffff" stroke-linecap="round" stroke-width="6"></path>
+<!-- Happy eyes -->
+<circle cx="184" cy="138" fill="#ffffff" r="4.5"></circle>
+<circle cx="216" cy="138" fill="#ffffff" r="4.5"></circle>
+</g>
+<!-- Open Caring Hands (Solidarity, Uplifting the Neighborhood) -->
+<g class="hands-group" filter="url(#softShadow)">
+<!-- Left Hand cupping -->
+<path d="M 115 250 C 115 190 165 190 195 228 C 175 250 145 272 115 250 Z" fill="url(#handLeftGrad)"></path>
+<!-- Right Hand cupping -->
+<path d="M 285 250 C 285 190 235 190 205 228 C 225 250 255 272 285 250 Z" fill="url(#handRightGrad)"></path>
+<!-- Center connecting base/heart-cradle -->
+<path d="M 155 265 Q 200 300 245 265 Q 200 282 155 265 Z" fill="#047857"></path>
+</g>
+<!-- Beating Heart in center (Generosity & Empathy) -->
+<g class="heart-core" filter="drop-shadow(0 3px 5px rgba(225,29,72,0.35))">
+<path d="M 200 226 C 196 220 186 210 186 200 C 186 193 192 188 198 188 C 201 188 203 190 205 192 C 207 190 209 188 212 188 C 218 188 224 193 224 200 C 224 210 214 220 210 226 L 205 230 Z" fill="url(#heartGrad)"></path>
+</g>
+<!-- Twinkling Hope Stars -->
+<g class="twinkle-star1">
+<path d="M 295 87 L 298 94 L 305 97 L 298 100 L 295 107 L 292 100 L 285 97 L 292 94 Z" fill="#f59e0b"></path>
+</g>
+<g class="twinkle-star2">
+<path d="M 105 107 L 108 114 L 115 117 L 108 120 L 105 127 L 102 120 L 95 117 L 102 114 Z" fill="#10b981"></path>
+</g>
+</svg></div><!-- STITCH_SVG_END:ANIMATION_81 -->
+</body>
+</html>

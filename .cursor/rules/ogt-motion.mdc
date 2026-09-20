@@ -1,0 +1,27 @@
+---
+description: Motion Quiet Studio — springs cortos, sin rebote de red social
+alwaysApply: true
+---
+
+# Motion Only Good Things
+
+Toda interacción nueva usa tokens de `OgtMotion`. Emoción: precisa, aireada, sin prisa. No confeti, no overshoot > 1.08, no loops salvo loader/radar.
+
+## Cuándo animar
+
+- Cambio de modo (ficha ↔ comentarios, mapa compacto).
+- Confirmación táctil (clap, enviar, CTA).
+- Aparición/salida de chrome (extras, sheet, dock).
+
+## Cómo
+
+- Layout: `OgtMotion.layout` (spring 0.86 / 210, como Parking).
+- Color/fade: `OgtMotion.color` / `fade` (~220 ms).
+- Press: escala 0.96, no ripple Material de color.
+- Entrada: fade + 8–14 dp de translateY. Nunca flip ni bounce elástico.
+
+## No hacer
+
+- `tween` de 600+ ms en chrome (se siente lento).
+- Animar scroll de lectura (la foto/texto no “reaccionan”).
+- Inventar easing por pantalla. Si falta un spec, se agrega en `OgtMotion`.

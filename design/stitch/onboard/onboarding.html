@@ -1,0 +1,346 @@
+<!DOCTYPE html><html lang="es"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport">
+<title>Onboarding - OnlyGoodThings</title>
+<style>
+    @layer base {
+      html, body {
+        width: 100vw;
+        height: 100dvh;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+      body {
+        overscroll-behavior: none;
+      }
+      .pb-safe {
+        padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
+      }
+      .pt-safe {
+        padding-top: max(12px, env(safe-area-inset-top, 12px));
+      }
+    }
+    ::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#006948",
+            "primary-container": "#00855d",
+            "primary-fixed": "#85f8c4",
+            "primary-fixed-dim": "#68dba9",
+            "on-primary": "#ffffff",
+            "on-primary-fixed": "#002114",
+            "on-primary-fixed-variant": "#005137",
+            "secondary": "#a73a00",
+            "secondary-container": "#fd651e",
+            "secondary-fixed": "#ffdbce",
+            "secondary-fixed-dim": "#ffb599",
+            "on-secondary": "#ffffff",
+            "on-secondary-container": "#571a00",
+            "tertiary": "#006947",
+            "tertiary-container": "#00855b",
+            "tertiary-fixed": "#6ffbbe",
+            "on-tertiary-fixed": "#002113",
+            "surface": "#fbf8fc",
+            "surface-bright": "#fbf8fc",
+            "surface-dim": "#dcd9dd",
+            "surface-container-lowest": "#ffffff",
+            "surface-container-low": "#f6f2f7",
+            "surface-container": "#f0edf1",
+            "surface-container-high": "#eae7eb",
+            "surface-container-highest": "#e4e1e6",
+            "on-surface": "#1b1b1e",
+            "on-surface-variant": "#3d4a42",
+            "outline": "#6d7a72",
+            "outline-variant": "#bccac0",
+            "error": "#ba1a1a",
+            "error-container": "#ffdad6",
+            "on-error-container": "#93000a"
+          },
+          borderRadius: {
+            "DEFAULT": "1rem",
+            "lg": "1.5rem",
+            "xl": "2rem",
+            "2xl": "2.25rem",
+            "3xl": "2.75rem",
+            "full": "9999px"
+          },
+          fontFamily: {
+            sans: ["Plus Jakarta Sans", "Inter", "sans-serif"],
+            headline: ["Plus Jakarta Sans", "sans-serif"],
+            body: ["Inter", "sans-serif"]
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="bg-surface text-on-surface font-body antialiased flex flex-col justify-between select-none h-screen w-screen overflow-hidden">
+<!-- 1. BARRA SUPERIOR -->
+<header class="w-full pt-safe px-6 flex items-center justify-between z-30 shrink-0 h-16">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary shadow-sm">
+<span class="material-symbols-outlined text-[19px]" style="font-variation-settings: 'FILL' 1;">eco</span>
+</div>
+<div class="flex items-baseline gap-1">
+<span class="font-headline font-bold text-base tracking-tight text-on-surface">OnlyGoodThings</span>
+<span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>
+</div>
+</div>
+<button class="text-sm font-semibold text-on-surface-variant hover:text-primary transition-colors py-1.5 px-3.5 rounded-full hover:bg-surface-container-high active:scale-95" onclick="skipOnboarding()" type="button">
+      Omitir
+    </button>
+</header>
+<!-- 2. SLIDE / CARRUSEL PRINCIPAL -->
+<main class="flex-1 flex flex-col justify-center min-h-0 relative w-full overflow-hidden px-5 py-2">
+<div class="flex w-full h-full transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]" id="slides-slider" style="transform: translateX(0%);">
+<!-- Slide 1: Parking Colaborativo -->
+<section class="w-full h-full shrink-0 flex flex-col justify-between items-center text-center px-1">
+<!-- Hero Card con Imagen -->
+<div class="relative w-full max-w-sm aspect-[4/3] rounded-3xl overflow-hidden shadow-lg border border-black/5 bg-surface-container">
+<img alt="Ilustración Onboarding Parking Colaborativo" class="w-full h-full object-cover object-center" src="https://lh3.googleusercontent.com/aida/AEtjO1VprHrWmOGiMQnGGwcpVc_JktuTh-o6NSY7iKISoRe1uW9Q5-0wXzMlfOtiRAI5e48pzD6-gkipXEfrbrt3v5iPdgahUcQVbcYzUAF2PWeni0Trre3IiWjN08__wtCCLXhD2GpL24MmONalz6OIddxyKmgdMkdrnXcBtoiv_COT31YCffqAHF3CB0FNeL34r41N7OdCvyNP-hroMRZ3XpGWrtiPoImsLpxazaeS9woIUukFpru_JwCZgyI">
+<!-- Floating Badge -->
+<div class="absolute top-4 right-4 bg-secondary-container text-on-secondary-container text-xs font-bold font-headline px-3.5 py-1.5 rounded-full shadow-md backdrop-blur-md flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px]" style="font-variation-settings: 'FILL' 1;">add_circle</span>
+<span class="">+50 Pts Barriales</span>
+</div>
+<div class="absolute bottom-4 left-4 bg-surface-container-lowest/90 backdrop-blur-md px-3 py-1 rounded-full flex items-center gap-1.5 text-xs font-semibold text-primary shadow-sm">
+<span class="material-symbols-outlined text-sm">energy_savings_leaf</span>
+<span class="">-1.2 kg CO₂ en tu barrio</span>
+</div>
+</div>
+<!-- Copy & Detalles -->
+<div class="mt-4 flex flex-col items-center max-w-xs sm:max-w-sm px-2">
+<div class="inline-flex items-center gap-1.5 text-primary text-xs font-bold uppercase tracking-widest bg-primary-fixed/50 px-3 py-1 rounded-full mb-2">
+<span class="material-symbols-outlined text-[14px]">local_parking</span>
+<span class="">Movilidad Sostenible</span>
+</div>
+<h2 class="font-headline font-extrabold text-2xl text-on-surface leading-tight tracking-tight">
+            Parking Colaborativo en tiempo real
+          </h2>
+<p class="font-body text-sm text-on-surface-variant mt-2 leading-relaxed">
+            Avisa cuando dejas tu lugar en la calle o encuentra un espacio libre de un vecino en segundos. Ahorra combustible y cuida el planeta.
+          </p>
+</div>
+</section>
+<!-- Slide 2: Trueque de Saberes -->
+<section class="w-full h-full shrink-0 flex flex-col justify-between items-center text-center px-1">
+<div class="relative w-full max-w-sm aspect-[4/3] rounded-3xl overflow-hidden shadow-lg border border-black/5 bg-surface-container">
+<img alt="Vecinos compartiendo saberes en huerto urbano" class="w-full h-full object-cover object-center" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC4h6Bpwxp9RMT1zFjE7yEZBOn_xKQhPCqCGMmfhvmaJ3ZTy_2s52kCJEeXqVHpqGNTpx2NOB3paDR2CxUkGkU8K_XmmcoWuvvYfj7q5coZGU59cbmIPqXqaRfkYNZRsXft5eI2srydMFNa6w5J8szCr1OdRjKjWZr9W1Xef-tD__k4DNFb8O4XpleTOmF-QhhVp2UVD8oOR2VZNT6OhbESQ6qvf8USroivSltom2Dt7QcGNk3E00Dw2g">
+<div class="absolute top-4 right-4 bg-tertiary-fixed text-on-tertiary-fixed text-xs font-bold font-headline px-3.5 py-1.5 rounded-full shadow-md backdrop-blur-md flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px]" style="font-variation-settings: 'FILL' 1;">volunteer_activism</span>
+<span class="">100% Sin Dinero</span>
+</div>
+<div class="absolute bottom-4 left-4 bg-surface-container-lowest/90 backdrop-blur-md px-3 py-1 rounded-full flex items-center gap-1.5 text-xs font-semibold text-secondary shadow-sm">
+<span class="material-symbols-outlined text-sm">school</span>
+<span class="">+180 talleres activos</span>
+</div>
+</div>
+<div class="mt-4 flex flex-col items-center max-w-xs sm:max-w-sm px-2">
+<div class="inline-flex items-center gap-1.5 text-secondary text-xs font-bold uppercase tracking-widest bg-secondary-fixed/60 px-3 py-1 rounded-full mb-2">
+<span class="material-symbols-outlined text-[14px]">handshake</span>
+<span class="">Trueque de Saberes</span>
+</div>
+<h2 class="font-headline font-extrabold text-2xl text-on-surface leading-tight tracking-tight">
+            Intercambio de talentos e ideas
+          </h2>
+<p class="font-body text-sm text-on-surface-variant mt-2 leading-relaxed">
+            Aprende cocina tradicional, idiomas, huerta o arreglo de bicis. Comparte tus dones con la comunidad sin costos económicos.
+          </p>
+</div>
+</section>
+<!-- Slide 3: Alertas & Rescate Animal -->
+<section class="w-full h-full shrink-0 flex flex-col justify-between items-center text-center px-1">
+<div class="relative w-full max-w-sm aspect-[4/3] rounded-3xl overflow-hidden shadow-lg border border-black/5 bg-surface-container">
+<img alt="Voluntaria rescatando a un cachorro en el parque" class="w-full h-full object-cover object-center" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCmB4WfNHmF8rEju3Km-EJXC7CzKO127GJJ072njLBdl54MqcOvbnB2bGB6MlaVttDH33wLGShUkWPjpZgm77KoY1uBl3AEGYynZ8rqxOGLKqJvBG_Db0fSLXqFQuhwxWXUyz2khxl_KYJ2ImZBhFWVwOqpdjsbf1YRckFM5qDAFsiSKJtSXPAAym-kvr_ZO4Fk_MYw7QHOHvJaUHKFLEdKeRqha204Irjv3pTPOvTcwYOeeLEb59kNwA">
+<div class="absolute top-4 right-4 bg-error-container text-on-error-container text-xs font-bold font-headline px-3.5 py-1.5 rounded-full shadow-md backdrop-blur-md flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px]" style="font-variation-settings: 'FILL' 1;">emergency</span>
+<span class="">Alerta Radio 2 km</span>
+</div>
+<div class="absolute bottom-4 left-4 bg-surface-container-lowest/90 backdrop-blur-md px-3 py-1 rounded-full flex items-center gap-1.5 text-xs font-semibold text-on-surface shadow-sm">
+<span class="material-symbols-outlined text-error text-sm">favorite</span>
+<span class="">94% mascotas reencontradas</span>
+</div>
+</div>
+<div class="mt-4 flex flex-col items-center max-w-xs sm:max-w-sm px-2">
+<div class="inline-flex items-center gap-1.5 text-secondary text-xs font-bold uppercase tracking-widest bg-secondary-fixed/50 px-3 py-1 rounded-full mb-2">
+<span class="material-symbols-outlined text-[14px]">pets</span>
+<span class="">Bienestar Animal</span>
+</div>
+<h2 class="font-headline font-extrabold text-2xl text-on-surface leading-tight tracking-tight">
+            Alertas barriales y adopciones
+          </h2>
+<p class="font-body text-sm text-on-surface-variant mt-2 leading-relaxed">
+            Reporta mascotas perdidas con alertas geolocalizadas al instante. Coordina adopciones responsables y hogares temporales.
+          </p>
+</div>
+</section>
+<!-- Slide 4: Feed de Impacto Verde -->
+<section class="w-full h-full shrink-0 flex flex-col justify-between items-center text-center px-1">
+<div class="relative w-full max-w-sm aspect-[4/3] rounded-3xl overflow-hidden shadow-lg border border-black/5 bg-surface-container">
+<img alt="Vecinos plantando árboles y celebrando el voluntariado" class="w-full h-full object-cover object-center" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC2srA6i7H20NSYKkoWC8QgGmqsCAiNnE8FGfDghSq5FEzJITxStgZqCHsgBqpDAEnx4dwLMe6OKs9qnOzgYvaXbGRWrBH1s649-2elnfMmM8HnBgvKFjDTzySerctpovMSXNchHj6yOLvezRzOMTNZSI9qCfJVhT8YYdkzLgSYm6gocPKx-iWDCrHSHLnwuSN0PFVHS0f7EPd_MhDI2ABtPLGU7WR-DkHOvFw60FfJOLBxUda2z_PZzA">
+<div class="absolute top-4 right-4 bg-primary-fixed text-on-primary-fixed text-xs font-bold font-headline px-3.5 py-1.5 rounded-full shadow-md backdrop-blur-md flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px]" style="font-variation-settings: 'FILL' 1;">stars</span>
+<span class="">Impacto 100% Positivo</span>
+</div>
+<div class="absolute bottom-4 left-4 bg-surface-container-lowest/90 backdrop-blur-md px-3 py-1 rounded-full flex items-center gap-1.5 text-xs font-semibold text-primary shadow-sm">
+<span class="material-symbols-outlined text-sm">nest_eco_leaf</span>
+<span class="">Karma Verde Canjeable</span>
+</div>
+</div>
+<div class="mt-4 flex flex-col items-center max-w-xs sm:max-w-sm px-2">
+<div class="inline-flex items-center gap-1.5 text-primary text-xs font-bold uppercase tracking-widest bg-primary-fixed/50 px-3 py-1 rounded-full mb-2">
+<span class="material-symbols-outlined text-[14px]">public</span>
+<span class="">Comunidad Activa</span>
+</div>
+<h2 class="font-headline font-extrabold text-2xl text-on-surface leading-tight tracking-tight">
+            Feed de Buenas Acciones
+          </h2>
+<p class="font-body text-sm text-on-surface-variant mt-2 leading-relaxed">
+            Suma karma ecológico por cada acto solidario y canjéalo por recompensas exclusivas en tiendas de cercanía de tu barrio.
+          </p>
+</div>
+</section>
+</div>
+</main>
+<!-- 3. INDICADOR DE PUNTOS Y CONTROLES DE NAVEGACIÓN -->
+<div class="w-full px-6 flex items-center justify-between py-3 shrink-0">
+<!-- Botón previo -->
+<button aria-label="Diapositiva anterior" class="w-10 h-10 rounded-full flex items-center justify-center bg-surface-container text-on-surface-variant disabled:opacity-20 disabled:cursor-not-allowed hover:bg-surface-container-high transition-all active:scale-95" id="prev-btn" onclick="prevSlide()" disabled="">
+<span class="material-symbols-outlined text-xl">chevron_left</span>
+</button>
+<!-- Dots Paginados -->
+<div class="flex items-center gap-2">
+<button aria-label="Ir a diapositiva 1" class="dot transition-all duration-300 h-2 w-7 rounded-full bg-primary shadow-sm" id="dot-0" onclick="goToSlide(0)"></button>
+<button aria-label="Ir a diapositiva 2" class="dot transition-all duration-300 h-2 w-2 rounded-full bg-surface-container-highest hover:bg-outline-variant" id="dot-1" onclick="goToSlide(1)"></button>
+<button aria-label="Ir a diapositiva 3" class="dot transition-all duration-300 h-2 w-2 rounded-full bg-surface-container-highest hover:bg-outline-variant" id="dot-2" onclick="goToSlide(2)"></button>
+<button aria-label="Ir a diapositiva 4" class="dot transition-all duration-300 h-2 w-2 rounded-full bg-surface-container-highest hover:bg-outline-variant" id="dot-3" onclick="goToSlide(3)"></button>
+</div>
+<!-- Botón siguiente -->
+<button aria-label="Siguiente diapositiva" class="w-10 h-10 rounded-full flex items-center justify-center bg-surface-container text-on-surface-variant disabled:opacity-20 disabled:cursor-not-allowed hover:bg-surface-container-high transition-all active:scale-95" id="next-arrow-btn" onclick="nextSlide()">
+<span class="material-symbols-outlined text-xl">chevron_right</span>
+</button>
+</div>
+<!-- 4. ZONA INFERIOR / ACCIONES PRINCIPALES -->
+<footer class="w-full px-6 pb-safe pt-1 flex flex-col gap-3 shrink-0 bg-surface">
+<button class="w-full h-14 bg-primary text-on-primary rounded-full font-headline font-bold text-base shadow-md hover:bg-primary-container active:scale-[0.98] transition-all flex items-center justify-center gap-2" id="main-cta" onclick="handlePrimaryAction()">
+<span id="cta-text" class="">Siguiente</span>
+<span class="material-symbols-outlined text-xl" id="cta-icon">arrow_forward</span>
+</button>
+<div class="text-center pb-2">
+<a class="inline-block text-xs font-semibold text-on-surface-variant hover:text-primary transition-colors py-1" href="#login">
+        ¿Ya tienes cuenta? <span class="text-primary underline font-bold ml-1">Iniciar sesión</span>
+</a>
+</div>
+</footer>
+<!-- SCRIPT DE CONTROL DEL CARRUSEL -->
+<script>
+    let currentSlide = 0;
+    const totalSlides = 4;
+    const slider = document.getElementById('slides-slider');
+    const prevBtn = document.getElementById('prev-btn');
+    const nextArrowBtn = document.getElementById('next-arrow-btn');
+    const ctaText = document.getElementById('cta-text');
+    const ctaIcon = document.getElementById('cta-icon');
+
+    function updateCarousel() {
+      // Mover slider
+      slider.style.transform = `translateX(-${currentSlide * 100}%)`;
+
+      // Actualizar Dots (Pill indicator animado)
+      for (let i = 0; i < totalSlides; i++) {
+        const dot = document.getElementById(`dot-${i}`);
+        if (i === currentSlide) {
+          dot.className = "dot transition-all duration-300 h-2 w-7 rounded-full bg-primary shadow-sm";
+        } else {
+          dot.className = "dot transition-all duration-300 h-2 w-2 rounded-full bg-surface-container-highest hover:bg-outline-variant";
+        }
+      }
+
+      // Deshabilitar flechas en extremos
+      prevBtn.disabled = currentSlide === 0;
+      nextArrowBtn.disabled = currentSlide === totalSlides - 1;
+
+      // Adaptar CTA principal en el último slide
+      if (currentSlide === totalSlides - 1) {
+        ctaText.textContent = "Comenzar mi impacto";
+        ctaIcon.textContent = "rocket_launch";
+      } else {
+        ctaText.textContent = "Siguiente";
+        ctaIcon.textContent = "arrow_forward";
+      }
+    }
+
+    function goToSlide(index) {
+      currentSlide = Math.max(0, Math.min(totalSlides - 1, index));
+      updateCarousel();
+    }
+
+    function nextSlide() {
+      if (currentSlide < totalSlides - 1) {
+        currentSlide++;
+        updateCarousel();
+      }
+    }
+
+    function prevSlide() {
+      if (currentSlide > 0) {
+        currentSlide--;
+        updateCarousel();
+      }
+    }
+
+    function handlePrimaryAction() {
+      if (currentSlide < totalSlides - 1) {
+        nextSlide();
+      } else {
+        alert("¡Bienvenido a OnlyGoodThings! Iniciando registro barrial...");
+      }
+    }
+
+    function skipOnboarding() {
+      goToSlide(totalSlides - 1);
+    }
+
+    // Gesto táctil Swiping nativo
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    slider.addEventListener('touchstart', (e) => {
+      touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    slider.addEventListener('touchend', (e) => {
+      touchEndX = e.changedTouches[0].screenX;
+      handleSwipe();
+    }, { passive: true });
+
+    function handleSwipe() {
+      const swipeDistance = touchStartX - touchEndX;
+      if (Math.abs(swipeDistance) > 40) {
+        if (swipeDistance > 0) {
+          nextSlide();
+        } else {
+          prevSlide();
+        }
+      }
+    }
+
+    // Inicializar
+    updateCarousel();
+  </script>
+
+
+</body></html>

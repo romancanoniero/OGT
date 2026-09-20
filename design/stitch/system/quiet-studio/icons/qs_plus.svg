@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Quiet Studio · Stitch 809f4881008541839e3348714b0f335d · agregar · trazo 1.5px, viewBox 20. No animado. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none"
+     stroke="#111213" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4 10H16"/>
+  <path d="M10 4V16"/>
+</svg>

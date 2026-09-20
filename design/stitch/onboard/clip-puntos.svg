@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgPoints" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FEF3C7"/>
+      <stop offset="50%" stop-color="#FDE68A"/>
+      <stop offset="100%" stop-color="#D1FAE5"/>
+    </linearGradient>
+    <filter id="shadowCoin" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#B45309" flood-opacity="0.2"/>
+    </filter>
+    <filter id="shadowBadge" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000000" flood-opacity="0.1"/>
+    </filter>
+  </defs>
+
+  <!-- Background rounded card -->
+  <rect width="600" height="450" rx="36" fill="url(#bgPoints)"/>
+
+  <!-- Glowing rays / sparkles in background -->
+  <circle cx="300" cy="200" r="160" fill="#FFFFFF" fill-opacity="0.5"/>
+  <circle cx="300" cy="200" r="110" fill="#FEF08A" fill-opacity="0.6"/>
+
+  <!-- Sparkle stars -->
+  <path d="M 120,90 Q 120,105 135,105 Q 120,105 120,120 Q 120,105 105,105 Q 120,105 120,90 Z" fill="#F59E0B"/>
+  <path d="M 480,120 Q 480,135 495,135 Q 480,135 480,150 Q 480,135 465,135 Q 480,135 480,120 Z" fill="#10B981"/>
+  <path d="M 450,280 Q 450,290 460,290 Q 450,290 450,300 Q 450,290 440,290 Q 450,290 450,280 Z" fill="#F59E0B"/>
+  <path d="M 150,260 Q 150,270 160,270 Q 150,270 150,280 Q 150,270 140,270 Q 150,270 150,260 Z" fill="#059669"/>
+
+  <!-- Floating Floating Top Badges -->
+  <g transform="translate(60, 42)" filter="url(#shadowBadge)">
+    <rect width="210" height="42" rx="21" fill="#EA580C"/>
+    <text x="105" y="26" fill="#FFFFFF" font-family="Plus Jakarta Sans, sans-serif" font-weight="800" font-size="13" text-anchor="middle">✨ +100 Pts Solidarios</text>
+  </g>
+
+  <g transform="translate(350, 42)" filter="url(#shadowBadge)">
+    <rect width="190" height="42" rx="21" fill="#059669"/>
+    <text x="95" y="26" fill="#FFFFFF" font-family="Plus Jakarta Sans, sans-serif" font-weight="800" font-size="13" text-anchor="middle">🏅 Vecino Ejemplar</text>
+  </g>
+
+  <!-- Big Central Gold Token / Community Medal with heart & star -->
+  <g transform="translate(240, 100)" filter="url(#shadowCoin)">
+    <!-- Golden medal outer ring -->
+    <circle cx="60" cy="60" r="58" fill="#F59E0B"/>
+    <circle cx="60" cy="60" r="50" fill="#FBBF24"/>
+    <circle cx="60" cy="60" r="44" fill="#FDE68A" stroke="#D97706" stroke-width="2"/>
+    <!-- Heart in medal center -->
+    <path d="M 60,70 C 45,55 40,40 50,32 C 60,24 60,35 60,35 C 60,35 60,24 70,32 C 80,40 75,55 60,70 Z" fill="#DC2626"/>
+    <!-- Leaf badge inside heart -->
+    <path d="M 60,42 C 57,48 60,54 60,54 C 60,54 63,48 60,42 Z" fill="#FFFFFF"/>
+  </g>
+
+  <!-- Two Grateful Neighbors / Community helpers exchanging applause & support -->
+  <!-- Helper Left: Volunteer offering help & receiving heart badge -->
+  <g transform="translate(100, 180)">
+    <!-- Body -->
+    <path d="M 40,160 C 30,130 50,110 70,110 C 90,110 110,130 100,160 Z" fill="#059669"/>
+    <!-- Head -->
+    <circle cx="70" cy="75" r="24" fill="#FCD34D"/>
+    <!-- Hair -->
+    <path d="M 48,75 C 48,50 62,50 78,50 C 92,50 92,65 92,75 C 85,62 60,65 48,75 Z" fill="#451A03"/>
+    <!-- Face smile -->
+    <circle cx="65" cy="73" r="3" fill="#451A03"/>
+    <circle cx="78" cy="73" r="3" fill="#451A03"/>
+    <path d="M 67,82 Q 72,87 77,82" stroke="#451A03" stroke-width="2" stroke-linecap="round" fill="none"/>
+    <!-- Arm raised high-five / waving gratitude -->
+    <path d="M 90,120 Q 120,95 135,105" stroke="#FCD34D" stroke-width="8" stroke-linecap="round" fill="none"/>
+  </g>
+
+  <!-- Helper Right: Neighbor clapping and gifting points / heart token -->
+  <g transform="translate(360, 175)">
+    <!-- Body -->
+    <path d="M 40,165 C 30,135 50,115 70,115 C 90,115 110,135 100,165 Z" fill="#2563EB"/>
+    <!-- Head -->
+    <circle cx="70" cy="80" r="24" fill="#FBCFE8"/>
+    <!-- Hair -->
+    <circle cx="70" cy="50" r="14" fill="#1F2937"/>
+    <path d="M 50,78 C 50,60 62,58 78,58 C 92,58 92,72 92,80 Z" fill="#1F2937"/>
+    <!-- Face smile -->
+    <circle cx="65" cy="78" r="3" fill="#1F2937"/>
+    <circle cx="78" cy="78" r="3" fill="#1F2937"/>
+    <path d="M 68,87 Q 72,92 76,87" stroke="#1F2937" stroke-width="2" stroke-linecap="round" fill="none"/>
+    <!-- Hands clapping / offering gift box -->
+    <path d="M 50,125 Q 25,105 10,115" stroke="#FBCFE8" stroke-width="8" stroke-linecap="round" fill="none"/>
+    <!-- Mini Gift / Karma box -->
+    <g transform="translate(0, 95)">
+      <rect width="26" height="24" rx="4" fill="#EF4444"/>
+      <rect x="10" y="0" width="6" height="24" fill="#FBBF24"/>
+      <rect x="0" y="9" width="26" height="6" fill="#FBBF24"/>
+    </g>
+  </g>
+
+  <!-- Floating mini coins / karma points around them -->
+  <g transform="translate(190, 260)" filter="url(#shadowBadge)">
+    <circle cx="18" cy="18" r="18" fill="#F59E0B"/>
+    <circle cx="18" cy="18" r="14" fill="#FDE68A"/>
+    <text x="18" y="23" fill="#B45309" font-family="Plus Jakarta Sans, sans-serif" font-weight="900" font-size="13" text-anchor="middle">★</text>
+  </g>
+
+  <g transform="translate(370, 270)" filter="url(#shadowBadge)">
+    <circle cx="16" cy="16" r="16" fill="#10B981"/>
+    <circle cx="16" cy="16" r="12" fill="#A7F3D0"/>
+    <text x="16" y="21" fill="#047857" font-family="Plus Jakarta Sans, sans-serif" font-weight="900" font-size="12" text-anchor="middle">+♥</text>
+  </g>
+
+  <!-- Bottom pill -->
+  <g transform="translate(170, 390)">
+    <rect width="260" height="34" rx="17" fill="#1E293B"/>
+    <text x="130" y="22" fill="#FFFFFF" font-family="Plus Jakarta Sans, sans-serif" font-weight="700" font-size="12" text-anchor="middle">SISTEMA DE KARMA Y RECOMPENSAS</text>
+  </g>
+</svg>

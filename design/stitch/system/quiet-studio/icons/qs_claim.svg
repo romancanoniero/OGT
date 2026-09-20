@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Quiet Studio · Stitch 7fe8296ee5574bada3c07f167b8b683b · pedir lugar. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none"
+     stroke="#111213" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M14.55 5v8.18"/>
+  <path d="M11.82 5h2.73"/>
+  <path d="M11.82 13.18h2.73"/>
+  <path d="M9.55 9.09h1.82"/>
+  <path d="M10.45 8.18L11.82 9.09 10.45 10"/>
+  <circle cx="5.4" cy="11.36" r="0.9"/>
+  <circle cx="8.64" cy="11.36" r="0.9"/>
+  <path d="M9.55 10.45V9.55C9.55 9.09 9.09 8.86 8.18 8.86L7.27 7.27C7.05 6.95 6.59 6.82 5.91 6.82H4.32C3.86 6.82 3.55 7.18 3.41 7.73L2.95 8.86C2.64 9.09 2.5 9.32 2.5 9.77V10.45"/>
+  <path d="M5.68 7.05L5.45 8.86"/>
+</svg>

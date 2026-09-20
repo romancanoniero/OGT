@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Quiet Studio · Stitch f68c1b7c · aplauso · trazo 1.5px, viewBox 20. No animado. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none"
+     stroke="#111213" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M10 1.5V3.5" />
+  <path d="M6.8 2.6L8 4.2" />
+  <path d="M13.2 2.6L12 4.2" />
+  <path d="M4 14.5L7.5 9.5C8 8.8 9.2 8.6 9.8 9.3C10.2 9.8 10.1 10.6 9.6 11.2L7.2 13.8" />
+  <path d="M16 14.5L12.5 9.5C12 8.8 10.8 8.6 10.2 9.3C9.8 9.8 9.9 10.6 10.4 11.2L12.8 13.8" />
+  <path d="M3 16.5H8.5" />
+  <path d="M11.5 16.5H17" />
+</svg>

@@ -1,0 +1,28 @@
+---
+description: Iconos solo de Stitch; reutilizar los existentes
+alwaysApply: true
+---
+
+# Iconos Stitch
+
+Todos los iconos de la app se generan en Stitch (proyecto EcoAction Social App UI `11995265718269939633`, sistema Lush Impact). No inventar iconos en código.
+
+## Antes de crear uno nuevo
+
+1. Buscar en `design/stitch/` y en `composeApp/src/commonMain/composeResources/drawable/`.
+2. Si ya existe (estacioné, ceder, buscar, logo, onboard, GPS, etc.), reutilizar el asset y el `Res.drawable.*`.
+3. Solo si no hay equivalente: generar el icono en Stitch, exportarlo y copiarlo a `design/stitch/<feature>/` y a `composeResources/drawable/`.
+
+## No hacer
+
+- Glifos en `Canvas`, emoji o texto (`P`, `♡`, `⌂`) como icono de producto.
+- Material Icons / iconos inventados en Compose.
+- Regenerar un PNG que ya cubre el mismo significado.
+
+## Cómo usarlos
+
+`painterResource(Res.drawable.<nombre>)`. Ejemplo: `parking_action_parked`, `parking_action_yield`, `parking_action_search`.
+
+## 3D y fondo
+
+Todo icono de producto nuevo es **clay 3D** Quiet Studio (Harbor Navy `#0D3D4D` + gris mate, sombra de contacto) en **PNG con alfa**. El fondo es transparente: no blanco, no cream, no pozo. Si Stitch pinta un lienzo, recortar el objeto y tirar el relleno. Inventario: `design/stitch/system/quiet-studio/icons/INVENTARIO.md`.

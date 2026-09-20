@@ -1,0 +1,18 @@
+---
+description: Arquitectura Only Good Things — sockets, auth y contratos
+alwaysApply: true
+---
+
+# Only Good Things
+
+- Cliente de tiempo real: `db-kmp-sdk` (`OgtSdk` + `OgtRealtime`). No reinventar WebSockets.
+- Gateway: `db-realtime-gateway`. Paths en `OgtDbPaths`.
+- Auth: Firebase JWT. Tokens de lab `dev.<firebaseUid>.<ROLE>`.
+- REST POST: parsear body a `Map<String, Any?>` con Jackson (`JsonBody`).
+- Respuesta: `ApiResponse<T>`.
+- Postgres + PostGIS es la fuente de verdad. El árbol WS es proyección.
+- Las pantallas Compose viven en otro repo; no duplicar UI aquí.
+- Iconos: generarlos en Stitch y reutilizar los que ya existan. Ver `ogt-stitch-icons.mdc`.
+- Paleta: solo tokens `OgtColors`. Ver `ogt-palette.mdc`.
+- Motion: solo tokens `OgtMotion`. Ver `ogt-motion.mdc`.
+- Comentarios de código en español.

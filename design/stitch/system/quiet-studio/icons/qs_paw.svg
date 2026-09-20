@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Quiet Studio · Stitch 6f5706e4f4214afba6e4f39a9240e85e · trazo 1.5px, viewBox 20. No animado. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none"
+     stroke="#111213" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M5.5 11.5C4.2 13.5 5 16.5 7 17.8C9 18.8 11 18.8 13 17.8C15 16.5 15.8 13.5 14.5 11.5C13.2 9.8 11.2 10.8 10 10.8C8.8 10.8 6.8 9.8 5.5 11.5Z"/>
+  <ellipse cx="3.8" cy="7.5" rx="1.4" ry="2" transform="rotate(-28 3.8 7.5)"/>
+  <ellipse cx="7.7" cy="4.2" rx="1.5" ry="2.2" transform="rotate(-10 7.7 4.2)"/>
+  <ellipse cx="12.3" cy="4.2" rx="1.5" ry="2.2" transform="rotate(10 12.3 4.2)"/>
+  <ellipse cx="16.2" cy="7.5" rx="1.4" ry="2" transform="rotate(28 16.2 7.5)"/>
+</svg>

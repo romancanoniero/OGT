@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+
+<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "on-secondary-fixed": "#370e00", "on-primary-fixed-variant": "#005137", "on-surface": "#1b1b1e", "primary-fixed-dim": "#68dba9", "secondary-fixed-dim": "#ffb599", "primary-fixed": "#85f8c4", "surface-container-highest": "#e4e1e6", "outline": "#6d7a72", "surface-bright": "#fbf8fc", "on-surface-variant": "#3d4a42", "tertiary-fixed": "#6ffbbe", "on-tertiary-container": "#f5fff6", "error": "#ba1a1a", "on-primary-fixed": "#002114", "background": "#fbf8fc", "surface-container-lowest": "#ffffff", "on-primary": "#ffffff", "on-error": "#ffffff", "surface-container-high": "#eae7eb", "on-tertiary-fixed-variant": "#005236", "on-secondary": "#ffffff", "on-tertiary": "#ffffff", "inverse-primary": "#68dba9", "surface-dim": "#dcd9dd", "inverse-on-surface": "#f3f0f4", "surface": "#fbf8fc", "on-tertiary-fixed": "#002113", "outline-variant": "#bccac0", "secondary": "#a73a00", "tertiary": "#006947", "primary-container": "#00855d", "on-background": "#1b1b1e", "tertiary-fixed-dim": "#4edea3", "on-error-container": "#93000a", "secondary-container": "#fd651e", "tertiary-container": "#00855b", "primary": "#006948", "secondary-fixed": "#ffdbce", "inverse-surface": "#303033", "on-primary-container": "#f5fff7", "surface-container-low": "#f6f2f7", "surface-container": "#f0edf1", "surface-variant": "#e4e1e6", "error-container": "#ffdad6", "surface-tint": "#006c4a", "on-secondary-container": "#571a00", "on-secondary-fixed-variant": "#7f2b00" }, borderRadius: { "DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px" }, spacing: { "space-sm": "0.5rem", "margin-mobile": "1rem", "space-2xl": "3rem", "space-xl": "2rem", "space-lg": "1.5rem", "gutter-mobile": "0.75rem", "gutter": "1rem", "space-md": "1rem", "space-xs": "0.25rem", "margin": "1.5rem" }, fontFamily: { "headline-sm": ["Plus Jakarta Sans"], "body-sm": ["Inter"], "headline-md": ["Plus Jakarta Sans"], "body-md": ["Inter"], "display-lg-mobile": ["Plus Jakarta Sans"], "label-lg": ["Inter"], "display-lg": ["Plus Jakarta Sans"], "body-lg": ["Inter"], "label-sm": ["Inter"], "label-md": ["Inter"], "headline-lg": ["Plus Jakarta Sans"] }, fontSize: { "headline-sm": ["18px", { "lineHeight": "26px", "letterSpacing": "0em", "fontWeight": "600" }], "body-sm": ["13px", { "lineHeight": "18px", "letterSpacing": "0.005em", "fontWeight": "400" }], "headline-md": ["22px", { "lineHeight": "30px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "body-md": ["14px", { "lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "400" }], "display-lg-mobile": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.015em", "fontWeight": "700" }], "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }], "display-lg": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "-0.005em", "fontWeight": "400" }], "label-sm": ["11px", { "lineHeight": "14px", "letterSpacing": "0.03em", "fontWeight": "500" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600" }], "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "700" }] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-body-md text-on-surface min-h-screen flex flex-col"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-margin-mobile flex items-center justify-between"><div class="flex items-center gap-space-sm min-w-0 flex-1"><button aria-label="Volver" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface hover:bg-surface-container-high transition-colors" onclick="history.back()" type="button"><span class="material-symbols-outlined">arrow_back</span></button><img alt="Brand logo. - Primary color: #059669
+- Font: plusJakartaSans
+- Mode: light
+- Roundness: rounded-full
+" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1VsqKYDLYkevT4DgKlPKjlStHwgkTNo4hXMevaWjzm9wtvQZHPdzHISfMgNOFTO9rbF6r4zs6TCvjeytuFsqdIc64JYcgLy8ErcISzKojb3Egp0Vl1utxiX1-gfvcWb2bCo-nW_au77U1ch2faMRkQgx-5v8eDNyn3f1PoQ6_sTYk9TQ7le02j6dD3quAl1wxfsuGJ116ze7WIzUumDHnHYey6MxofDy1Bvz8FSqLE9QmdDeVdA99WaE2bs"/><span class="font-headline-sm text-headline-sm text-on-surface truncate">Onboarding Slide One</span></div><div class="flex items-center gap-space-sm shrink-0"><button class="min-h-[44px] px-space-md py-space-xs rounded-full bg-surface-container-low text-on-surface-variant font-label-md text-label-md hover:bg-surface-container-high transition-colors" type="button">Omitir</button><img alt="Profile" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida/AEtjO1Uvolq8nMKY6XHYgwgWR6JvMGV2sjff0fmPOU5Sm8sDRam2L8X3cc-Ry5BcQDqMSJo8YplyBb5lngZi99r8E1QA2BfJmfF3PZLVTxVf0nfYLRv7embNnmyvx-VR6t7J0AAtdrbypHC4i78_dRBr0-qZ1sDLGol_ZwUubWIflxFm_h3n2i4ZmzVO0v173BcKhXHwOMtwCV78Q-LfuN3rZAKIgDsaB8ox0F_ycpRgkIKkplOI7jt88uUZ7FqR"/></div></div></header><main class="flex flex-col relative w-full pt-16 bg-surface pb-safe"><div class="flex flex-col w-full pb-8">
+<!-- Interactive Progress & Tracker Header -->
+<div class="px-margin-mobile pt-space-md flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs bg-primary-fixed text-on-primary-fixed px-3 py-1 rounded-full shadow-sm">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">eco</span>
+<span class="font-label-sm text-label-sm uppercase tracking-wider font-semibold">Bienvenida a OnlyGoodThings</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface-variant font-medium" id="step-counter">Paso 1 de 4</span>
+</div>
+<!-- 4-Step Progress Segments -->
+<div class="grid grid-cols-4 gap-2 w-full pt-1" id="progress-container">
+<button aria-label="Ver Parking Colaborativo" class="h-1.5 rounded-full transition-all duration-300 bg-primary" onclick="goToSlide(0)"></button>
+<button aria-label="Ver Trueque de Saberes" class="h-1.5 rounded-full transition-all duration-300 bg-surface-container-highest" onclick="goToSlide(1)"></button>
+<button aria-label="Ver Causas &amp; Rescate Animal" class="h-1.5 rounded-full transition-all duration-300 bg-surface-container-highest" onclick="goToSlide(2)"></button>
+<button aria-label="Ver Feed de Impacto" class="h-1.5 rounded-full transition-all duration-300 bg-surface-container-highest" onclick="goToSlide(3)"></button>
+</div>
+</div>
+<!-- Warm Conversational Heading -->
+<div class="px-margin-mobile pt-space-lg pb-space-sm text-center">
+<h1 class="font-display-lg-mobile text-display-lg-mobile text-on-surface leading-tight">
+      Descubre el poder de las <span class="text-primary underline decoration-tertiary-fixed decoration-4">buenas acciones</span> en tu comunidad
+    </h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-space-xs max-w-sm mx-auto">
+      Cada gesto cuenta. Conéctate con tus vecinos, comparte recursos y transforma tu barrio día a día.
+    </p>
+</div>
+<!-- Tab Selector Pills for Direct Discovery -->
+<div class="px-margin-mobile py-space-sm overflow-x-auto no-scrollbar flex items-center gap-2">
+<button class="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-primary text-on-primary font-label-md text-label-md transition-all shadow-sm" id="tab-0" onclick="goToSlide(0)">
+<span class="material-symbols-outlined text-[18px]">directions_car</span>
+<span>Parking</span>
+</button>
+<button class="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-surface-container-high text-on-surface-variant font-label-md text-label-md hover:bg-surface-container-highest transition-all" id="tab-1" onclick="goToSlide(1)">
+<span class="material-symbols-outlined text-[18px]">handshake</span>
+<span>Trueque</span>
+</button>
+<button class="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-surface-container-high text-on-surface-variant font-label-md text-label-md hover:bg-surface-container-highest transition-all" id="tab-2" onclick="goToSlide(2)">
+<span class="material-symbols-outlined text-[18px]">pets</span>
+<span>Rescate</span>
+</button>
+<button class="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-surface-container-high text-on-surface-variant font-label-md text-label-md hover:bg-surface-container-highest transition-all" id="tab-3" onclick="goToSlide(3)">
+<span class="material-symbols-outlined text-[18px]">nest_eco_leaf</span>
+<span>Impacto</span>
+</button>
+</div>
+<!-- Carousel / Cards Container -->
+<div class="relative px-margin-mobile py-space-sm overflow-hidden">
+<div class="flex transition-transform duration-500 ease-out w-full" id="slides-wrapper" style="transform: translateX(0%);">
+<!-- Slide 1: Parking Colaborativo -->
+<div class="w-full shrink-0 pr-0">
+<div class="bg-surface-container-lowest rounded-lg p-space-md shadow-md flex flex-col gap-space-sm">
+<div class="relative h-48 w-full rounded-DEFAULT overflow-hidden bg-surface-container">
+<img class="w-full h-full object-cover" data-alt="A sunny urban neighborhood street scene with green trees and bicycles, where a smiling neighbor in a soft jacket waves while pulling out of an open parking spot, warm golden hour light, community lifestyle photography, vivid emerald and warm terracotta tones" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD6QlSpkfjzU7EU1XxrYisETuRpDAyBNQvrMGqptxGAm2oiloodyFTz7JHoh_ppT08Ab0bhDb_up90A-DDFoCcn0oyf9EHPlgU0R17-8CYTsfhQBngPnpKIMZJLhlh0Roh6NJ0Qbw3Qk6lJePUNw73Slngj91SwVEf3YgD23qI7VPVbNo87CLSyja4rVknm1TQQ7EBcFtsgOpNnGuKNfB2HSJQE_U9jriT7W6UU1HfsjDc0HIHzQDpQiQ"/>
+<div class="absolute top-3 right-3 bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full font-label-md text-label-md font-bold shadow-md flex items-center gap-1">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">add_circle</span>
+              +50 Pts
+            </div>
+<div class="absolute bottom-3 left-3 bg-surface/90 backdrop-blur-md px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-sm">
+<span class="material-symbols-outlined text-primary text-sm">local_gas_station</span>
+<span class="font-label-sm text-label-sm text-on-surface font-semibold">-1.2 kg CO₂ ahorrado</span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs mt-1">
+<div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-on-primary-fixed">
+<span class="material-symbols-outlined text-lg">local_parking</span>
+</div>
+<span class="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-primary">Movilidad Sostenible</span>
+</div>
+<h2 class="font-headline-md text-headline-md text-on-surface">Parking Colaborativo</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">
+            Avisa cuando dejas tu lugar en la calle o encuentra un espacio libre de un vecino en tiempo real. Ahorra combustible, reduce emisiones y gana puntos barriales instantáneos.
+          </p>
+<div class="bg-surface-container-low rounded-DEFAULT p-3 mt-1 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-base">near_me</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">Libera tu espacio en 2 toques</span>
+</div>
+<span class="font-label-md text-label-md text-secondary font-bold">Avisar ahora</span>
+</div>
+</div>
+</div>
+<!-- Slide 2: Trueque de Saberes & Habilidades -->
+<div class="w-full shrink-0 pr-0">
+<div class="bg-surface-container-lowest rounded-lg p-space-md shadow-md flex flex-col gap-space-sm">
+<div class="relative h-48 w-full rounded-DEFAULT overflow-hidden bg-surface-container">
+<img class="w-full h-full object-cover" data-alt="Two neighbors happily learning together on a sunlit balcony filled with flourishing plants and aromatic herbs, one showing organic gardening techniques, joyful authentic human connection, warm earthy tones with vibrant botanical greens" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC4h6Bpwxp9RMT1zFjE7yEZBOn_xKQhPCqCGMmfhvmaJ3ZTy_2s52kCJEeXqVHpqGNTpx2NOB3paDR2CxUkGkU8K_XmmcoWuvvYfj7q5coZGU59cbmIPqXqaRfkYNZRsXft5eI2srydMFNa6w5J8szCr1OdRjKjWZr9W1Xef-tD__k4DNFb8O4XpleTOmF-QhhVp2UVD8oOR2VZNT6OhbESQ6qvf8USroivSltom2Dt7QcGNk3E00Dw2g"/>
+<div class="absolute top-3 right-3 bg-tertiary-fixed text-on-tertiary-fixed px-3 py-1 rounded-full font-label-md text-label-md font-bold shadow-md flex items-center gap-1">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">volunteer_activism</span>
+              Sin Dinero
+            </div>
+<div class="absolute bottom-3 left-3 bg-surface/90 backdrop-blur-md px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-sm">
+<span class="material-symbols-outlined text-tertiary text-sm">school</span>
+<span class="font-label-sm text-label-sm text-on-surface font-semibold">+180 talleres activos</span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs mt-1">
+<div class="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center text-on-secondary-fixed">
+<span class="material-symbols-outlined text-lg">sync_alt</span>
+</div>
+<span class="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-secondary">Aprendizaje Comunitario</span>
+</div>
+<h2 class="font-headline-md text-headline-md text-on-surface">Trueque de Saberes &amp; Habilidades</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">
+            Comparte lo que amas hacer (jardinería urbana, cocina tradicional, idiomas o carpintería) y aprende gratis de tus vecinos sin transacciones económicas.
+          </p>
+<div class="bg-surface-container-low rounded-DEFAULT p-3 mt-1 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-base">forum</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">Intercambia horas y conocimientos</span>
+</div>
+<span class="font-label-md text-label-md text-primary font-bold">Explorar</span>
+</div>
+</div>
+</div>
+<!-- Slide 3: Causas & Rescate Animal -->
+<div class="w-full shrink-0 pr-0">
+<div class="bg-surface-container-lowest rounded-lg p-space-md shadow-md flex flex-col gap-space-sm">
+<div class="relative h-48 w-full rounded-DEFAULT overflow-hidden bg-surface-container">
+<img class="w-full h-full object-cover" data-alt="A friendly volunteer smiling warmly as she holds a rescued golden retriever pup in an urban park, wearing an emerald green volunteer vest, sun flares and joyful neighborhood atmosphere, clean editorial mobile aesthetic" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCmB4WfNHmF8rEju3Km-EJXC7CzKO127GJJ072njLBdl54MqcOvbnB2bGB6MlaVttDH33wLGShUkWPjpZgm77KoY1uBl3AEGYynZ8rqxOGLKqJvBG_Db0fSLXqFQuhwxWXUyz2khxl_KYJ2ImZBhFWVwOqpdjsbf1YRckFM5qDAFsiSKJtSXPAAym-kvr_ZO4Fk_MYw7QHOHvJaUHKFLEdKeRqha204Irjv3pTPOvTcwYOeeLEb59kNwA"/>
+<div class="absolute top-3 right-3 bg-error-container text-on-error-container px-3 py-1 rounded-full font-label-md text-label-md font-bold shadow-md flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">notifications_active</span>
+              Radio 2 km
+            </div>
+<div class="absolute bottom-3 left-3 bg-surface/90 backdrop-blur-md px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-sm">
+<span class="material-symbols-outlined text-secondary text-sm">favorite</span>
+<span class="font-label-sm text-label-sm text-on-surface font-semibold">94% mascotas reencontradas</span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs mt-1">
+<div class="w-8 h-8 rounded-full bg-error-container flex items-center justify-center text-on-error-container">
+<span class="material-symbols-outlined text-lg">emergency</span>
+</div>
+<span class="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-secondary">Alerta Solidaria</span>
+</div>
+<h2 class="font-headline-md text-headline-md text-on-surface">Causas &amp; Rescate Animal</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">
+            Reporta mascotas perdidas con alertas geolocalizadas inmediatas en tu perímetro. Colabora en adopciones responsables, casas cuna y campañas solidarias locales.
+          </p>
+<div class="bg-surface-container-low rounded-DEFAULT p-3 mt-1 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-base">location_searching</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">Red de rescate barrial en alerta</span>
+</div>
+<span class="font-label-md text-label-md text-secondary font-bold">Ver mapa</span>
+</div>
+</div>
+</div>
+<!-- Slide 4: Feed de Impacto & Buenas Acciones -->
+<div class="w-full shrink-0 pr-0">
+<div class="bg-surface-container-lowest rounded-lg p-space-md shadow-md flex flex-col gap-space-sm">
+<div class="relative h-48 w-full rounded-DEFAULT overflow-hidden bg-surface-container">
+<img class="w-full h-full object-cover" data-alt="A lively group of diverse smiling neighbors planting native trees in an urban square, laughing, holding shovels and green saplings, vibrant natural daylight, authentic community warmth with emerald green and earthy accents" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC2srA6i7H20NSYKkoWC8QgGmqsCAiNnE8FGfDghSq5FEzJITxStgZqCHsgBqpDAEnx4dwLMe6OKs9qnOzgYvaXbGRWrBH1s649-2elnfMmM8HnBgvKFjDTzySerctpovMSXNchHj6yOLvezRzOMTNZSI9qCfJVhT8YYdkzLgSYm6gocPKx-iWDCrHSHLnwuSN0PFVHS0f7EPd_MhDI2ABtPLGU7WR-DkHOvFw60FfJOLBxUda2z_PZzA"/>
+<div class="absolute top-3 right-3 bg-primary-fixed text-on-primary-fixed px-3 py-1 rounded-full font-label-md text-label-md font-bold shadow-md flex items-center gap-1">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">stars</span>
+              Nivel Vecino Oro
+            </div>
+<div class="absolute bottom-3 left-3 bg-surface/90 backdrop-blur-md px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-sm">
+<span class="material-symbols-outlined text-primary text-sm">compost</span>
+<span class="font-label-sm text-label-sm text-on-surface font-semibold">4.8 toneladas de ayuda</span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs mt-1">
+<div class="w-8 h-8 rounded-full bg-primary-fixed-dim flex items-center justify-center text-on-primary-fixed-variant">
+<span class="material-symbols-outlined text-lg">public</span>
+</div>
+<span class="font-label-sm text-label-sm uppercase tracking-wider font-semibold text-primary">Incentivos Verdes</span>
+</div>
+<h2 class="font-headline-md text-headline-md text-on-surface">Feed de Impacto &amp; Buenas Acciones</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">
+            Comparte tus iniciativas ecológicas y de ayuda mutua. Acumula puntos de impacto verificado y canjéalos por beneficios directos en comercios de tu propio barrio.
+          </p>
+<div class="bg-surface-container-low rounded-DEFAULT p-3 mt-1 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-base">redeem</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">Recompensas en comercios locales</span>
+</div>
+<span class="font-label-md text-label-md text-primary font-bold">Canjear</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Interactive Slide Controls & Quick Navigation -->
+<div class="px-margin-mobile flex items-center justify-between py-2">
+<button aria-label="Función anterior" class="w-11 h-11 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center disabled:opacity-40 transition-all hover:bg-surface-container-highest" disabled="" id="prev-btn" onclick="prevSlide()">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<!-- Dots Indicator -->
+<div class="flex items-center gap-2">
+<span class="cursor-pointer w-6 h-2 rounded-full bg-primary transition-all" id="dot-0" onclick="goToSlide(0)"></span>
+<span class="cursor-pointer w-2 h-2 rounded-full bg-surface-container-highest transition-all" id="dot-1" onclick="goToSlide(1)"></span>
+<span class="cursor-pointer w-2 h-2 rounded-full bg-surface-container-highest transition-all" id="dot-2" onclick="goToSlide(2)"></span>
+<span class="cursor-pointer w-2 h-2 rounded-full bg-surface-container-highest transition-all" id="dot-3" onclick="goToSlide(3)"></span>
+</div>
+<button aria-label="Siguiente función" class="w-11 h-11 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center transition-all hover:bg-surface-container-highest" id="next-btn" onclick="nextSlide()">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+<!-- Neighborhood Live Pulse Card (Community Trust Metric) -->
+<div class="px-margin-mobile mt-space-sm">
+<div class="bg-surface-container-low rounded-DEFAULT p-space-md flex items-center gap-space-sm">
+<div class="flex -space-x-2 overflow-hidden shrink-0">
+<img class="inline-block h-8 w-8 rounded-full ring-2 ring-surface-container-lowest object-cover" data-alt="Warm portrait of a smiling young Latina woman volunteer outdoors in soft daylight" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAo7Ir9jt6Qb_jssPP8_d7CWWdjVy0KldOi2Ll6GMbLdE9v6OBYxZJAi5JtskY7D0mpFaBbm_cld57qx9iDJTaZIAgIoEGxTOh8F-AKAy9ov3DSROxF812Z_2jP4Uk18_dZZVdvkshk8VQ6n6l3BEErDBUnRpjQBS9qe7b6Nm-WFF9RaZk8KlqJa85p0XkjEnnQjWIzLaDLwvWj0PHzOUmgADcEqyj_z-_ga-Koh-jF_zWDK7FRnqszzQ"/>
+<img class="inline-block h-8 w-8 rounded-full ring-2 ring-surface-container-lowest object-cover" data-alt="Portrait of an elderly neighbor with cheerful expression wearing glasses outdoors" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBHZXLdfOY0VbeYEfszudGOUkBQe4XYR864wPCWJ6FUxwWwnu99T0rgNeOBFmjRzbDFgqDoA5mmWF_p69OU1V8R6O9c6_BdsC1SL33vvD5HkB_jOuecINpqlZNjCZ-iYX6t9Njya22pWtDUn2c0RBR9amGYebNUJmGKqgd9UhS5PLrDucIiAxEyzksOTt6rPbdwF4mRPyWYOZin9_g7F-K-7vF6yod7apmp1M1ZSs-INgk03h923-b_Kg"/>
+<img class="inline-block h-8 w-8 rounded-full ring-2 ring-surface-container-lowest object-cover" data-alt="Portrait of a young man smiling with eco-friendly tote bag in an urban green space" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB5qa096XX-ckFVOTgzk3P0-N8ZITiKJ_TPiK13E6XM-WbplHCYEmPItXhi9ur9FpVte_41FIKLgW7v2D15c8spx16NAox-r8QrTZGoIsrdFxxsO8VLllYbkyXBDyf0SP29kGKKqGr2PXd-z_rhqwQ2XluzKHwt8hl6Cck_5C7-QNqQPZt313tgKS5knPXQAxaBfSuj037j6wLisvM1OslWlPWtu-b0rl1td3S4QzKehno7DQUXzFAYBw"/>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-md text-label-md font-semibold text-on-surface truncate">+2,480 vecinos activos hoy</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">42 buenas acciones coordinadas en tu zona</span>
+</div>
+</div>
+</div>
+<!-- Primary & Secondary CTA Section -->
+<div class="px-margin-mobile pt-space-lg flex flex-col gap-space-sm">
+<button class="w-full min-h-[52px] bg-primary text-on-primary rounded-full font-label-lg text-label-lg shadow-md hover:bg-primary-container active:scale-[0.99] transition-all flex items-center justify-center gap-2" type="button">
+<span>Comenzar mi impacto barrial</span>
+<span class="material-symbols-outlined text-xl">arrow_forward</span>
+</button>
+<button class="w-full min-h-[48px] bg-surface-container-low text-on-surface font-label-lg text-label-lg rounded-full hover:bg-surface-container-high active:scale-[0.99] transition-all flex items-center justify-center" type="button">
+      Ya tengo una cuenta
+    </button>
+</div>
+</div>
+<script>
+  let currentSlide = 0;
+  const totalSlides = 4;
+  const wrapper = document.getElementById('slides-wrapper');
+  const stepCounter = document.getElementById('step-counter');
+  const prevBtn = document.getElementById('prev-btn');
+  const nextBtn = document.getElementById('next-btn');
+  const progressBars = document.getElementById('progress-container').children;
+
+  function updateUI() {
+    wrapper.style.transform = `translateX(-${currentSlide * 100}%)`;
+    stepCounter.textContent = `Paso ${currentSlide + 1} de ${totalSlides}`;
+
+    // Update Dots & Progress Bars
+    for (let i = 0; i < totalSlides; i++) {
+      const dot = document.getElementById(`dot-${i}`);
+      const tab = document.getElementById(`tab-${i}`);
+      const prog = progressBars[i];
+
+      if (i === currentSlide) {
+        dot.className = 'cursor-pointer w-6 h-2 rounded-full bg-primary transition-all';
+        tab.className = 'shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-primary text-on-primary font-label-md text-label-md transition-all shadow-sm';
+        prog.className = 'h-1.5 rounded-full transition-all duration-300 bg-primary';
+      } else {
+        dot.className = 'cursor-pointer w-2 h-2 rounded-full bg-surface-container-highest transition-all';
+        tab.className = 'shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-surface-container-high text-on-surface-variant font-label-md text-label-md hover:bg-surface-container-highest transition-all';
+        prog.className = 'h-1.5 rounded-full transition-all duration-300 bg-surface-container-highest';
+      }
+    }
+
+    prevBtn.disabled = currentSlide === 0;
+    nextBtn.disabled = currentSlide === totalSlides - 1;
+  }
+
+  function goToSlide(index) {
+    currentSlide = Math.max(0, Math.min(totalSlides - 1, index));
+    updateUI();
+  }
+
+  function nextSlide() {
+    if (currentSlide < totalSlides - 1) {
+      currentSlide++;
+      updateUI();
+    }
+  }
+
+  function prevSlide() {
+    if (currentSlide > 0) {
+      currentSlide--;
+      updateUI();
+    }
+  }
+
+  // Touch swipe support for smooth mobile gestures
+  let startX = 0;
+  let endX = 0;
+  wrapper.addEventListener('touchstart', (e) => {
+    startX = e.changedTouches[0].screenX;
+  }, { passive: true });
+
+  wrapper.addEventListener('touchend', (e) => {
+    endX = e.changedTouches[0].screenX;
+    if (startX - endX > 45) {
+      nextSlide();
+    } else if (endX - startX > 45) {
+      prevSlide();
+    }
+  }, { passive: true });
+</script></main></body></html>

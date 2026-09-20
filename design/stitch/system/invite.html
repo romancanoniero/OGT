@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base { html, body { width: 100vw; margin: 0; padding: 0; } body { overscroll-behavior: none; } .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); } .pt-safe { padding-top: env(safe-area-inset-top, 0px); } main > :first-child { margin-top: 0 !important; } main > :last-child { margin-bottom: 0 !important; } } ::-webkit-scrollbar { display: none; }</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "on-tertiary": "#ffffff", "surface-container-low": "#f6f2f7", "secondary-container": "#fd651e", "on-primary-fixed-variant": "#005137", "on-background": "#1b1b1e", "primary-fixed": "#85f8c4", "secondary-fixed-dim": "#ffb599", "background": "#fbf8fc", "outline-variant": "#bccac0", "on-secondary-fixed": "#370e00", "on-surface-variant": "#3d4a42", "on-surface": "#1b1b1e", "error": "#ba1a1a", "primary": "#006948", "surface-variant": "#e4e1e6", "tertiary-fixed-dim": "#4edea3", "inverse-primary": "#68dba9", "primary-fixed-dim": "#68dba9", "tertiary-fixed": "#6ffbbe", "tertiary": "#006947", "tertiary-container": "#00855b", "on-primary-fixed": "#002114", "on-primary-container": "#f5fff7", "surface-dim": "#dcd9dd", "surface-bright": "#fbf8fc", "on-secondary-container": "#571a00", "surface-container-high": "#eae7eb", "secondary": "#a73a00", "secondary-fixed": "#ffdbce", "surface-container-highest": "#e4e1e6", "inverse-surface": "#303033", "on-tertiary-fixed-variant": "#005236", "surface-container": "#f0edf1", "inverse-on-surface": "#f3f0f4", "on-error-container": "#93000a", "on-secondary": "#ffffff", "on-tertiary-fixed": "#002113", "error-container": "#ffdad6", "outline": "#6d7a72", "surface-tint": "#006c4a", "on-tertiary-container": "#f5fff6", "surface": "#fbf8fc", "on-error": "#ffffff", "surface-container-lowest": "#ffffff", "on-primary": "#ffffff", "primary-container": "#00855d", "on-secondary-fixed-variant": "#7f2b00" }, borderRadius: { "DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px" }, spacing: { "space-xl": "2rem", "gutter-mobile": "0.75rem", "space-md": "1rem", "margin-mobile": "1rem", "space-xs": "0.25rem", "space-2xl": "3rem", "space-sm": "0.5rem", "space-lg": "1.5rem", "gutter": "1rem", "margin": "1.5rem" }, fontFamily: { "headline-lg": ["Plus Jakarta Sans"], "label-sm": ["Inter"], "display-lg-mobile": ["Plus Jakarta Sans"], "headline-sm": ["Plus Jakarta Sans"], "body-md": ["Inter"], "label-lg": ["Inter"], "display-lg": ["Plus Jakarta Sans"], "body-sm": ["Inter"], "headline-md": ["Plus Jakarta Sans"], "label-md": ["Inter"], "body-lg": ["Inter"] }, fontSize: { "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "700" }], "label-sm": ["11px", { "lineHeight": "14px", "letterSpacing": "0.03em", "fontWeight": "500" }], "display-lg-mobile": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.015em", "fontWeight": "700" }], "headline-sm": ["18px", { "lineHeight": "26px", "letterSpacing": "0em", "fontWeight": "600" }], "body-md": ["14px", { "lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "400" }], "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }], "display-lg": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "body-sm": ["13px", { "lineHeight": "18px", "letterSpacing": "0.005em", "fontWeight": "400" }], "headline-md": ["22px", { "lineHeight": "30px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600" }], "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "-0.005em", "fontWeight": "400" }] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-background font-body-md text-on-surface flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-margin-mobile flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-sm min-w-0"><img alt="Brand logo. - Primary color: #059669
+- Font: plusJakartaSans
+- Mode: light
+- Roundness: rounded-full
+" class="h-8 w-auto object-contain flex-shrink-0" src="https://lh3.googleusercontent.com/aida/AEtjO1VsqKYDLYkevT4DgKlPKjlStHwgkTNo4hXMevaWjzm9wtvQZHPdzHISfMgNOFTO9rbF6r4zs6TCvjeytuFsqdIc64JYcgLy8ErcISzKojb3Egp0Vl1utxiX1-gfvcWb2bCo-nW_au77U1ch2faMRkQgx-5v8eDNyn3f1PoQ6_sTYk9TQ7le02j6dD3quAl1wxfsuGJ116ze7WIzUumDHnHYey6MxofDy1Bvz8FSqLE9QmdDeVdA99WaE2bs"/><div class="flex flex-col min-w-0"><span class="font-headline-sm text-headline-sm text-primary truncate leading-none">OnlyGoodThings</span><span class="font-label-sm text-label-sm text-on-surface-variant truncate mt-0.5">Perfil Ajustes</span></div></div><div class="flex items-center gap-space-xs flex-shrink-0"><button aria-label="Mensajes" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">chat_bubble_outline</span></button><button aria-label="Notificaciones" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors relative" type="button"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-secondary-container"></span></button><a class="w-11 h-11 flex items-center justify-center rounded-full ml-space-xs" data-path="perfil-ajustes" href="#"><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-2 ring-primary/20" src="https://lh3.googleusercontent.com/aida/AEtjO1Uvolq8nMKY6XHYgwgWR6JvMGV2sjff0fmPOU5Sm8sDRam2L8X3cc-Ry5BcQDqMSJo8YplyBb5lngZi99r8E1QA2BfJmfF3PZLVTxVf0nfYLRv7embNnmyvx-VR6t7J0AAtdrbypHC4i78_dRBr0-qZ1sDLGol_ZwUubWIflxFm_h3n2i4ZmzVO0v173BcKhXHwOMtwCV78Q-LfuN3rZAKIgDsaB8ox0F_ycpRgkIKkplOI7jt88uUZ7FqR"/></a></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 pb-20 bg-surface"><div class="flex flex-col w-full px-margin-mobile pb-space-2xl gap-space-lg">
+<!-- Header Contextual -->
+<section class="flex flex-col gap-space-xs mt-space-sm">
+<div class="inline-flex items-center gap-space-xs self-start px-space-sm py-1 rounded-full bg-primary-fixed text-on-primary-fixed font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">park</span>
+<span>Impacto Barrial Compartido</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">
+      Invita a tus Vecinos &amp; Amigos
+    </h1>
+<p class="font-body-md text-body-md text-on-surface-variant">
+      Una red comunitaria crece con personas de buen corazón. Por cada persona que se sume, ambos reciben <span class="font-semibold text-primary">+100 puntos</span> y una donación automática de un árbol.
+    </p>
+</section>
+<!-- Impact Counter Banner -->
+<div class="relative overflow-hidden rounded-lg bg-surface-container p-space-md shadow-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-on-primary shadow-md">
+<span class="material-symbols-outlined text-[24px]">forest</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Tu bosque barrial</span>
+<span class="font-headline-sm text-headline-sm text-primary">7 árboles donados</span>
+</div>
+</div>
+<div class="px-space-sm py-1.5 rounded-full bg-surface-container-highest text-on-surface-variant font-label-md text-label-md flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-secondary-container">stars</span>
+<span>+700 pts</span>
+</div>
+</div>
+</div>
+<!-- Hero Card: Invitación Directa -->
+<div class="flex flex-col bg-surface-container-lowest rounded-lg p-space-lg shadow-sm gap-space-md relative overflow-hidden">
+<div class="absolute -right-8 -top-8 w-32 h-32 bg-primary-fixed/20 rounded-full blur-2xl pointer-events-none"></div>
+<!-- Badge Visual & Header -->
+<div class="flex items-center gap-space-md">
+<div class="w-14 h-14 rounded-full bg-surface-container-low flex items-center justify-center text-primary flex-shrink-0">
+<span class="material-symbols-outlined text-[30px]" style="font-variation-settings: 'FILL' 1;">diversity_1</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-sm text-label-sm text-primary uppercase tracking-wider font-semibold">Tus Credenciales Barriales</span>
+<span class="font-headline-sm text-headline-sm text-on-surface truncate">Comunidad Mariana Cordero</span>
+</div>
+</div>
+<!-- Código Barrial -->
+<div class="flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface-variant">Tu código de invitación barrial</label>
+<div class="flex items-center justify-between bg-surface-container-low px-space-md py-space-sm rounded-full gap-space-sm">
+<span class="font-headline-sm text-headline-sm text-primary tracking-widest select-all" id="code-val">BUENOSVECINOS-MC</span>
+<button class="inline-flex items-center gap-1 bg-surface-container-highest hover:bg-primary hover:text-on-primary text-on-surface px-space-md py-2 rounded-full font-label-md text-label-md transition-all active:scale-95" onclick="copySnippet('code-val', this)" type="button">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+<span class="copy-text">Copiar</span>
+</button>
+</div>
+</div>
+<!-- Enlace Personal Directo -->
+<div class="flex flex-col gap-1.5">
+<label class="font-label-md text-label-md text-on-surface-variant">Enlace personal directo para nuevos vecinos</label>
+<div class="flex items-center justify-between bg-surface-container-low px-space-md py-space-sm rounded-full gap-space-sm">
+<span class="font-body-md text-body-md text-on-surface truncate select-all" id="link-val">onlygoodthings.app/join/mariana-cordero</span>
+<button class="inline-flex items-center gap-1 bg-primary text-on-primary px-space-md py-2 rounded-full font-label-md text-label-md shadow-sm transition-all active:scale-95 flex-shrink-0" onclick="copySnippet('link-val', this)" type="button">
+<span class="material-symbols-outlined text-[18px]">link</span>
+<span class="copy-text">Copiar Enlace</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Acciones Rápidas de Compartir -->
+<section class="flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Compartir Rápido</h2>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Elige tu canal favorito</span>
+</div>
+<div class="grid grid-cols-2 gap-space-sm">
+<!-- WhatsApp (Destacado) -->
+<a class="col-span-2 flex items-center justify-between p-space-md bg-primary text-on-primary rounded-lg shadow-sm hover:opacity-95 transition-all active:scale-[0.99]" href="https://api.whatsapp.com/send?text=%C2%A1Hola!%20Te%20invito%20a%20sumarte%20a%20OnlyGoodThings%20para%20cuidar%20nuestro%20barrio.%20Usa%20mi%20enlace%3A%20https%3A%2F%2Fonlygoodthings.app%2Fjoin%2Fmariana-cordero" rel="noopener noreferrer" target="_blank">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-full bg-on-primary/15 flex items-center justify-center">
+<span class="material-symbols-outlined text-[22px]">send</span>
+</div>
+<div class="flex flex-col text-left">
+<span class="font-label-lg text-label-lg font-semibold">Compartir por WhatsApp</span>
+<span class="font-label-sm text-label-sm text-on-primary/80">Mensaje directo con un tap</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</a>
+<!-- Telegram -->
+<a class="flex flex-col p-space-md bg-surface-container rounded-lg gap-space-xs hover:bg-surface-container-high transition-colors active:scale-95" href="https://t.me/share/url?url=https%3A%2F%2Fonlygoodthings.app%2Fjoin%2Fmariana-cordero&amp;text=%C2%A1Hola!%20Sumate%20a%20OnlyGoodThings" rel="noopener noreferrer" target="_blank">
+<div class="w-9 h-9 rounded-full bg-surface-container-highest flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">near_me</span>
+</div>
+<span class="font-label-lg text-label-lg text-on-surface mt-1">Telegram</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Grupos vecinales</span>
+</a>
+<!-- SMS -->
+<a class="flex flex-col p-space-md bg-surface-container rounded-lg gap-space-xs hover:bg-surface-container-high transition-colors active:scale-95" href="sms:?body=%C2%A1Hola!%20Sumate%20a%20OnlyGoodThings%20para%20transformar%20nuestro%20barrio%3A%20https%3A%2F%2Fonlygoodthings.app%2Fjoin%2Fmariana-cordero">
+<div class="w-9 h-9 rounded-full bg-surface-container-highest flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">sms</span>
+</div>
+<span class="font-label-lg text-label-lg text-on-surface mt-1">SMS Tradicional</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Sin internet</span>
+</a>
+</div>
+<!-- QR Expandible para Reuniones Barriales -->
+<div class="flex flex-col bg-surface-container-lowest rounded-lg p-space-md shadow-sm gap-space-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[22px]">qr_code_2</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Código QR Barrial</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Ideal para proyectar o imprimir</span>
+</div>
+</div>
+<button class="px-space-md py-1.5 rounded-full bg-surface-container hover:bg-surface-container-high text-primary font-label-md text-label-md transition-colors" onclick="toggleQRModal()" type="button">
+          Mostrar QR
+        </button>
+</div>
+<!-- QR Card desplegable integrada -->
+<div class="hidden flex-col items-center justify-center pt-space-sm pb-space-xs gap-space-sm" id="qr-panel">
+<div class="relative p-space-md bg-surface-container-lowest rounded-lg shadow-md flex items-center justify-center">
+<!-- QR SVG estilizado simétrico -->
+<svg class="w-48 h-48 text-on-surface" fill="currentColor" viewbox="0 0 160 160">
+<!-- Position Marks -->
+<path d="M10,10 h40 v40 h-40 z M20,20 v20 h20 v-20 z M25,25 h10 v10 h-10 z"></path>
+<path d="M110,10 h40 v40 h-40 z M120,20 v20 h20 v-20 z M125,25 h10 v10 h-10 z"></path>
+<path d="M10,110 h40 v40 h-40 z M20,120 v20 h20 v-20 z M25,125 h10 v10 h-10 z"></path>
+<!-- Data Grid Modules -->
+<path d="M60,15 h10 v10 h-10 z M80,15 h15 v8 h-15 z M65,30 h8 v15 h-8 z M85,30 h10 v10 h-10 z"></path>
+<path d="M15,60 h10 v10 h-10 z M35,65 h10 v10 h-10 z M20,85 h15 v8 h-15 z M40,80 h10 v15 h-10 z"></path>
+<path d="M60,60 h12 v12 h-12 z M88,60 h10 v10 h-10 z M60,88 h10 v10 h-10 z M82,82 h18 v8 h-18 z"></path>
+<path d="M110,65 h8 v10 h-8 z M130,60 h15 v10 h-15 z M120,80 h12 v12 h-12 z M140,85 h10 v15 h-10 z"></path>
+<path d="M60,110 h15 v10 h-15 z M85,115 h10 v12 h-10 z M65,135 h12 v15 h-12 z M85,135 h15 v10 h-15 z"></path>
+<path d="M110,110 h12 v8 h-12 z M132,110 h15 v12 h-15 z M115,130 h10 v15 h-10 z M135,130 h15 v15 h-15 z"></path>
+</svg>
+<!-- Center Badge -->
+<div class="absolute inset-0 m-auto w-11 h-11 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-lg">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">eco</span>
+</div>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant text-center max-w-xs">
+          Escanea con cualquier cámara móvil para ingresar a la red barrial de Mariana.
+        </p>
+</div>
+</div>
+</section>
+<!-- Selector Rápido de Contactos del Teléfono -->
+<section class="flex flex-col gap-space-sm">
+<div class="flex flex-col">
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Contactos de Confianza</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Suma personas cercanas para coordinar huertas, reciclaje y eventos.</p>
+</div>
+<!-- Buscador -->
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-space-md text-[20px] text-outline">search</span>
+<input class="w-full pl-11 pr-space-md py-3 rounded-full bg-surface-container-low text-on-surface placeholder:text-outline font-body-md text-body-md focus:outline-none focus:bg-surface-container transition-colors" id="contact-search" oninput="filterContacts(this.value)" placeholder="Buscar en mis contactos..." type="search"/>
+</div>
+<!-- Lista de Contactos -->
+<div class="flex flex-col gap-space-xs" id="contact-list">
+<!-- Contacto 1: WhatsApp Directo -->
+<div class="contact-card flex items-center justify-between p-space-md rounded-lg bg-surface-container-lowest shadow-sm gap-space-sm" data-name="carolina rossi">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="relative flex-shrink-0">
+<div class="w-11 h-11 rounded-full bg-surface-container-high flex items-center justify-center text-primary font-headline-sm text-headline-sm font-bold">
+              CR
+            </div>
+<span class="absolute bottom-0 right-0 w-3 h-3 bg-secondary-container rounded-full ring-2 ring-surface-container-lowest"></span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-lg text-label-lg text-on-surface font-semibold truncate">Carolina Rossi</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">+54 9 11 4455-8899</span>
+</div>
+</div>
+<button class="flex items-center gap-1 bg-primary text-on-primary px-space-md py-2 rounded-full font-label-md text-label-md flex-shrink-0 shadow-sm transition-transform active:scale-95" onclick="inviteViaWhatsApp('Carolina Rossi', this)" type="button">
+<span class="material-symbols-outlined text-[16px]">chat</span>
+<span>Invitar WhatsApp</span>
+</button>
+</div>
+<!-- Contacto 2: Envío por Correo / App Link -->
+<div class="contact-card flex items-center justify-between p-space-md rounded-lg bg-surface-container-lowest shadow-sm gap-space-sm" data-name="agustin pereyra">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="relative flex-shrink-0">
+<div class="w-11 h-11 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center font-headline-sm text-headline-sm font-bold">
+              AP
+            </div>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-lg text-label-lg text-on-surface font-semibold truncate">Agustín Pereyra</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">agustin.p@correo.com</span>
+</div>
+</div>
+<button class="flex items-center gap-1 bg-surface-container text-primary hover:bg-surface-container-high px-space-md py-2 rounded-full font-label-md text-label-md flex-shrink-0 transition-transform active:scale-95" onclick="inviteGeneral('Agustín Pereyra', this)" type="button">
+<span class="material-symbols-outlined text-[16px]">mail</span>
+<span>Enviar invitación</span>
+</button>
+</div>
+<!-- Contacto 3: Ya registrado (Estado Pasivo de Reaseguro) -->
+<div class="contact-card flex items-center justify-between p-space-md rounded-lg bg-surface-container-low shadow-sm gap-space-sm" data-name="valeria gomez">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="relative flex-shrink-0">
+<div class="w-11 h-11 rounded-full bg-primary text-on-primary flex items-center justify-center font-headline-sm text-headline-sm font-bold">
+              VG
+            </div>
+<span class="material-symbols-outlined absolute -bottom-1 -right-1 text-[16px] text-primary bg-surface-container-lowest rounded-full" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-lg text-label-lg text-on-surface font-semibold truncate">Valeria Gómez</span>
+<span class="font-body-sm text-body-sm text-primary truncate font-medium">Vecina activa • Huertas</span>
+</div>
+</div>
+<div class="inline-flex items-center gap-1 bg-surface-container-highest px-space-md py-1.5 rounded-full text-on-surface-variant font-label-md text-label-md flex-shrink-0">
+<span class="material-symbols-outlined text-[16px] text-primary" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span>En OnlyGoodThings</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Nota de Transparencia y Privacidad -->
+<aside class="flex items-start gap-space-sm p-space-md rounded-lg bg-surface-container-low text-on-surface-variant">
+<span class="material-symbols-outlined text-[22px] text-primary flex-shrink-0 mt-0.5" style="font-variation-settings: 'FILL' 1;">lock</span>
+<p class="font-body-sm text-body-sm leading-relaxed">
+<strong class="font-semibold text-on-surface">Respetamos a tus contactos:</strong> No enviamos correos masivos, spam ni mensajes automatizados sin tu confirmación expresa. Cada invitación es un acto personal entre vecinos.
+    </p>
+</aside>
+</div>
+<script>
+  function copySnippet(elementId, btn) {
+    const text = document.getElementById(elementId).innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      const copyTextEl = btn.querySelector('.copy-text');
+      const originalText = copyTextEl.innerText;
+      copyTextEl.innerText = '¡Copiado!';
+      btn.classList.add('scale-105');
+      setTimeout(() => {
+        copyTextEl.innerText = originalText;
+        btn.classList.remove('scale-105');
+      }, 1800);
+    }).catch(() => {
+      alert('Enlace copiado al portapapeles');
+    });
+  }
+
+  function toggleQRModal() {
+    const panel = document.getElementById('qr-panel');
+    if (panel.classList.contains('hidden')) {
+      panel.classList.remove('hidden');
+      panel.classList.add('flex');
+    } else {
+      panel.classList.add('hidden');
+      panel.classList.remove('flex');
+    }
+  }
+
+  function filterContacts(query) {
+    const term = query.toLowerCase().trim();
+    const cards = document.querySelectorAll('.contact-card');
+    cards.forEach(card => {
+      const name = card.getAttribute('data-name') || '';
+      if (name.includes(term)) {
+        card.style.display = 'flex';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  }
+
+  function inviteViaWhatsApp(name, button) {
+    const url = "https://api.whatsapp.com/send?text=" + encodeURIComponent("¡Hola " + name + "! Te invito a OnlyGoodThings con mi código BUENOSVECINOS-MC para sumar un árbol juntos: https://onlygoodthings.app/join/mariana-cordero");
+    window.open(url, '_blank');
+    button.innerHTML = '<span class="material-symbols-outlined text-[16px]">check</span><span>Enviado</span>';
+    button.classList.replace('bg-primary', 'bg-surface-container-highest');
+    button.classList.replace('text-on-primary', 'text-on-surface-variant');
+  }
+
+  function inviteGeneral(name, button) {
+    button.innerHTML = '<span class="material-symbols-outlined text-[16px]">check</span><span>Invitación enviada</span>';
+    button.classList.add('bg-primary', 'text-on-primary');
+    button.classList.remove('text-primary');
+  }
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface/85 backdrop-blur-xl shadow-[0_-2px_12px_rgba(0,0,0,0.05)]" data-active-classes="text-primary font-semibold"><div class="h-16 px-gutter-mobile flex items-center justify-around"><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant hover:text-primary transition-all" data-path="inicio" href="#"><span class="material-symbols-outlined text-[22px]">cottage</span><span class="font-label-sm text-label-sm mt-0.5">Inicio</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant hover:text-primary transition-all" data-path="parking" href="#"><span class="material-symbols-outlined text-[22px]">local_parking</span><span class="font-label-sm text-label-sm mt-0.5">Parking</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant hover:text-primary transition-all" data-path="causas" href="#"><span class="material-symbols-outlined text-[22px]">volunteer_activism</span><span class="font-label-sm text-label-sm mt-0.5">Causas</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-on-surface-variant hover:text-primary transition-all" data-path="habilidades" href="#"><span class="material-symbols-outlined text-[22px]">handshake</span><span class="font-label-sm text-label-sm mt-0.5">Habilidades</span></a><a aria-current="page" class="flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-all text-primary font-semibold" data-path="perfil-ajustes" href="#"><span class="material-symbols-outlined text-[22px]">tune</span><span class="font-label-sm text-label-sm mt-0.5">Perfil</span></a></div></nav></body></html>

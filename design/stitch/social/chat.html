@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="es"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "surface-container-lowest": "#ffffff", "surface-bright": "#fbf8fc", "on-secondary-fixed-variant": "#7f2b00", "on-surface-variant": "#3d4a42", "surface-dim": "#dcd9dd", "surface-tint": "#006c4a", "surface-container-highest": "#e4e1e6", "tertiary-container": "#00855b", "secondary": "#a73a00", "on-primary-fixed": "#002114", "inverse-on-surface": "#f3f0f4", "on-tertiary-fixed": "#002113", "outline-variant": "#bccac0", "on-secondary": "#ffffff", "background": "#fbf8fc", "error": "#ba1a1a", "surface-container-low": "#f6f2f7", "surface-container": "#f0edf1", "on-secondary-fixed": "#370e00", "on-secondary-container": "#571a00", "on-error-container": "#93000a", "on-error": "#ffffff", "tertiary-fixed": "#6ffbbe", "inverse-surface": "#303033", "on-surface": "#1b1b1e", "secondary-fixed": "#ffdbce", "primary": "#006948", "on-background": "#1b1b1e", "primary-container": "#00855d", "primary-fixed-dim": "#68dba9", "surface-container-high": "#eae7eb", "outline": "#6d7a72", "surface": "#fbf8fc", "on-primary-fixed-variant": "#005137", "secondary-container": "#fd651e", "error-container": "#ffdad6", "on-tertiary": "#ffffff", "on-primary": "#ffffff", "inverse-primary": "#68dba9", "primary-fixed": "#85f8c4", "tertiary": "#006947", "on-tertiary-fixed-variant": "#005236", "on-primary-container": "#f5fff7", "on-tertiary-container": "#f5fff6", "secondary-fixed-dim": "#ffb599", "tertiary-fixed-dim": "#4edea3", "surface-variant": "#e4e1e6" }, borderRadius: { "DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px" }, spacing: { "space-2xl": "3rem", "space-md": "1rem", "space-sm": "0.5rem", "space-xl": "2rem", "gutter-mobile": "0.75rem", "margin": "1.5rem", "gutter": "1rem", "margin-mobile": "1rem", "space-xs": "0.25rem", "space-lg": "1.5rem" }, fontFamily: { "display-lg-mobile": ["Plus Jakarta Sans"], "body-md": ["Inter"], "body-lg": ["Inter"], "headline-md": ["Plus Jakarta Sans"], "display-lg": ["Plus Jakarta Sans"], "body-sm": ["Inter"], "label-sm": ["Inter"], "label-md": ["Inter"], "headline-sm": ["Plus Jakarta Sans"], "label-lg": ["Inter"], "headline-lg": ["Plus Jakarta Sans"] }, fontSize: { "display-lg-mobile": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.015em", "fontWeight": "700" }], "body-md": ["14px", { "lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "400" }], "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "-0.005em", "fontWeight": "400" }], "headline-md": ["22px", { "lineHeight": "30px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "display-lg": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "body-sm": ["13px", { "lineHeight": "18px", "letterSpacing": "0.005em", "fontWeight": "400" }], "label-sm": ["11px", { "lineHeight": "14px", "letterSpacing": "0.03em", "fontWeight": "500" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600" }], "headline-sm": ["18px", { "lineHeight": "26px", "letterSpacing": "0em", "fontWeight": "600" }], "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }], "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "700" }] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-on-surface antialiased min-h-screen flex flex-col selection:bg-primary-fixed selection:text-on-primary-fixed"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/85 backdrop-blur-xl shadow-[0_1px_12px_rgba(0,0,0,0.03)]"><div class="h-16 px-margin-mobile flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-sm min-w-0 flex-1"><img alt="Brand logo. - Primary color: #059669 - Font: plusJakartaSans - Mode: light - Roundness: rounded-full" class="h-8 w-auto object-contain shrink-0" src="https://lh3.googleusercontent.com/aida/AEtjO1VsqKYDLYkevT4DgKlPKjlStHwgkTNo4hXMevaWjzm9wtvQZHPdzHISfMgNOFTO9rbF6r4zs6TCvjeytuFsqdIc64JYcgLy8ErcISzKojb3Egp0Vl1utxiX1-gfvcWb2bCo-nW_au77U1ch2faMRkQgx-5v8eDNyn3f1PoQ6_sTYk9TQ7le02j6dD3quAl1wxfsuGJ116ze7WIzUumDHnHYey6MxofDy1Bvz8FSqLE9QmdDeVdA99WaE2bs"/><div class="flex flex-col truncate"><span class="font-headline-sm text-headline-sm text-primary leading-tight truncate tracking-tight">OnlyGoodThings</span><span class="font-label-sm text-label-sm text-on-surface-variant truncate">Mensajes</span></div></div><div class="flex items-center gap-space-xs shrink-0"><button aria-label="Buscar o notificaciones" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">volunteer_activism</span></button><div class="p-0.5 rounded-full ring-2 ring-primary/25"><img alt="Profile" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida/AEtjO1Uvolq8nMKY6XHYgwgWR6JvMGV2sjff0fmPOU5Sm8sDRam2L8X3cc-Ry5BcQDqMSJo8YplyBb5lngZi99r8E1QA2BfJmfF3PZLVTxVf0nfYLRv7embNnmyvx-VR6t7J0AAtdrbypHC4i78_dRBr0-qZ1sDLGol_ZwUubWIflxFm_h3n2i4ZmzVO0v173BcKhXHwOMtwCV78Q-LfuN3rZAKIgDsaB8ox0F_ycpRgkIKkplOI7jt88uUZ7FqR"/></div></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 pb-28 bg-surface"><div class="flex flex-col w-full">
+<div class="sticky top-0 z-40 bg-surface/95 backdrop-blur-md px-margin-mobile py-space-sm shadow-sm flex items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="relative shrink-0">
+<img class="w-11 h-11 rounded-full object-cover shadow-sm" data-alt="A warm candid portrait photo of Camila, a friendly Latin woman in her early 30s wearing an earth-toned olive linen shirt outdoors, natural bright sunlight, warm genuine smile, clean photography style with soft bokeh background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDy_mph1hkA_DokJMQDWeXBdiHZ1R8OwiFjKohjg0EYYZdW1Buyu4MkHMRTqJYUd3jFmotkG2C-hBgfOiUfLy1i1JdsWKoPkU8b7es3fOI1sHIwQItQuhxGpkvVThTeNLhWGsy14eiSjHpP2Cml0uJcyUUB-O3ljIs79O2em2F0KW_QG7FNojgkRW0rfOzVk40izfWYRFAC537qyLzD6wb4Pg0k7Wj4IwLfUXBR8Yvzrv5A5QSU9lwHyw"/>
+<span class="absolute bottom-0 right-0 w-3.5 h-3.5 bg-primary rounded-full shadow-[0_0_0_2px_#ffffff]"></span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1.5 truncate">
+<span class="font-headline-sm text-headline-sm text-on-surface truncate">Camila T.</span>
+<span class="material-symbols-outlined text-[16px] text-primary shrink-0" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<div class="flex items-center gap-1.5 text-on-surface-variant">
+<span class="font-label-sm text-label-sm bg-primary-fixed text-on-primary-fixed px-1.5 py-0.5 rounded-full font-medium">Nv. 3 · 1.890 pts</span>
+<span class="font-label-sm text-label-sm text-primary flex items-center gap-0.5">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+            En línea
+          </span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-1 shrink-0">
+<button aria-label="Llamada de voz segura" class="w-10 h-10 rounded-full flex items-center justify-center bg-surface-container text-on-surface-variant hover:bg-primary-fixed hover:text-on-primary-fixed transition-colors" type="button">
+<span class="material-symbols-outlined text-[20px]">phone_in_talk</span>
+</button>
+<button aria-label="Más opciones" class="w-10 h-10 rounded-full flex items-center justify-center bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors" type="button">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+</div>
+<div class="px-margin-mobile pt-space-sm pb-space-xs">
+<div class="bg-surface-container-low rounded-xl p-space-sm shadow-sm flex items-start gap-space-sm">
+<div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-on-primary-fixed shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">shield</span>
+</div>
+<div class="flex-1 min-w-0">
+<p class="font-label-md text-label-md text-primary font-bold tracking-wide">Encuentro Seguro</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-tight mt-0.5">
+          Recomendamos coordinar siempre en lugares públicos y de día. Nunca compartas datos bancarios ni contraseñas.
+        </p>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface p-1" onclick="this.closest('.bg-surface-container-low').remove()" type="button">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+</div>
+</div>
+<div class="px-margin-mobile py-space-xs">
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-md flex flex-col gap-space-sm">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex items-center gap-space-xs">
+<div class="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center text-on-secondary-fixed shrink-0">
+<span class="material-symbols-outlined text-[18px]">sync_alt</span>
+</div>
+<div>
+<span class="font-label-sm text-label-sm text-secondary font-semibold uppercase tracking-wider block">Acción comunitaria en curso</span>
+<span class="font-headline-sm text-headline-sm text-on-surface leading-tight font-bold">Compostera x 2 Plantines</span>
+</div>
+</div>
+<span class="font-label-sm text-label-sm bg-primary-fixed text-on-primary-fixed px-2.5 py-1 rounded-full font-semibold shrink-0">Punto fijado</span>
+</div>
+<div class="flex items-center gap-space-xs text-on-surface-variant bg-surface-container-low px-space-sm py-2 rounded-lg">
+<span class="material-symbols-outlined text-[18px] text-primary shrink-0" style="font-variation-settings: 'FILL' 1;">pin_drop</span>
+<span class="font-body-sm text-body-sm truncate"><strong class="text-on-surface font-semibold">Plaza Armenia</strong> (frente al café) · Hoy 17:30 hs</span>
+</div>
+<div class="flex items-center justify-between pt-1">
+<div class="flex items-center -space-x-2">
+<img class="w-7 h-7 rounded-full object-cover shadow-sm" data-alt="Close up photograph of a rustic wooden vertical worm composting bin on an apartment balcony surrounded by green plants, bright morning natural light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD5yfmJqMY05S-gTk2MRGLwaUZ8PycLwDIWCfSaj1hcdux3pbC1oj9YMycHg_H4jjOLxWNkl3FALwODkJQ6SHysRWtyl7iA9o0TBsn52niklpMmFFBghslpjQnA18mUbbtpp5MCgofAAggaRxZzs19MU3zvspH-KINULNCCbD3fKfPdiIiPGrcp-WLEKbghgzWjKyehg8IIusrV9xb8p-EzapIeaLWdOIxt0L9nnVTicRidXX7utzXtQQ"/>
+<img class="w-7 h-7 rounded-full object-cover shadow-sm" data-alt="Close up photograph of two small ceramic pots with healthy fragrant rosemary seedlings with green dewy leaves, soft botanical aesthetic" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAub5LBwNedQrQuMrmRiaPstrCmes-PixGJ-k8k9JViXjY9iwYHSBQPX3Dem7q11hwo12-V2VB715Wi2XPdJckl2UVM-j3Lqc-nogOwj_EnKlrGdTaIA9qID-xDGi5TwF_pjQxkWqAj42LXId_TWtZlzZHKmxXOWRE3IKQRM29UQELuh4K1acCVQPB9boLaSjT5EY6Wvn6fUzzpk9lzbNGnSKwmcyoejNLIgghnSC2Ox3rPMZu0SN3crw"/>
+<span class="font-label-sm text-label-sm pl-3 text-on-surface-variant">2 artículos acordados</span>
+</div>
+<button class="font-label-md text-label-md px-3.5 py-2 rounded-full bg-primary text-on-primary hover:bg-primary-container transition-all shadow-sm flex items-center gap-1.5 active:scale-95" id="confirm-card-btn" onclick="toggleAgreement(this)" type="button">
+<span class="material-symbols-outlined text-[16px]">check_circle</span>
+          Confirmar encuentro
+        </button>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-center my-space-sm">
+<span class="font-label-sm text-label-sm bg-surface-container-high text-on-surface-variant px-3 py-1 rounded-full">
+      Hoy, 24 de Mayo
+    </span>
+</div>
+<div class="flex flex-col gap-space-sm px-margin-mobile pb-space-lg">
+<div class="flex items-end gap-space-xs max-w-[85%]">
+<img class="w-7 h-7 rounded-full object-cover shrink-0 mb-1" data-alt="Avatar photo of Camila, smiling warmly outdoors in natural daylight, candid social portrait" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBgPjxLqnKr8OqgIwkbbw288RI_pVWeUqGX0Q7a6nhFNwQxoe_wYDogC6L4hYQiiV3tAaf6rAQJSufsNFjOFkLYAxGJPmO_A9zmyRXVc1CsYX84OPkpZuUkz0B8C7LtWn1l9CHo939sklR1FUQhGFbYcqAGtSk8rk18S2Fq8Mb99z8eugQ8bTJtS4ffh4mu9nYFZldvlWb89XS5wEni9U7TM5geeoBsTocauKQUiqldNg50cwQlYOig0A"/>
+<div class="flex flex-col gap-1">
+<div class="bg-surface-container-lowest text-on-surface px-space-md py-2.5 rounded-2xl rounded-bl-sm shadow-sm">
+<p class="font-body-md text-body-md">¡Hola! Vi tu publicación sobre los plantines de huerta. ¿Todavía te queda la compostera casera?</p>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant ml-1">16:42 hs</span>
+</div>
+</div>
+<div class="flex items-end justify-end gap-space-xs max-w-[85%] self-end">
+<div class="flex flex-col items-end gap-1">
+<div class="bg-primary text-on-primary px-space-md py-2.5 rounded-2xl rounded-br-sm shadow-sm">
+<p class="font-body-md text-body-md">¡Hola Camila! Sí, la tengo lista con las lombrices californianas activas. ¿Te queda bien hoy por Plaza Armenia?</p>
+</div>
+<div class="flex items-center gap-1 mr-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant">16:45 hs</span>
+<span class="material-symbols-outlined text-[14px] text-primary" style="font-variation-settings: 'FILL' 1;">done_all</span>
+</div>
+</div>
+</div>
+<div class="flex items-end gap-space-xs max-w-[85%]">
+<img class="w-7 h-7 rounded-full object-cover shrink-0 mb-1" data-alt="Avatar photo of Camila smiling cheerfully, warm daylight background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAZrNvOt-n7YDNv6miIByZatpKwCoLB68LZEPB5xUmr9HPmgoF5hueKdDDFuT4ErhkPDM8OPV1_bGWYke1YYZNBHLwsVFaKfFtsmN-jULyi8X-xVhU02m1V6xVG6dEmg2MWINgm1yIbBs6dl7T4Kc1OL1vWts6YSJTTgtZIbZvye0aKGQ3XM2neMHuQDY9XnOnUruxCBR6Rmvd-05oeofnSCURoaCFrqZOM5L0ix6VbdK8OmTvXeGTnJw"/>
+<div class="flex flex-col gap-1">
+<div class="bg-surface-container-lowest text-on-surface px-space-md py-2.5 rounded-2xl rounded-bl-sm shadow-sm">
+<p class="font-body-md text-body-md">¡Buenísimo! Sí, puedo tipo 17:30 hs. Llevo los plantines de romero y unas semillas de albahaca de regalo 🌱</p>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant ml-1">16:48 hs</span>
+</div>
+</div>
+<div class="my-space-xs mx-auto w-full max-w-sm">
+<div class="bg-surface-container-lowest rounded-xl shadow-md overflow-hidden">
+<div class="relative w-full h-32">
+<div class="w-full h-full bg-cover bg-center" data-location="Plaza Armenia, Buenos Aires, Argentina" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAtZ1gjOkCLm2-qeWXzZ4KtoZegBhr1xzHWuJc3AD8nsdTlB9hH12aBFS5WKRUZ2coNSsnkp5tYckJhU4uhOYX9qBLvxaJdmrpn3zZziwY4qftDhrBOWEjx37-630vgr-VxLfrPPT7DJd35JbGtme03xz0Zh2K0UiWi0ZHELPceom6ejqoAtXXqGuz5KJGn9t0wVbSBYOMZUyNOOXeEV5VTF1v80t7SAl7Ryws2SQ4iaLmYk4M3krATxA')"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent flex items-end p-space-sm">
+<span class="font-label-md text-label-md text-white bg-primary/90 backdrop-blur-sm px-2.5 py-1 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">location_on</span>
+              Pérgola Central
+            </span>
+</div>
+</div>
+<div class="p-space-sm flex flex-col gap-space-xs">
+<div class="flex items-start justify-between">
+<div>
+<p class="font-headline-sm text-headline-sm text-on-surface font-semibold leading-tight">Plaza Armenia</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Punto de encuentro verificado · 17:30 hs</p>
+</div>
+<div class="flex items-center gap-1 bg-primary-fixed text-on-primary-fixed px-2 py-1 rounded-full text-[11px] font-semibold">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+              Ambos confirmaron
+            </div>
+</div>
+<div class="flex items-center gap-2 pt-1">
+<button class="flex-1 py-1.5 rounded-lg bg-surface-container text-on-surface font-label-md text-label-md text-center hover:bg-surface-container-high transition-colors flex items-center justify-center gap-1" type="button">
+<span class="material-symbols-outlined text-[16px]">navigation</span>
+              Cómo llegar
+            </button>
+<button class="py-1.5 px-3 rounded-lg bg-surface-container text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center" type="button">
+<span class="material-symbols-outlined text-[18px]">share_location</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<div class="flex items-end justify-end gap-space-xs max-w-[85%] self-end">
+<div class="flex flex-col items-end gap-1">
+<div class="bg-primary text-on-primary px-space-md py-2.5 rounded-2xl rounded-br-sm shadow-sm">
+<p class="font-body-md text-body-md">¡Excelente! Ya salgo para allá con la caja protegida. Nos vemos en la pérgola 🙌</p>
+</div>
+<div class="flex items-center gap-1 mr-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant">17:05 hs</span>
+<span class="material-symbols-outlined text-[14px] text-primary" style="font-variation-settings: 'FILL' 1;">done_all</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant px-space-sm pt-space-xs">
+<div class="w-6 h-6 rounded-full bg-surface-container-high flex items-center justify-center text-primary animate-spin">
+<span class="material-symbols-outlined text-[14px]">compost</span>
+</div>
+<span class="font-label-sm text-label-sm italic">Camila está escribiendo...</span>
+</div>
+</div>
+<div class="px-margin-mobile pb-space-sm">
+<button class="w-full py-3.5 px-space-md rounded-full bg-secondary-container text-on-secondary-container font-headline-sm text-headline-sm font-bold shadow-lg hover:shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-2" id="complete-trade-cta" onclick="triggerCelebration(this)" type="button">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">volunteer_activism</span>
+<span>Completar Trueque y Calificar</span>
+<span class="font-label-sm text-label-sm bg-on-secondary-container text-secondary-container px-2 py-0.5 rounded-full font-extrabold ml-1">+80 Karma</span>
+</button>
+</div>
+<div class="px-margin-mobile pb-space-md pt-space-xs">
+<div class="bg-surface-container-lowest rounded-full p-1.5 shadow-md flex items-center gap-1">
+<button aria-label="Adjuntar foto o elemento" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors shrink-0" type="button">
+<span class="material-symbols-outlined text-[22px]">add_circle</span>
+</button>
+<button aria-label="Enviar ubicación en vivo" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors shrink-0" title="Compartir punto de encuentro" type="button">
+<span class="material-symbols-outlined text-[20px]">add_location_alt</span>
+</button>
+<input class="flex-1 bg-transparent px-space-xs py-2 font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none min-w-0" id="chat-input" placeholder="Escribe un mensaje solidario..." type="text"/>
+<button aria-label="Mensaje de voz" class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors shrink-0" type="button">
+<span class="material-symbols-outlined text-[20px]">mic</span>
+</button>
+<button aria-label="Enviar mensaje" class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-sm hover:bg-primary-container active:scale-95 transition-all shrink-0" onclick="sendMessage()" type="button">
+<span class="material-symbols-outlined text-[18px]">send</span>
+</button>
+</div>
+</div>
+<div class="fixed inset-x-4 bottom-24 z-50 pointer-events-none transform translate-y-10 opacity-0 transition-all duration-300 flex justify-center" id="karma-toast">
+<div class="bg-inverse-surface text-inverse-on-surface px-space-lg py-space-sm rounded-full shadow-2xl flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-tertiary-fixed text-[24px]" style="font-variation-settings: 'FILL' 1;">eco</span>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm font-bold text-tertiary-fixed leading-none">¡Impacto Generado!</span>
+<span class="font-body-sm text-body-sm text-inverse-on-surface">Compostera entregada · Ganaste +80 pts Karma</span>
+</div>
+</div>
+</div>
+</div>
+<script>
+function toggleAgreement(btn) {
+  if (btn.dataset.confirmed === "true") {
+    btn.dataset.confirmed = "false";
+    btn.innerHTML = '<span class="material-symbols-outlined text-[16px]">check_circle</span> Confirmar encuentro';
+    btn.className = "font-label-md text-label-md px-3.5 py-2 rounded-full bg-primary text-on-primary hover:bg-primary-container transition-all shadow-sm flex items-center gap-1.5 active:scale-95";
+  } else {
+    btn.dataset.confirmed = "true";
+    btn.innerHTML = '<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: \'FILL\' 1;">done</span> ¡Confirmado!';
+    btn.className = "font-label-md text-label-md px-3.5 py-2 rounded-full bg-primary-fixed text-on-primary-fixed font-bold transition-all shadow-sm flex items-center gap-1.5";
+  }
+}
+
+function triggerCelebration(cta) {
+  const toast = document.getElementById('karma-toast');
+  toast.classList.remove('opacity-0', 'translate-y-10');
+  toast.classList.add('opacity-100', 'translate-y-0');
+  cta.innerHTML = '<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: \'FILL\' 1;">favorite</span> ¡Calificación enviada a Camila!';
+  cta.classList.remove('bg-secondary-container', 'text-on-secondary-container');
+  cta.classList.add('bg-primary-fixed', 'text-on-primary-fixed');
+  
+  setTimeout(() => {
+    toast.classList.remove('opacity-100', 'translate-y-0');
+    toast.classList.add('opacity-0', 'translate-y-10');
+  }, 4000);
+}
+
+function sendMessage() {
+  const input = document.getElementById('chat-input');
+  if (input && input.value.trim() !== "") {
+    input.value = "";
+    input.placeholder = "¡Mensaje solidario enviado!";
+    setTimeout(() => {
+      input.placeholder = "Escribe un mensaje solidario...";
+    }, 2000);
+  }
+}
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-safe pointer-events-none" data-active-classes="text-primary font-semibold fill-1"><div class="max-w-md mx-auto px-margin-mobile pb-space-sm pointer-events-auto"><div class="h-16 rounded-full bg-surface-container-lowest/90 backdrop-blur-2xl shadow-[0_8px_30px_rgba(0,105,72,0.08)] flex items-center justify-around px-space-xs"><a class="flex flex-col items-center justify-center min-w-[52px] h-12 rounded-full text-on-surface-variant hover:text-primary transition-colors gap-0.5" data-path="feed" href="#"><span class="material-symbols-outlined text-[22px]">newspaper</span><span class="font-label-sm text-label-sm leading-none">Feed</span></a><a class="flex flex-col items-center justify-center min-w-[52px] h-12 rounded-full text-on-surface-variant hover:text-primary transition-colors gap-0.5" data-path="mapa" href="#"><span class="material-symbols-outlined text-[22px]">explore</span><span class="font-label-sm text-label-sm leading-none">Mapa</span></a><a class="flex flex-col items-center justify-center min-w-[52px] h-12 rounded-full text-on-surface-variant hover:text-primary transition-colors gap-0.5" data-path="trueque" href="#"><span class="material-symbols-outlined text-[22px]">swap_horiz</span><span class="font-label-sm text-label-sm leading-none">Trueque</span></a><a aria-current="page" class="flex flex-col items-center justify-center min-w-[52px] h-12 rounded-full transition-colors gap-0.5 relative text-primary font-semibold fill-1" data-path="mensajes" href="#"><span class="material-symbols-outlined text-[22px]">chat_bubble</span><span class="font-label-sm text-label-sm leading-none">Mensajes</span></a><a class="flex flex-col items-center justify-center min-w-[52px] h-12 rounded-full text-on-surface-variant hover:text-primary transition-colors gap-0.5" data-path="perfil" href="#"><span class="material-symbols-outlined text-[22px]">eco</span><span class="font-label-sm text-label-sm leading-none">Perfil</span></a></div></div></nav></body></html>

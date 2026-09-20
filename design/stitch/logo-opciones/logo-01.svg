@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none">
+  <rect width="1024" height="1024" fill="#FFFFFF"/>
+  <!-- Contención: el anillo abraza a un círculo desplazado, no un target. -->
+  <circle cx="512" cy="512" r="348" stroke="#0D3D4D" stroke-width="43"/>
+  <circle cx="616" cy="616" r="125" fill="#0D3D4D"/>
+</svg>

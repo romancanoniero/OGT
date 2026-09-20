@@ -1,0 +1,38 @@
+appId: com.onlygoodthings.app
+---
+- tapOn:
+    text: "Permitir"
+    optional: true
+- tapOn:
+    text: "Allow"
+    optional: true
+- tapOn:
+    text: "Permitir mientras se usa la app"
+    optional: true
+- tapOn:
+    text: "Allow While Using App"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: ios-01-feed
+- tapOn:
+    text: "Mascotas"
+- waitForAnimationToEnd
+- takeScreenshot: ios-02-mascotas
+- tapOn:
+    text: "Todas"
+- tapOn:
+    text: "Estacionar"
+- waitForAnimationToEnd
+- takeScreenshot: ios-03-parking
+- tapOn:
+    text: "Habilidades"
+- waitForAnimationToEnd
+- takeScreenshot: ios-04-skills
+- tapOn:
+    text: "Publicar"
+- waitForAnimationToEnd
+- takeScreenshot: ios-05-dock
+- tapOn:
+    text: "Buena acción"
+- waitForAnimationToEnd
+- takeScreenshot: ios-06-publish

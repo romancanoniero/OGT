@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="es"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "surface-container-lowest": "#ffffff", "surface-bright": "#fbf8fc", "on-secondary-fixed-variant": "#7f2b00", "on-surface-variant": "#3d4a42", "surface-dim": "#dcd9dd", "surface-tint": "#006c4a", "surface-container-highest": "#e4e1e6", "tertiary-container": "#00855b", "secondary": "#a73a00", "on-primary-fixed": "#002114", "inverse-on-surface": "#f3f0f4", "on-tertiary-fixed": "#002113", "outline-variant": "#bccac0", "on-secondary": "#ffffff", "background": "#fbf8fc", "error": "#ba1a1a", "surface-container-low": "#f6f2f7", "surface-container": "#f0edf1", "on-secondary-fixed": "#370e00", "on-secondary-container": "#571a00", "on-error-container": "#93000a", "on-error": "#ffffff", "tertiary-fixed": "#6ffbbe", "inverse-surface": "#303033", "on-surface": "#1b1b1e", "secondary-fixed": "#ffdbce", "primary": "#006948", "on-background": "#1b1b1e", "primary-container": "#00855d", "primary-fixed-dim": "#68dba9", "surface-container-high": "#eae7eb", "outline": "#6d7a72", "surface": "#fbf8fc", "on-primary-fixed-variant": "#005137", "secondary-container": "#fd651e", "error-container": "#ffdad6", "on-tertiary": "#ffffff", "on-primary": "#ffffff", "inverse-primary": "#68dba9", "primary-fixed": "#85f8c4", "tertiary": "#006947", "on-tertiary-fixed-variant": "#005236", "on-primary-container": "#f5fff7", "on-tertiary-container": "#f5fff6", "secondary-fixed-dim": "#ffb599", "tertiary-fixed-dim": "#4edea3", "surface-variant": "#e4e1e6" }, borderRadius: { "DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px" }, spacing: { "space-2xl": "3rem", "space-md": "1rem", "space-sm": "0.5rem", "space-xl": "2rem", "gutter-mobile": "0.75rem", "margin": "1.5rem", "gutter": "1rem", "margin-mobile": "1rem", "space-xs": "0.25rem", "space-lg": "1.5rem" }, fontFamily: { "display-lg-mobile": ["Plus Jakarta Sans"], "body-md": ["Inter"], "body-lg": ["Inter"], "headline-md": ["Plus Jakarta Sans"], "display-lg": ["Plus Jakarta Sans"], "body-sm": ["Inter"], "label-sm": ["Inter"], "label-md": ["Inter"], "headline-sm": ["Plus Jakarta Sans"], "label-lg": ["Inter"], "headline-lg": ["Plus Jakarta Sans"] }, fontSize: { "display-lg-mobile": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.015em", "fontWeight": "700" }], "body-md": ["14px", { "lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "400" }], "body-lg": ["16px", { "lineHeight": "24px", "letterSpacing": "-0.005em", "fontWeight": "400" }], "headline-md": ["22px", { "lineHeight": "30px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "display-lg": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "body-sm": ["13px", { "lineHeight": "18px", "letterSpacing": "0.005em", "fontWeight": "400" }], "label-sm": ["11px", { "lineHeight": "14px", "letterSpacing": "0.03em", "fontWeight": "500" }], "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600" }], "headline-sm": ["18px", { "lineHeight": "26px", "letterSpacing": "0em", "fontWeight": "600" }], "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }], "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "700" }] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface font-body-md text-on-surface antialiased min-h-screen flex flex-col selection:bg-primary-fixed selection:text-on-primary-fixed"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/85 backdrop-blur-xl shadow-[0_1px_12px_rgba(0,0,0,0.03)]"><div class="h-16 px-margin-mobile flex items-center justify-between gap-space-sm"><div class="flex items-center gap-space-sm min-w-0 flex-1"><a aria-label="Volver" class="w-11 h-11 -ml-1 flex items-center justify-center rounded-full text-on-surface hover:text-primary hover:bg-surface-container-low transition-colors shrink-0" href="#" onclick="history.back()"><span class="material-symbols-outlined text-[24px]">arrow_back</span></a><div class="flex flex-col truncate"><span class="font-headline-sm text-headline-sm text-on-surface leading-tight truncate tracking-tight">Verificación De Vecino</span><span class="font-label-sm text-label-sm text-primary font-medium truncate">OnlyGoodThings</span></div></div><div class="flex items-center gap-space-xs shrink-0"><button aria-label="Compartir o acciones" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">share</span></button><div class="p-0.5 rounded-full ring-2 ring-primary/25"><img alt="Profile" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida/AEtjO1Uvolq8nMKY6XHYgwgWR6JvMGV2sjff0fmPOU5Sm8sDRam2L8X3cc-Ry5BcQDqMSJo8YplyBb5lngZi99r8E1QA2BfJmfF3PZLVTxVf0nfYLRv7embNnmyvx-VR6t7J0AAtdrbypHC4i78_dRBr0-qZ1sDLGol_ZwUubWIflxFm_h3n2i4ZmzVO0v173BcKhXHwOMtwCV78Q-LfuN3rZAKIgDsaB8ox0F_ycpRgkIKkplOI7jt88uUZ7FqR"/></div></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 pb-safe bg-surface"><div class="flex flex-col w-full">
+<!-- Content Body Container -->
+<div class="px-margin-mobile pt-space-md pb-space-2xl flex flex-col gap-space-lg">
+<!-- Top Badge and Trust Flag -->
+<div class="flex items-center justify-between gap-space-sm">
+<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-fixed text-on-primary-fixed shadow-sm">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<span class="font-label-md text-label-md uppercase tracking-wider">Validación de Confianza Comunitaria</span>
+</div>
+<div class="flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span>Red Segura CABA</span>
+</div>
+</div>
+<!-- Title & Subtitle Section -->
+<div class="flex flex-col gap-space-xs">
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight leading-tight">
+        Verificá tu Perfil de Vecino Auténtico
+      </h1>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+        OnlyGoodThings es una red segura basada en personas reales. Verificá tu residencia en tu barrio para activar todos los beneficios y generar máxima confianza en trueques y alertas.
+      </p>
+</div>
+<!-- Hero Bento Banner with Real-World Community Imagery -->
+<div class="relative overflow-hidden rounded-lg bg-surface-container-low shadow-sm">
+<div class="h-32 w-full bg-cover bg-center" data-alt="Warm sunny morning in a leafy neighborhood in Palermo Buenos Aires, smiling local residents chatting beside blooming jacaranda trees and bicycles, soft golden natural light, joyful mutual aid atmosphere, photographic style with rich emerald greens and warm terracotta accents" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBNeZgfTYcMlWimrNdX7CjOl9-i_sl_e4-oFaML4B9z5Ps1XMSWI1jUNQkVe74BNxXAL3L2X2eaXSMX0NScF7_fCywExZuO1VTSD0XfSy7W24OPGqBtvn3sKFJ-T2zK42r6T9RCPx4rJKO8nNIkruhf5GlZLCSaDVCHxUkXEmA81KuErskuZ3mNrc61iCM0u9eA8tj4ZmgmB-5xMgqWlR7CgIvguzNa6REKiJPBiAOHC9MLVkkr4MzeVQ')"></div>
+<div class="p-space-md flex items-center justify-between gap-space-sm bg-surface-container-lowest">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-on-primary shadow-sm">
+<span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">shield</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-on-surface">Comunidad Activa Palermo</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">94% de vecinos verificados en 400m</span>
+</div>
+</div>
+<span class="font-label-md text-label-md text-primary bg-primary-fixed/40 px-2.5 py-1 rounded-full font-semibold">Nivel 2 / 3</span>
+</div>
+</div>
+<!-- Benefits Highlight Card -->
+<div class="rounded-lg bg-surface-container-lowest p-space-md shadow-sm flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center text-on-secondary-fixed">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">workspace_premium</span>
+</div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Beneficios de estar verificado</h2>
+</div>
+<span class="font-label-sm text-label-sm text-secondary font-semibold uppercase tracking-wider bg-secondary-fixed/50 px-2 py-0.5 rounded-full">Exclusivo</span>
+</div>
+<div class="grid grid-cols-1 gap-space-sm">
+<!-- Benefit 1 -->
+<div class="flex items-start gap-3 p-2.5 rounded bg-surface-container-low">
+<div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-on-primary-fixed shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Badge de Vecino Verificado ✔️</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Destacado en tu avatar, perfil, publicaciones y respuestas de la comunidad.</span>
+</div>
+</div>
+<!-- Benefit 2 -->
+<div class="flex items-start gap-3 p-2.5 rounded bg-surface-container-low">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">campaign</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Alertas urgentes de mascotas</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Emisión de notificación push geolocalizada en 2 km para extravíos en tiempo real.</span>
+</div>
+</div>
+<!-- Benefit 3 -->
+<div class="flex items-start gap-3 p-2.5 rounded bg-surface-container-low">
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-on-primary shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">swap_horiz</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Trueques ilimitados y reservas</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Sin comisiones, intercambio seguro de herramientas y prioridad en dársenas barriales.</span>
+</div>
+</div>
+<!-- Benefit 4 -->
+<div class="flex items-start gap-3 p-2.5 rounded bg-surface-container-low">
+<div class="w-8 h-8 rounded-full bg-tertiary-fixed-dim flex items-center justify-center text-on-tertiary-fixed shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">how_to_vote</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Presupuesto participativo</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Voz y voto vinculante en la distribución del fondo ecológico y proyectos de la plaza.</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Verification Timeline / Interactive Stepper -->
+<div class="flex flex-col gap-space-sm">
+<div class="flex items-center justify-between px-1">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Proceso de verificación</h3>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Paso 2 de 3</span>
+</div>
+<!-- Step 1 (Completed) -->
+<div class="p-space-md rounded bg-surface-container-lowest shadow-sm flex flex-col gap-2">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-[18px]">check</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Paso 1: Confirmación de Dirección Barrial</span>
+<span class="font-body-sm text-body-sm text-primary font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">pin_drop</span> Palermo Soho, CABA · Cuadra validada
+              </span>
+</div>
+</div>
+<span class="px-2.5 py-1 rounded-full bg-primary-fixed text-on-primary-fixed font-label-sm text-label-sm font-semibold">Completado</span>
+</div>
+</div>
+<!-- Step 2 (Active / In Progress) -->
+<div class="p-space-md rounded-lg bg-surface-container-lowest shadow-md flex flex-col gap-space-md">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary text-on-secondary flex items-center justify-center shadow-sm animate-bounce">
+<span class="material-symbols-outlined text-[18px]">description</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Paso 2: Documento o Servicio de Residencia</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Subí o escaneá DNI o factura con domicilio coincidente</span>
+</div>
+</div>
+<span class="px-2.5 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm font-semibold">En curso</span>
+</div>
+<!-- Document Preview & Live Guidance -->
+<div class="rounded bg-surface-container-low p-space-md flex flex-col items-center justify-center text-center gap-space-xs">
+<div class="w-14 h-14 rounded-full bg-surface-container-highest flex items-center justify-center text-primary mb-1">
+<span class="material-symbols-outlined text-[30px]">badge</span>
+</div>
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">DNI vigente o Factura de Luz / Gas / Agua</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant max-w-xs">
+            Asegurate de que figure claramente tu nombre completo y la dirección registrada en Palermo Soho.
+          </p>
+<div class="mt-2 flex flex-wrap justify-center gap-1.5 text-on-surface-variant font-label-sm text-label-sm">
+<span class="px-2 py-0.5 rounded bg-surface-container-highest">✓ JPG o PNG</span>
+<span class="px-2 py-0.5 rounded bg-surface-container-highest">✓ PDF digital</span>
+<span class="px-2 py-0.5 rounded bg-surface-container-highest">✓ Máx 10 MB</span>
+</div>
+</div>
+</div>
+<!-- Step 3 (Optional / Neighbors Endorsement) -->
+<div class="p-space-md rounded bg-surface-container-low shadow-sm flex flex-col gap-3">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest text-on-surface-variant flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]">group</span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1.5">
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Paso 3: Validación por Vecinos</span>
+<span class="px-2 py-0.2 rounded-full bg-surface-container-highest text-on-surface-variant font-label-sm text-label-sm">Opcional</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">2 vecinos verificados pueden avalar tu presencia en la cuadra</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">schedule</span>
+</div>
+<!-- Mini Neighbor Avatars Preview -->
+<div class="flex items-center justify-between pt-1">
+<div class="flex items-center -space-x-2">
+<div class="w-7 h-7 rounded-full bg-cover bg-center shadow-sm" data-alt="Portrait of an energetic young female community gardener in Buenos Aires with soft warm sunlight and foliage backdrop" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAxYNI0k0ZMKquygAIGyswZ9iV4-Qb0mzILA1WxldqL_FSFjKYN1jA9N0s1-alfeqCOASlN1WCES4Ah1v5fPN0yCfLLw4JVlpC9VmhLw0lqlgcoBOhwKpihVVsjZp7-_RPB18fKB-qff9P8IiIeEvmFNQh6wmsc8zgJZlBW7Gp8-AaxcHOMTgLkIZ0NWD2lHGPrAE-NPXab1d-P-pMz5Z5Gx496uyfn-bYvRfEVkmywYa56qlAy85Lwvw')"></div>
+<div class="w-7 h-7 rounded-full bg-cover bg-center shadow-sm" data-alt="Close up portrait of a mature kind Argentine neighbor wearing eyeglasses and a relaxed green polo shirt" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBTSuXwWWYcsM-w9Qrf5wzq_qMU91dgytN_aRSR8gFVRA8KncUB5a-2nvMIYvSRFyE8HhBNpo_Lwm_PxTGKzxqIdC1bKsJinWdeNg8_z5528j7ZoZeNVrXfp3vT5V7ISXtI5lfMbl1RVcilFmtiaV2SzURAPiAsYZj3b6CyNyC6jiKZeK9QWhMjCIXWiC-xwUajAPhgS3d3LMu5AaEmTQQEEEThFVRtFFqLo7xFVncuylpK6xzKjRfpRg')"></div>
+<div class="w-7 h-7 rounded-full bg-surface-container-highest flex items-center justify-center text-[10px] font-semibold text-on-surface-variant">
+              +18
+            </div>
+</div>
+<button class="font-label-md text-label-md text-primary font-semibold hover:underline" type="button">
+            Pedir aval a conocidos →
+          </button>
+</div>
+</div>
+</div>
+<!-- Security & Privacy Guarantee Card -->
+<div class="rounded-lg bg-surface-container-lowest p-space-md shadow-sm flex items-start gap-space-md">
+<div class="w-12 h-12 rounded-full bg-primary-fixed flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined text-[26px]" style="font-variation-settings: 'FILL' 1;">lock</span>
+</div>
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-1.5">
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Garantía de Privacidad &amp; Cifrado</span>
+<span class="material-symbols-outlined text-primary text-[16px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+          Tus documentos son procesados con cifrado militar de punto a punto y eliminados inmediatamente tras la validación automática. Nunca vendemos ni compartimos datos con terceros.
+        </p>
+</div>
+</div>
+<!-- Sticky Bottom CTA Section -->
+<div class="flex flex-col gap-space-sm pt-2">
+<!-- Big Primary Emerald Button with Delight Interaction -->
+<button class="w-full h-14 rounded-full bg-primary hover:bg-primary-container active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2.5 text-on-primary font-label-lg text-label-lg shadow-md hover:shadow-lg" id="scan-camera-btn" type="button">
+<span class="material-symbols-outlined text-[24px]">photo_camera</span>
+<span>Escanear Documento con la Cámara 📷</span>
+</button>
+<!-- Secondary Soft Action Button -->
+<button class="w-full h-12 rounded-full bg-surface-container-highest hover:bg-surface-container-high active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 text-on-surface font-label-lg text-label-lg" id="upload-file-btn" type="button">
+<span class="material-symbols-outlined text-[20px] text-primary">upload_file</span>
+<span>Subir comprobante en PDF o Foto</span>
+</button>
+<!-- Privacy link -->
+<div class="text-center pt-2">
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors underline inline-flex items-center gap-1" href="#privacidad-info" id="privacy-more-link">
+<span class="material-symbols-outlined text-[16px]">info</span>
+<span>¿Dudas sobre cómo cuidamos tu privacidad? Conocer más</span>
+</a>
+</div>
+</div>
+<!-- Hidden Interactive Toast Notification for Camera Action feedback -->
+<div class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-inverse-surface text-inverse-on-surface p-4 rounded-lg shadow-xl flex items-center justify-between gap-3 z-50 transition-all duration-300" id="action-toast">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary-fixed text-[24px]">photo_camera_front</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-semibold">Iniciando escaneo biométrico seguro...</span>
+<span class="font-body-sm text-body-sm text-inverse-on-surface/80">Posicioná el frente de tu DNI con buena luz.</span>
+</div>
+</div>
+<button class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-inverse-on-surface" id="close-toast" type="button">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+</div>
+</div>
+<script>
+  (function() {
+    const scanBtn = document.getElementById('scan-camera-btn');
+    const uploadBtn = document.getElementById('upload-file-btn');
+    const toast = document.getElementById('action-toast');
+    const closeToast = document.getElementById('close-toast');
+    const privacyLink = document.getElementById('privacy-more-link');
+
+    function showNotification(title, message, icon) {
+      if (!toast) return;
+      const titleEl = toast.querySelector('.font-label-md');
+      const bodyEl = toast.querySelector('.font-body-sm');
+      const iconEl = toast.querySelector('.material-symbols-outlined');
+      if (titleEl) titleEl.textContent = title;
+      if (bodyEl) bodyEl.textContent = message;
+      if (iconEl && icon) iconEl.textContent = icon;
+      toast.classList.remove('hidden');
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 4000);
+    }
+
+    if (scanBtn) {
+      scanBtn.addEventListener('click', function() {
+        showNotification('Accediendo a la cámara...', 'Prepará tu DNI o cédula frente a la lente.', 'photo_camera');
+      });
+    }
+
+    if (uploadBtn) {
+      uploadBtn.addEventListener('click', function() {
+        showNotification('Selector de archivos', 'Podés adjuntar PDF de servicios o imagen de frente y dorso.', 'upload_file');
+      });
+    }
+
+    if (closeToast) {
+      closeToast.addEventListener('click', function() {
+        if (toast) toast.classList.add('hidden');
+      });
+    }
+
+    if (privacyLink) {
+      privacyLink.addEventListener('click', function(e) {
+        e.preventDefault();
+        showNotification('Protocolo Cero Almacenamiento', 'Los datos son validados por hash criptográfico y descartados.', 'security');
+      });
+    }
+  })();
+</script></main></body></html>

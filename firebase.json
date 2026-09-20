@@ -1,0 +1,38 @@
+{
+  "hosting": {
+    "site": "ogt-app-links",
+    "public": "web/links",
+    "cleanUrls": true,
+    "ignore": ["firebase.json", "**/node_modules/**"],
+    "rewrites": [
+      { "source": "/h/**", "destination": "/honor.html" },
+      { "source": "/p/**", "destination": "/honor.html" }
+    ],
+    "headers": [
+      {
+        "source": "/.well-known/apple-app-site-association",
+        "headers": [{ "key": "Content-Type", "value": "application/json" }]
+      },
+      {
+        "source": "/apple-app-site-association",
+        "headers": [{ "key": "Content-Type", "value": "application/json" }]
+      },
+      {
+        "source": "/.well-known/assetlinks.json",
+        "headers": [{ "key": "Content-Type", "value": "application/json" }]
+      }
+    ]
+  },
+  "auth": {
+    "providers": {
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Only Good Things",
+        "supportEmail": "romancanoniero@gmail.com",
+        "authorizedRedirectUris": [
+          "https://goodthings-55612.firebaseapp.com/__/auth/handler"
+        ]
+      }
+    }
+  }
+}

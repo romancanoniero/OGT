@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Quiet Studio · Stitch f68c1b7c · adoptar · estático. Tintable. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="20"
+    android:viewportHeight="20">
+    <path android:pathData="M6.8 15.2C6 14 7.2 12.5 10 12.5C12.8 12.5 14 14 13.2 15.2C12.4 16.4 11.4 16.8 10 16.8C8.6 16.8 7.6 16.4 6.8 15.2Z" android:fillColor="#00000000" android:strokeWidth="1.5" android:strokeColor="#111213" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    <group android:pivotX="4.8" android:pivotY="10.8" android:rotation="-20">
+        <path android:pathData="M3.5,10.8 a1.3,1.9 0 1 1 2.6,0 a1.3,1.9 0 1 1 -2.6,0" android:fillColor="#00000000" android:strokeWidth="1.5" android:strokeColor="#111213" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    </group>
+    <group android:pivotX="7.8" android:pivotY="6.8" android:rotation="-6">
+        <path android:pathData="M6.4,6.8 a1.4,2.1 0 1 1 2.8,0 a1.4,2.1 0 1 1 -2.8,0" android:fillColor="#00000000" android:strokeWidth="1.5" android:strokeColor="#111213" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    </group>
+    <group android:pivotX="12.2" android:pivotY="6.8" android:rotation="6">
+        <path android:pathData="M10.8,6.8 a1.4,2.1 0 1 1 2.8,0 a1.4,2.1 0 1 1 -2.8,0" android:fillColor="#00000000" android:strokeWidth="1.5" android:strokeColor="#111213" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    </group>
+    <group android:pivotX="15.2" android:pivotY="10.8" android:rotation="20">
+        <path android:pathData="M13.9,10.8 a1.3,1.9 0 1 1 2.6,0 a1.3,1.9 0 1 1 -2.6,0" android:fillColor="#00000000" android:strokeWidth="1.5" android:strokeColor="#111213" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    </group>
+</vector>

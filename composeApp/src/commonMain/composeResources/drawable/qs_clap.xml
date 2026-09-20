@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Quiet Studio · Stitch f68c1b7c · aplauso · estático. Tintable. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="20"
+    android:viewportHeight="20">
+    <path android:pathData="M10 1.5V3.5" android:fillColor="#00000000" android:strokeWidth="1.5" android:strokeColor="#111213" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    <path android:pathData="M6.8 2.6L8 4.2" android:fillColor="#00000000" android:strokeWidth="1.5" android:strokeColor="#111213" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    <path android:pathData="M13.2 2.6L12 4.2" android:fillColor="#00000000" android:strokeWidth="1.5" android:strokeColor="#111213" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    <path android:pathData="M4 14.5L7.5 9.5C8 8.8 9.2 8.6 9.8 9.3C10.2 9.8 10.1 10.6 9.6 11.2L7.2 13.8" android:fillColor="#00000000" android:strokeWidth="1.5" android:strokeColor="#111213" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    <path android:pathData="M16 14.5L12.5 9.5C12 8.8 10.8 8.6 10.2 9.3C9.8 9.8 9.9 10.6 10.4 11.2L12.8 13.8" android:fillColor="#00000000" android:strokeWidth="1.5" android:strokeColor="#111213" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    <path android:pathData="M3 16.5H8.5" android:fillColor="#00000000" android:strokeWidth="1.5" android:strokeColor="#111213" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    <path android:pathData="M11.5 16.5H17" android:fillColor="#00000000" android:strokeWidth="1.5" android:strokeColor="#111213" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+</vector>

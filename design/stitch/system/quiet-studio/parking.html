@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+
+<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#ffffff;}body{overscroll-behavior:none;font-family:'Inter',sans-serif;color:#111213;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script>tailwind.config = { darkMode: "class", theme: { extend: { colors: { ink: "#111213", navy: "#0D3D4D", soft: "#F4F5F7", hairline: "#E5E7EB", muted: "#6B7280" }, fontFamily: { sans: ["Inter", "sans-serif"], display: ["Plus Jakarta Sans", "sans-serif"] } } } };</script></head><body class="bg-white text-ink flex flex-col min-h-screen antialiased"><header class="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-hairline pt-safe"><div class="h-14 px-4 flex items-center justify-between"><div class="flex items-center gap-2.5"><span class="w-8 h-8 rounded-full bg-ink text-white flex items-center justify-center font-display font-bold text-base">O</span><span class="font-display text-lg font-bold tracking-tight text-ink">OnlyGoodThings</span></div><div class="flex items-center gap-1.5"><button aria-label="Notificaciones" class="relative w-10 h-10 flex items-center justify-center rounded-full text-ink hover:bg-soft transition-colors" type="button"><span class="material-symbols-outlined text-[20px]">notifications</span><span class="absolute top-2.5 right-2.5 w-1.5 h-1.5 bg-ink rounded-full"></span></button><button aria-label="Mensajes directos" class="w-10 h-10 flex items-center justify-center rounded-full text-ink hover:bg-soft transition-colors" type="button"><span class="material-symbols-outlined text-[20px]">chat_bubble_outline</span></button><div class="pl-1"><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-1 ring-hairline" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCeZPtFhdsQrUWOpkHziPhycTOlk3yU0Ap92C9bfyn3i99l4itb_Zm490n-XIoCQ4Om4shQwH7Fem_pM8sZ08Rl0IRl_zaP5TONq1wbIs8JGP-SIHV4ZhirperGYVkOmF2qT0CSS0T0b3tui0G_vgNK1tK8NFIV5lGr-PdccrEn47mnTHu5sClxxlIq4cvmtUkiUMHXiJRA5myGdPQFO6ZtRXgevuoqfC_TBdxs34W-96S_2dhTpiSNbQ"/></div></div></div></header><main class="flex-1 flex flex-col relative w-full pt-14 pb-28 bg-white"><div class="flex flex-col w-full relative">
+<!-- Top Radar Status & Action -->
+<div class="px-4 pt-3 pb-2.5 w-full flex items-center justify-between gap-2 z-10">
+<div class="flex items-center gap-2 bg-soft border border-hairline rounded-full py-1.5 px-3">
+<span class="w-2 h-2 rounded-full bg-ink animate-pulse"></span>
+<span class="text-xs font-semibold text-ink">Modo radar activo</span>
+<span class="text-xs text-muted font-normal">· Microcentro</span>
+</div>
+<button class="flex items-center gap-1.5 bg-white text-ink border border-hairline hover:bg-soft active:bg-hairline py-1.5 px-3.5 rounded-full text-xs font-semibold tracking-tight transition-colors" id="btn-ceder" type="button">
+<span class="material-symbols-outlined text-[16px]">directions_car</span>
+<span>Ceder mi lugar ahora</span>
+</button>
+</div>
+<!-- Interactive Visual Map Viewport -->
+<div class="relative w-full h-[380px] overflow-hidden bg-[#F8F9FA] border-y border-hairline">
+<!-- Map Container -->
+<div class="w-full h-full bg-cover bg-center grayscale contrast-125 opacity-75" data-location="Av. Corrientes 1420, Buenos Aires, Argentina" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDPU9vj0TQD-8yUvZtY7Eqbzvy3RYYLKVtmPYbPOnicgwa3GhYKafawk3pRI1EakkNC48eaDaar68vzMdUpZbZ3bRZ2mqSg5apH-So1rAzaC1JlIu4ty24zKDtSkNW3DWbuF8dk-zcFg5DHsEfnbSsrGmVZEiKWeQkDBHjcuyO1cUcsl3L1t4laMC9-TjDSUCTqaGDTNI3ZlhmJxNzvrjiNAjcFFV8azqhR7B9brLGD73ipDcBGB4mPSg')"></div>
+<!-- Ambient Vignette -->
+<div class="absolute inset-0 bg-gradient-to-b from-white/70 via-transparent to-white pointer-events-none"></div>
+<!-- Route Path SVG -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none" fill="none" viewbox="0 0 360 380">
+<path d="M90 95 C 140 115, 150 190, 230 210" stroke="#111213" stroke-dasharray="4 4" stroke-linecap="round" stroke-width="2.5"></path>
+</svg>
+<!-- Current User Pin -->
+<div class="absolute top-[95px] left-[90px] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
+<div class="bg-white text-ink text-[11px] font-semibold px-2 py-0.5 rounded-full border border-hairline shadow-sm mb-1">
+Tú
+</div>
+<div class="w-8 h-8 rounded-full bg-ink text-white flex items-center justify-center shadow-md">
+<span class="material-symbols-outlined text-[16px]">navigation</span>
+</div>
+</div>
+<!-- Spot Releaser Pin (Lucas V. Spot) with Subtle Navy Accent -->
+<div class="absolute top-[210px] left-[230px] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center cursor-pointer">
+<div class="bg-ink text-white text-[11px] font-semibold px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1 mb-1">
+<span class="material-symbols-outlined text-[13px]">timer</span>
+<span>Liberando en 1m 30s</span>
+</div>
+<div class="w-10 h-10 rounded-full bg-navy text-white shadow-lg flex items-center justify-center ring-4 ring-white">
+<span class="material-symbols-outlined text-[20px]">local_parking</span>
+</div>
+</div>
+<!-- Floating Nearby Stat Chip -->
+<div class="absolute top-3 right-3 bg-white/95 backdrop-blur-sm border border-hairline rounded-full px-3 py-1 shadow-sm flex items-center gap-1.5 text-xs text-muted">
+<span class="w-1.5 h-1.5 rounded-full bg-navy"></span>
+<span>3 lugares liberados hoy cerca</span>
+</div>
+<!-- Recenter Map Button (Circular 44px hairline button) -->
+<button aria-label="Recentrar ubicación" class="absolute bottom-4 right-4 w-11 h-11 bg-white border border-hairline text-ink rounded-full shadow-sm flex items-center justify-center hover:bg-soft active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[20px]">my_location</span>
+</button>
+</div>
+<!-- Real-Time Assigned Spot Card in Soft Gray Well with Hairline -->
+<div class="w-full px-4 -mt-4 z-20 flex flex-col">
+<div class="bg-soft border border-hairline rounded-2xl p-4 flex flex-col gap-3.5 shadow-sm">
+<!-- Card Status Header -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-ink"></span>
+<span class="text-xs font-bold uppercase tracking-wider text-ink font-display">Lugar Asignado en Directo</span>
+</div>
+<div class="bg-white border border-hairline text-ink px-2.5 py-0.5 rounded-full text-xs font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-muted">add_circle</span>
+<span>+50 Pts</span>
+</div>
+</div>
+<!-- Driver & Vehicle Profile Information -->
+<div class="flex items-center gap-3 bg-white border border-hairline rounded-xl p-3">
+<div class="relative flex-shrink-0">
+<img alt="Lucas V." class="w-11 h-11 rounded-full object-cover ring-1 ring-hairline" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBfflk6e7PH8Ai7Wsz-u44_jSqc9q8nJSwCtUilr-kuNPaJAl5lmPAzAFX8Xsnr2UoC3x3fFW6mIpNrzNbka43DHRtbeZPSUboew4jSDLomchl5OvnY1UfHfizAos9JkeRfufOv4NfAjs3ZtzdpGj94G5CU4R-Oh9Oa0tQ5f3DvJijaLkaat5FAdhseQRcc9Dvjblq5VWYuze1NtwEn9qBr1QMQjeO0gCprrLCPPFGA18ejJvPhUgUX9w"/>
+<div class="absolute -bottom-1 -right-1 bg-ink text-white rounded-full p-0.5 flex items-center justify-center">
+<span class="material-symbols-outlined text-[12px]">check</span>
+</div>
+</div>
+<div class="flex flex-col min-w-0 flex-1">
+<div class="flex items-center justify-between">
+<h3 class="font-display text-base text-ink truncate font-bold">Lucas V.</h3>
+<span class="text-xs text-muted flex items-center gap-0.5">
+<span class="material-symbols-outlined text-[13px] text-ink">star</span> 4.9 (42)
+</span>
+</div>
+<p class="text-xs text-muted truncate">Toyota Corolla Blanco · ABC 492</p>
+<p class="text-xs font-medium text-ink flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[13px] text-muted">pin_drop</span> Av. Corrientes 1420
+</p>
+</div>
+</div>
+<!-- Metrics Grid (ETA, Countdown) with Large Ink Numerals -->
+<div class="grid grid-cols-2 gap-2.5">
+<div class="bg-white border border-hairline rounded-xl p-3 flex flex-col justify-between">
+<span class="text-xs text-muted">Llegada Estimada</span>
+<div class="mt-1">
+<span class="font-display text-xl font-bold text-ink">3 min</span>
+<span class="text-xs text-muted block">(450 m)</span>
+</div>
+</div>
+<div class="bg-white border border-hairline rounded-xl p-3 flex flex-col justify-between">
+<span class="text-xs text-muted">Espacio Libre en</span>
+<div class="mt-1">
+<span class="font-display text-xl font-bold text-ink" id="countdown-timer">¡Lugar libre ya!</span>
+<span class="text-xs text-muted block">En tiempo</span>
+</div>
+</div>
+</div>
+<!-- Quiet Impact Micro-copy -->
+<div class="flex items-start gap-2 bg-white/70 border border-hairline px-3 py-2 rounded-lg">
+<span class="material-symbols-outlined text-muted text-[16px] mt-0.5">info</span>
+<p class="text-xs text-muted leading-relaxed">
+Al ceder el lugar, Lucas recibe <span class="text-ink font-semibold">50 puntos</span> y tú evitas 850g de emisiones de CO2.
+</p>
+</div>
+<!-- Actions -->
+<div class="flex flex-col gap-2 pt-1">
+<button class="w-full h-11 rounded-full bg-ink text-white font-medium text-sm flex items-center justify-center gap-2 hover:bg-black active:scale-[0.99] transition-all" id="btn-confirm-route" type="button">
+<span class="material-symbols-outlined text-[18px]">turn_right</span>
+<span>Confirmar Ruta &amp; Avisar Llegada</span>
+</button>
+<div class="grid grid-cols-2 gap-2">
+<button class="h-10 rounded-full bg-white border border-hairline text-ink text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-soft active:bg-hairline transition-colors" id="btn-call" type="button">
+<span class="material-symbols-outlined text-[16px] text-muted">call</span>
+<span>Llamada Rápida</span>
+</button>
+<button class="h-10 rounded-full bg-white border border-hairline text-ink text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-soft active:bg-hairline transition-colors" id="btn-chat" type="button">
+<span class="material-symbols-outlined text-[16px] text-muted">chat</span>
+<span>Chat con Lucas</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Minimal Toast Notification -->
+<div class="fixed top-16 left-1/2 -translate-x-1/2 w-[90%] max-w-sm bg-ink text-white p-3 rounded-xl shadow-lg flex items-center gap-2.5 opacity-0 pointer-events-none transition-all duration-300 z-50 text-xs" id="toast-notification">
+<span class="material-symbols-outlined text-[18px] text-white" id="toast-icon">check_circle</span>
+<span class="flex-1" id="toast-msg">Ruta confirmada con éxito.</span>
+</div>
+</div>
+<script>
+  (function() {
+    var timeLeft = 88;
+    var timerEl = document.getElementById('countdown-timer');
+    if (timerEl) {
+      var interval = setInterval(function() {
+        if (timeLeft <= 0) {
+          clearInterval(interval);
+          timerEl.textContent = "¡Lugar libre ya!";
+          return;
+        }
+        timeLeft--;
+        var minutes = Math.floor(timeLeft / 60);
+        var seconds = timeLeft % 60;
+        timerEl.textContent = (minutes < 10 ? "0" + minutes : minutes) + ":" + (seconds < 10 ? "0" + seconds : seconds);
+      }, 1000);
+    }
+
+    var toast = document.getElementById('toast-notification');
+    var toastMsg = document.getElementById('toast-msg');
+    var toastTimeout;
+
+    function showToast(message, iconName) {
+      if (!toast) return;
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastMsg.textContent = message;
+      if (iconName) {
+        var iconEl = document.getElementById('toast-icon');
+        if (iconEl) iconEl.textContent = iconName;
+      }
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      toast.classList.add('opacity-100');
+      toastTimeout = setTimeout(function() {
+        toast.classList.add('opacity-0', 'pointer-events-none');
+        toast.classList.remove('opacity-100');
+      }, 2800);
+    }
+
+    var btnConfirm = document.getElementById('btn-confirm-route');
+    if (btnConfirm) {
+      btnConfirm.addEventListener('click', function() {
+        showToast('Ruta confirmada. Lucas fue notificado.', 'near_me');
+      });
+    }
+
+    var btnCeder = document.getElementById('btn-ceder');
+    if (btnCeder) {
+      btnCeder.addEventListener('click', function() {
+        showToast('Tu lugar está visible para la comunidad.', 'check_circle');
+      });
+    }
+
+    var btnCall = document.getElementById('btn-call');
+    if (btnCall) {
+      btnCall.addEventListener('click', function() {
+        showToast('Iniciando llamada con Lucas...', 'call');
+      });
+    }
+
+    var btnChat = document.getElementById('btn-chat');
+    if (btnChat) {
+      btnChat.addEventListener('click', function() {
+        showToast('Abriendo conversación...', 'chat');
+      });
+    }
+  })();
+</script></main>
+<!-- Floating White Pill Dock (3 Circular Items: Feed, Parking, Perfil) -->
+<nav class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 pb-safe">
+<div class="bg-white/95 backdrop-blur-md border border-hairline shadow-lg rounded-full p-1.5 flex items-center gap-2">
+<a aria-label="Inicio" class="w-11 h-11 rounded-full flex items-center justify-center text-muted hover:text-ink hover:bg-soft transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">feed</span>
+</a>
+<a aria-current="page" aria-label="Parking" class="w-11 h-11 rounded-full flex items-center justify-center bg-ink text-white transition-all shadow-sm" href="#">
+<span class="material-symbols-outlined text-[20px]">local_parking</span>
+</a>
+<a aria-label="Perfil" class="w-11 h-11 rounded-full flex items-center justify-center text-muted hover:text-ink hover:bg-soft transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">account_balance_wallet</span>
+</a>
+</div>
+</nav>
+</body></html>

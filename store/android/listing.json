@@ -1,0 +1,10 @@
+{
+  "package_name": "com.onlygoodthings.app",
+  "default_language": "es-419",
+  "category": "LIFESTYLE",
+  "tags": ["community", "social", "maps-and-navigation"],
+  "contact_email": "romancanoniero@gmail.com",
+  "website": "https://onlygoodthings.lat",
+  "privacy_url": "https://onlygoodthings.lat/privacy",
+  "track": "internal"
+}

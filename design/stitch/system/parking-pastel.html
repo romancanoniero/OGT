@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+
+<html lang="es"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "tertiary-fixed": "#dde1ff",
+          "surface": "#ecfdf7",
+          "tertiary-container": "#7e90dc",
+          "on-tertiary-container": "#10266d",
+          "tertiary-fixed-dim": "#b7c4ff",
+          "primary-container": "#52a478",
+          "error": "#ba1a1a",
+          "on-surface-variant": "#3f4942",
+          "secondary-container": "#fdaa8a",
+          "on-tertiary-fixed": "#001452",
+          "outline": "#6f7a71",
+          "secondary-fixed-dim": "#ffb599",
+          "tertiary": "#485aa2",
+          "on-surface": "#0f1e1b",
+          "primary-fixed-dim": "#85d8a8",
+          "surface-dim": "#cdded8",
+          "on-secondary": "#ffffff",
+          "on-error-container": "#93000a",
+          "on-primary-fixed-variant": "#005232",
+          "on-secondary-fixed": "#370e00",
+          "surface-container-low": "#e6f7f1",
+          "surface-tint": "#0f6c45",
+          "surface-container-lowest": "#ffffff",
+          "inverse-surface": "#24332f",
+          "background": "#ecfdf7",
+          "surface-container": "#e0f2eb",
+          "surface-container-high": "#dbece6",
+          "on-secondary-container": "#783c23",
+          "secondary-fixed": "#ffdbce",
+          "on-primary-container": "#00351f",
+          "on-primary-fixed": "#002111",
+          "on-background": "#0f1e1b",
+          "on-error": "#ffffff",
+          "inverse-on-surface": "#e3f5ee",
+          "outline-variant": "#bec9c0",
+          "surface-bright": "#ecfdf7",
+          "inverse-primary": "#85d8a8",
+          "on-secondary-fixed-variant": "#70361e",
+          "error-container": "#ffdad6",
+          "on-tertiary-fixed-variant": "#2f4288",
+          "on-primary": "#ffffff",
+          "secondary": "#8d4d33",
+          "on-tertiary": "#ffffff",
+          "primary-fixed": "#a0f4c3",
+          "surface-variant": "#d5e6e0",
+          "primary": "#0f6c45",
+          "surface-container-highest": "#d5e6e0"
+        },
+        "borderRadius": {
+          "DEFAULT": "1rem",
+          "lg": "2rem",
+          "xl": "3rem",
+          "full": "9999px"
+        },
+        "spacing": {
+          "space-xl": "2rem",
+          "space-sm": "0.5rem",
+          "space-lg": "1.5rem",
+          "gutter-md": "1.5rem",
+          "gutter": "1rem",
+          "margin-md": "2rem",
+          "margin": "1rem",
+          "space-xs": "0.25rem",
+          "space-md": "1rem",
+          "margin-lg": "3rem",
+          "gutter-lg": "2rem"
+        },
+        "fontFamily": {
+          "headline-md": ["Plus Jakarta Sans"],
+          "label-lg": ["Plus Jakarta Sans"],
+          "label-md": ["Plus Jakarta Sans"],
+          "body-sm": ["Plus Jakarta Sans"],
+          "body-md": ["Plus Jakarta Sans"],
+          "headline-xl-mobile": ["Plus Jakarta Sans"],
+          "label-sm": ["Plus Jakarta Sans"],
+          "headline-lg-mobile": ["Plus Jakarta Sans"],
+          "headline-sm": ["Plus Jakarta Sans"],
+          "headline-xl": ["Plus Jakarta Sans"],
+          "headline-lg": ["Plus Jakarta Sans"],
+          "body-lg": ["Plus Jakarta Sans"]
+        },
+        "fontSize": {
+          "headline-md": ["1.5rem", {"lineHeight": "2rem", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+          "label-lg": ["0.875rem", {"lineHeight": "1.25rem", "letterSpacing": "0.01em", "fontWeight": "600"}],
+          "label-md": ["0.75rem", {"lineHeight": "1rem", "letterSpacing": "0.02em", "fontWeight": "600"}],
+          "body-sm": ["0.875rem", {"lineHeight": "1.25rem", "letterSpacing": "0", "fontWeight": "400"}],
+          "body-md": ["1rem", {"lineHeight": "1.5rem", "letterSpacing": "0", "fontWeight": "400"}],
+          "headline-xl-mobile": ["2.25rem", {"lineHeight": "2.75rem", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+          "label-sm": ["0.6875rem", {"lineHeight": "0.875rem", "letterSpacing": "0.03em", "fontWeight": "700"}],
+          "headline-lg-mobile": ["1.75rem", {"lineHeight": "2.25rem", "letterSpacing": "-0.015em", "fontWeight": "600"}],
+          "headline-sm": ["1.25rem", {"lineHeight": "1.75rem", "letterSpacing": "0", "fontWeight": "600"}],
+          "headline-xl": ["3rem", {"lineHeight": "3.5rem", "letterSpacing": "-0.025em", "fontWeight": "700"}],
+          "headline-lg": ["2.25rem", {"lineHeight": "2.75rem", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+          "body-lg": ["1.125rem", {"lineHeight": "1.75rem", "letterSpacing": "0", "fontWeight": "400"}]
+        }
+      }
+    }
+  }
+</script></head><body class="bg-background text-on-surface font-body-md text-body-md flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 bg-surface-container-lowest/90 backdrop-blur-xl border-b border-surface-container-high/60 shadow-[0_2px_12px_rgba(82,164,120,0.06)] pt-safe"><div class="h-16 px-gutter flex items-center justify-between"><div class="flex items-center gap-space-sm"><img alt="OnlyGoodThings Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1VsqKYDLYkevT4DgKlPKjlStHwgkTNo4hXMevaWjzm9wtvQZHPdzHISfMgNOFTO9rbF6r4zs6TCvjeytuFsqdIc64JYcgLy8ErcISzKojb3Egp0Vl1utxiX1-gfvcWb2bCo-nW_au77U1ch2faMRkQgx-5v8eDNyn3f1PoQ6_sTYk9TQ7le02j6dD3quAl1wxfsuGJ116ze7WIzUumDHnHYey6MxofDy1Bvz8FSqLE9QmdDeVdA99WaE2bs"/><span class="font-headline-md text-headline-md font-bold tracking-tight text-primary">OnlyGoodThings</span><span class="hidden">Parking</span></div><div class="flex items-center gap-space-xs"><button aria-label="Notificaciones" class="relative w-11 h-11 flex items-center justify-center rounded-full text-on-surface hover:bg-surface-container-low transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">notifications</span><span class="absolute top-2.5 right-2.5 w-2 h-2 bg-[#fdaa8a] rounded-full ring-2 ring-surface-container-lowest"></span></button><button aria-label="Mensajes directos" class="w-11 h-11 flex items-center justify-center rounded-full text-on-surface hover:bg-surface-container-low transition-colors" type="button"><span class="material-symbols-outlined text-[22px]">chat_bubble_outline</span></button><div class="pl-space-xs"><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-2 ring-[#52a478]/40 shadow-sm" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCeZPtFhdsQrUWOpkHziPhycTOlk3yU0Ap92C9bfyn3i99l4itb_Zm490n-XIoCQ4Om4shQwH7Fem_pM8sZ08Rl0IRl_zaP5TONq1wbIs8JGP-SIHV4ZhirperGYVkOmF2qT0CSS0T0b3tui0G_vgNK1tK8NFIV5lGr-PdccrEn47mnTHu5sClxxlIq4cvmtUkiUMHXiJRA5myGdPQFO6ZtRXgevuoqfC_TBdxs34W-96S_2dhTpiSNbQ"/></div></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 pb-24 bg-background"><div class="flex flex-col w-full relative">
+<!-- Dynamic Top Action & Radar Notification Bar -->
+<div class="px-gutter pt-space-sm pb-space-xs w-full flex flex-col gap-space-xs z-10">
+<div class="flex items-center justify-between gap-space-xs">
+<div class="flex items-center gap-space-xs bg-surface-container-lowest/90 backdrop-blur-md border border-[#bec9c0]/40 shadow-[0_2px_8px_rgba(82,164,120,0.08)] rounded-full py-1.5 px-3.5">
+<span class="relative flex h-2.5 w-2.5">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#52a478] opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#52a478]"></span>
+</span>
+<span class="font-label-sm text-label-sm font-bold text-primary">Modo Radar Activo</span>
+<span class="text-outline-variant font-light">·</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-normal">Microcentro</span>
+</div>
+<button class="flex items-center gap-1.5 bg-[#fdaa8a]/80 hover:bg-[#fdaa8a] text-[#783c23] border border-[#ffb599]/50 py-2 px-4 rounded-full shadow-[0_2px_8px_rgba(253,170,138,0.25)] active:scale-95 transition-all" id="btn-ceder" type="button">
+<span class="material-symbols-outlined text-[18px]">directions_car</span>
+<span class="font-label-sm text-label-sm font-semibold tracking-tight">Ceder mi lugar ahora</span>
+</button>
+</div>
+</div>
+<!-- Interactive Visual Map Display Viewport -->
+<div class="relative w-full h-[400px] overflow-hidden">
+<!-- Map Container -->
+<div class="w-full h-full bg-cover bg-center" data-location="Av. Corrientes 1420, Buenos Aires, Argentina" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDPU9vj0TQD-8yUvZtY7Eqbzvy3RYYLKVtmPYbPOnicgwa3GhYKafawk3pRI1EakkNC48eaDaar68vzMdUpZbZ3bRZ2mqSg5apH-So1rAzaC1JlIu4ty24zKDtSkNW3DWbuF8dk-zcFg5DHsEfnbSsrGmVZEiKWeQkDBHjcuyO1cUcsl3L1t4laMC9-TjDSUCTqaGDTNI3ZlhmJxNzvrjiNAjcFFV8azqhR7B9brLGD73ipDcBGB4mPSg')"></div>
+<!-- Soft Map Ambient Delicate Pastel Overlays for Readability -->
+<div class="absolute inset-0 bg-gradient-to-b from-surface/80 via-transparent to-surface/90 pointer-events-none"></div>
+<!-- Map Elements / Floating Pins -->
+<!-- Current User Pin (Looking for parking) -->
+<div class="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
+<div class="bg-surface-container-lowest text-on-surface px-2.5 py-1 rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.08)] border border-[#bec9c0]/30 flex items-center gap-1.5 mb-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-[#52a478]"></span>
+<span class="font-label-sm text-label-sm font-bold">Tú</span>
+</div>
+<div class="relative flex items-center justify-center">
+<div class="w-10 h-10 rounded-full bg-[#a0f4c3]/40 animate-ping absolute"></div>
+<div class="w-10 h-10 rounded-full bg-[#52a478] text-on-primary shadow-[0_4px_12px_rgba(82,164,120,0.35)] flex items-center justify-center ring-2 ring-surface-container-lowest">
+<span class="material-symbols-outlined text-[20px]">navigation</span>
+</div>
+</div>
+</div>
+<!-- Route Line Effect (Soft pastel mint dashed route) -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none opacity-85" fill="none" viewbox="0 0 360 400">
+<path class="animate-pulse" d="M90 100 C 140 120, 150 200, 230 220" stroke="#52a478" stroke-dasharray="6 6" stroke-linecap="round" stroke-width="4.5"></path>
+</svg>
+<!-- Spot Releaser Pin (Lucas V. Spot) -->
+<div class="absolute top-[55%] right-[22%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center cursor-pointer">
+<div class="bg-[#52a478] text-on-primary px-3 py-1 rounded-full shadow-[0_3px_10px_rgba(82,164,120,0.3)] flex items-center gap-1.5 mb-1 animate-pulse">
+<span class="material-symbols-outlined text-[14px]">timer</span>
+<span class="font-label-sm text-label-sm font-semibold tracking-tight">Liberando en 1m 30s</span>
+</div>
+<div class="relative flex items-center justify-center">
+<div class="w-12 h-12 rounded-full bg-[#a0f4c3]/50 animate-ping absolute"></div>
+<div class="w-11 h-11 rounded-full bg-surface-container-lowest text-[#52a478] shadow-xl flex items-center justify-center ring-3 ring-[#a0f4c3]">
+<span class="material-symbols-outlined text-[24px]">local_parking</span>
+</div>
+</div>
+<div class="w-2.5 h-2.5 rounded-full bg-[#52a478] mt-1 shadow-sm"></div>
+</div>
+<!-- Nearby Community Quick Stat Chip (Soft pastel peach/cream) -->
+<div class="absolute top-3 right-3 bg-surface-container-lowest/95 backdrop-blur-md rounded-full px-3.5 py-1.5 shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-[#bec9c0]/40 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[#8d4d33] text-[16px]">eco</span>
+<span class="font-label-sm text-label-sm font-medium text-on-surface">3 lugares liberados hoy cerca</span>
+</div>
+<!-- Recenter Map Control -->
+<button aria-label="Recentrar ubicación" class="absolute bottom-5 right-4 w-11 h-11 bg-surface-container-lowest/95 backdrop-blur-md text-on-surface rounded-full shadow-[0_3px_10px_rgba(0,0,0,0.08)] border border-[#bec9c0]/40 flex items-center justify-center hover:bg-surface-container-low active:scale-95 transition-all" type="button">
+<span class="material-symbols-outlined text-[22px]">my_location</span>
+</button>
+</div>
+<!-- Real-Time Floating Bottom Tray (Floating card with soft pastel border & subtle shadow) -->
+<div class="w-full px-gutter -mt-4 z-20 pb-space-lg flex flex-col">
+<div class="bg-surface-container-lowest/95 backdrop-blur-md shadow-[0_8px_24px_rgba(82,164,120,0.08)] border border-surface-container-high rounded-3xl p-space-md flex flex-col gap-space-md">
+<!-- Drag / Status Indicator Bar -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<div class="w-2.5 h-2.5 rounded-full bg-[#52a478] animate-pulse"></div>
+<span class="font-label-md text-label-md font-bold uppercase tracking-wider text-primary">Lugar Asignado en Directo</span>
+</div>
+<div class="bg-surface-container-low text-primary border border-[#a0f4c3]/60 px-2.5 py-1 rounded-full flex items-center gap-1 shadow-xs">
+<span class="material-symbols-outlined text-[15px]">volunteer_activism</span>
+<span class="font-label-sm text-label-sm font-semibold">+50 Pts OnlyGoodThings</span>
+</div>
+</div>
+<!-- Driver & Vehicle Profile Information -->
+<div class="flex items-center gap-space-sm bg-surface-container-low/70 border border-surface-container-high/70 rounded-2xl p-space-sm">
+<div class="relative flex-shrink-0">
+<img class="w-12 h-12 rounded-full object-cover ring-2 ring-white shadow-sm" data-alt="Warm friendly smiling portrait of a young man wearing a sustainable casual green t-shirt outdoor city morning light authentic profile picture" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBfflk6e7PH8Ai7Wsz-u44_jSqc9q8nJSwCtUilr-kuNPaJAl5lmPAzAFX8Xsnr2UoC3x3fFW6mIpNrzNbka43DHRtbeZPSUboew4jSDLomchl5OvnY1UfHfizAos9JkeRfufOv4NfAjs3ZtzdpGj94G5CU4R-Oh9Oa0tQ5f3DvJijaLkaat5FAdhseQRcc9Dvjblq5VWYuze1NtwEn9qBr1QMQjeO0gCprrLCPPFGA18ejJvPhUgUX9w"/>
+<div class="absolute -bottom-1 -right-1 bg-[#52a478] text-on-primary rounded-full p-0.5 shadow-xs flex items-center justify-center">
+<span class="material-symbols-outlined text-[13px]">verified</span>
+</div>
+</div>
+<div class="flex flex-col min-w-0 flex-1">
+<div class="flex items-center justify-between gap-1">
+<h3 class="font-headline-sm text-headline-sm text-on-surface truncate font-semibold">Lucas V.</h3>
+<span class="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-0.5 font-medium">
+<span class="material-symbols-outlined text-[13px] text-[#fdaa8a]">star</span> 4.9 (42)
+            </span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Toyota Corolla Blanco · ABC 492</p>
+<p class="font-label-sm text-label-sm font-medium text-primary flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[14px]">pin_drop</span> Av. Corrientes 1420
+          </p>
+</div>
+</div>
+<!-- Dynamic Metrics Grid (ETA, Countdown, Distance) in pastel mint & pastel peach -->
+<div class="grid grid-cols-2 gap-space-xs">
+<div class="bg-[#e6f7f1] border border-[#bec9c0]/40 rounded-2xl p-space-sm flex items-center gap-space-xs shadow-xs">
+<div class="w-9 h-9 rounded-full bg-[#a0f4c3] text-[#00351f] flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-[19px]">near_me</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">Llegada Estimada</span>
+<span class="font-headline-sm text-headline-sm font-bold text-on-surface truncate">3 min <span class="font-body-sm text-body-sm font-normal text-outline">(450 m)</span></span>
+</div>
+</div>
+<div class="bg-[#ffdbce]/40 border border-[#ffb599]/50 rounded-2xl p-space-sm flex items-center gap-space-xs shadow-xs">
+<div class="w-9 h-9 rounded-full bg-[#fdaa8a]/80 text-[#370e00] flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-[19px]">hourglass_top</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">Espacio Libre en</span>
+<span class="font-headline-sm text-headline-sm font-bold text-[#8d4d33] truncate" id="countdown-timer">¡Lugar libre ya!</span>
+</div>
+</div>
+</div>
+<!-- Social Good & Impact Micro-copy -->
+<div class="flex items-center gap-space-xs bg-surface-container-low/80 border border-surface-container-high px-3.5 py-2.5 rounded-xl">
+<span class="material-symbols-outlined text-[#52a478] text-[19px] flex-shrink-0">workspace_premium</span>
+<p class="font-label-sm text-label-sm text-on-surface-variant leading-tight">
+          Al ceder el lugar, Lucas recibe <span class="font-semibold text-primary">50 puntos comunitarios</span> y tú evitas 850g de emisiones de CO2.
+        </p>
+</div>
+<!-- Action Buttons Group -->
+<div class="flex flex-col gap-space-xs pt-0.5">
+<button class="w-full h-12 rounded-full bg-[#52a478] hover:bg-[#438a64] text-white font-label-lg text-label-lg font-semibold flex items-center justify-center gap-2 shadow-[0_4px_12px_rgba(82,164,120,0.3)] active:scale-[0.98] transition-all" id="btn-confirm-route" type="button">
+<span class="material-symbols-outlined text-[20px]">turn_right</span>
+<span>Confirmar Ruta &amp; Avisar Llegada</span>
+</button>
+<div class="grid grid-cols-2 gap-space-xs">
+<button class="h-11 rounded-full bg-surface-container border border-surface-container-high text-on-surface font-label-md text-label-md font-semibold flex items-center justify-center gap-1.5 hover:bg-surface-container-highest active:scale-95 transition-all" id="btn-call" type="button">
+<span class="material-symbols-outlined text-[18px]">call</span>
+<span>Llamada Rápida</span>
+</button>
+<button class="h-11 rounded-full bg-surface-container border border-surface-container-high text-on-surface font-label-md text-label-md font-semibold flex items-center justify-center gap-1.5 hover:bg-surface-container-highest active:scale-95 transition-all" id="btn-chat" type="button">
+<span class="material-symbols-outlined text-[18px]">chat</span>
+<span>Chat con Lucas</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Toast / Feedback Notification Micro-container -->
+<div class="fixed top-20 left-1/2 -translate-x-1/2 w-[90%] max-w-sm bg-inverse-surface text-inverse-on-surface p-space-sm rounded-2xl shadow-xl flex items-center gap-space-xs opacity-0 pointer-events-none transition-all duration-300 z-50" id="toast-notification">
+<span class="material-symbols-outlined text-[#85d8a8]" id="toast-icon">check_circle</span>
+<span class="font-label-md text-label-md flex-1" id="toast-msg">Ruta confirmada con éxito. Lucas fue notificado.</span>
+</div>
+</div>
+<script>
+  (function() {
+    // Dynamic Countdown Simulation
+    var timeLeft = 88; // 1m 28s in seconds
+    var timerEl = document.getElementById('countdown-timer');
+    if (timerEl) {
+      var interval = setInterval(function() {
+        if (timeLeft <= 0) {
+          clearInterval(interval);
+          timerEl.textContent = "¡Lugar libre ya!";
+          return;
+        }
+        timeLeft--;
+        var minutes = Math.floor(timeLeft / 60);
+        var seconds = timeLeft % 60;
+        timerEl.textContent = (minutes < 10 ? "0" + minutes : minutes) + ":" + (seconds < 10 ? "0" + seconds : seconds);
+      }, 1000);
+    }
+
+    // Toast Trigger helper
+    var toast = document.getElementById('toast-notification');
+    var toastMsg = document.getElementById('toast-msg');
+    var toastTimeout;
+
+    function showToast(message, iconName) {
+      if (!toast) return;
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastMsg.textContent = message;
+      if (iconName) {
+        var iconEl = document.getElementById('toast-icon');
+        if (iconEl) iconEl.textContent = iconName;
+      }
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      toast.classList.add('opacity-100');
+      toastTimeout = setTimeout(function() {
+        toast.classList.add('opacity-0', 'pointer-events-none');
+        toast.classList.remove('opacity-100');
+      }, 3200);
+    }
+
+    // Event Listeners
+    var btnConfirm = document.getElementById('btn-confirm-route');
+    if (btnConfirm) {
+      btnConfirm.addEventListener('click', function() {
+        showToast('Ruta confirmada. Lucas sabe que estás a 3 minutos.', 'near_me');
+      });
+    }
+
+    var btnCeder = document.getElementById('btn-ceder');
+    if (btnCeder) {
+      btnCeder.addEventListener('click', function() {
+        showToast('¡Genial! Tu lugar está visible para la comunidad. +50 Pts.', 'celebration');
+      });
+    }
+
+    var btnCall = document.getElementById('btn-call');
+    if (btnCall) {
+      btnCall.addEventListener('click', function() {
+        showToast('Iniciando llamada de voz segura con Lucas...', 'phone_in_talk');
+      });
+    }
+
+    var btnChat = document.getElementById('btn-chat');
+    if (btnChat) {
+      btnChat.addEventListener('click', function() {
+        showToast('Abriendo canal directo de mensajería con Lucas...', 'chat_bubble');
+      });
+    }
+  })();
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface-container-lowest/90 backdrop-blur-xl border-t border-surface-container-high/60 shadow-[0_-2px_12px_rgba(82,164,120,0.06)]" data-active-classes="text-primary font-semibold"><div class="flex justify-around items-center h-16 px-space-xs"><a class="flex flex-col items-center justify-center w-14 h-14 text-on-surface-variant hover:text-on-surface transition-colors" data-path="inicio" href="#"><span class="material-symbols-outlined text-[24px]">home</span><span class="font-label-sm text-label-sm tracking-tight">Inicio</span></a><a aria-current="page" class="flex flex-col items-center justify-center w-14 h-14 transition-colors text-primary font-semibold" data-path="parking" href="#"><span class="material-symbols-outlined text-[24px]">local_parking</span><span class="font-label-sm text-label-sm tracking-tight">Parking</span></a><a class="flex flex-col items-center justify-center w-14 h-14 text-on-surface-variant hover:text-on-surface transition-colors" data-path="causas" href="#"><span class="material-symbols-outlined text-[24px]">volunteer_activism</span><span class="font-label-sm text-label-sm tracking-tight">Causas</span></a><a class="flex flex-col items-center justify-center w-14 h-14 text-on-surface-variant hover:text-on-surface transition-colors" data-path="habilidades" href="#"><span class="material-symbols-outlined text-[24px]">psychology</span><span class="font-label-sm text-label-sm tracking-tight">Habilidades</span></a><a class="flex flex-col items-center justify-center w-14 h-14 text-on-surface-variant hover:text-on-surface transition-colors" data-path="perfil" href="#"><div class="w-6 h-6 rounded-full overflow-hidden mb-0.5"><img alt="Perfil" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCeZPtFhdsQrUWOpkHziPhycTOlk3yU0Ap92C9bfyn3i99l4itb_Zm490n-XIoCQ4Om4shQwH7Fem_pM8sZ08Rl0IRl_zaP5TONq1wbIs8JGP-SIHV4ZhirperGYVkOmF2qT0CSS0T0b3tui0G_vgNK1tK8NFIV5lGr-PdccrEn47mnTHu5sClxxlIq4cvmtUkiUMHXiJRA5myGdPQFO6ZtRXgevuoqfC_TBdxs34W-96S_2dhTpiSNbQ"/></div><span class="font-label-sm text-label-sm tracking-tight">Perfil</span></a></div></nav>
+</body></html>

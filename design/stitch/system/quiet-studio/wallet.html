@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<title>Billetera de Puntos y Recompensas - OnlyGoodThings</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            canvas: "#FFFFFF",
+            ink: "#111213",
+            "ink-muted": "#6B7280",
+            "ink-subtle": "#9CA3AF",
+            "border-hairline": "#E5E7EB",
+            "gray-well": "#F4F5F7",
+            "gray-hover": "#EDEDF0",
+            "navy-accent": "#0D3D4D",
+          },
+          fontFamily: {
+            headline: ["Plus Jakarta Sans", "sans-serif"],
+            body: ["Inter", "sans-serif"],
+          },
+        },
+      },
+    };
+  </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+      overscroll-behavior-y: none;
+      -webkit-tap-highlight-color: transparent;
+      background-color: #FFFFFF;
+    }
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom, 16px); }
+    .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+    ::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-canvas font-body text-ink min-h-screen flex flex-col antialiased selection:bg-gray-well selection:text-ink">
+<!-- Header: Pure Studio Clean -->
+<header class="fixed top-0 inset-x-0 z-50 bg-white/90 backdrop-blur-md border-b border-border-hairline pt-safe">
+<div class="h-16 px-5 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-full bg-ink text-white flex items-center justify-center font-headline font-bold text-xs tracking-tight shadow-sm">
+          OG
+        </div>
+<div class="flex flex-col">
+<h1 class="font-headline font-bold text-[17px] text-ink leading-tight tracking-tight">Puntos y Recompensas</h1>
+<span class="text-[12px] text-ink-muted leading-tight">OnlyGoodThings · Palermo</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button aria-label="Notificaciones" class="w-11 h-11 rounded-full border border-border-hairline flex items-center justify-center text-ink hover:bg-gray-well transition-colors">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+</button>
+<a aria-label="Perfil" class="w-11 h-11 rounded-full border border-border-hairline p-0.5 flex items-center justify-center hover:opacity-90 transition-opacity" href="#">
+<img alt="Perfil de usuario" class="w-full h-full rounded-full object-cover" src="https://lh3.googleusercontent.com/aida/AEtjO1Uvolq8nMKY6XHYgwgWR6JvMGV2sjff0fmPOU5Sm8sDRam2L8X3cc-Ry5BcQDqMSJo8YplyBb5lngZi99r8E1QA2BfJmfF3PZLVTxVf0nfYLRv7embNnmyvx-VR6t7J0AAtdrbypHC4i78_dRBr0-qZ1sDLGol_ZwUubWIflxFm_h3n2i4ZmzVO0v173BcKhXHwOMtwCV78Q-LfuN3rZAKIgDsaB8ox0F_ycpRgkIKkplOI7jt88uUZ7FqR"/>
+</a>
+</div>
+</div>
+</header>
+<!-- Main Scrollable Body -->
+<main class="flex-1 flex flex-col pt-20 pb-28 px-5 max-w-md mx-auto w-full gap-7">
+<!-- Balance Hero Card: Soft gray well #F4F5F7, 1px hairline border -->
+<section class="rounded-2xl bg-gray-well border border-border-hairline p-6 flex flex-col gap-5">
+<!-- Top Badges & Meta -->
+<div class="flex items-center justify-between">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-border-hairline font-body text-[12px] font-medium text-ink shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+<span class="w-1.5 h-1.5 rounded-full bg-navy-accent"></span>
+          Nivel 4: Guardián Comunitario
+        </span>
+<span class="text-[12px] text-ink-muted font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-ink-muted">spa</span>
+          Karma Activo
+        </span>
+</div>
+<!-- Main Balance Display: Massive ink numerals -->
+<div class="flex flex-col gap-1 pt-1">
+<span class="font-body text-[11px] uppercase tracking-[0.08em] font-semibold text-ink-muted">
+          Puntos Barriales Acumulados
+        </span>
+<div class="flex items-baseline gap-2 mt-0.5">
+<span class="font-headline font-extrabold text-[44px] leading-none text-ink tracking-tight">2.450</span>
+<span class="font-headline font-bold text-[18px] text-ink tracking-tight">PTS</span>
+</div>
+</div>
+<!-- Level Progression Bar -->
+<div class="pt-2 border-t border-border-hairline/80 flex flex-col gap-2">
+<div class="flex items-center justify-between text-[12px] text-ink-muted">
+<span>Próximo: <strong class="text-ink font-semibold">Héroe Barrial</strong></span>
+<span class="font-medium text-ink-muted">Faltan 550 pts</span>
+</div>
+<div class="w-full h-1.5 rounded-full bg-border-hairline overflow-hidden">
+<div class="h-full rounded-full bg-ink transition-all duration-500" style="width: 78%;"></div>
+</div>
+<div class="flex justify-between text-[11px] text-ink-subtle">
+<span>2.000 pts</span>
+<span>Meta: 3.000 pts</span>
+</div>
+</div>
+</section>
+<!-- Quick Action Buttons: Row of 3 soft hairline pill/tiles -->
+<section class="grid grid-cols-3 gap-3">
+<button class="group flex flex-col items-center justify-center p-3.5 rounded-2xl bg-white border border-border-hairline hover:bg-gray-well active:scale-[0.98] transition-all text-center gap-2 shadow-[0_1px_2px_rgba(0,0,0,0.02)]" id="btn-transfer-gratitude">
+<div class="w-10 h-10 rounded-full border border-border-hairline bg-gray-well flex items-center justify-center text-ink group-hover:border-ink/20 transition-colors">
+<span class="material-symbols-outlined text-[19px]">volunteer_activism</span>
+</div>
+<span class="text-[12px] font-semibold text-ink leading-snug">Transferir Gratitud</span>
+</button>
+<button class="group flex flex-col items-center justify-center p-3.5 rounded-2xl bg-white border border-border-hairline hover:bg-gray-well active:scale-[0.98] transition-all text-center gap-2 shadow-[0_1px_2px_rgba(0,0,0,0.02)]" id="btn-redeem-perk">
+<div class="w-10 h-10 rounded-full border border-border-hairline bg-gray-well flex items-center justify-center text-ink group-hover:border-ink/20 transition-colors">
+<span class="material-symbols-outlined text-[19px]">redeem</span>
+</div>
+<span class="text-[12px] font-semibold text-ink leading-snug">Canjear Beneficio</span>
+</button>
+<button class="group flex flex-col items-center justify-center p-3.5 rounded-2xl bg-white border border-border-hairline hover:bg-gray-well active:scale-[0.98] transition-all text-center gap-2 shadow-[0_1px_2px_rgba(0,0,0,0.02)]" id="btn-view-history">
+<div class="w-10 h-10 rounded-full border border-border-hairline bg-gray-well flex items-center justify-center text-ink group-hover:border-ink/20 transition-colors">
+<span class="material-symbols-outlined text-[19px]">history</span>
+</div>
+<span class="text-[12px] font-semibold text-ink leading-snug">Historial Karma</span>
+</button>
+</section>
+<!-- Comercios Aliados Section -->
+<section class="flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<div>
+<h2 class="font-headline font-bold text-[18px] text-ink leading-tight">Comercios Aliados</h2>
+<p class="text-[13px] text-ink-muted mt-0.5">Beneficios de cercanía por tus acciones barriales</p>
+</div>
+<button class="text-[13px] font-medium text-navy-accent hover:underline flex items-center gap-0.5">
+<span>Ver mapa</span>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</button>
+</div>
+<!-- Horizontal partner cards with 1px hairline border & clean typography -->
+<div class="flex gap-3.5 overflow-x-auto pb-2 -mx-5 px-5 no-scrollbar snap-x snap-mandatory">
+<!-- Card 1: Café El Encuentro -->
+<article class="snap-start flex-shrink-0 w-[260px] rounded-2xl bg-white border border-border-hairline overflow-hidden flex flex-col justify-between shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+<div class="relative h-32 w-full overflow-hidden bg-gray-well">
+<img class="w-full h-full object-cover" data-alt="Café El Encuentro en Palermo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-Z1gPYE3Cao-Le-NstCtvh208wZoRLIzsZY-MSvVQ_MIwXzTj7iasRNXLO4uPwP7gToYxrMYafZN0s_PRBGni6tGf_ftWQw_n7Iofkc-0c4CWNTX4Es9Vl_EFmQOgyUK8RB8-lLIzDhUX-IlxCau4Ifl_ooRNIqa6DACm7P6kLZGiqb52GwRnhGgdIXDlh_lpFyS4QguuzSQ9yw25dJEwex12f5DhNUSZvskoEQUoWpvU82HkjBhyYg"/>
+<span class="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-sm border border-border-hairline text-ink font-semibold text-[11px]">
+              180 pts
+            </span>
+</div>
+<div class="p-4 flex flex-col justify-between flex-1 gap-3">
+<div>
+<span class="text-[11px] font-medium text-ink-muted uppercase tracking-wider block">Café El Encuentro · Palermo</span>
+<h3 class="font-headline font-bold text-[14px] text-ink mt-1 leading-snug">Cappuccino o Flat White artesanal</h3>
+<p class="text-[13px] text-ink-muted mt-1 leading-relaxed line-clamp-2">Válido en barra matutina presentando tu pase comunitario.</p>
+</div>
+<button class="w-full py-2 px-3 rounded-full bg-ink hover:bg-ink/90 active:scale-[0.98] text-white font-medium text-[13px] transition-colors flex items-center justify-center gap-1.5" onclick="canjearBeneficio('Café El Encuentro', 180)">
+<span class="material-symbols-outlined text-[15px]">redeem</span>
+              Canjear cupón
+            </button>
+</div>
+</article>
+<!-- Card 2: Vivero Verde -->
+<article class="snap-start flex-shrink-0 w-[260px] rounded-2xl bg-white border border-border-hairline overflow-hidden flex flex-col justify-between shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+<div class="relative h-32 w-full overflow-hidden bg-gray-well">
+<img class="w-full h-full object-cover" data-alt="Vivero Verde huerta urbana" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBcbkVujHApu5kH7Ov9XFehzDidklk_ZGgH2NZEcte7KpnCbZWEER1ra8XaEnhvhijizlWEO5a0I9evjgKqRYCzFuPTJi6vokAwv2E1dh8BKFCAzLwAQUzd9yz6vd6rksojZBOpHObMUFr3wb_ETKJOMp2LBnioBnh1j8ZVFgSOYg-sKFoImlqzdRorCw6L-ZUHKNJJyEgdnz5MNMK3LzoFd9vWJvVQEnssoY8ODbjD9bsP4OzDYnRpdA"/>
+<span class="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-sm border border-border-hairline text-ink font-semibold text-[11px]">
+              120 pts
+            </span>
+</div>
+<div class="p-4 flex flex-col justify-between flex-1 gap-3">
+<div>
+<div class="flex items-center justify-between">
+<span class="text-[11px] font-medium text-ink-muted uppercase tracking-wider block">Vivero Verde</span>
+<span class="text-[11px] font-semibold text-navy-accent bg-navy-accent/5 px-2 py-0.5 rounded-full border border-navy-accent/15">20% OFF</span>
+</div>
+<h3 class="font-headline font-bold text-[14px] text-ink mt-1 leading-snug">Plantines y semillas</h3>
+<p class="text-[13px] text-ink-muted mt-1 leading-relaxed line-clamp-2">Para huertas domésticas y balcones vecinales agroecológicos.</p>
+</div>
+<button class="w-full py-2 px-3 rounded-full bg-ink hover:bg-ink/90 active:scale-[0.98] text-white font-medium text-[13px] transition-colors flex items-center justify-center gap-1.5" onclick="canjearBeneficio('Vivero Verde', 120)">
+<span class="material-symbols-outlined text-[15px]">redeem</span>
+              Canjear cupón
+            </button>
+</div>
+</article>
+<!-- Card 3: Panadería La Espiga -->
+<article class="snap-start flex-shrink-0 w-[260px] rounded-2xl bg-white border border-border-hairline overflow-hidden flex flex-col justify-between shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+<div class="relative h-32 w-full overflow-hidden bg-gray-well">
+<img class="w-full h-full object-cover" data-alt="Panadería La Espiga" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCD6LkkjTK1vJBpOR_j-eVSBK5GUW0awW8pxHUB7U5Gwy7RV989ObvIu85YMjmK9iNebAGc3b0G-3nexskOaTButI9zc7A-izCnNsj-YJ9gqG51Qjr9CfG2D02yRKyXag0XQvclTjj-iJTwgMtcdqqOcoBGmOSypD-wMPkXybXYeHsByLcuhy6tJt1QDJofCvYOsEPERVBFCaaZ5oRybuL5xOrTViwGuUKfpIwArMUFDGz_zEO7NgbCKA"/>
+<span class="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-sm border border-border-hairline text-ink font-semibold text-[11px]">
+              120 pts
+            </span>
+</div>
+<div class="p-4 flex flex-col justify-between flex-1 gap-3">
+<div>
+<span class="text-[11px] font-medium text-ink-muted uppercase tracking-wider block">Panadería La Espiga</span>
+<h3 class="font-headline font-bold text-[14px] text-ink mt-1 leading-snug">Pan de masa madre &amp; medialunas</h3>
+<p class="text-[13px] text-ink-muted mt-1 leading-relaxed line-clamp-2">Descuento directo en panificados artesanales de masa madre.</p>
+</div>
+<button class="w-full py-2 px-3 rounded-full bg-ink hover:bg-ink/90 active:scale-[0.98] text-white font-medium text-[13px] transition-colors flex items-center justify-center gap-1.5" onclick="canjearBeneficio('Panadería La Espiga', 120)">
+<span class="material-symbols-outlined text-[15px]">redeem</span>
+              Canjear cupón
+            </button>
+</div>
+</article>
+</div>
+</section>
+<!-- Actividad de Karma (Ledger) -->
+<section class="flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<div>
+<h2 class="font-headline font-bold text-[18px] text-ink leading-tight">Actividad de Karma</h2>
+<p class="text-[13px] text-ink-muted mt-0.5">Libro diario de participaciones solidarias</p>
+</div>
+</div>
+<!-- Filter Chips: Selected ink #111213, Idle white + hairline -->
+<div class="flex gap-2 overflow-x-auto pb-1 no-scrollbar" id="filtros-karma">
+<button class="filtro-btn px-3.5 py-1.5 rounded-full bg-ink text-white text-[12px] font-medium whitespace-nowrap transition-colors" onclick="filtrarActividad('todos', this)">
+          Todos
+        </button>
+<button class="filtro-btn px-3.5 py-1.5 rounded-full bg-white border border-border-hairline text-ink-muted hover:text-ink hover:bg-gray-well text-[12px] font-medium whitespace-nowrap transition-colors" onclick="filtrarActividad('ganados', this)">
+          Ganados
+        </button>
+<button class="filtro-btn px-3.5 py-1.5 rounded-full bg-white border border-border-hairline text-ink-muted hover:text-ink hover:bg-gray-well text-[12px] font-medium whitespace-nowrap transition-colors" onclick="filtrarActividad('canjeados', this)">
+          Canjeados
+        </button>
+<button class="filtro-btn px-3.5 py-1.5 rounded-full bg-white border border-border-hairline text-ink-muted hover:text-ink hover:bg-gray-well text-[12px] font-medium whitespace-nowrap transition-colors" onclick="filtrarActividad('donaciones', this)">
+          Donaciones
+        </button>
+</div>
+<!-- Ledger Entries: Clean circular icon wells and bold ink/muted point amounts -->
+<div class="flex flex-col divide-y divide-border-hairline border border-border-hairline rounded-2xl bg-white overflow-hidden" id="lista-transacciones">
+<!-- Item 1: Perrita extraviada -->
+<div class="item-transaccion flex items-center justify-between p-4 hover:bg-gray-well/50 transition-colors" data-tipo="ganados">
+<div class="flex items-center gap-3.5 min-w-0">
+<div class="w-10 h-10 rounded-full border border-border-hairline bg-gray-well flex items-center justify-center text-ink flex-shrink-0">
+<span class="material-symbols-outlined text-[19px]">pets</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-headline font-bold text-[14px] text-ink truncate">Ayuda a encontrar perrita</span>
+<span class="text-[12px] text-ink-muted truncate mt-0.5">Palermo Soho · Hace 2 horas</span>
+</div>
+</div>
+<div class="flex flex-col items-end flex-shrink-0 ml-3">
+<span class="font-headline font-bold text-[15px] text-ink tracking-tight">+100</span>
+<span class="text-[11px] text-ink-muted font-medium">pts ganados</span>
+</div>
+</div>
+<!-- Item 2: Parking colaborativo -->
+<div class="item-transaccion flex items-center justify-between p-4 hover:bg-gray-well/50 transition-colors" data-tipo="ganados">
+<div class="flex items-center gap-3.5 min-w-0">
+<div class="w-10 h-10 rounded-full border border-border-hairline bg-gray-well flex items-center justify-center text-ink flex-shrink-0">
+<span class="material-symbols-outlined text-[19px]">local_parking</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-headline font-bold text-[14px] text-ink truncate">Espacio de parking liberado</span>
+<span class="text-[12px] text-ink-muted truncate mt-0.5">Av. Santa Fe 3400 · Ayer</span>
+</div>
+</div>
+<div class="flex flex-col items-end flex-shrink-0 ml-3">
+<span class="font-headline font-bold text-[15px] text-ink tracking-tight">+50</span>
+<span class="text-[11px] text-ink-muted font-medium">pts ganados</span>
+</div>
+</div>
+<!-- Item 3: Taller huerta -->
+<div class="item-transaccion flex items-center justify-between p-4 hover:bg-gray-well/50 transition-colors" data-tipo="ganados">
+<div class="flex items-center gap-3.5 min-w-0">
+<div class="w-10 h-10 rounded-full border border-border-hairline bg-gray-well flex items-center justify-center text-ink flex-shrink-0">
+<span class="material-symbols-outlined text-[19px]">psychology_alt</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-headline font-bold text-[14px] text-ink truncate">Taller gratuito de huerta</span>
+<span class="text-[12px] text-ink-muted truncate mt-0.5">Plaza Armenia · Hace 3 días</span>
+</div>
+</div>
+<div class="flex flex-col items-end flex-shrink-0 ml-3">
+<span class="font-headline font-bold text-[15px] text-ink tracking-tight">+150</span>
+<span class="text-[11px] text-ink-muted font-medium">pts ganados</span>
+</div>
+</div>
+<!-- Item 4: Donación de semillas -->
+<div class="item-transaccion flex items-center justify-between p-4 hover:bg-gray-well/50 transition-colors" data-tipo="donaciones">
+<div class="flex items-center gap-3.5 min-w-0">
+<div class="w-10 h-10 rounded-full border border-border-hairline bg-gray-well flex items-center justify-center text-ink flex-shrink-0">
+<span class="material-symbols-outlined text-[19px]">eco</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-headline font-bold text-[14px] text-ink truncate">Donación de semillas</span>
+<span class="text-[12px] text-ink-muted truncate mt-0.5">Huerta El Manantial · Hace 5 días</span>
+</div>
+</div>
+<div class="flex flex-col items-end flex-shrink-0 ml-3">
+<span class="font-headline font-bold text-[15px] text-ink tracking-tight">-200</span>
+<span class="text-[11px] text-ink-muted font-medium">pts donados</span>
+</div>
+</div>
+</div>
+<!-- Empty state if filter has no entries -->
+<div class="hidden flex-col items-center justify-center p-8 rounded-2xl bg-gray-well border border-border-hairline text-center gap-2" id="empty-state-karma">
+<div class="w-10 h-10 rounded-full border border-border-hairline bg-white flex items-center justify-center text-ink-muted mb-1">
+<span class="material-symbols-outlined text-[20px]">inbox</span>
+</div>
+<p class="font-headline font-bold text-[14px] text-ink">Sin movimientos registrados</p>
+<p class="text-[12px] text-ink-muted max-w-xs">No hay operaciones registradas en esta categoría del ledger barrial.</p>
+</div>
+</section>
+</main>
+<!-- Toast Microinteraction -->
+<div class="fixed bottom-24 left-1/2 -translate-x-1/2 bg-ink text-white px-4 py-2.5 rounded-full text-[13px] font-medium flex items-center gap-2 shadow-lg opacity-0 pointer-events-none transition-all duration-300 z-50" id="toast-notificacion">
+<span class="material-symbols-outlined text-white text-[17px]">check_circle</span>
+<span id="toast-mensaje">Acción confirmada</span>
+</div>
+<!-- Floating Bottom Dock: White pill floating above bottom with 3 circular items (Feed, Parking, Billetera active in ink) -->
+<nav class="fixed bottom-5 inset-x-0 z-50 flex justify-center px-6 pointer-events-none pb-safe">
+<div class="bg-white/95 backdrop-blur-xl border border-border-hairline rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.08)] p-1.5 flex items-center gap-1.5 pointer-events-auto">
+<!-- Item: Feed -->
+<a aria-label="Feed" class="w-12 h-12 rounded-full flex items-center justify-center text-ink-muted hover:text-ink hover:bg-gray-well transition-colors" href="#">
+<span class="material-symbols-outlined text-[21px]">home</span>
+</a>
+<!-- Item: Parking -->
+<a aria-label="Parking" class="w-12 h-12 rounded-full flex items-center justify-center text-ink-muted hover:text-ink hover:bg-gray-well transition-colors" href="#">
+<span class="material-symbols-outlined text-[21px]">local_parking</span>
+</a>
+<!-- Item: Billetera (Active in ink) -->
+<a aria-label="Billetera" class="w-12 h-12 rounded-full bg-ink text-white flex items-center justify-center shadow-sm" href="#">
+<span class="material-symbols-outlined text-[21px]">stars</span>
+</a>
+</div>
+</nav>
+<script>
+    function filtrarActividad(categoria, botonActivo) {
+      const botones = document.querySelectorAll('.filtro-btn');
+      botones.forEach(b => {
+        b.className = 'filtro-btn px-3.5 py-1.5 rounded-full bg-white border border-border-hairline text-ink-muted hover:text-ink hover:bg-gray-well text-[12px] font-medium whitespace-nowrap transition-colors';
+      });
+      botonActivo.className = 'filtro-btn px-3.5 py-1.5 rounded-full bg-ink text-white text-[12px] font-medium whitespace-nowrap transition-colors';
+
+      const items = document.querySelectorAll('.item-transaccion');
+      let visibles = 0;
+
+      items.forEach(item => {
+        const tipo = item.getAttribute('data-tipo');
+        if (categoria === 'todos' || tipo === categoria) {
+          item.style.display = 'flex';
+          visibles++;
+        } else {
+          item.style.display = 'none';
+        }
+      });
+
+      const empty = document.getElementById('empty-state-karma');
+      if (visibles === 0) {
+        empty.classList.remove('hidden');
+        empty.classList.add('flex');
+      } else {
+        empty.classList.add('hidden');
+        empty.classList.remove('flex');
+      }
+    }
+
+    function showToast(mensaje) {
+      const toast = document.getElementById('toast-notificacion');
+      const toastMsg = document.getElementById('toast-mensaje');
+      toastMsg.textContent = mensaje;
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      toast.classList.add('opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('opacity-100');
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 2600);
+    }
+
+    function canjearBeneficio(comercio, puntos) {
+      showToast(`Cupón generado para ${comercio} (-${puntos} pts)`);
+    }
+
+    document.getElementById('btn-transfer-gratitude')?.addEventListener('click', () => {
+      showToast('Selecciona a qué vecino transferir Gratitud');
+    });
+
+    document.getElementById('btn-redeem-perk')?.addEventListener('click', () => {
+      showToast('Explorando comercios aliados cercanos');
+    });
+
+    document.getElementById('btn-view-history')?.addEventListener('click', () => {
+      showToast('Historial descargado en formato resumen');
+    });
+  </script>
+</body></html>

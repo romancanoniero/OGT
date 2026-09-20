@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Quiet Studio · Stitch f68c1b7c · comentar · estático. Tintable. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="20"
+    android:viewportHeight="20">
+    <path android:pathData="M10 3.5C5.86 3.5 2.5 6.41 2.5 10C2.5 11.83 3.37 13.48 4.8 14.65L3.8 17.2C3.68 17.52 4.02 17.82 4.32 17.65L7.5 15.85C8.3 16.27 9.13 16.5 10 16.5C14.14 16.5 17.5 13.59 17.5 10C17.5 6.41 14.14 3.5 10 3.5Z" android:fillColor="#00000000" android:strokeWidth="1.5" android:strokeColor="#111213" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    <path android:pathData="M7 10H13" android:fillColor="#00000000" android:strokeWidth="1.5" android:strokeColor="#111213" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+</vector>

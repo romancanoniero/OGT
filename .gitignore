@@ -1,0 +1,38 @@
+# Gradle
+.gradle/
+build/
+**/build/
+local.properties
+.kotlin/
+
+# Local / emulador
+.android-user/
+.firebase/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.hprof
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
+.env.local
+google-services.json
+GoogleService-Info.plist
+**/serviceAccount*.json
+firebase-adminsdk*.json
+
+# Kotlin / Native
+*.xcuserstate
+xcuserdata/
+DerivedData/
+kotlin-js-store/
+
+# Logs
+*.log
+out/

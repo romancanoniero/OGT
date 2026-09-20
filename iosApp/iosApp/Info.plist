@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>es</string>
+	<key>CFBundleDisplayName</key>
+	<string>Only Good Things</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>armv7</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Usamos Face ID para entrar a tu barrio sin escribir la contraseña.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Usamos tu GPS mientras usás Parking para sincronizar cesiones, distancias reales y para que encuentres tu auto.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Con “Siempre” podemos detectar si estacionaste y recordarte ceder el lugar, incluso si cambiaste de app. No guardamos el historial de rutas.</string>
+	<key>GIDClientID</key>
+	<string>521063054927-34gajgesa1pk2rh51vep08rrs617tsuf.apps.googleusercontent.com</string>
+	<key>GIDServerClientID</key>
+	<string>521063054927-2i8k3qkmh48p5h3qp3nqaunt5t7j4sj0.apps.googleusercontent.com</string>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>NSContactsUsageDescription</key>
+	<string>Para elegir a quién enviarle la invitación por SMS desde tu agenda. No subimos tu libreta.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Para sacar la foto o el video del recuerdo que querés publicar.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Para elegir fotos o videos de tu biblioteca y sumarlos al homenaje o a la historia.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Para grabar el audio si filmás un recuerdo con la cámara.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>comgooglemaps</string>
+		<string>whatsapp</string>
+		<string>sms</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.521063054927-34gajgesa1pk2rh51vep08rrs617tsuf</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>app-1-521063054927-ios-4148b99938eb083430743a</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.onlygoodthings.app.honor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>ogt</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

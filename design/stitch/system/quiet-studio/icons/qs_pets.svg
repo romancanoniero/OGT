@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Quiet Studio · Stitch EcoAction 38da9e8c · trazo 1.5px, viewBox 20. No animado. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none"
+     stroke="#111213" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+
+  <path d="M4 15.5c.8-2.5 2.5-4 4.5-4s3.7 1.5 4.5 4"/>
+  <path d="M6.5 11.5V8a3.5 3.5 0 0 1 7 0v3.5"/>
+  <path d="M6 8.5C5 8 4 9 4.2 10.8c.2 1.4 1.3 2 2.3 1.7"/>
+  <circle cx="8.5" cy="7.5" r="0.7" fill="#111213" stroke="none"/>
+  <circle cx="11.5" cy="7.5" r="0.7" fill="#111213" stroke="none"/>
+  <path d="M9.5 9.5a.7.7 0 0 0 1 0"/>
+</svg>

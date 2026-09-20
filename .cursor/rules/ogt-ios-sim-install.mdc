@@ -1,0 +1,22 @@
+---
+description: Tras un cambio en la app, instalar y abrir en el simulador iOS
+alwaysApply: true
+---
+
+# Instalar en el simulador iOS
+
+Después de cada cambio que el usuario pueda probar (UI, navegación, datos locales, icono, auth), compilar e instalar en el simulador **iPhone 17 Pro** (`B8D6D203-C781-446E-B85B-07631CE9A9FC`) y lanzar `com.onlygoodthings.app`. No esperar a que lo pida.
+
+```bash
+export DEVELOPER_DIR=/Applications/Xcode_26.app/Contents/Developer
+xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -configuration Debug \
+  -destination 'platform=iOS Simulator,id=B8D6D203-C781-446E-B85B-07631CE9A9FC' \
+  -derivedDataPath build/ios-derived -clonedSourcePackagesDirPath build/ios-spm \
+  DEVELOPMENT_TEAM=WER3D825VB build
+xcrun simctl install B8D6D203-C781-446E-B85B-07631CE9A9FC \
+  build/ios-derived/Build/Products/Debug-iphonesimulator/iosApp.app
+xcrun simctl launch B8D6D203-C781-446E-B85B-07631CE9A9FC com.onlygoodthings.app
+```
+
+Si el sim no está booteado: `xcrun simctl boot B8D6D203-C781-446E-B85B-07631CE9A9FC`.
+No aplica a solo docs, fichas de tienda o backend sin cambio visible en el cliente.

@@ -1,0 +1,13 @@
+{
+  "sku": "onlygoodthings",
+  "bundle_id": "com.onlygoodthings.app",
+  "primary_locale": "es-MX",
+  "category": "Lifestyle",
+  "secondary_category": "Social Networking",
+  "content_rights": false,
+  "age_rating": "12+",
+  "copyright": "2026 Only Good Things",
+  "support_url": "https://onlygoodthings.lat",
+  "marketing_url": "https://onlygoodthings.lat",
+  "privacy_url": "https://onlygoodthings.lat/privacy"
+}

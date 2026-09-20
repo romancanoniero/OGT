@@ -1,0 +1,13 @@
+Build de prueba interna. Demo sin backend de producción: el feed arranca con datos de comunidad (Mariana).
+
+Login de laboratorio (si pide cuenta):
+correo: vecino.emulador@goodthings.test
+clave: GoodThings123
+teléfono Firebase de prueba: +5491112345678
+OTP: 123456
+
+Universal Links: https://onlygoodthings.lat/h/{token}
+Scheme: ogt://h/{token}
+
+GPS: usar simulación de ubicación en Buenos Aires.
+Contactos: opcional, solo para SMS de invitación.

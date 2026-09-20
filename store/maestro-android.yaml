@@ -1,0 +1,43 @@
+appId: com.onlygoodthings.app
+---
+- launchApp:
+    clearState: false
+    arguments:
+      ogt.store_preview: "1"
+- tapOn:
+    text: "Permitir"
+    optional: true
+- tapOn:
+    text: "Allow"
+    optional: true
+- tapOn:
+    text: "Mientras se usa la app"
+    optional: true
+- tapOn:
+    text: "While using the app"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: android-01-feed
+- tapOn:
+    text: "Mascotas"
+- waitForAnimationToEnd
+- takeScreenshot: android-02-mascotas
+- tapOn:
+    text: "Todas"
+    optional: true
+- tapOn:
+    text: "Estacionar"
+- waitForAnimationToEnd
+- takeScreenshot: android-03-parking
+- tapOn:
+    text: "Habilidades"
+- waitForAnimationToEnd
+- takeScreenshot: android-04-skills
+- tapOn:
+    text: "Publicar"
+- waitForAnimationToEnd
+- takeScreenshot: android-05-dock
+- tapOn:
+    text: "Buena acción"
+- waitForAnimationToEnd
+- takeScreenshot: android-06-publish

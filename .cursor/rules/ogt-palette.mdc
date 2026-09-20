@@ -1,0 +1,35 @@
+---
+description: Toda UI usa la paleta Quiet Studio (OgtColors), nunca colores inventados ni defaults de Material
+alwaysApply: true
+---
+
+# Paleta Only Good Things
+
+Cualquier implementación (pantalla, componente, campo, estado) usa **solo** tokens de `OgtColors` / `OgtDimens` en `LushImpactTheme.kt`. Origen: Quiet Studio en `design/stitch/DESIGN.md`.
+
+## Obligatorio
+
+- Color de texto, fondo, borde, icono, placeholder, cursor, ripple y disabled: `OgtColors.*`.
+- Campos: `ogtOutlinedFieldColors()`, no el `OutlinedTextField` pelado (filtra lila/gris Material).
+- Expresión (clap, enviar): `expressionIdle` / `expressionOn`.
+- Inactivo: `disabledFill` / `disabledInk` / `disabledLine`.
+
+## No hacer
+
+- `Color(0xFF…)` suelto en UI. Si falta un token, agregarlo en `OgtColors` desde DESIGN.md y usarlo.
+- `MaterialTheme.colorScheme` para “salir del paso”.
+- Paletas paralelas (`PublishColors`, hex de Stitch HTML) en pantallas nuevas.
+
+```kotlin
+// MAL
+OutlinedTextField(value, onValueChange, placeholder = { Text("…") })
+Text(label, color = Color(0xFF49454F))
+
+// BIEN
+OutlinedTextField(
+    value, onValueChange,
+    placeholder = { Text("…", color = OgtColors.muted) },
+    colors = ogtOutlinedFieldColors(),
+)
+Text(label, color = OgtColors.ink)
+```

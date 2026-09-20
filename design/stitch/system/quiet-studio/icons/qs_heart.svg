@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Quiet Studio · emoción de homenaje · trazo 1.5px, viewBox 20. Misma familia que qs_clap. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none"
+     stroke="#111213" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M10 16.7L9.2 16C5.7 12.85 3.4 10.8 3.4 8.15C3.4 6.15 5 4.6 7 4.6C8.15 4.6 9.25 5.15 10 6.05C10.75 5.15 11.85 4.6 13 4.6C15 4.6 16.6 6.15 16.6 8.15C16.6 10.8 14.3 12.85 10.8 16L10 16.7Z" />
+</svg>

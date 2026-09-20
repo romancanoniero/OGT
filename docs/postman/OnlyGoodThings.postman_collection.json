@@ -1,0 +1,308 @@
+{
+  "info": {
+    "name": "Only Good Things API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8080" },
+    { "key": "token", "value": "dev.dev-user-ana.USER" },
+    { "key": "adminToken", "value": "dev.dev-admin-diego.COMPANY_ADMIN" },
+    { "key": "spotId", "value": "77777777-7777-7777-7777-777777777777" },
+    { "key": "postId", "value": "55555555-5555-5555-5555-555555555555" },
+    { "key": "campaignId", "value": "88888888-8888-8888-8888-888888888888" },
+    { "key": "causeId", "value": "99999999-9999-9999-9999-999999999999" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Crear sesión",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/auth/session",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"dev.dev-user-ana.USER\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/auth/me",
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Parking",
+      "item": [
+        {
+          "name": "Publicar vacante",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/parking/publish",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": -34.6037,\n  \"longitude\": -58.3816,\n  \"ownerLatitude\": -34.6050,\n  \"ownerLongitude\": -58.3830,\n  \"ttlMinutes\": 12,\n  \"notes\": \"Salgo de 9 de Julio y Corrientes\",\n  \"vehicleLabel\": \"Gol Trend gris · AB 123 CD\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Cercanas",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/parking/nearby",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": -34.6037,\n  \"longitude\": -58.3816,\n  \"radius\": 400\n}"
+            }
+          }
+        },
+        {
+          "name": "Anotar interés (ventana 20s)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/parking/interest",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"spotId\": \"{{spotId}}\",\n  \"latitude\": -34.6040,\n  \"longitude\": -58.3819\n}"
+            }
+          }
+        },
+        {
+          "name": "Pedir leftover (FCFS post-ventana)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/parking/claim",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"spotId\": \"{{spotId}}\",\n  \"expectedVersion\": 0,\n  \"latitude\": -34.6040,\n  \"longitude\": -58.3819\n}"
+            }
+          }
+        },
+        {
+          "name": "Tick de ubicación",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/parking/tick",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"spotId\": \"{{spotId}}\",\n  \"latitude\": -34.6040,\n  \"longitude\": -58.3819,\n  \"role\": \"CLAIMANT\",\n  \"speedMps\": 4.5\n}"
+            }
+          }
+        },
+        {
+          "name": "Confirmar cesión (proximidad)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/parking/complete",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"spotId\": \"{{spotId}}\",\n  \"latitude\": -34.6040,\n  \"longitude\": -58.3819\n}"
+            }
+          }
+        },
+        {
+          "name": "Cancelar o liberar reserva",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/parking/cancel",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"spotId\": \"{{spotId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Mis plazas activas",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/parking/active",
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+        {
+          "name": "Historial de cesiones",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/parking/history",
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+        {
+          "name": "Obtener plaza",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/parking/get",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"spotId\": \"{{spotId}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Social",
+      "item": [
+        {
+          "name": "Feed",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/social/feed",
+            "body": { "mode": "raw", "raw": "{\n  \"pageSize\": 20\n}" }
+          }
+        },
+        {
+          "name": "Aplauso / Impacto",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/social/impact",
+            "body": { "mode": "raw", "raw": "{\n  \"postId\": \"{{postId}}\"\n}" }
+          }
+        },
+        {
+          "name": "Comentar",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/social/comment",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"postId\": \"{{postId}}\",\n  \"body\": \"Sumo frutas mañana a las 10\",\n  \"parentCommentId\": null\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Animales",
+      "item": [
+        {
+          "name": "Publicar alerta",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/animals/publish",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kind\": \"LOST\",\n  \"species\": \"DOG\",\n  \"size\": \"MEDIUM\",\n  \"urgency\": \"HIGH\",\n  \"title\": \"Labrador perdido en Palermo\",\n  \"description\": \"Collar rojo, responde a Coco\",\n  \"latitude\": -34.5780,\n  \"longitude\": -58.4250,\n  \"radius\": 3000\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "RSE",
+      "item": [
+        {
+          "name": "Campañas (COMPANY_ADMIN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/csr/campaigns",
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+        {
+          "name": "Emitir cupón",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/csr/promo/issue",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campaignId\": \"{{campaignId}}\",\n  \"discountBps\": 1500,\n  \"issuedToUser\": \"11111111-1111-1111-1111-111111111111\",\n  \"conditionNote\": \"100 cesiones de estacionamiento\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Crowdfunding",
+      "item": [
+        {
+          "name": "Progreso de causa",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/causes/progress",
+            "body": { "mode": "raw", "raw": "{\n  \"causeId\": \"{{causeId}}\"\n}" }
+          }
+        }
+      ]
+    }
+  ]
+}
