@@ -46,22 +46,38 @@ import com.onlygoodthings.shared.domain.titleCasePersonName
  * señas, última vista y foto. El radio lo define el CRM.
  */
 @Composable
-fun ReportAnimalScreen(onDone: () -> Unit) {
+fun ReportAnimalScreen(
+    onDone: () -> Unit,
+    editPostId: String? = null,
+) {
     val db = LocalOgtDb.current
     val session = LocalOgtSession.current
     val me = session.me()
     val auth = LocalAuth.current
     val copy = LocalOgtCopy.current
     val scope = rememberCoroutineScope()
-    var name by remember { mutableStateOf("") }
-    var species by remember { mutableStateOf("") }
-    var size by remember { mutableStateOf("") }
-    var marks by remember { mutableStateOf("") }
-    var lastSeen by remember { mutableStateOf("") }
-    var lastSeenPoint by remember { mutableStateOf<GeoPoint?>(null) }
-    var lastSeenLabel by remember { mutableStateOf("") }
-    var story by remember { mutableStateOf("") }
-    val draftMedia = rememberAnimalDraftMedia()
+    val editing = !editPostId.isNullOrBlank()
+    val existing = remember(editPostId) { editPostId?.let { db.post(it) } }
+    val listing = remember(editPostId) {
+        existing?.listingId?.let { id -> db.animals.firstOrNull { it.id == id } }
+    }
+    var name by remember { mutableStateOf(listing?.petName.orEmpty()) }
+    var species by remember { mutableStateOf(listing?.species.orEmpty()) }
+    var size by remember { mutableStateOf(listing?.size.orEmpty()) }
+    var marks by remember { mutableStateOf(listing?.marks.orEmpty()) }
+    var lastSeen by remember { mutableStateOf(listing?.lastSeenPlace.orEmpty()) }
+    var lastSeenPoint by remember {
+        mutableStateOf(
+            listing?.latitude?.let { lat ->
+                listing.longitude?.let { lng -> GeoPoint(lat, lng) }
+            },
+        )
+    }
+    var lastSeenLabel by remember { mutableStateOf(listing?.lastSeenPlace.orEmpty()) }
+    var story by remember { mutableStateOf(listing?.description ?: existing?.body.orEmpty()) }
+    val draftMedia = rememberAnimalDraftMedia(
+        existing?.let { db.mediaOf(it.id).map { media -> media.toDraft() } }.orEmpty(),
+    )
     var triedPublish by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     val missing = buildList {
@@ -74,7 +90,7 @@ fun ReportAnimalScreen(onDone: () -> Unit) {
         if (story.isBlank()) add("cómo es")
     }
     Column(Modifier.fillMaxSize().background(OgtColors.canvas).ogtDismissImeOnScroll().verticalScroll(rememberScrollState())) {
-        OgtTopBar(title = copy.petsLost, onBack = onDone)
+        OgtTopBar(title = if (editing) "Editar alerta" else copy.petsLost, onBack = onDone)
         ScreenColumn {
             OgtCaption("Lo que complete acá es lo que ve la comunidad en la alerta: señas y última vista. El radio lo define el CRM.")
             Text("1. Foto clara", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
@@ -131,31 +147,59 @@ fun ReportAnimalScreen(onDone: () -> Unit) {
             if (triedPublish && missing.isNotEmpty()) {
                 Text("Falta ${joinMissing(missing)}.", color = OgtColors.error, fontSize = 12.sp, fontWeight = FontWeight.Medium)
             }
-            OgtPrimaryButton(if (saving) "Publicando…" else "Emitir alerta a la comunidad", enabled = !saving) {
+            OgtPrimaryButton(
+                when {
+                    saving && editing -> "Guardando…"
+                    saving -> "Publicando…"
+                    editing -> "Guardar alerta"
+                    else -> "Emitir alerta a la comunidad"
+                },
+                enabled = !saving,
+            ) {
                 if (missing.isNotEmpty()) {
                     triedPublish = true
                     return@OgtPrimaryButton
                 }
                 saving = true
                 val place = lastSeenPoint ?: return@OgtPrimaryButton
-                val post = db.publishAnimalListing(
-                    author = me,
-                    kind = "LOST",
-                    petName = name,
-                    species = species,
-                    size = size,
-                    description = story,
-                    place = lastSeen,
-                    marks = marks,
-                    lastSeenPlace = lastSeen,
-                    alertRadiusM = OgtCrmDefaults.LOST_ALERT_RADIUS_M,
-                    latitude = place.latitude,
-                    longitude = place.longitude,
-                ) ?: run {
+                val post = if (editing && existing != null) {
+                    db.updateAnimalListing(
+                        author = me,
+                        postId = existing.id,
+                        petName = name,
+                        species = species,
+                        size = size,
+                        description = story,
+                        place = lastSeen,
+                        marks = marks,
+                        lastSeenPlace = lastSeen,
+                        latitude = place.latitude,
+                        longitude = place.longitude,
+                    )
+                } else {
+                    db.publishAnimalListing(
+                        author = me,
+                        kind = "LOST",
+                        petName = name,
+                        species = species,
+                        size = size,
+                        description = story,
+                        place = lastSeen,
+                        marks = marks,
+                        lastSeenPlace = lastSeen,
+                        alertRadiusM = OgtCrmDefaults.LOST_ALERT_RADIUS_M,
+                        latitude = place.latitude,
+                        longitude = place.longitude,
+                    )
+                } ?: run {
                     saving = false
                     return@OgtPrimaryButton
                 }
-                db.attachAnimalMedia(post.id, "Mascota perdida", draftMedia)
+                if (editing) {
+                    db.replaceAnimalMedia(post.id, "Mascota perdida", draftMedia)
+                } else {
+                    db.attachAnimalMedia(post.id, "Mascota perdida", draftMedia)
+                }
                 session.persistPublishedAnimals()
                 auth.ensureDevBearer()
                 scope.launch {
@@ -163,8 +207,13 @@ fun ReportAnimalScreen(onDone: () -> Unit) {
                         val live = runCatching {
                             persistAnimalOnServer(db, auth.animals, me, post, draftMedia, place)
                         }.getOrDefault(post)
+                        if (editing) {
+                            runCatching { auth.feed.editPost(live.id, story, "Mascota perdida") }
+                                .onSuccess { db.upsertRemoteSocial(it) }
+                        }
                         session.persistPublishedAnimals()
-                        announcePublishedPost(db, live)
+                        session.persistSocialFeed()
+                        if (!editing) announcePublishedPost(db, live)
                     }
                     onDone()
                 }

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Only Good Things</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=feed-copy">
+</head>
+<body>
+  <div id="auth-root" hidden></div>
+  <div class="shell" id="app-shell">
+    <aside class="nav">
+      <div class="brand">Only Good Things</div>
+      <div id="nav-links"></div>
+    </aside>
+    <main class="main" id="main"></main>
+    <aside class="rail">
+      <div class="me">
+        <img class="avatar" src="avatars/feed_avatar_reply.jpg" alt="">
+        <div>
+          <div class="who">Vecino</div>
+          <p class="hint" style="margin:0"></p>
+        </div>
+      </div>
+      <p class="hint">Te puede importar</p>
+      <p class="hint">Cesiones y mascotas cerca se ven en la app. Acá leés y publicás.</p>
+      <button type="button" class="ghost-cta" id="sign-out-rail">Salir</button>
+    </aside>
+  </div>
+  <div id="icons"></div>
+  <div id="dialog" hidden></div>
+  <div id="recaptcha"></div>
+  <p id="toast" class="toast" hidden></p>
+  <script>
+    window.OGT_API_BASE = "";
+  </script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+  <script src="auth.js?v=auth-desk"></script>
+  <script>
+    fetch("icons/qs.svg?v=auth-desk").then((r) => r.text()).then((svg) => {
+      document.getElementById("icons").innerHTML = svg;
+    }).then(() => {
+      const db = document.createElement("script");
+      db.src = "ogt-sdk.js?v=lib";
+      db.onload = function () {
+        const s = document.createElement("script");
+        s.src = "app.js?v=feed-copy";
+        document.body.appendChild(s);
+      };
+      document.body.appendChild(db);
+    });
+  </script>
+</body>
+</html>

@@ -17,3 +17,6 @@ internal actual fun writeMediaCacheFile(name: String, bytes: ByteArray) {
     val file = cacheDir()?.resolve(name) ?: return
     runCatching { file.writeBytes(bytes) }
 }
+
+internal actual fun mediaCacheFilePath(name: String): String =
+    cacheDir()?.resolve(name)?.absolutePath.orEmpty()

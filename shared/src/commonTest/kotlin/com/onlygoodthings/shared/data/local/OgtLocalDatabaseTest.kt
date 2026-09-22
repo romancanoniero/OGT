@@ -2,6 +2,7 @@ package com.onlygoodthings.shared.data.local
 
 import com.onlygoodthings.shared.domain.AnimalListingDto
 import com.onlygoodthings.shared.domain.AuthorKind
+import com.onlygoodthings.shared.domain.FeedEventKind
 import com.onlygoodthings.shared.domain.OgtCrmDefaults
 import com.onlygoodthings.shared.domain.FeedMode
 import com.onlygoodthings.shared.domain.HonorChannel
@@ -17,6 +18,7 @@ import com.onlygoodthings.shared.realtime.socialCommentFrom
 import com.onlygoodthings.shared.realtime.socialLiveCountersFrom
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -68,10 +70,8 @@ class OgtLocalDatabaseTest {
     @Test
     fun cadaPostTieneCarruselInstagramYHayCuarentaNoticias() {
         val db = OgtLocalDatabase.seeded()
-        assertEquals(40, db.posts.count { it.id.startsWith("news-") })
-        assertEquals(100, db.posts.count { it.id.startsWith("pet-") })
-        assertTrue(db.posts.filter { it.id.startsWith("pet-") }.count { !it.sourceUrl.isNullOrBlank() } >= 5)
-        assertTrue(db.posts.filter { it.id.startsWith("pet-") }.count { it.sourceUrl.isNullOrBlank() } >= 80)
+        assertEquals(0, db.posts.count { it.id.startsWith("news-") })
+        assertEquals(0, db.posts.count { it.id.startsWith("pet-") })
         assertEquals(OgtIds.AnimalLuna, db.post(OgtIds.PostLuna).listingId)
         assertEquals(OgtIds.AnimalOliver, db.post(OgtIds.PostOliver).listingId)
         assertEquals(OgtIds.AnimalGrisu, db.post(OgtIds.PostGrisu).listingId)
@@ -87,7 +87,6 @@ class OgtLocalDatabaseTest {
         }
         assertTrue(db.postMedia.any { it.kind == MediaKind.VIDEO })
         assertTrue(db.feedPosts().any { db.mediaOf(it.id).size >= 2 })
-        assertTrue(db.posts.any { !it.sourceUrl.isNullOrBlank() })
     }
 
     @Test
@@ -562,5 +561,109 @@ class OgtLocalDatabaseTest {
         assertEquals("hola", comment?.body)
         assertEquals("ws://127.0.0.1:8080/db", gatewayEndpointFromApiBase("http://127.0.0.1:8080"))
         assertEquals("wss://api.onlygoodthings.lat/db", gatewayEndpointFromApiBase("https://api.onlygoodthings.lat"))
+    }
+
+    @Test
+    fun anecdotaDeHomenajeRecibeComentarioLikeYEdicion() {
+        val db = OgtLocalDatabase.seeded()
+        val me = db.user(OgtIds.Mariana)
+        val post = db.post(OgtIds.PostHomenaje)
+        val story = db.addAnecdote(me, post.id, "Devolvió un sobre que no era suyo.")
+        assertTrue(story != null)
+        val clapped = db.clapAnecdote(me.id, story!!.id)
+        assertEquals(1, clapped?.impactCount)
+        assertTrue(clapped?.viewerHasImpacted == true)
+        val hearted = db.heartAnecdote(me.id, story.id)
+        assertEquals(1, hearted?.heartCount)
+        val note = db.addComment(me, post.id, "Lo vi yo también.", anecdoteId = story.id)
+        assertTrue(note != null)
+        val commentId = note!!.id
+        assertEquals(1, db.commentsOf(post.id, story.id).size)
+        assertEquals(0, db.commentsOf(post.id).count { it.id == commentId })
+        val edited = db.editComment(me.id, commentId, "Lo vi yo también, frente al Congreso.")
+        assertTrue(edited?.edited == true)
+        assertTrue(db.deleteComment(me.id, commentId))
+        assertTrue(db.commentsOf(post.id, story.id).isEmpty())
+        val rewritten = db.editAnecdote(me.id, story.id, "Rechazó el sobre y lo devolvió.")
+        assertEquals("Rechazó el sobre y lo devolvió.", rewritten?.body)
+        assertTrue(db.deleteAnecdote(me.id, story.id))
+        assertTrue(db.anecdotesOf(post.id).none { it.id == story.id })
+    }
+
+    @Test
+    fun anecdotaPuntualAjenaSeVeYLaPropiaNo() {
+        val db = OgtLocalDatabase.seeded()
+        val preview = db.ensureFeedAnecdotePreview()
+        assertEquals(OgtIds.PostAnecdoteShare, preview.id)
+        assertEquals(OgtIds.Sofia, preview.authorUserId)
+        assertTrue(preview.isAnecdoteShare())
+        assertTrue(db.shouldShowInFeed(OgtIds.Mariana, preview))
+        assertTrue(db.visibleFeed(OgtIds.Mariana).any { it.id == preview.id })
+        val me = db.user(OgtIds.Mariana)
+        val story = db.addAnecdote(me, OgtIds.PostHomenaje, "Le devolvió un sobre que no era suyo.")
+        val mine = db.repostAnecdote(me, story!!.id)
+        assertTrue(mine != null)
+        assertTrue(mine!!.isAnecdoteShare())
+        assertEquals("Anécdota", mine.tag)
+        assertEquals(OgtIds.PostHomenaje, mine.parentPostId)
+        assertTrue(db.hidesOwnAnecdoteShare(OgtIds.Mariana, mine))
+        assertFalse(db.shouldShowInFeed(OgtIds.Mariana, mine, nowEpochMs = mine.createdAtEpochMs))
+        assertTrue(db.visibleFeed(OgtIds.Mariana, nowEpochMs = mine.createdAtEpochMs).none { it.id == mine.id })
+        assertFalse(db.hidesOwnAnecdoteShare(OgtIds.Sofia, mine))
+    }
+
+    @Test
+    fun autorEditaEliminaYElRestoOcultaElPost() {
+        val db = OgtLocalDatabase.seeded()
+        val edited = db.editOwnPost(OgtIds.Sofia, OgtIds.PostTaller, "Texto corregido", "Huerta comunitaria")
+        assertEquals("Texto corregido", edited?.body)
+        assertEquals("Huerta comunitaria", edited?.tag)
+        assertNull(db.editOwnPost(OgtIds.Mariana, OgtIds.PostTaller, "No es mío"))
+        db.recordFeedEvent(OgtIds.Mariana, OgtIds.PostTaller, FeedEventKind.HIDE)
+        assertTrue(OgtIds.PostTaller in db.hiddenPostIds(OgtIds.Mariana))
+        assertFalse(db.shouldShowInFeed(OgtIds.Mariana, db.post(OgtIds.PostTaller)))
+        val order = listOf(OgtIds.PostTaller, OgtIds.PostAnecdoteShare)
+        assertTrue(db.composeVisibleRiver(OgtIds.Mariana).none { it.id == OgtIds.PostTaller })
+        assertTrue(db.composeVisibleRiver(OgtIds.Mariana, remoteOrder = order).none { it.id == OgtIds.PostTaller })
+        db.recordFeedEvent(OgtIds.Mariana, OgtIds.PostAnecdoteShare, FeedEventKind.HIDE)
+        assertTrue(db.composeVisibleRiver(OgtIds.Mariana, remoteOrder = order).none { it.id == OgtIds.PostAnecdoteShare })
+        val hiddenSnap = db.exportSocialFeed(OgtIds.Mariana)
+        val rehydrated = OgtLocalDatabase.seeded()
+        rehydrated.importSocialFeed(hiddenSnap)
+        assertTrue(OgtIds.PostTaller in rehydrated.hiddenPostIds(OgtIds.Mariana))
+        assertTrue(rehydrated.composeVisibleRiver(OgtIds.Mariana, remoteOrder = order).none { it.id == OgtIds.PostTaller })
+        val removed = db.removeOwnPost(OgtIds.Sofia, OgtIds.PostTaller)
+        assertEquals(OgtIds.PostTaller, removed?.id)
+        assertTrue(db.posts.none { it.id == OgtIds.PostTaller })
+        db.restorePost(removed!!)
+        assertEquals("Texto corregido", db.post(OgtIds.PostTaller).body)
+    }
+
+    @Test
+    fun clapPostEsDeUnaVezYSePuedeRevertir() {
+        val db = OgtLocalDatabase.seeded()
+        val before = db.snapshotPost(OgtIds.PostTaller)!!
+        val first = db.clapPost(OgtIds.Mariana, OgtIds.PostTaller)!!
+        assertEquals(before.impactCount + 1, first.impactCount)
+        assertTrue(first.viewerHasImpacted)
+        val second = db.clapPost(OgtIds.Mariana, OgtIds.PostTaller)!!
+        assertEquals(first.impactCount, second.impactCount)
+        db.restorePost(before)
+        assertEquals(before.impactCount, db.post(OgtIds.PostTaller).impactCount)
+        assertFalse(db.post(OgtIds.PostTaller).viewerHasImpacted)
+    }
+
+    @Test
+    fun snapshotDelRioSeRehidrataSinPerderAplausos() {
+        val db = OgtLocalDatabase.seeded()
+        db.clapPost(OgtIds.Mariana, OgtIds.PostTaller)
+        db.toggleFollow(OgtIds.Mariana, OgtIds.Ana)
+        val raw = db.exportSocialFeed(OgtIds.Mariana)
+        val other = OgtLocalDatabase.seeded()
+        other.importSocialFeed(raw)
+        assertTrue(other.post(OgtIds.PostTaller).viewerHasImpacted)
+        assertTrue(other.isFollowing(OgtIds.Mariana, OgtIds.Ana))
+        val river = other.composeVisibleRiver(OgtIds.Mariana)
+        assertTrue(river.any { it.id == OgtIds.PostTaller })
     }
 }

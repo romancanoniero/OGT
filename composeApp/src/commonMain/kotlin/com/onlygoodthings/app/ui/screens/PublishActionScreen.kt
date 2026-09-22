@@ -46,6 +46,7 @@ import com.onlygoodthings.app.data.LocalAuth
 import com.onlygoodthings.app.data.LocalOgtDb
 import com.onlygoodthings.app.data.LocalOgtSession
 import com.onlygoodthings.app.data.announcePublishedPost
+import com.onlygoodthings.app.data.optimisticEditPost
 import com.onlygoodthings.app.media.OgtMediaCache
 import com.onlygoodthings.app.nav.ComposePostKind
 import com.onlygoodthings.app.notify.showSystemNotice
@@ -75,6 +76,7 @@ import com.onlygoodthings.shared.domain.MediaKind
 import com.onlygoodthings.shared.domain.MentionCandidate
 import com.onlygoodthings.shared.domain.mentionHandle
 import com.onlygoodthings.shared.domain.namedMention
+import com.onlygoodthings.shared.domain.PostMediaItem
 import com.onlygoodthings.shared.domain.PostMediaRules
 import com.onlygoodthings.shared.domain.PostPersonRole
 import com.onlygoodthings.shared.domain.honorShareText
@@ -145,6 +147,7 @@ private val BarrioSpots = listOf(
 @Composable
 fun PublishActionScreen(
     kind: ComposePostKind = ComposePostKind.ACTION,
+    editPostId: String? = null,
     onDone: () -> Unit,
     onBack: () -> Unit = onDone,
 ) {
@@ -154,16 +157,23 @@ fun PublishActionScreen(
     val scope = rememberCoroutineScope()
     val invite = rememberHonorInviteActions()
     val me = session.me()
+    val editing = !editPostId.isNullOrBlank()
+    val existing = remember(editPostId) { editPostId?.let { db.post(it) } }
     val categories = categoriesFor(kind)
     val storyMode = kind == ComposePostKind.TERNURA || kind == ComposePostKind.HOMENAJE
     val ternuraForm = kind == ComposePostKind.TERNURA
     val honorForm = kind == ComposePostKind.HOMENAJE
     var authorIsSelf by remember(kind) { mutableStateOf(false) }
-    var storyTouched by remember(kind) { mutableStateOf(false) }
-    var category by remember(kind) { mutableStateOf(defaultCategory(kind)) }
+    var storyTouched by remember(kind) { mutableStateOf(editing) }
+    var category by remember(kind) {
+        mutableStateOf(
+            existing?.let { post -> categories.firstOrNull { it.label.equals(post.tag, ignoreCase = true) }?.id }
+                ?: defaultCategory(kind),
+        )
+    }
     var categoryOpen by remember(kind) { mutableStateOf(false) }
     var story by remember(kind) {
-        mutableStateOf(if (storyMode) "" else defaultStory(kind, false))
+        mutableStateOf(existing?.body?.takeIf { it.isNotBlank() } ?: if (storyMode) "" else defaultStory(kind, false))
     }
     val draftMedia = remember(kind) {
         mutableStateListOf<OgtPickedMedia>().also { list ->
@@ -228,13 +238,20 @@ fun PublishActionScreen(
         if (draftMedia.isEmpty() && !storyMode) {
             draftMedia += OgtPickedMedia("jardin", MediaKind.IMAGE, "jardin", fromDevice = false)
         }
-        if (draftMedia.isEmpty()) return
-        val now = currentEpochMs()
-        val postId = "post-pub-$now"
+        if (draftMedia.isEmpty() && !editing) return
         val tag = when {
             ternuraForm -> "Ternura"
             else -> categories.firstOrNull { it.id == category }?.label ?: "Ayuda vecinal"
         }
+        if (editing && existing != null) {
+            optimisticEditPost(db, auth.feed, scope, me.id, existing.id, story, tag) {
+                session.persistSocialFeed()
+            }
+            toast = true
+            return
+        }
+        val now = currentEpochMs()
+        val postId = "post-pub-$now"
         db.posts += LocalSocialPost(
             id = postId,
             authorKind = AuthorKind.USER,
@@ -303,7 +320,32 @@ fun PublishActionScreen(
         db.recordFeedEvent(me.id, postId, FeedEventKind.SHARE)
         db.bumpFeed()
         val published = db.post(postId)
-        scope.launch { announcePublishedPost(db, published) }
+        scope.launch {
+            auth.ensureDevBearer()
+            val remote = runCatching {
+                auth.feed.publishPost(
+                    body = story,
+                    topic = tag,
+                    media = draftMedia.take(PostMediaRules.MAX_ITEMS).mapIndexed { order, item ->
+                        val video = item.kind == MediaKind.VIDEO
+                        PostMediaItem(
+                            id = "$postId-m$order",
+                            kind = item.kind,
+                            url = if (item.fromDevice) "file://${item.path}" else "asset://${item.path}",
+                            posterUrl = item.posterPath?.let { "file://$it" },
+                            sortOrder = order,
+                            altText = tag,
+                            assetKey = if (item.fromDevice) "" else if (video) "feed_story_playa" else item.path,
+                        )
+                    },
+                    protagonistUserId = heroId,
+                    participantUserIds = neighbors.mapNotNull { it.userId }.distinct(),
+                    honoreeName = protagonist?.takeIf { it.namedOnly }?.displayName,
+                )
+            }.getOrNull()
+            if (remote != null) db.upsertRemoteSocial(remote)
+            announcePublishedPost(db, published)
+        }
         session.persistHonors()
         val mentionedIds = buildList {
             if (!ternuraForm && !authorIsSelf) protagonist?.userId?.let(::add)
@@ -336,9 +378,12 @@ fun PublishActionScreen(
 
     Column(Modifier.fillMaxSize().background(OgtColors.canvas)) {
         OgtTopBar(
-            title = when (kind) {
-                ComposePostKind.TERNURA -> "Ternura"
-                ComposePostKind.HOMENAJE -> "Homenaje"
+            title = when {
+                editing && honorForm -> "Editar homenaje"
+                editing && ternuraForm -> "Editar ternura"
+                editing -> "Editar publicación"
+                kind == ComposePostKind.TERNURA -> "Ternura"
+                kind == ComposePostKind.HOMENAJE -> "Homenaje"
                 else -> "Dar a conocer"
             },
             onBack = onBack,
@@ -632,6 +677,7 @@ fun PublishActionScreen(
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             OgtPrimaryButton(
                                 when {
+                                    editing -> "Guardar cambios"
                                     kind == ComposePostKind.TERNURA -> "Compartir esta ternura"
                                     kind == ComposePostKind.HOMENAJE -> "Publicar el homenaje"
                                     authorIsSelf -> "Compartir con la comunidad"

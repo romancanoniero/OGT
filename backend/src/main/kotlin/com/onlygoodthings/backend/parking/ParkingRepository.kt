@@ -379,13 +379,6 @@ class ParkingSqlRepository(
                 connection.rollback()
                 return@withConnection null
             }
-            connection.prepareStatement(
-                "UPDATE users SET community_points = community_points + ? WHERE id = ?::uuid",
-            ).use { stmt ->
-                stmt.setInt(1, verified.points)
-                stmt.setString(2, verified.owner)
-                stmt.executeUpdate()
-            }
             val handoff = connection.prepareStatement(
                 """
                 INSERT INTO parking_handoffs (parking_spot_id, owner_user_id, claimant_user_id, proximity_meters, verified, points_awarded)
@@ -405,17 +398,18 @@ class ParkingSqlRepository(
                     rs.toHandoff()
                 }
             }
-            connection.prepareStatement(
-                """
-                INSERT INTO domain_events (event_type, aggregate_type, aggregate_id, payload)
-                VALUES ('parking.completed', 'parking_spot', ?::uuid, jsonb_build_object('points', ?, 'meters', ?))
-                """.trimIndent(),
-            ).use { stmt ->
-                stmt.setString(1, spotId)
-                stmt.setInt(2, verified.points)
-                stmt.setDouble(3, verified.meters)
-                stmt.executeUpdate()
-            }
+            com.onlygoodthings.backend.social.OutcomeSqlRepository(db).awardOn(
+                connection,
+                com.onlygoodthings.backend.social.OutcomeSqlRepository.Draft(
+                    kind = com.onlygoodthings.shared.domain.ActionOutcomeKind.PARKING_HANDOFF,
+                    method = com.onlygoodthings.shared.domain.VerificationMethod.GEO,
+                    actorUserId = verified.owner,
+                    beneficiaryUserId = verified.claimant,
+                    sourceTable = "parking_spots",
+                    sourceId = spotId,
+                    points = verified.points,
+                ),
+            )
             connection.commit()
             ParkingCompleteResult(verified.spot, handoff)
         } catch (error: Exception) {

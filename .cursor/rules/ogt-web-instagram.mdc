@@ -1,0 +1,13 @@
+---
+description: Web de vecinos y empresas — patrón Instagram
+globs: web/app/**,design/stitch/web/**
+alwaysApply: false
+---
+
+# Web OGT
+
+- **Vecino** (`USER`): esqueleto Instagram. Inicio, Buscar, Mascotas, Ayuda, Mensajes, Avisos, Publicar, Billetera, Perfil. Columna ~680 px. Sin parking ni GPS.
+- **Empresa** (`COMPANY_ADMIN`): escritorio operativo en `#/empresa` (panel, campañas, comunidad de solo lectura). No es un feed de Instagram.
+- Auth: mismos medios que la app (correo, Google, Facebook, teléfono). Sin Apple. Sin token de lab por defecto.
+
+Paleta Quiet Studio. Lo que matchea se copia; lo operativo de empresa no se fuerza al patrón Instagram.

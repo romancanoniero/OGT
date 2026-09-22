@@ -16,37 +16,39 @@ import androidx.compose.ui.unit.sp
 import com.onlygoodthings.app.data.LocalOgtDb
 import com.onlygoodthings.app.data.LocalOgtSession
 import com.onlygoodthings.app.theme.OgtColors
-import com.onlygoodthings.app.ui.components.OgtCard
 import com.onlygoodthings.app.ui.components.OgtCaption
-import com.onlygoodthings.app.ui.components.OgtPill
-import com.onlygoodthings.app.ui.components.OgtPrimaryButton
-import com.onlygoodthings.app.ui.components.OgtSectionTitle
 import com.onlygoodthings.app.ui.components.OgtTopBar
+import com.onlygoodthings.app.ui.components.PrefCategory
+import com.onlygoodthings.app.ui.components.PrefDivider
+import com.onlygoodthings.app.ui.components.PrefGroup
+import com.onlygoodthings.app.ui.components.PrefLine
 import com.onlygoodthings.app.ui.components.ScreenColumn
 
 @Composable
 fun SponsorsScreen(onBack: () -> Unit = {}) {
     val db = LocalOgtDb.current
     val me = LocalOgtSession.current.me()
-    Column(Modifier.fillMaxSize().background(OgtColors.canvas).verticalScroll(rememberScrollState())) {
-        OgtTopBar(title = "Sponsors Verificados", onBack = onBack)
+    Column(Modifier.fillMaxSize().background(OgtColors.canvas)) {
+        OgtTopBar(title = "Sponsors", onBack = onBack)
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         ScreenColumn {
-            OgtPill("Triple Impacto")
-            OgtSectionTitle("Alianzas de Impacto y Beneficios")
-            OgtCaption("Empresas que financian proyectos comunitarios y premian tu huella positiva.")
-            Text("Tu Score Verde Actual", fontWeight = FontWeight.SemiBold)
-            Text("${me.communityPoints} Puntos OGT · ${me.levelLabel}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = OgtColors.primary)
-            db.sponsors.forEach { offer ->
-                OgtCard {
-                    offer.badge?.let { OgtPill(it) }
-                    Text(offer.company, fontWeight = FontWeight.Bold)
-                    offer.title?.let { Text(it, fontWeight = FontWeight.SemiBold, color = OgtColors.primary) }
-                    OgtCaption(offer.body)
-                    offer.cta?.let { OgtPrimaryButton(it) { } }
+            OgtCaption("Empresas que financian proyectos comunitarios y premian tu huella.")
+            Text("${me.communityPoints} pts", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = OgtColors.primary)
+            OgtCaption("${me.levelLabel} · Score verde")
+            PrefCategory("Alianzas")
+            PrefGroup {
+                db.sponsors.forEachIndexed { index, offer ->
+                    if (index > 0) PrefDivider()
+                    PrefLine(
+                        title = offer.company,
+                        body = listOfNotNull(offer.title, offer.body).joinToString(" · "),
+                        trailing = offer.badge,
+                    )
                 }
             }
-            OgtCaption("El 100% de la publicidad financia causas sociales sin venta de datos personales.")
+            OgtCaption("El 100% de la publicidad financia causas. No se venden datos.")
             Spacer(Modifier.height(80.dp))
+        }
         }
     }
 }

@@ -11,9 +11,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.onlygoodthings.app.nav.OgtRoute
 import com.onlygoodthings.app.resources.Res
+import com.onlygoodthings.app.resources.logo_havanna
+import com.onlygoodthings.app.resources.logo_la_espiga
+import com.onlygoodthings.app.resources.logo_santander
+import com.onlygoodthings.app.resources.logo_vivero_esperanza
+import com.onlygoodthings.app.resources.qs_attend
 import com.onlygoodthings.app.resources.qs_feed
 import com.onlygoodthings.app.resources.qs_gps
 import com.onlygoodthings.app.resources.qs_parked
+import com.onlygoodthings.app.resources.qs_parking
 import com.onlygoodthings.app.resources.qs_paw
 import com.onlygoodthings.app.resources.qs_search
 import com.onlygoodthings.app.resources.qs_skills
@@ -53,16 +59,32 @@ fun OgtStitchIcon(
 
 fun tabStitchArt(route: OgtRoute): DrawableResource = when (route) {
     OgtRoute.Feed -> Res.drawable.qs_feed
-    OgtRoute.Parking -> Res.drawable.qs_search
+    OgtRoute.Parking -> Res.drawable.qs_parking
     OgtRoute.Animals -> Res.drawable.qs_paw
     OgtRoute.Skills -> Res.drawable.qs_skills
     OgtRoute.Settings -> Res.drawable.qs_wallet
     else -> Res.drawable.qs_feed
 }
 
+/** Marca de fila: comercios (PNG) o glifo Quiet Studio. */
+fun walletMarkArt(mark: String): DrawableResource = when (mark) {
+    "havanna" -> Res.drawable.logo_havanna
+    "vivero" -> Res.drawable.logo_vivero_esperanza
+    "espiga" -> Res.drawable.logo_la_espiga
+    "santander" -> Res.drawable.logo_santander
+    "paw" -> Res.drawable.qs_paw
+    "yield", "parking" -> Res.drawable.qs_yield
+    "skills" -> Res.drawable.qs_skills
+    "attend" -> Res.drawable.qs_attend
+    "feed" -> Res.drawable.qs_feed
+    else -> Res.drawable.qs_wallet
+}
+
+fun walletMarkIsBrand(mark: String): Boolean = mark in setOf("havanna", "vivero", "espiga", "santander")
+
 fun pinStitchArt(kind: String): DrawableResource = when (kind) {
     "CAR" -> Res.drawable.qs_parked
-    "PARKING" -> Res.drawable.qs_search
+    "PARKING" -> Res.drawable.qs_parking
     "ANIMAL" -> Res.drawable.qs_paw
     "ORIGIN" -> Res.drawable.qs_search
     "SIGHT" -> Res.drawable.qs_gps

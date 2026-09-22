@@ -10,7 +10,6 @@ expect class AuthPlatform() {
     suspend fun startPhoneAuth(phoneE164: String): PendingPhoneAuth
     suspend fun confirmPhone(pending: PendingPhoneAuth, code: String): AuthUser
     suspend fun signInGoogle(): AuthUser
-    suspend fun signInApple(): AuthUser
     suspend fun signInFacebook(): AuthUser
     suspend fun unlockBiometric(): Boolean
     suspend fun canUseBiometric(): Boolean
@@ -43,11 +42,14 @@ expect class AuthPrefs() {
     var honorsJson: String
     /** Fichas de adopción/perdido publicadas en este dispositivo. */
     var publishedAnimalsJson: String
+    /** Último feed social visto: se muestra hasta que llegue el REST. */
+    var feedCacheJson: String
     /** Ya se leyó el referrer de Play para no reaplicar el claim. */
     var honorReferrerConsumed: Boolean
+    /** El vecino encendió el GPS. Sin esto no hay tracking ni ping al servidor. */
+    var gpsEnabled: Boolean
+    /** `while` o `always`. Alcance pedido al sistema. */
+    var locationScope: String
 }
 
 expect fun defaultApiBaseUrl(): String
-
-/** Sign in with Apple solo en dispositivos Apple. */
-expect fun showsAppleSignIn(): Boolean

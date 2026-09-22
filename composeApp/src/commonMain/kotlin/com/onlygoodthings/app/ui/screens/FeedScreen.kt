@@ -67,11 +67,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.onlygoodthings.app.data.LocalAuth
 import com.onlygoodthings.app.data.LocalOgtDb
 import com.onlygoodthings.app.data.LocalOgtSession
-import com.onlygoodthings.app.data.LocalOgtSession
+import com.onlygoodthings.app.data.backgroundFeedEvent
+import com.onlygoodthings.app.data.optimisticClapPost
+import com.onlygoodthings.app.data.optimisticDeletePost
+import com.onlygoodthings.app.data.optimisticHeartPost
+import com.onlygoodthings.app.data.optimisticHidePost
+import com.onlygoodthings.app.data.optimisticReportPost
+import com.onlygoodthings.app.media.OgtMediaCache
 import com.onlygoodthings.app.resources.Res
 import com.onlygoodthings.app.resources.feed_avatar_carlos
 import com.onlygoodthings.app.resources.feed_avatar_mariana
@@ -92,21 +100,27 @@ import com.onlygoodthings.app.resources.qs_feed
 import com.onlygoodthings.app.resources.qs_notifications
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.i18n.LocalOgtCopy
+import com.onlygoodthings.app.resources.qs_anecdote
 import com.onlygoodthings.app.resources.qs_invite
 import com.onlygoodthings.app.resources.qs_paw
 import com.onlygoodthings.app.resources.qs_pets
 import com.onlygoodthings.app.resources.qs_search
 import com.onlygoodthings.app.ui.components.CircleIconButton
 import com.onlygoodthings.app.ui.components.MediaPagerIndicator
+import com.onlygoodthings.app.ui.components.OgtTopBar
 import com.onlygoodthings.app.ui.components.OgtCaption
 import com.onlygoodthings.app.ui.components.OgtPill
 import com.onlygoodthings.app.ui.components.LostAlertMap
 import com.onlygoodthings.app.ui.components.OgtPrimaryButton
 import com.onlygoodthings.app.ui.components.OgtStitchIcon
 import com.onlygoodthings.app.ui.components.PostActionRow
+import com.onlygoodthings.app.ui.components.PostOverflowSheet
+import com.onlygoodthings.app.ui.components.PostReportSheet
+import com.onlygoodthings.app.ui.components.PostShareSheet
 import com.onlygoodthings.shared.data.local.LocalAnimalListing
 import com.onlygoodthings.shared.data.local.LocalComment
 import com.onlygoodthings.shared.data.local.LocalPostMedia
+import com.onlygoodthings.shared.domain.PostPlacement
 import com.onlygoodthings.shared.data.local.LocalSocialPost
 import com.onlygoodthings.shared.data.local.OgtIds
 import com.onlygoodthings.shared.domain.AuthorKind
@@ -115,10 +129,17 @@ import com.onlygoodthings.shared.domain.FeedEventKind
 import com.onlygoodthings.shared.domain.FeedMode
 import com.onlygoodthings.shared.domain.FeedTopicFamily
 import com.onlygoodthings.shared.domain.MediaKind
+import com.onlygoodthings.shared.domain.anecdoteShareText
+import com.onlygoodthings.shared.domain.canEditSocialPost
 import com.onlygoodthings.shared.domain.feedCardKind
 import com.onlygoodthings.shared.domain.canRsvpToGathering
 import com.onlygoodthings.shared.domain.gatheringWhenWhere
 import com.onlygoodthings.shared.domain.isGatheringPost
+import com.onlygoodthings.shared.domain.isHomenajePost
+import com.onlygoodthings.shared.domain.postMetaLine
+import com.onlygoodthings.shared.domain.postShareText
+import com.onlygoodthings.shared.data.local.anecdoteParentId
+import com.onlygoodthings.shared.data.local.isAnecdoteShare
 import com.onlygoodthings.shared.realtime.OgtRealtime
 import com.onlygoodthings.shared.realtime.OgtSdk
 import com.onlygoodthings.shared.realtime.currentEpochMs
@@ -138,10 +159,13 @@ fun FeedScreen(
     onOpenNeighbor: (String) -> Unit = {},
     onPetsMap: () -> Unit = {},
     onAdopt: () -> Unit = {},
-    onEditAdoption: (String) -> Unit = {},
+    onEditPost: (String) -> Unit = {},
+    onOpenRules: () -> Unit = {},
 ) {
     val db = LocalOgtDb.current
-    val me = LocalOgtSession.current.me()
+    val auth = LocalAuth.current
+    val session = LocalOgtSession.current
+    val me = session.me()
     val lostTick = db.lostEpoch
     val socialTick by db.socialTick.collectAsState()
     val feedTick by db.feedTick.collectAsState()
@@ -156,16 +180,44 @@ fun FeedScreen(
     var refreshTick by remember { mutableStateOf(0) }
     var refreshing by remember { mutableStateOf(false) }
     var pullPx by remember { mutableStateOf(0f) }
-    var feedPosts by remember { mutableStateOf(listOf<LocalSocialPost>()) }
+    var feedPosts by remember {
+        mutableStateOf(db.composeVisibleRiver(me.id, feedMode, feedFamily))
+    }
+    var lastRemoteOrder by remember { mutableStateOf<List<String>?>(null) }
     var incomingToast by remember { mutableStateOf(false) }
     var suppressIncomingToast by remember { mutableStateOf(false) }
     val seenPostIds = remember { mutableStateListOf<String>() }
+    fun paintRiver(remoteOrder: List<String>? = lastRemoteOrder) {
+        feedPosts = db.composeVisibleRiver(me.id, feedMode, feedFamily, remoteOrder)
+    }
     LaunchedEffect(feedMode, feedFamily) { page = 1 }
-    LaunchedEffect(me.id, feedMode, feedFamily, refreshTick, feedTick, socialTick) {
-        feedPosts = db.visibleFeed(me.id, feedMode, feedFamily)
+    LaunchedEffect(me.id, feedMode, feedFamily, feedTick, socialTick) {
+        paintRiver()
+    }
+    LaunchedEffect(me.id, feedMode, feedFamily, refreshTick) {
+        paintRiver()
+        auth.ensureDevBearer()
+        val remote = try {
+            auth.feed.loadFeed(cursor = "0", pageSize = 40, mode = feedMode, family = feedFamily)
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            null
+        }
+        if (remote != null) {
+            remote.forEach { db.upsertRemoteSocial(it, silent = true) }
+            lastRemoteOrder = remote.map { it.id }
+            paintRiver(lastRemoteOrder)
+            session.persistSocialFeed()
+            val mediaUrls = remote.flatMap { post ->
+                post.media.flatMap { listOfNotNull(it.url, it.posterUrl) } + post.mediaUrls
+            }
+            runCatching { OgtMediaCache.prefetch(mediaUrls) }
+        }
         if (seenPostIds.isEmpty()) seenPostIds.addAll(db.feedPosts().map { it.id })
     }
     LaunchedEffect(feedTick) {
+        session.persistSocialFeed()
         val first = feedPosts.firstOrNull()
         if (first != null && db.isOwnPost(first, me.aliases())) listState.animateScrollToItem(0)
     }
@@ -250,16 +302,23 @@ fun FeedScreen(
         }
     }
     var viewingStoryId by remember { mutableStateOf<String?>(null) }
+    var sharePostId by remember { mutableStateOf<String?>(null) }
+    var overflowPostId by remember { mutableStateOf<String?>(null) }
+    var reportPostId by remember { mutableStateOf<String?>(null) }
     val seenStoryIds = remember { mutableStateListOf<String>() }
-    Box(Modifier.fillMaxSize().background(Color(0xFFFBF8FC))) {
+    OgtTopBar(
+        title = "OnlyGoodThings",
+        onNotifications = onNotifications,
+        onProfile = onProfile,
+        onMessages = onMessages,
+        branded = true,
+    )
+    Box(Modifier.fillMaxSize().background(OgtColors.canvas)) {
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().nestedScroll(pull),
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
-            item(key = "chrome-header") {
-                FeedHeader(onNotifications = onNotifications, onMessages = onMessages, onProfile = onProfile)
-            }
             item(key = "chrome-stories") {
                 FeedStories(
                     stories = stories,
@@ -295,23 +354,31 @@ fun FeedScreen(
                     comments = comments,
                     onOpen = {
                         db.recordFeedEvent(me.id, post.id, FeedEventKind.IMPRESSION)
-                        onOpenPost(post.id)
+                        backgroundFeedEvent(auth.feed, scope, post.id, FeedEventKind.IMPRESSION)
+                        onOpenPost(db.openFeedTarget(post))
                     },
                     onOpenAuthor = {
                         val authorId = post.authorUserId
                         if (authorId != null) {
                             db.recordFeedEvent(me.id, post.id, FeedEventKind.PROFILE_TAP)
+                            backgroundFeedEvent(auth.feed, scope, post.id, FeedEventKind.PROFILE_TAP)
                             onOpenNeighbor(authorId)
                         }
                     },
                     onInvite = onInvite,
-                    onClap = { db.recordFeedEvent(me.id, post.id, FeedEventKind.CLAP) },
-                    onHeart = { db.recordFeedEvent(me.id, post.id, FeedEventKind.HEART) },
+                    onShare = { sharePostId = post.id },
+                    onOverflow = { overflowPostId = post.id },
+                    onClap = {
+                        optimisticClapPost(db, auth.feed, scope, me.id, post.id) { session.persistSocialFeed() }
+                    },
+                    onHeart = {
+                        optimisticHeartPost(db, auth.feed, scope, me.id, post.id)
+                    },
                     onPetsMap = onPetsMap,
                     onAdopt = onAdopt,
-                    onEditAdoption = { onEditAdoption(post.id) },
+                    onEditAdoption = { onEditPost(post.id) },
                     isAdoptionAuthor = me.owns(post.authorUserId) || me.owns(listing?.reporterUserId),
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                 )
             }
             item(key = "chrome-end") {
@@ -342,6 +409,79 @@ fun FeedScreen(
                     .padding(horizontal = 16.dp, vertical = 10.dp),
             )
         }
+        sharePostId?.let { postId ->
+            val post = remember(postId, socialTick) { db.post(postId) }
+            val listing = remember(postId, lostTick) { post.listingId?.let { id -> db.animals.firstOrNull { it.id == id } } }
+            val honorLink = post.anecdoteParentId() ?: post.id
+            PostShareSheet(
+                shareText = if (post.isAnecdoteShare()) {
+                    anecdoteShareText(db.creditName(post), post.body, honorLink)
+                } else {
+                    postShareText(
+                        headline = listing?.title?.takeIf { it.isNotBlank() }
+                            ?: db.creditName(post).takeIf { isHomenajePost(post.tag) }
+                            ?: post.tag,
+                        body = listing?.description?.takeIf { it.isNotBlank() } ?: post.body.takeIf { it.isNotBlank() },
+                        place = gatheringWhenWhere(post.place, post.eventStartsAtEpochMs, currentEpochMs())
+                            ?: post.place.takeIf { it.isNotBlank() },
+                        postId = post.id,
+                    )
+                },
+                onDismiss = { sharePostId = null },
+                onRepost = {
+                    db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE)
+                    backgroundFeedEvent(auth.feed, scope, post.id, FeedEventKind.SHARE)
+                },
+                onInvite = {
+                    db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE)
+                    backgroundFeedEvent(auth.feed, scope, post.id, FeedEventKind.SHARE)
+                    onInvite()
+                },
+                onExternal = {
+                    db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE)
+                    backgroundFeedEvent(auth.feed, scope, post.id, FeedEventKind.SHARE)
+                },
+            )
+        }
+        reportPostId?.let { postId ->
+            val post = remember(postId, socialTick) { db.posts.firstOrNull { it.id == postId } }
+            val listing = post?.listingId?.let { id -> db.animals.firstOrNull { it.id == id } }
+            PostReportSheet(
+                kind = post?.let { feedCardKind(it.tag, listing?.kind, it.sourceUrl) },
+                onDismiss = { reportPostId = null },
+                onSubmit = { reason, details ->
+                    optimisticReportPost(db, auth.feed, scope, me.id, postId, reason, details) {
+                        session.persistSocialFeed()
+                        paintRiver()
+                    }
+                },
+                onOpenRules = onOpenRules,
+            )
+        }
+        overflowPostId?.let { postId ->
+            val post = remember(postId, socialTick) { db.posts.firstOrNull { it.id == postId } } ?: return@let
+            val listing = post.listingId?.let { id -> db.animals.firstOrNull { it.id == id } }
+            val mine = db.isOwnPost(post, me.aliases())
+            PostOverflowSheet(
+                isAuthor = mine,
+                canEdit = canEditSocialPost(mine, post.authorKind, post.tag, listing?.kind, post.sourceUrl),
+                onDismiss = { overflowPostId = null },
+                onHide = {
+                    optimisticHidePost(db, auth.feed, scope, me.id, post.id) {
+                        session.persistSocialFeed()
+                        paintRiver()
+                    }
+                },
+                onReport = { reportPostId = post.id },
+                onEdit = { onEditPost(post.id) },
+                onDelete = {
+                    optimisticDeletePost(db, auth.feed, scope, me.id, post.id, persistFeed = {
+                        session.persistSocialFeed()
+                        paintRiver()
+                    })
+                },
+            )
+        }
         viewingStoryId?.let { startId ->
             Dialog(
                 onDismissRequest = { viewingStoryId = null },
@@ -359,42 +499,6 @@ fun FeedScreen(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun FeedHeader(onNotifications: () -> Unit, onMessages: () -> Unit, onProfile: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(Color.White.copy(alpha = 0.92f))
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        androidx.compose.foundation.Image(
-            painterResource(Res.drawable.feed_logo),
-            contentDescription = "OnlyGoodThings",
-            modifier = Modifier.size(36.dp),
-            contentScale = ContentScale.Fit,
-        )
-        Spacer(Modifier.width(8.dp))
-        Text("OnlyGoodThings", color = OgtColors.primary, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-        Spacer(Modifier.weight(1f))
-        Box {
-            CircleIconButton(Res.drawable.qs_notifications, "Alertas", onNotifications)
-            Box(
-                Modifier.align(Alignment.TopEnd).padding(8.dp).size(7.dp).clip(CircleShape).background(OgtColors.ink),
-            )
-        }
-        Spacer(Modifier.width(6.dp))
-        CircleIconButton(Res.drawable.qs_feed, "Mensajes", onMessages)
-        Spacer(Modifier.width(6.dp))
-        androidx.compose.foundation.Image(
-            painterResource(Res.drawable.feed_avatar_me),
-            contentDescription = "Perfil",
-            modifier = Modifier.size(44.dp).clip(CircleShape).border(1.dp, OgtColors.hairline, CircleShape).clickable(onClick = onProfile),
-            contentScale = ContentScale.Crop,
-        )
     }
 }
 
@@ -734,6 +838,8 @@ private fun NeighborPostCard(
     onOpen: () -> Unit,
     onOpenAuthor: () -> Unit,
     onInvite: () -> Unit,
+    onShare: () -> Unit,
+    onOverflow: () -> Unit = {},
     onClap: () -> Unit,
     onHeart: () -> Unit = {},
     onPetsMap: () -> Unit,
@@ -752,6 +858,9 @@ private fun NeighborPostCard(
             sightings = listing?.let { LocalOgtDb.current.sightingsOf(it.id) }.orEmpty(),
             onOpen = onOpen,
             onOpenAuthor = onOpenAuthor,
+            onShare = onShare,
+            onOverflow = onOverflow,
+            onClap = onClap,
         )
         FeedCardKind.ADOPTION -> AdoptionFeedCard(
             post = post,
@@ -763,6 +872,8 @@ private fun NeighborPostCard(
             isAuthor = isAdoptionAuthor,
             onAdopt = onAdopt,
             onEdit = onEditAdoption,
+            onShare = onShare,
+            onOverflow = onOverflow,
             onClap = onClap,
         )
         FeedCardKind.TERNURA -> TernuraFeedCard(
@@ -770,6 +881,8 @@ private fun NeighborPostCard(
             profile = profile,
             media = media,
             onOpen = onOpen,
+            onShare = onShare,
+            onOverflow = onOverflow,
             onClap = onClap,
         )
         FeedCardKind.HOMENAJE -> HomenajeFeedCard(
@@ -777,6 +890,8 @@ private fun NeighborPostCard(
             profile = profile,
             media = media,
             onOpen = onOpen,
+            onShare = onShare,
+            onOverflow = onOverflow,
             onClap = onClap,
             onHeart = onHeart,
         )
@@ -790,6 +905,8 @@ private fun NeighborPostCard(
             onOpen = onOpen,
             onOpenAuthor = onOpenAuthor,
             onInvite = onInvite,
+            onShare = onShare,
+            onOverflow = onOverflow,
             onClap = onClap,
         )
     }
@@ -805,9 +922,14 @@ private fun LostPetFeedCard(
     sightings: List<com.onlygoodthings.shared.data.local.LocalSighting>,
     onOpen: () -> Unit,
     onOpenAuthor: () -> Unit,
+    onShare: () -> Unit,
+    onOverflow: () -> Unit = {},
+    onClap: () -> Unit,
 ) {
     val copy = LocalOgtCopy.current
     val session = LocalOgtSession.current
+    var thanks by remember(post.id, post.impactCount) { mutableStateOf(post.impactCount) }
+    var clapped by remember(post.id, post.viewerHasImpacted) { mutableStateOf(post.viewerHasImpacted) }
     val radius = listing?.alertRadiusM ?: 2000
     val lastSeen = listing?.lastSeenPlace?.ifBlank { null } ?: listing?.place?.ifBlank { post.place } ?: post.place
     val resolved = listing?.resolved == true
@@ -816,21 +938,37 @@ private fun LostPetFeedCard(
             name = profile.fullName,
             place = post.place,
             time = post.timeLabel,
+            createdAtEpochMs = post.createdAtEpochMs,
             avatar = profile.avatar,
             verified = profile.verified,
-            onOpenAuthor = onOpen,
+            onOpenAuthor = onOpenAuthor,
+            onOverflow = onOverflow,
         )
         Column(
-            Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            Modifier.padding(horizontal = 12.dp).padding(bottom = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OgtStitchIcon(Res.drawable.qs_search, copy.petsLost, tint = OgtColors.secondary)
                 OgtPill(if (resolved) "Ya está en casa" else copy.petsLost, OgtColors.sunset, OgtColors.sunsetText)
+                ImpactTruthPills(post)
             }
             OgtCaption("Última vista · $lastSeen · ${radius} m")
             listing?.marks?.takeIf { it.isNotBlank() }?.let { OgtCaption(it) }
-            ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen, height = 140.dp)
+            ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen)
+            PostActionRow(
+                clapped = clapped,
+                thanks = thanks,
+                comments = post.commentCount,
+                onClap = {
+                    if (clapped) return@PostActionRow
+                    clapped = true
+                    thanks += 1
+                    onClap()
+                },
+                onComments = onOpen,
+                onShare = onShare,
+            )
             if (listing?.latitude != null && listing.longitude != null) {
                 LostAlertMap(
                     listing = listing,
@@ -864,39 +1002,46 @@ private fun AdoptionFeedCard(
     isAuthor: Boolean,
     onAdopt: () -> Unit,
     onEdit: () -> Unit,
+    onShare: () -> Unit,
+    onOverflow: () -> Unit = {},
     onClap: () -> Unit,
 ) {
     val copy = LocalOgtCopy.current
-    var thanks by remember(post.id) { mutableStateOf(post.impactCount) }
-    var clapped by remember(post.id) { mutableStateOf(false) }
+    var thanks by remember(post.id, post.impactCount) { mutableStateOf(post.impactCount) }
+    var clapped by remember(post.id, post.viewerHasImpacted) { mutableStateOf(post.viewerHasImpacted) }
     FeedArticle(onOpen = onOpen) {
         PostHeader(
             name = profile.fullName,
             place = post.place,
             time = post.timeLabel,
+            createdAtEpochMs = post.createdAtEpochMs,
             avatar = profile.avatar,
             verified = profile.verified,
-            onOpenAuthor = onOpen,
+            onOpenAuthor = onOpenAuthor,
+            onOverflow = onOverflow,
         )
         Column(
-            Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            Modifier.padding(horizontal = 12.dp).padding(bottom = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OgtStitchIcon(Res.drawable.qs_paw, copy.petsAdoption, tint = OgtColors.secondary)
                 OgtPill(copy.petsAdoption, OgtColors.sand, OgtColors.ink)
+                ImpactTruthPills(post)
             }
-            ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen, height = 168.dp)
+            ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen)
             PostActionRow(
                 clapped = clapped,
                 thanks = thanks,
                 comments = post.commentCount,
                 onClap = {
-                    clapped = !clapped
-                    thanks += if (clapped) 1 else -1
-                    if (clapped) onClap()
+                    if (clapped) return@PostActionRow
+                    clapped = true
+                    thanks += 1
+                    onClap()
                 },
                 onComments = onOpen,
+                onShare = onShare,
             )
             Text(listing?.displayPetName()?.ifBlank { null } ?: post.tag, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = OgtColors.ink)
             listing?.let { row ->
@@ -933,44 +1078,51 @@ private fun TernuraFeedCard(
     profile: PostLook,
     media: List<LocalPostMedia>,
     onOpen: () -> Unit,
+    onShare: () -> Unit,
+    onOverflow: () -> Unit = {},
     onClap: () -> Unit,
 ) {
     val copy = LocalOgtCopy.current
     val db = LocalOgtDb.current
-    var thanks by remember(post.id) { mutableStateOf(post.impactCount) }
-    var clapped by remember(post.id) { mutableStateOf(false) }
+    var thanks by remember(post.id, post.impactCount) { mutableStateOf(post.impactCount) }
+    var clapped by remember(post.id, post.viewerHasImpacted) { mutableStateOf(post.viewerHasImpacted) }
     val credit = db.creditName(post)
     FeedArticle(onOpen = onOpen) {
         PostHeader(
             name = profile.fullName,
             place = post.place,
             time = post.timeLabel,
+            createdAtEpochMs = post.createdAtEpochMs,
             avatar = profile.avatar,
             verified = profile.verified,
             onOpenAuthor = onOpen,
+            onOverflow = onOverflow,
         )
         Column(
-            Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            Modifier.padding(horizontal = 12.dp).padding(bottom = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OgtStitchIcon(Res.drawable.qs_pets, copy.feedTitleTernura, tint = OgtColors.secondary)
                 OgtPill(post.tag, OgtColors.sand, OgtColors.secondary)
             }
-            ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen, height = 188.dp)
+            ImpactTruthPills(post)
+            ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen)
             PostActionRow(
                 clapped = clapped,
                 thanks = thanks,
                 comments = post.commentCount,
                 onClap = {
-                    clapped = !clapped
-                    thanks += if (clapped) 1 else -1
-                    if (clapped) onClap()
+                    if (clapped) return@PostActionRow
+                    clapped = true
+                    thanks += 1
+                    onClap()
                 },
                 onComments = onOpen,
+                onShare = onShare,
             )
-            Text(post.body, fontSize = 14.sp, lineHeight = 20.sp, color = OgtColors.ink)
-            if (credit != profile.fullName || db.creditPending(post)) {
+            Text(post.body, fontSize = 14.sp, lineHeight = 20.sp, color = OgtColors.ink, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            if (credit != profile.fullName) {
                 OgtCaption(
                     if (db.creditPending(post)) "La historia es de $credit · Invitada" else "La historia es de $credit",
                 )
@@ -985,58 +1137,90 @@ private fun HomenajeFeedCard(
     profile: PostLook,
     media: List<LocalPostMedia>,
     onOpen: () -> Unit,
+    onShare: () -> Unit,
+    onOverflow: () -> Unit = {},
     onClap: () -> Unit,
     onHeart: () -> Unit,
 ) {
     val copy = LocalOgtCopy.current
     val db = LocalOgtDb.current
-    var thanks by remember(post.id) { mutableStateOf(post.impactCount) }
-    var clapped by remember(post.id) { mutableStateOf(false) }
-    var hearts by remember(post.id) { mutableStateOf(post.heartCount) }
-    var hearted by remember(post.id) { mutableStateOf(false) }
+    var thanks by remember(post.id, post.impactCount) { mutableStateOf(post.impactCount) }
+    var clapped by remember(post.id, post.viewerHasImpacted) { mutableStateOf(post.viewerHasImpacted) }
+    var hearts by remember(post.id, post.heartCount) { mutableStateOf(post.heartCount) }
+    var hearted by remember(post.id, post.viewerHasHearted) { mutableStateOf(post.viewerHasHearted) }
     val honoree = db.creditName(post)
+    val moment = post.isAnecdoteShare()
     FeedArticle(onOpen = onOpen) {
         PostHeader(
             name = profile.fullName,
             place = post.place,
             time = post.timeLabel,
+            createdAtEpochMs = post.createdAtEpochMs,
             avatar = profile.avatar,
             verified = profile.verified,
             onOpenAuthor = onOpen,
+            onOverflow = onOverflow,
         )
         Column(
-            Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            Modifier.padding(horizontal = 12.dp).padding(bottom = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OgtStitchIcon(Res.drawable.qs_invite, copy.feedTitleHomenaje, tint = OgtColors.secondary)
-                OgtPill(post.tag, OgtColors.sand, OgtColors.ink)
+                OgtStitchIcon(
+                    if (moment) Res.drawable.qs_anecdote else Res.drawable.qs_invite,
+                    if (moment) "Anécdota" else copy.feedTitleHomenaje,
+                    tint = OgtColors.secondary,
+                )
+                OgtPill(if (moment) "Anécdota" else post.tag, OgtColors.sand, OgtColors.ink)
             }
-            Text(honoree, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = OgtColors.ink)
-            OgtCaption("Lo cuenta ${profile.fullName}")
+            if (!moment) ImpactTruthPills(post)
+            if (moment || honoree != profile.fullName) {
+                Text(
+                    if (moment) "Anécdota del homenaje a $honoree" else honoree,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = OgtColors.ink,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             if (db.creditPending(post)) {
                 OgtCaption("La familia puede reivindicar este crédito.")
             }
-            ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen, height = 168.dp)
+            ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen)
             PostActionRow(
                 clapped = clapped,
                 thanks = thanks,
                 comments = post.commentCount,
                 onClap = {
-                    clapped = !clapped
-                    thanks += if (clapped) 1 else -1
-                    if (clapped) onClap()
+                    if (clapped) return@PostActionRow
+                    clapped = true
+                    thanks += 1
+                    onClap()
                 },
                 hearted = hearted,
                 hearts = hearts,
                 onHeart = {
-                    hearted = !hearted
-                    hearts += if (hearted) 1 else -1
-                    if (hearted) onHeart()
+                    if (hearted) return@PostActionRow
+                    hearted = true
+                    hearts += 1
+                    onHeart()
                 },
                 onComments = onOpen,
+                onShare = onShare,
             )
-            Text(post.body, fontSize = 14.sp, lineHeight = 20.sp, color = OgtColors.ink)
+            Text(post.body, fontSize = 14.sp, lineHeight = 20.sp, color = OgtColors.ink, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            if (moment) {
+                OgtCaption("Se abre el homenaje completo")
+            } else {
+                val stories = db.anecdotesOf(post.id)
+                if (stories.isNotEmpty()) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        OgtStitchIcon(Res.drawable.qs_anecdote, "Anécdotas", size = 16.dp, tint = OgtColors.secondary)
+                        OgtCaption("${stories.size} anécdotas · se leen en el detalle")
+                    }
+                }
+            }
         }
     }
 }
@@ -1046,15 +1230,14 @@ private fun ListingPhotoStrip(
     media: List<LocalPostMedia>,
     fallback: DrawableResource,
     onOpen: () -> Unit,
-    height: androidx.compose.ui.unit.Dp,
 ) {
     val pageCount = media.size.coerceAtLeast(1)
     val pager = rememberPagerState { pageCount }
     Box(
         Modifier
             .fillMaxWidth()
-            .height(height)
-            .clip(RoundedCornerShape(16.dp)),
+            .aspectRatio(16f / 9f)
+            .clip(RoundedCornerShape(12.dp)),
     ) {
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { media.getOrNull(it)?.id ?: it }) { page ->
             val item = media.getOrNull(page)
@@ -1102,19 +1285,23 @@ private fun StoryFeedCard(
     onOpen: () -> Unit,
     onOpenAuthor: () -> Unit,
     onInvite: () -> Unit,
+    onShare: () -> Unit,
+    onOverflow: () -> Unit = {},
     onClap: () -> Unit,
 ) {
-    var thanks by remember(post.id) { mutableStateOf(post.impactCount) }
-    var clapped by remember(post.id) { mutableStateOf(false) }
+    var thanks by remember(post.id, post.impactCount) { mutableStateOf(post.impactCount) }
+    var clapped by remember(post.id, post.viewerHasImpacted) { mutableStateOf(post.viewerHasImpacted) }
     val petStory = kind == FeedCardKind.PET_STORY
     FeedArticle(onOpen = onOpen) {
         PostHeader(
             name = profile.fullName,
             place = post.place,
             time = post.timeLabel,
+            createdAtEpochMs = post.createdAtEpochMs,
             avatar = profile.avatar,
             verified = profile.verified,
-            onOpenAuthor = onOpen,
+            onOpenAuthor = onOpenAuthor,
+            onOverflow = onOverflow,
         )
         PostMediaPager(
             media = media,
@@ -1129,13 +1316,16 @@ private fun StoryFeedCard(
             thanks = thanks,
             comments = post.commentCount,
             onClap = {
-                clapped = !clapped
-                thanks += if (clapped) 1 else -1
-                if (clapped) onClap()
+                if (clapped) return@PostActionRow
+                clapped = true
+                thanks += 1
+                onClap()
             },
             onComments = onOpen,
+            onShare = onShare,
         )
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            ImpactTruthPills(post)
             val whenWhere = if (isGatheringPost(post.tag)) {
                 gatheringWhenWhere(post.place, post.eventStartsAtEpochMs, currentEpochMs())
             } else {
@@ -1145,68 +1335,30 @@ private fun StoryFeedCard(
                 Text(
                     whenWhere,
                     color = OgtColors.ink,
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             Text(
-                "${profile.fullName}  ${post.body}",
+                post.body,
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
                 color = OgtColors.ink,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
             )
             val credit = LocalOgtDb.current.creditName(post)
             val author = LocalOgtDb.current.authorName(post)
-            if (credit != author || LocalOgtDb.current.creditPending(post)) {
+            if (credit != author) {
                 OgtCaption(
                     if (LocalOgtDb.current.creditPending(post)) "Lo hizo $credit · Invitada" else "Lo hizo $credit",
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                profile.hashtags.forEach { tag ->
+                profile.hashtags.take(2).forEach { tag ->
                     Text(tag, color = OgtColors.primary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                }
-            }
-            if (!post.sourceUrl.isNullOrBlank()) {
-                Text("Resumen de noticia real · fuente en el detalle", color = OgtColors.muted, fontSize = 11.sp)
-            }
-        }
-        if (comments.isNotEmpty()) {
-            Column(
-                Modifier
-                    .padding(horizontal = 16.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFFF6F2F7))
-                    .padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                comments.take(2).forEach { comment ->
-                    val avatar = commentAvatar(comment.authorUserId)
-                    val name = LocalOgtDb.current.userOrNull(comment.authorUserId)?.displayName ?: "Alguien de la comunidad"
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        CirclePhoto(avatar, 24.dp)
-                        Text(
-                            name,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp,
-                            color = OgtColors.ink,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
-                        )
-                        Text(comment.timeLabel, color = OgtColors.muted, fontSize = 11.sp, maxLines = 1)
-                        Text(
-                            comment.body,
-                            fontSize = 13.sp,
-                            color = OgtColors.ink,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
                 }
             }
         }
@@ -1290,33 +1442,53 @@ private fun PostHeader(
     name: String,
     place: String,
     time: String,
+    createdAtEpochMs: Long,
     avatar: DrawableResource,
     verified: Boolean,
     star: Boolean = false,
     onOpenAuthor: () -> Unit = {},
+    onOverflow: () -> Unit = {},
 ) {
+    val meta = postMetaLine(place, time, createdAtEpochMs, currentEpochMs())
     Row(
-        Modifier.fillMaxWidth().padding(16.dp).clickable(onClick = onOpenAuthor),
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).clickable(onClick = onOpenAuthor),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier.size(44.dp).clip(CircleShape).background(
-                Brush.linearGradient(listOf(OgtColors.hairline, OgtColors.hairline)),
-            ),
-            contentAlignment = Alignment.Center,
-        ) {
-            CirclePhoto(avatar, 40.dp)
-        }
-        Spacer(Modifier.width(10.dp))
+        CirclePhoto(avatar, 36.dp)
+        Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(name, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (verified) Text("✓", color = OgtColors.primary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 if (star) Text("★", color = OgtColors.secondary, fontSize = 13.sp)
             }
-            Text("$place  •  $time", color = OgtColors.muted, fontSize = 11.sp)
+            if (meta.isNotBlank()) {
+                Text(meta, color = OgtColors.muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
-        Text("⋯", color = OgtColors.muted, fontSize = 20.sp, modifier = Modifier.padding(8.dp))
+        Text(
+            "⋯",
+            color = OgtColors.muted,
+            fontSize = 20.sp,
+            modifier = Modifier
+                .clip(CircleShape)
+                .clickable(onClick = onOverflow)
+                .padding(8.dp),
+        )
+    }
+}
+
+@Composable
+private fun ImpactTruthPills(post: LocalSocialPost) {
+    val pills = buildList {
+        if (post.achievedCount > 0) add("Se logró")
+        if (post.placement == PostPlacement.PROMOTED) add("Promocionado")
+        if (post.placement == PostPlacement.AD) add("Publicidad")
+        if (post.empresaQueSuma) add("Empresa que suma")
+    }
+    if (pills.isEmpty()) return
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        pills.forEach { OgtPill(it, OgtColors.sand, OgtColors.secondary) }
     }
 }
 
@@ -1332,7 +1504,7 @@ private fun PostMediaPager(
     val items = media.ifEmpty { emptyList() }
     val pageCount = items.size.coerceAtLeast(1)
     val pagerState = rememberPagerState { pageCount }
-    Box(Modifier.fillMaxWidth().aspectRatio(4f / 3f)) {
+    Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize(), key = { items.getOrNull(it)?.id ?: it }) { page ->
             val item = items.getOrNull(page)
             Box(Modifier.fillMaxSize().clickable(onClick = onOpen)) {

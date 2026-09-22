@@ -92,11 +92,7 @@ actual fun rememberOgtLocation(track: Boolean): OgtLocationState {
     fun requestPermission(scope: LocationScope) {
         pendingAlways = scope == LocationScope.ALWAYS
         val current = readPermission(context)
-        if (current == LocationPermissionState.GRANTED_ALWAYS) {
-            permission = current
-            return
-        }
-        if (current == LocationPermissionState.GRANTED && scope == LocationScope.WHILE_USING) {
+        if (current.covers(scope)) {
             permission = current
             return
         }
@@ -106,6 +102,21 @@ actual fun rememberOgtLocation(track: Boolean): OgtLocationState {
             return
         }
         if (current.isGranted() && scope == LocationScope.ALWAYS && Build.VERSION.SDK_INT >= 29) {
+            val blocked = activity != null &&
+                !ActivityCompat.shouldShowRequestPermissionRationale(
+                    activity,
+                    Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+                ) &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) !=
+                PackageManager.PERMISSION_GRANTED
+            // Primera vez rationale es false también: pedimos. Si ya negó, Ajustes.
+            val askedBackground = context.getSharedPreferences("ogt_auth", 0)
+                .getBoolean("gps_bg_asked", false)
+            if (askedBackground && blocked) {
+                openAppOrLocationSettings(forever = true)
+                return
+            }
+            context.getSharedPreferences("ogt_auth", 0).edit().putBoolean("gps_bg_asked", true).apply()
             backgroundLauncher.launch(arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION))
             return
         }
@@ -192,6 +203,7 @@ actual fun rememberOgtLocation(track: Boolean): OgtLocationState {
         val session = if (canListen) startLiveUpdates(context) { next ->
             acquiring = false
             fix = next
+            OgtLocationSync.offer(next)
         } else null
         if (canListen) acquiring = fix == null
 
@@ -335,10 +347,10 @@ private fun requestCurrentFix(context: Context, onResult: (DeviceLocation?) -> U
         .addOnFailureListener { onResult(cached) }
 }
 
-private class LiveSession(val close: () -> Unit)
+internal class LiveSession(val close: () -> Unit)
 
 @SuppressLint("MissingPermission")
-private fun startLiveUpdates(context: Context, onFix: (DeviceLocation) -> Unit): LiveSession {
+internal fun startLiveUpdates(context: Context, onFix: (DeviceLocation) -> Unit): LiveSession {
     if (hasPlayServices(context)) {
         val fused = LocationServices.getFusedLocationProviderClient(context)
         val callback = object : LocationCallback() {

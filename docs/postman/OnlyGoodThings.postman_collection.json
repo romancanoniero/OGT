@@ -10,7 +10,12 @@
     { "key": "spotId", "value": "77777777-7777-7777-7777-777777777777" },
     { "key": "postId", "value": "55555555-5555-5555-5555-555555555555" },
     { "key": "campaignId", "value": "88888888-8888-8888-8888-888888888888" },
-    { "key": "causeId", "value": "99999999-9999-9999-9999-999999999999" }
+    { "key": "causeId", "value": "99999999-9999-9999-9999-999999999999" },
+    { "key": "companyId", "value": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" },
+    { "key": "callId", "value": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" },
+    { "key": "listingId", "value": "11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa" },
+    { "key": "brunoToken", "value": "dev.dev-user-bruno.USER" },
+    { "key": "modToken", "value": "dev.dev-mod-carla.COMMUNITY_MODERATOR" }
   ],
   "item": [
     {
@@ -38,6 +43,21 @@
             ],
             "url": "{{baseUrl}}/api/v1/auth/me",
             "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+        {
+          "name": "Actualizar ubicación",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/me/location",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": -34.6037,\n  \"longitude\": -58.3816,\n  \"accuracyMeters\": 12.4\n}"
+            }
           }
         }
       ]
@@ -232,6 +252,117 @@
               "raw": "{\n  \"postId\": \"{{postId}}\",\n  \"body\": \"Sumo frutas mañana a las 10\",\n  \"parentCommentId\": null\n}"
             }
           }
+        },
+        {
+          "name": "Publicar orgánico",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/social/publish",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"body\": \"Llevé fruta al comedor de Balvanera.\",\n  \"topic\": \"Comedor\",\n  \"latitude\": -34.6092,\n  \"longitude\": -58.4008,\n  \"media\": [{ \"kind\": \"IMAGE\", \"url\": \"https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Golde33443.jpg/640px-Golde33443.jpg\" }]\n}"
+            }
+          }
+        },
+        {
+          "name": "Publicar homenaje",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/social/publish",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"body\": \"Nos enseñó a no pasar de largo si un vecino necesita una mano.\",\n  \"topic\": \"En vida\",\n  \"honoreeName\": \"Don Héctor\",\n  \"media\": [{ \"kind\": \"IMAGE\", \"url\": \"https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Golde33443.jpg/640px-Golde33443.jpg\" }]\n}"
+            }
+          }
+        },
+        {
+          "name": "Subir foto",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/media/upload",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"filename\": \"huerta-01.jpg\",\n  \"contentType\": \"image/jpeg\",\n  \"bytesBase64\": \"/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBxISEhUS\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Seguir a Ana",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{brunoToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/social/follow",
+            "body": { "mode": "raw", "raw": "{ \"userId\": \"11111111-1111-1111-1111-111111111111\" }" }
+          }
+        },
+        {
+          "name": "Editar post propio",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/social/post/edit",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"postId\": \"{{postId}}\",\n  \"body\": \"Llevé fruta y pan al comedor de Balvanera.\",\n  \"topic\": \"Comedor\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Eliminar post propio",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/social/post/delete",
+            "body": { "mode": "raw", "raw": "{ \"postId\": \"{{postId}}\" }" }
+          }
+        },
+        {
+          "name": "Reportar post",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{brunoToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/social/report",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"postId\": \"{{postId}}\",\n  \"reason\": \"OFF_TOPIC_PROSELYTISM\",\n  \"details\": \"Pide adhesión a una fe o causa\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Promocionar post (no suma reputación)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/social/promote",
+            "body": { "mode": "raw", "raw": "{ \"postId\": \"{{postId}}\", \"amountCents\": 15000 }" }
+          }
         }
       ]
     },
@@ -249,8 +380,184 @@
             "url": "{{baseUrl}}/api/v1/animals/publish",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"kind\": \"LOST\",\n  \"species\": \"DOG\",\n  \"size\": \"MEDIUM\",\n  \"urgency\": \"HIGH\",\n  \"title\": \"Labrador perdido en Palermo\",\n  \"description\": \"Collar rojo, responde a Coco\",\n  \"latitude\": -34.5780,\n  \"longitude\": -58.4250,\n  \"radius\": 3000\n}"
+              "raw": "{\n  \"kind\": \"LOST\",\n  \"species\": \"DOG\",\n  \"size\": \"MEDIUM\",\n  \"urgency\": \"HIGH\",\n  \"petName\": \"Coco\",\n  \"marks\": \"Collar rojo\",\n  \"lastSeenPlace\": \"Palermo\",\n  \"description\": \"Collar rojo, responde a Coco\",\n  \"place\": \"Palermo\",\n  \"latitude\": -34.5780,\n  \"longitude\": -58.4250,\n  \"media\": [{ \"kind\": \"IMAGE\", \"url\": \"https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Golde33443.jpg/640px-Golde33443.jpg\", \"altText\": \"Mascota perdida\" }]\n}"
             }
+          }
+        },
+        {
+          "name": "Publicar adopción",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/animals/publish",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kind\": \"ADOPTION\",\n  \"species\": \"DOG\",\n  \"size\": \"SMALL\",\n  \"petName\": \"Luna\",\n  \"ageLabel\": \"6 meses\",\n  \"sex\": \"HEMBRA\",\n  \"temperament\": \"Cariñosa y sociable\",\n  \"description\": \"Cachorra mestiza rescatada.\",\n  \"place\": \"Parque Centenario\",\n  \"vaccinated\": true,\n  \"sterilized\": false,\n  \"homeNeeds\": \"Alguien en casa varias horas\",\n  \"media\": [{ \"kind\": \"IMAGE\", \"url\": \"https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Golde33443.jpg/640px-Golde33443.jpg\", \"altText\": \"Adopción\" }]\n}"
+            }
+          }
+        },
+        {
+          "name": "Resolver (otra persona = se logró)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{brunoToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/animals/resolve",
+            "body": { "mode": "raw", "raw": "{ \"listingId\": \"{{listingId}}\" }" }
+          }
+        },
+        {
+          "name": "Fichas abiertas",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/animals/open",
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+        {
+          "name": "Leer ficha",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/animals/get",
+            "body": { "mode": "raw", "raw": "{ \"listingId\": \"{{listingId}}\" }" }
+          }
+        },
+        {
+          "name": "Buscar calle (Nominatim)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/geo/search",
+            "body": { "mode": "raw", "raw": "{ \"query\": \"Plaza Italia Palermo\", \"lang\": \"es\" }" }
+          }
+        },
+        {
+          "name": "Reverse geocode",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/geo/reverse",
+            "body": { "mode": "raw", "raw": "{ \"latitude\": -34.5812, \"longitude\": -58.4214, \"lang\": \"es\" }" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Comunidad web",
+      "item": [
+        {
+          "name": "Buscar",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/social/search",
+            "body": { "mode": "raw", "raw": "{ \"query\": \"Héctor\", \"pageSize\": 20 }" }
+          }
+        },
+        {
+          "name": "Perfil propio",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/users/profile",
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+        {
+          "name": "Posts de un autor",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/social/posts-by-author",
+            "body": { "mode": "raw", "raw": "{ \"userId\": \"11111111-1111-1111-1111-111111111111\", \"pageSize\": 20 }" }
+          }
+        },
+        {
+          "name": "Billetera",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/wallet/summary",
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+        {
+          "name": "Bandeja de avisos",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/notifications/inbox",
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+        {
+          "name": "Tags del banco de tiempo",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/timebank/tags",
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+        {
+          "name": "Abrir trueque",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/timebank/start",
+            "body": { "mode": "raw", "raw": "{ \"userId\": \"22222222-2222-2222-2222-222222222222\", \"tagSlug\": \"gardening\" }" }
+          }
+        },
+        {
+          "name": "Inbox de mensajes",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/timebank/inbox",
+            "body": { "mode": "raw", "raw": "{}" }
           }
         }
       ]
@@ -284,6 +591,83 @@
               "raw": "{\n  \"campaignId\": \"{{campaignId}}\",\n  \"discountBps\": 1500,\n  \"issuedToUser\": \"11111111-1111-1111-1111-111111111111\",\n  \"conditionNote\": \"100 cesiones de estacionamiento\"\n}"
             }
           }
+        },
+        {
+          "name": "Financiar acción (no es ad)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/csr/finance-action",
+            "body": { "mode": "raw", "raw": "{ \"campaignId\": \"{{campaignId}}\", \"amountCents\": 250000 }" }
+          }
+        },
+        {
+          "name": "Empresa que suma",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/companies/impact",
+            "body": { "mode": "raw", "raw": "{ \"companyId\": \"{{companyId}}\" }" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Empresa",
+      "item": [
+        {
+          "name": "Mi empresa",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/companies/mine",
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+        {
+          "name": "Campañas",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/csr/campaigns",
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+        {
+          "name": "Financiar hecho",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/csr/finance-action",
+            "body": { "mode": "raw", "raw": "{\n  \"campaignId\": \"{{campaignId}}\",\n  \"amountCents\": 50000\n}" }
+          }
+        },
+        {
+          "name": "Emitir cupón",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/csr/promo/issue",
+            "body": { "mode": "raw", "raw": "{\n  \"campaignId\": \"{{campaignId}}\",\n  \"discountBps\": 1000,\n  \"conditionNote\": \"Meta comunitaria alcanzada\"\n}" }
+          }
         }
       ]
     },
@@ -300,6 +684,33 @@
             ],
             "url": "{{baseUrl}}/api/v1/causes/progress",
             "body": { "mode": "raw", "raw": "{\n  \"causeId\": \"{{causeId}}\"\n}" }
+          }
+        },
+        {
+          "name": "Entregar causa (moderador)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{modToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/causes/deliver",
+            "body": { "mode": "raw", "raw": "{ \"causeId\": \"{{causeId}}\" }" }
+          }
+        },
+        {
+          "name": "Check-in voluntariado",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/volunteer/check-in",
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"callId\": \"{{callId}}\", \"latitude\": -34.6092, \"longitude\": -58.4008 }"
+            }
           }
         }
       ]

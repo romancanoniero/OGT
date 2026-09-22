@@ -16,6 +16,22 @@ enum class FeedCardKind {
     COMMUNITY,
 }
 
+/** El autor edita su post; una noticia editorial o de empresa no se reescribe acá. */
+fun canEditSocialPost(
+    isAuthor: Boolean,
+    authorKind: AuthorKind,
+    tag: String,
+    listingKind: String? = null,
+    sourceUrl: String? = null,
+): Boolean {
+    if (!isAuthor || authorKind == AuthorKind.COMPANY) return false
+    val kind = feedCardKind(tag, listingKind, sourceUrl)
+    if (kind == FeedCardKind.NEWS && !sourceUrl.isNullOrBlank() && !sourceUrl.startsWith("ogt://")) {
+        return false
+    }
+    return true
+}
+
 fun feedCardKind(
     tag: String,
     listingKind: String? = null,
@@ -36,6 +52,24 @@ fun feedCardKind(
 fun isTernuraPost(tag: String): Boolean = tag.trim().lowercase() in TERNURA_TAGS
 
 fun isHomenajePost(tag: String): Boolean = tag.trim().lowercase() in HOMENAJE_TAGS
+
+/**
+ * Un momento puntual del homenaje, no la ficha completa.
+ * El link sigue abriendo el homenaje: sin eso se pierde a quién se honra.
+ */
+fun isAnecdoteShare(
+    tag: String,
+    sourceUrl: String? = null,
+    postId: String = "",
+    parentPostId: String? = null,
+): Boolean {
+    if (!parentPostId.isNullOrBlank()) return true
+    if (postId.startsWith("post-anecdote-")) return true
+    return isHomenajePost(tag) && sourceUrl?.startsWith("ogt://p/") == true
+}
+
+fun anecdoteParentPostId(parentPostId: String?, sourceUrl: String?): String? =
+    parentPostId?.takeIf { it.isNotBlank() } ?: sourceUrl?.let(::parsePostDeepLink)
 
 /** Convocatoria a la que alguien de la comunidad puede decir “asistiré” y avisar a sus contactos. */
 fun isGatheringPost(tag: String): Boolean = tag.trim().lowercase() in GATHERING_TAGS
@@ -115,6 +149,7 @@ enum class FeedShowReason {
     AFFINITY,
     EXPLORE,
     FILTER,
+    PROMOTED,
 }
 
 /** Home rankeado vs tubo cronológico del grafo. */

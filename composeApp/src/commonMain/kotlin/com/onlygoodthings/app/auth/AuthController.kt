@@ -10,6 +10,7 @@ import com.onlygoodthings.shared.data.createPlatformHttpClient
 import com.onlygoodthings.shared.data.local.LocalUser
 import com.onlygoodthings.shared.data.local.OgtLocalDatabase
 import com.onlygoodthings.shared.data.remote.RestAnimalsRepository
+import com.onlygoodthings.shared.data.remote.RestFeedRepository
 import com.onlygoodthings.shared.data.remote.RestHonorRepository
 import com.onlygoodthings.shared.data.remote.RestNoticeRepository
 import com.onlygoodthings.shared.domain.UserRole
@@ -28,6 +29,17 @@ class AuthController(
     val honor = RestHonorRepository(createPlatformHttpClient(), session)
     val notices = RestNoticeRepository(createPlatformHttpClient(), session)
     val animals = RestAnimalsRepository(createPlatformHttpClient(), session)
+    val feed = RestFeedRepository(createPlatformHttpClient(), session)
+
+    suspend fun updateMyLocation(latitude: Double, longitude: Double, accuracyMeters: Double?) {
+        val ok = api.updateLocation(latitude, longitude, accuracyMeters)
+        if (!ok) return
+        val me = preview.overlayUser ?: return
+        val updated = me.copy(latitude = latitude, longitude = longitude)
+        val idx = db.users.indexOfFirst { it.id == me.id }
+        if (idx >= 0) db.users[idx] = updated
+        preview.overlayUser = updated
+    }
 
     var pendingPhone by mutableStateOf<PendingPhoneAuth?>(null)
     var busy by mutableStateOf(false)
@@ -108,10 +120,6 @@ class AuthController(
     suspend fun signInProvider(provider: String): Boolean = wrap {
         val user = when (provider) {
             "google" -> platform.signInGoogle()
-            "apple" -> {
-                require(showsAppleSignIn()) { "Sign in with Apple solo está disponible en iPhone o iPad" }
-                platform.signInApple()
-            }
             "facebook" -> platform.signInFacebook()
             else -> error("Proveedor no soportado")
         }

@@ -2,6 +2,7 @@ package com.onlygoodthings.shared.data.remote
 
 import com.onlygoodthings.shared.data.SessionStore
 import com.onlygoodthings.shared.domain.AnimalListingDto
+import com.onlygoodthings.shared.domain.AnimalResolveResult
 import com.onlygoodthings.shared.domain.ApiResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -25,6 +26,11 @@ class RestAnimalsRepository(
 
     suspend fun openListings(): List<AnimalListingDto> =
         post("/api/v1/animals/open", buildJsonObject {})
+
+    suspend fun resolve(listingId: String): AnimalResolveResult =
+        post("/api/v1/animals/resolve", buildJsonObject {
+            put("listingId", kotlinx.serialization.json.JsonPrimitive(listingId))
+        })
 
     private suspend inline fun <reified T> post(path: String, body: JsonObject): T {
         val response: ApiResponse<T> = client.post("${session.apiBaseUrl}$path") {

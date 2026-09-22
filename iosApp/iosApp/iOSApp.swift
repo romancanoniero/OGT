@@ -4,9 +4,7 @@ import FirebaseCore
 import FirebaseAuth
 import FirebaseMessaging
 import GoogleSignIn
-import AuthenticationServices
 import LocalAuthentication
-import CryptoKit
 import UserNotifications
 import Contacts
 import MessageUI
@@ -243,9 +241,6 @@ struct iOSApp: App {
 }
 
 final class OgtFirebaseHost: NSObject, IosAuthHost {
-    private var appleDelegate: AppleSignInDelegate?
-    private var currentNonce: String?
-
     func currentUser() -> AuthUser? {
         guard let user = Auth.auth().currentUser else { return nil }
         return Self.map(user)
@@ -330,43 +325,6 @@ final class OgtFirebaseHost: NSObject, IosAuthHost {
                 Self.finish(authResult?.user, authError, onResult)
             }
         }
-    }
-
-    func signInApple(onResult: @escaping (AuthUser?, String?) -> Void) {
-        let nonce = Self.randomNonce()
-        currentNonce = nonce
-        let request = ASAuthorizationAppleIDProvider().createRequest()
-        request.requestedScopes = [.fullName, .email]
-        request.nonce = Self.sha256(nonce)
-        let delegate = AppleSignInDelegate { [weak self] authorization, error in
-            self?.appleDelegate = nil
-            if let error {
-                onResult(nil, Self.mensaje(error))
-                return
-            }
-            guard
-                let credential = authorization?.credential as? ASAuthorizationAppleIDCredential,
-                let tokenData = credential.identityToken,
-                let idToken = String(data: tokenData, encoding: .utf8),
-                let nonce = self?.currentNonce
-            else {
-                onResult(nil, "Apple no devolvió un token válido")
-                return
-            }
-            let firebaseCred = OAuthProvider.appleCredential(
-                withIDToken: idToken,
-                rawNonce: nonce,
-                fullName: credential.fullName
-            )
-            Auth.auth().signIn(with: firebaseCred) { result, authError in
-                Self.finish(result?.user, authError, onResult)
-            }
-        }
-        appleDelegate = delegate
-        let controller = ASAuthorizationController(authorizationRequests: [request])
-        controller.delegate = delegate
-        controller.presentationContextProvider = delegate
-        controller.performRequests()
     }
 
     func signInFacebook(onResult: @escaping (AuthUser?, String?) -> Void) {
@@ -457,52 +415,5 @@ final class OgtFirebaseHost: NSObject, IosAuthHost {
         var top = window?.rootViewController
         while let presented = top?.presentedViewController { top = presented }
         return top
-    }
-
-    private static func randomNonce(length: Int = 32) -> String {
-        let charset = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
-        var result = ""
-        var remaining = length
-        while remaining > 0 {
-            let randoms: [UInt8] = (0..<16).map { _ in
-                var random: UInt8 = 0
-                _ = SecRandomCopyBytes(kSecRandomDefault, 1, &random)
-                return random
-            }
-            randoms.forEach { random in
-                if remaining == 0 { return }
-                if random < charset.count {
-                    result.append(charset[Int(random)])
-                    remaining -= 1
-                }
-            }
-        }
-        return result
-    }
-
-    private static func sha256(_ input: String) -> String {
-        let data = Data(input.utf8)
-        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-    }
-}
-
-private final class AppleSignInDelegate: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
-    private let completion: (ASAuthorization?, Error?) -> Void
-
-    init(completion: @escaping (ASAuthorization?, Error?) -> Void) {
-        self.completion = completion
-    }
-
-    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
-        completion(authorization, nil)
-    }
-
-    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
-        completion(nil, error)
-    }
-
-    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        return scenes.flatMap { $0.windows }.first { $0.isKeyWindow } ?? UIWindow()
     }
 }

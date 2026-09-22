@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Quiet Studio · Stitch b857fa87 · anécdota · estático. Tintable. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="20"
+    android:viewportHeight="20">
+    <path
+        android:pathData="M12,2 L5,2 C3.3,2 2,3.3 2,5 L2,15 C2,16.7 3.3,18 5,18 L15,18 C16.7,18 18,16.7 18,15 L18,8 L12,2 Z"
+        android:fillColor="#00000000"
+        android:strokeWidth="1.8"
+        android:strokeColor="#111213"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"/>
+    <path
+        android:pathData="M12,2 L12,8 L18,8"
+        android:fillColor="#00000000"
+        android:strokeWidth="1.8"
+        android:strokeColor="#111213"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"/>
+    <path
+        android:pathData="M6.8,10.8 C6.8,10 8,10 8,10.8 C8,11.8 6.8,13.2 6,13.8"
+        android:fillColor="#00000000"
+        android:strokeWidth="1.8"
+        android:strokeColor="#111213"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"/>
+    <path
+        android:pathData="M11.8,10.8 C11.8,10 13,10 13,10.8 C13,11.8 11.8,13.2 11,13.8"
+        android:fillColor="#00000000"
+        android:strokeWidth="1.8"
+        android:strokeColor="#111213"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"/>
+</vector>

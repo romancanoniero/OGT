@@ -43,8 +43,9 @@ fun LoginScreen(onEnter: () -> Unit, onSignUp: () -> Unit, onRecover: () -> Unit
     var keep by remember { mutableStateOf(true) }
     AuthScaffold {
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            OgtLogo(size = 88.dp)
+            OgtLogo(size = 64.dp)
             OgtPill("Red de impacto comunitario")
+            AuthFeatureReel(Modifier.padding(top = 4.dp))
             OgtSectionTitle("Bienvenido de vuelta")
             OgtCaption("Seguí multiplicando las buenas acciones e historias de tu comunidad.")
         }

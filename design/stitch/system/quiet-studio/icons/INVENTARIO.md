@@ -12,6 +12,8 @@ Leyenda: **OK** cumple · **FONDO** es 3D pero el lienzo no es blanco · **2D** 
 | `parking_action_yield` | Ceder | Clay 3D | Blanco | OK |
 | `parking_action_search` | Buscar lugar | Clay 3D | Blanco (unificado) | OK |
 | `parking_action_find` | Encontrar el auto | Clay 3D | Blanco (unificado) | OK |
+| `parking_sign_plate` | Señal P de parking | Clay 3D | Blanco | OK |
+| `anecdote_action` | Anécdota / relato en homenaje | Clay 3D | Transparente (PNG alfa) | OK |
 | `publish_action_add` | Placeholder de media | Clay 3D | Transparente (PNG alfa) | OK |
 | `onboard_feed` | Onboarding | Flat pastel | Transparente | 2D |
 | `onboard_parking` | Onboarding | Flat pastel | Transparente | 2D |
@@ -31,7 +33,9 @@ Hoy son **SVG line-art** (`qs_*.xml`). No son 3D. En botones de 44 px `OgtStitch
 | Asset | Significado | Dónde se ve |
 |---|---|---|
 | `qs_feed` | Feed / buena acción | Dock, publicar |
-| `qs_search` | Buscar / parking | Dock, perdido, honor |
+| `qs_search` | Pin / buscar lugar | Perdido, honor, origen GPS |
+| `qs_parking` | Placa P de estacionamiento | Dock parking, pin de plaza |
+| `qs_parked` | Auto de perfil | Pin de vehículo |
 | `qs_paw` | Animales / perdido | Dock, fichas |
 | `qs_skills` | Ayuda | Dock, pines |
 | `qs_wallet` | Puntos / ajustes | Dock |
@@ -47,17 +51,17 @@ Hoy son **SVG line-art** (`qs_*.xml`). No son 3D. En botones de 44 px `OgtStitch
 | `qs_invite` | Invitar / homenaje | Extras, fichas |
 | `qs_map` | Mapa mascotas | Extra perdido |
 | `qs_gps` | Pin / avistaje | Mapa, mensajes |
-| `qs_parked` | Auto estacionado | Pin mapa |
 | `qs_yield` | Ceder | Pin fallback |
 | `qs_adopt` | Adopción | Dock publicar |
 | `qs_attend` | Convocatoria | Dock publicar |
 | `qs_pets` | Ternura | Fichas |
 | `qs_claim` | Reclamar | Parking |
 | `qs_form` | Formulario | Chat, mensajes |
+| `qs_anecdote` | Anécdota (papelito + comillas) | Homenaje, feed |
 | `qs_eye` | Lo vio | Mapa, avistaje |
 | `qs_expand` | Ampliar / play | Media, mapa |
 
-**26 / 26 son 2D.** Hace falta un tile 3D por significado (fondo blanco) y un camino de render **sin tint** para no pintarlos de tinta.
+**27 / 27 son 2D.** Hace falta un tile 3D por significado (fondo blanco) y un camino de render **sin tint** para no pintarlos de tinta. `anecdote_action` ya cubre el tile 3D de anécdota.
 
 ## Fuera de inventario (no son iconos)
 

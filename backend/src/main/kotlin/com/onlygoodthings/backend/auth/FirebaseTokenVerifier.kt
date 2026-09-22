@@ -62,7 +62,7 @@ class DevTokenVerifier : FirebaseTokenVerifier {
             firebaseUid = parts[1],
             email = "${parts[1]}@dev.onlygoodthings.test",
             phone = null,
-            displayName = parts[1],
+            displayName = null,
             role = role,
         )
     }

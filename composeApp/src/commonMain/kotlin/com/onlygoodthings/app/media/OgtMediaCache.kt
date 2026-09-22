@@ -7,14 +7,24 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsBytes
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
- * Cache de multimedia del río: memoria + disco.
+ * Cache de multimedia del feed: memoria + disco.
  * La card muestra al toque si ya hay bytes (subida optimista).
+ * Las descargas remotas se deduplican para no picar la misma URL dos veces.
  */
 object OgtMediaCache {
-    private const val MaxMemory = 16
+    private const val MaxMemory = 48
     private val memory = mutableMapOf<String, ByteArray>()
+    private val memoryOrder = mutableListOf<String>()
+    private val inflight = mutableMapOf<String, CompletableDeferred<ByteArray?>>()
+    private val inflightLock = Mutex()
     private val http by lazy { createPlatformHttpClient() }
 
     fun peek(url: String): ByteArray? {
@@ -48,9 +58,49 @@ object OgtMediaCache {
         runCatching { writeMediaCacheFile(diskName(key), bytes) }
     }
 
+    /** Path local si ya está en disco (fotos y video). */
+    fun cachedFileUrl(url: String): String? {
+        val key = url.trim()
+        if (key.isBlank()) return null
+        if (key.startsWith("file://") || key.startsWith("/")) return key
+        val path = mediaCacheFilePath(diskName(key))
+        return if (readMediaCacheFile(diskName(key)) != null) "file://$path" else null
+    }
+
+    suspend fun cachedPlayableUrl(url: String): String {
+        val key = url.trim()
+        if (key.isBlank()) return key
+        if (key.startsWith("file://") || key.startsWith("/")) return key
+        load(key)
+        return cachedFileUrl(key) ?: key
+    }
+
     suspend fun load(url: String): ByteArray? {
         val key = url.trim()
         if (key.isBlank()) return null
+        peek(key)?.let { return it }
+        val mine = CompletableDeferred<ByteArray?>()
+        val winner = inflightLock.withLock {
+            inflight[key] ?: mine.also { inflight[key] = it }
+        }
+        if (winner !== mine) return winner.await()
+        val bytes = runCatching { loadUncached(key) }.getOrNull()
+        mine.complete(bytes)
+        inflightLock.withLock {
+            if (inflight[key] === mine) inflight.remove(key)
+        }
+        return bytes
+    }
+
+    suspend fun prefetch(urls: Iterable<String>) {
+        val keys = urls.map { it.trim() }.filter { it.isNotBlank() }.distinct().take(24)
+        if (keys.isEmpty()) return
+        coroutineScope {
+            keys.map { key -> async { load(key) } }.awaitAll()
+        }
+    }
+
+    private suspend fun loadUncached(key: String): ByteArray? {
         peek(key)?.let { return it }
         localFilePath(key)?.let { path ->
             readLocalFileBytes(path)?.also { put(key, it) }?.let { return it }
@@ -68,8 +118,11 @@ object OgtMediaCache {
 
     private fun putMemory(key: String, bytes: ByteArray) {
         memory[key] = bytes
-        if (memory.size > MaxMemory) {
-            memory.keys.firstOrNull { it != key }?.let { memory.remove(it) }
+        memoryOrder.remove(key)
+        memoryOrder.add(key)
+        while (memory.size > MaxMemory) {
+            val evict = memoryOrder.removeFirstOrNull() ?: break
+            if (evict != key) memory.remove(evict)
         }
     }
 }

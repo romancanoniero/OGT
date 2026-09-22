@@ -26,4 +26,22 @@ class AuthSessionApi(private val session: SessionStore) {
         if (!response.success) return@runCatching null
         response.data
     }.getOrNull()
+
+    /** Ping de presencia: actualiza users.home_location en el servidor. */
+    suspend fun updateLocation(latitude: Double, longitude: Double, accuracyMeters: Double?): Boolean = runCatching {
+        val token = session.firebaseJwt ?: return false
+        val response: ApiResponse<kotlinx.serialization.json.JsonObject> =
+            client.post("${session.apiBaseUrl}/api/v1/me/location") {
+                contentType(ContentType.Application.Json)
+                header("Authorization", "Bearer $token")
+                setBody(
+                    buildJsonObject {
+                        put("latitude", JsonPrimitive(latitude))
+                        put("longitude", JsonPrimitive(longitude))
+                        accuracyMeters?.let { put("accuracyMeters", JsonPrimitive(it)) }
+                    },
+                )
+            }.body()
+        response.success
+    }.getOrDefault(false)
 }

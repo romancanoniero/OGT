@@ -3,6 +3,10 @@ package com.onlygoodthings.app.theme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.RadioButtonColors
+import androidx.compose.material3.SwitchColors
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.TextFieldColors
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -59,6 +63,30 @@ fun ogtOutlinedFieldColors(missing: Boolean = false): TextFieldColors = Outlined
     focusedPlaceholderColor = if (missing) OgtColors.onErrorContainer else OgtColors.muted,
     unfocusedPlaceholderColor = if (missing) OgtColors.onErrorContainer else OgtColors.muted,
     disabledPlaceholderColor = OgtColors.disabledInk,
+)
+
+/** Switch de ajustes: Harbor Navy, sin lila Material. */
+@Composable
+fun ogtSwitchColors(): SwitchColors = SwitchDefaults.colors(
+    checkedThumbColor = OgtColors.onPrimary,
+    checkedTrackColor = OgtColors.secondary,
+    checkedBorderColor = OgtColors.secondary,
+    uncheckedThumbColor = OgtColors.surface,
+    uncheckedTrackColor = OgtColors.disabledFill,
+    uncheckedBorderColor = OgtColors.disabledLine,
+    disabledCheckedThumbColor = OgtColors.surface,
+    disabledCheckedTrackColor = OgtColors.disabledFill,
+    disabledUncheckedThumbColor = OgtColors.disabledFill,
+    disabledUncheckedTrackColor = OgtColors.stone,
+)
+
+/** Radio de idioma: mismo criterio que el switch. */
+@Composable
+fun ogtRadioColors(): RadioButtonColors = RadioButtonDefaults.colors(
+    selectedColor = OgtColors.secondary,
+    unselectedColor = OgtColors.muted,
+    disabledSelectedColor = OgtColors.disabledInk,
+    disabledUnselectedColor = OgtColors.disabledLine,
 )
 
 object OgtDimens {

@@ -10,12 +10,18 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.onlygoodthings.app.media.OgtMediaCache
 import com.onlygoodthings.app.platform.OgtPostedVideo
 import com.onlygoodthings.app.resources.Res
 import com.onlygoodthings.app.resources.feed_story_donacion
@@ -47,7 +53,13 @@ fun PostMediaViewer(
                     item.url.startsWith("http") || item.url.startsWith("file") || item.url.startsWith("/")
                 )
                 if (playable) {
-                    OgtPostedVideo(item.url, Modifier.fillMaxSize())
+                    var playUrl by remember(item.url) {
+                        mutableStateOf(OgtMediaCache.cachedFileUrl(item.url) ?: item.url)
+                    }
+                    LaunchedEffect(item.url) {
+                        playUrl = OgtMediaCache.cachedPlayableUrl(item.url)
+                    }
+                    OgtPostedVideo(playUrl, Modifier.fillMaxSize())
                 } else {
                     OgtPostImage(
                         item = item,

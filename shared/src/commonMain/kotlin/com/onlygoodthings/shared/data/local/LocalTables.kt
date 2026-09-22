@@ -7,6 +7,7 @@ import com.onlygoodthings.shared.domain.HonorStatus
 import com.onlygoodthings.shared.domain.MediaKind
 import com.onlygoodthings.shared.domain.ParkingStatus
 import com.onlygoodthings.shared.domain.PostPersonRole
+import com.onlygoodthings.shared.domain.PostPlacement
 import com.onlygoodthings.shared.domain.UserRole
 import kotlinx.serialization.Serializable
 
@@ -121,6 +122,30 @@ data class LocalSocialPost(
     val honoreeName: String? = null,
     /** Corazones en un homenaje. El aplauso sigue en [impactCount]. */
     val heartCount: Int = 0,
+    val placement: PostPlacement = PostPlacement.ORGANIC,
+    val achievedCount: Int = 0,
+    val empresaQueSuma: Boolean = false,
+    /** Homenaje origen si esta card es una anécdota puntual en el feed. */
+    val parentPostId: String? = null,
+    val viewerHasImpacted: Boolean = false,
+    val viewerHasHearted: Boolean = false,
+)
+
+@Serializable
+data class LocalAnecdote(
+    val id: String,
+    val postId: String,
+    val authorUserId: String,
+    val authorName: String,
+    val body: String,
+    val sourceUrl: String? = null,
+    val sortOrder: Int = 0,
+    val createdAtEpochMs: Long = 0L,
+    val impactCount: Int = 0,
+    val commentCount: Int = 0,
+    val heartCount: Int = 0,
+    val viewerHasImpacted: Boolean = false,
+    val viewerHasHearted: Boolean = false,
 )
 
 @Serializable
@@ -190,6 +215,8 @@ data class LocalComment(
     val parentCommentId: String?,
     val clapCount: Int = 0,
     val clapUserIds: List<String> = emptyList(),
+    val anecdoteId: String? = null,
+    val edited: Boolean = false,
 )
 
 @Serializable
@@ -253,6 +280,17 @@ data class PublishedAnimalsSnapshot(
     val listings: List<LocalAnimalListing> = emptyList(),
     val posts: List<LocalSocialPost> = emptyList(),
     val media: List<LocalPostMedia> = emptyList(),
+)
+
+/** Último feed visto: se pinta al toque y se reconcilia con REST. */
+@Serializable
+data class SocialFeedSnapshot(
+    val posts: List<LocalSocialPost> = emptyList(),
+    val media: List<LocalPostMedia> = emptyList(),
+    val comments: List<LocalComment> = emptyList(),
+    val anecdotes: List<LocalAnecdote> = emptyList(),
+    val follows: List<LocalFollow> = emptyList(),
+    val hideEvents: List<LocalFeedEvent> = emptyList(),
 )
 
 @Serializable
@@ -367,6 +405,8 @@ data class LocalKarmaEntry(
     val place: String,
     val delta: Int,
     val timeLabel: String,
+    /** Clave de glifo Stitch: paw, yield, skills, feed, wallet. */
+    val mark: String = "feed",
 )
 
 @Serializable
@@ -376,6 +416,7 @@ data class LocalReward(
     val costPoints: Int,
     val place: String,
     val detail: String,
+    val mark: String = "wallet",
 )
 
 @Serializable

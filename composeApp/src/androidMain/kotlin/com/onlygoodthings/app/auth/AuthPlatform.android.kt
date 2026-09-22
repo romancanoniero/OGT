@@ -139,8 +139,6 @@ actual class AuthPlatform actual constructor() {
         throw AuthException("La cuenta de Google no devolvió un token válido")
     }
 
-    actual suspend fun signInApple(): AuthUser = signInOAuth("apple.com", listOf("email", "name"))
-
     actual suspend fun signInFacebook(): AuthUser = signInOAuth("facebook.com", listOf("email", "public_profile"))
 
     actual suspend fun unlockBiometric(): Boolean {
@@ -305,11 +303,18 @@ actual class AuthPrefs actual constructor() {
     actual var publishedAnimalsJson: String
         get() = prefs.getString("animals_json", "").orEmpty()
         set(value) { prefs.edit().putString("animals_json", value).apply() }
+    actual var feedCacheJson: String
+        get() = prefs.getString("feed_json", "").orEmpty()
+        set(value) { prefs.edit().putString("feed_json", value).apply() }
     actual var honorReferrerConsumed: Boolean
         get() = prefs.getBoolean("honor_referrer_done", false)
         set(value) { prefs.edit().putBoolean("honor_referrer_done", value).apply() }
+    actual var gpsEnabled: Boolean
+        get() = prefs.getBoolean("gps_on", false)
+        set(value) { prefs.edit().putBoolean("gps_on", value).apply() }
+    actual var locationScope: String
+        get() = prefs.getString("gps_scope", "while").orEmpty().ifBlank { "while" }
+        set(value) { prefs.edit().putString("gps_scope", value).apply() }
 }
 
 actual fun defaultApiBaseUrl(): String = OGT_DEFAULT_API_BASE
-
-actual fun showsAppleSignIn(): Boolean = false

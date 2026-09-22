@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import com.onlygoodthings.app.i18n.LocalOgtCopy
 import com.onlygoodthings.app.map.LocalOgtLocation
 import com.onlygoodthings.app.map.LocationPermissionState
+import com.onlygoodthings.app.map.covers
 import com.onlygoodthings.app.map.isGranted
 /** CTA cuando todavía no hay fix GPS real. */
 @Composable
@@ -30,7 +31,10 @@ fun OgtGpsBanner() {
             OgtPrimaryButton(action) {
                 when {
                     gps.permission == LocationPermissionState.DENIED_FOREVER -> gps.openSettings()
-                    !gps.permission.isGranted() -> session.askLocationScope = true
+                    !gps.permission.isGranted() || !gps.permission.covers(session.locationScope) -> {
+                        if (session.gpsEnabled) gps.ensureScope(session.locationScope)
+                        else session.askLocationScope = true
+                    }
                     !gps.servicesEnabled -> gps.ensureServices()
                     else -> gps.refreshNow()
                 }

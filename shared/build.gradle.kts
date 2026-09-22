@@ -30,9 +30,14 @@ kotlin {
         }
     }
 
-    // db-kmp-sdk expone js(IR), no Wasm. La UI web/Wasm vive en el otro repo.
+    // Bundle de OgtSdk + OgtRealtime para la web estática (script tag).
     js(IR) {
-        browser()
+        browser {
+            commonWebpackConfig {
+                outputFileName = "ogt-sdk.js"
+            }
+            binaries.executable()
+        }
     }
 
     sourceSets {
@@ -67,7 +72,7 @@ kotlin {
 
 android {
     namespace = "com.onlygoodthings.shared"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         minSdk = 26
     }
@@ -75,4 +80,14 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+}
+
+tasks.register<Copy>("syncWebSdk") {
+    group = "distribution"
+    description = "Copia el bundle de OgtSdk a web/app para nginx."
+    dependsOn("jsBrowserProductionWebpack")
+    from(layout.buildDirectory.dir("kotlin-webpack/js/productionExecutable"))
+    include("ogt-sdk.js", "ogt-sdk.js.LICENSE.txt", "*.js")
+    exclude("*.map")
+    into(rootProject.layout.projectDirectory.dir("web/app"))
 }

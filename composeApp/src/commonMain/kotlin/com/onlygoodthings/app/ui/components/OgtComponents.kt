@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -76,6 +77,45 @@ import org.jetbrains.compose.resources.painterResource
 
 private val Hairline = BorderStroke(1.dp, OgtColors.hairline)
 private val Pill = RoundedCornerShape(OgtDimens.pill)
+
+/**
+ * Logo cuadrado de fila: marco hairline, radio corto.
+ * [brand] = marca de comercio (sin tint). Si no, glifo Stitch.
+ */
+@Composable
+fun OgtMark(
+    art: DrawableResource,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    brand: Boolean = false,
+) {
+    val shape = RoundedCornerShape(OgtDimens.buttonRadius)
+    Box(
+        modifier
+            .size(52.dp)
+            .clip(shape)
+            .background(OgtColors.canvas)
+            .border(Hairline, shape),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (brand) {
+            Image(
+                painter = painterResource(art),
+                contentDescription = contentDescription,
+                modifier = Modifier.fillMaxSize().padding(6.dp),
+                contentScale = ContentScale.Fit,
+            )
+        } else {
+            Image(
+                painter = painterResource(art),
+                contentDescription = contentDescription,
+                modifier = Modifier.fillMaxSize().padding(8.dp),
+                contentScale = ContentScale.Fit,
+                colorFilter = ColorFilter.tint(OgtColors.secondary),
+            )
+        }
+    }
+}
 
 /** Botón circular 44px: hairline + glifo. Activo = pozo arena + glifo harbor. */
 @Composable
@@ -170,40 +210,27 @@ fun OgtTopBar(
     onBack: (() -> Unit)? = null,
     onNotifications: () -> Unit = {},
     onProfile: () -> Unit = {},
+    onOverflow: (() -> Unit)? = null,
+    onMessages: (() -> Unit)? = null,
+    hideOnScroll: Boolean = true,
+    branded: Boolean = false,
 ) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .zIndex(2f)
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .padding(horizontal = OgtDimens.margin, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (onBack != null) {
-            OgtBackButton(onBack)
-        }
-        Spacer(Modifier.width(10.dp))
-        Text(
-            title,
-            modifier = Modifier.weight(1f),
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
-            color = OgtColors.ink,
-            letterSpacing = (-0.3).sp,
-        )
-        CircleIconButton(Res.drawable.qs_notifications, "Alertas", onNotifications)
-        Spacer(Modifier.width(8.dp))
-        Image(
-            painterResource(Res.drawable.feed_avatar_me),
-            contentDescription = "Perfil",
-            modifier = Modifier
-                .size(OgtDimens.iconButton)
-                .clip(CircleShape)
-                .border(Hairline, CircleShape)
-                .clickable(onClick = onProfile),
-            contentScale = ContentScale.Crop,
-        )
+    val spec = OgtChromeSpec(
+        title = title,
+        onBack = onBack,
+        onNotifications = onNotifications,
+        onProfile = onProfile,
+        onOverflow = onOverflow,
+        onMessages = onMessages,
+        hideOnScroll = hideOnScroll,
+        branded = branded,
+    )
+    val host = LocalOgtChrome.current
+    if (host != null) {
+        OgtProvideChrome(spec)
+        return
     }
+    OgtTopBarRow(spec)
 }
 
 @Composable
@@ -349,6 +376,7 @@ fun OgtPill(text: String, tint: Color = OgtColors.sand, ink: Color = OgtColors.i
 fun OgtCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Column(
         modifier
+            .fillMaxWidth()
             .shadow(8.dp, RoundedCornerShape(OgtDimens.cardRadius), ambientColor = Color(0x0F0A0A0B))
             .clip(RoundedCornerShape(OgtDimens.cardRadius))
             .background(OgtColors.surface)

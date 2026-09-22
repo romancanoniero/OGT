@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,8 +39,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.onlygoodthings.app.data.LocalAuth
 import com.onlygoodthings.app.data.LocalOgtDb
 import com.onlygoodthings.app.data.LocalOgtSession
+import com.onlygoodthings.app.data.optimisticToggleFollow
 import com.onlygoodthings.app.resources.Res
 import com.onlygoodthings.app.resources.feed_avatar_carlos
 import com.onlygoodthings.app.resources.feed_avatar_mariana
@@ -64,7 +67,10 @@ fun NeighborProfileScreen(
     onOpenPost: (String) -> Unit,
 ) {
     val db = LocalOgtDb.current
-    val me = LocalOgtSession.current.me()
+    val auth = LocalAuth.current
+    val session = LocalOgtSession.current
+    val me = session.me()
+    val scope = rememberCoroutineScope()
     val user = db.userOrNull(userId)
     if (user == null) {
         Column(
@@ -131,7 +137,9 @@ fun NeighborProfileScreen(
                         .clip(RoundedCornerShape(12.dp))
                         .background(fill)
                         .clickable {
-                            db.toggleFollow(me.id, userId)
+                            optimisticToggleFollow(db, auth.feed, scope, me.id, userId) {
+                                session.persistSocialFeed()
+                            }
                             following = db.isFollowing(me.id, userId)
                         },
                     contentAlignment = Alignment.Center,

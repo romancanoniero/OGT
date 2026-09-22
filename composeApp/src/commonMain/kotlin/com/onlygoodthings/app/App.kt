@@ -21,6 +21,9 @@ import com.onlygoodthings.app.data.OgtPreviewStore
 import com.onlygoodthings.app.i18n.LocalOgtCopy
 import com.onlygoodthings.app.map.LocalOgtLocation
 import com.onlygoodthings.app.map.LocationPermissionState
+import com.onlygoodthings.app.map.OgtBackgroundLocation
+import com.onlygoodthings.app.map.OgtLocationSync
+import com.onlygoodthings.app.map.covers
 import com.onlygoodthings.app.map.isGranted
 import com.onlygoodthings.app.map.rememberOgtLocation
 import com.onlygoodthings.app.notify.rememberOgtNotify
@@ -30,8 +33,16 @@ import com.onlygoodthings.app.platform.storePreviewRoute
 import com.onlygoodthings.app.platform.storePreviewScreenName
 import com.onlygoodthings.app.platform.readHonorClipboard
 import com.onlygoodthings.app.platform.startHonorInstallReferrer
+import com.onlygoodthings.shared.domain.FeedCardKind
+import com.onlygoodthings.shared.domain.feedCardKind
 import com.onlygoodthings.shared.domain.honorAppLink
+import com.onlygoodthings.shared.domain.isGatheringPost
+import com.onlygoodthings.app.ui.components.LocalOgtChrome
+import com.onlygoodthings.app.ui.components.OgtChromePad
+import com.onlygoodthings.app.ui.components.OgtHostedTopBar
 import com.onlygoodthings.app.ui.components.ogtDismissImeOnScroll
+import com.onlygoodthings.app.ui.components.rememberOgtChromeHost
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import com.onlygoodthings.app.ui.screens.LocationScopeDialog
 import com.onlygoodthings.app.ui.screens.ParkingManeuverDialog
 import com.onlygoodthings.app.ui.screens.ParkedPromptDialog
@@ -39,6 +50,7 @@ import com.onlygoodthings.app.ui.screens.YieldApproachDialog
 import com.onlygoodthings.shared.domain.DriveParkingDetector
 import com.onlygoodthings.shared.domain.GeoMath
 import com.onlygoodthings.shared.domain.GeoPoint
+import com.onlygoodthings.shared.domain.LocationScope
 import com.onlygoodthings.shared.domain.MotionSample
 import com.onlygoodthings.shared.domain.ParkedPresenceAction
 import com.onlygoodthings.shared.domain.ParkedPresenceTick
@@ -60,6 +72,8 @@ import com.onlygoodthings.app.ui.screens.AnimatedSvgScreen
 import com.onlygoodthings.app.ui.screens.AdoptApplicationScreen
 import com.onlygoodthings.app.ui.screens.AnimalsScreen
 import com.onlygoodthings.app.ui.screens.ChatScreen
+import com.onlygoodthings.app.ui.screens.CommunityRulesScreen
+import com.onlygoodthings.app.ui.screens.LanguageSettingsScreen
 import com.onlygoodthings.app.ui.screens.FeedScreen
 import com.onlygoodthings.app.ui.screens.IdentityScreen
 import com.onlygoodthings.app.ui.screens.ClaimHonorScreen
@@ -87,6 +101,7 @@ import com.onlygoodthings.app.ui.screens.PublishAdoptionScreen
 import com.onlygoodthings.app.ui.screens.RankingScreen
 import com.onlygoodthings.app.ui.screens.ReportAnimalScreen
 import com.onlygoodthings.app.ui.screens.SettingsScreen
+import com.onlygoodthings.app.ui.screens.VehicleEditorScreen
 import com.onlygoodthings.app.ui.screens.SkillsScreen
 import com.onlygoodthings.app.ui.screens.SplashScreen
 import com.onlygoodthings.app.ui.screens.SplashSponsorsScreen
@@ -105,7 +120,11 @@ fun App() {
         var chatBack by remember { mutableStateOf(OgtRoute.Skills) }
         var gpsReturn by remember { mutableStateOf(OgtRoute.Identity) }
         var reportBack by remember { mutableStateOf(OgtRoute.Animals) }
-        var editAdoptionPostId by remember { mutableStateOf<String?>(null) }
+        var rulesBack by remember { mutableStateOf(OgtRoute.Settings) }
+        /** Ajustes sigue debajo de sus hojas: atrás vuelve al mismo scroll. */
+        var settingsResume by remember { mutableStateOf(false) }
+        var editVehicleId by remember { mutableStateOf<String?>(null) }
+        var editPostId by remember { mutableStateOf<String?>(null) }
         var animalPublishKind by remember {
             mutableStateOf(
                 when (storePreviewScreenName()?.lowercase()) {
@@ -132,19 +151,40 @@ fun App() {
         if (storePreview) auth.markOnboardingDone()
         val session = LocalOgtSession.current
         val db = LocalOgtDb.current
+        fun openEditPost(postId: String, from: OgtRoute = OgtRoute.Feed) {
+            val post = db.post(postId)
+            val listing = post.listingId?.let { id -> db.animals.firstOrNull { it.id == id } }
+            val kind = feedCardKind(post.tag, listing?.kind, post.sourceUrl)
+            editPostId = postId
+            selectedPostId = postId
+            when (kind) {
+                FeedCardKind.LOST_PET -> {
+                    animalPublishKind = ComposePostKind.LOST
+                    reportBack = from
+                    route = OgtRoute.ReportAnimal
+                }
+                FeedCardKind.ADOPTION -> {
+                    animalPublishKind = ComposePostKind.ADOPT
+                    reportBack = from
+                    route = OgtRoute.ReportAnimal
+                }
+                FeedCardKind.TERNURA -> {
+                    publishKind = ComposePostKind.TERNURA
+                    route = OgtRoute.Publish
+                }
+                FeedCardKind.HOMENAJE -> {
+                    publishKind = ComposePostKind.HOMENAJE
+                    route = OgtRoute.Publish
+                }
+                else -> {
+                    publishKind = if (isGatheringPost(post.tag)) ComposePostKind.GATHERING else ComposePostKind.ACTION
+                    route = OgtRoute.Publish
+                }
+            }
+        }
         val copy = LocalOgtCopy.current
         val notify = rememberOgtNotify()
-        val location = rememberOgtLocation(
-            track = session.radarEnabled ||
-                session.locationPermission == LocationPermissionState.GRANTED_ALWAYS ||
-                route == OgtRoute.Parking ||
-                route == OgtRoute.ParkingConfirm ||
-                route == OgtRoute.ParkHere ||
-                route == OgtRoute.Map ||
-                route == OgtRoute.PetsMap ||
-                route == OgtRoute.Gps ||
-                route == OgtRoute.ReportAnimal,
-        )
+        val location = rememberOgtLocation(track = session.gpsEnabled)
         val detector = remember { DriveParkingDetector() }
         var detectedManeuver by remember { mutableStateOf<ParkingManeuver?>(null) }
         LaunchedEffect(location.permission, location.servicesEnabled, location.fix, location.acquiring) {
@@ -155,9 +195,33 @@ fun App() {
             session.locationAccuracy = location.fix?.accuracyMeters
             session.deviceLocation = location.fix?.toGeoPoint()
         }
-        LaunchedEffect(route) {
-            if (route == OgtRoute.Parking || route == OgtRoute.Map || route == OgtRoute.ParkHere || route == OgtRoute.PetsMap || route == OgtRoute.Gps || route == OgtRoute.ReportAnimal) {
-                location.resync()
+        LaunchedEffect(Unit) {
+            OgtLocationSync.bind { lat, lng, acc ->
+                auth.updateMyLocation(lat, lng, acc)
+            }
+        }
+        LaunchedEffect(session.gpsEnabled, session.locationScope, location.permission, location.servicesEnabled) {
+            OgtLocationSync.enabled = session.gpsEnabled && location.permission.isGranted()
+            val always = session.locationScope == LocationScope.ALWAYS
+            if (session.gpsEnabled && always && location.permission.isGranted() && location.servicesEnabled) {
+                OgtBackgroundLocation.start()
+            } else {
+                OgtBackgroundLocation.stop()
+            }
+        }
+        LaunchedEffect(route, session.gpsEnabled, location.permission) {
+            val needsFix = route == OgtRoute.Parking ||
+                route == OgtRoute.ParkingConfirm ||
+                route == OgtRoute.ParkHere ||
+                route == OgtRoute.Map ||
+                route == OgtRoute.PetsMap ||
+                route == OgtRoute.ReportAnimal
+            if (!session.gpsEnabled || !needsFix) return@LaunchedEffect
+            when {
+                location.permission == LocationPermissionState.DENIED_FOREVER -> location.openSettings()
+                !location.permission.covers(session.locationScope) -> location.ensureScope(session.locationScope)
+                !location.servicesEnabled -> location.ensureServices()
+                else -> location.resync()
             }
         }
         LaunchedEffect(location.fix?.epochMs, location.fix?.latitude, location.fix?.longitude) {
@@ -312,16 +376,27 @@ fun App() {
                 OgtRoute.Otp -> ({ route = otpBack })
                 OgtRoute.Recover, OgtRoute.SignUp -> ({ route = OgtRoute.Login })
                 OgtRoute.NeighborProfile, OgtRoute.PostDetail, OgtRoute.Publish,
-                OgtRoute.Notifications, OgtRoute.Invite, OgtRoute.ClaimHonor, OgtRoute.Messages,
+                OgtRoute.Notifications, OgtRoute.ClaimHonor,
                 -> ({ route = OgtRoute.Feed })
+                OgtRoute.Invite, OgtRoute.Messages, OgtRoute.Milestone -> ({
+                    route = if (settingsResume) OgtRoute.Settings else OgtRoute.Feed
+                })
                 OgtRoute.ParkingConfirm, OgtRoute.ParkHere, OgtRoute.Map -> ({ route = OgtRoute.Parking })
                 OgtRoute.PetsMap -> ({ route = OgtRoute.Animals })
                 OgtRoute.ReportAnimal -> ({ route = reportBack })
                 OgtRoute.AdoptApply -> ({ route = OgtRoute.PostDetail })
                 OgtRoute.ProposeSkill -> ({ route = OgtRoute.Skills })
                 OgtRoute.Chat -> ({ route = chatBack })
-                OgtRoute.Wallet, OgtRoute.Ranking, OgtRoute.Sponsors -> ({ route = OgtRoute.Settings })
-                OgtRoute.Milestone -> ({ route = OgtRoute.Feed })
+                OgtRoute.Settings -> ({
+                    settingsResume = false
+                    route = OgtRoute.Feed
+                })
+                OgtRoute.Language, OgtRoute.Wallet, OgtRoute.Ranking, OgtRoute.Sponsors,
+                OgtRoute.SplashSponsors, OgtRoute.Vehicle,
+                -> ({ route = OgtRoute.Settings })
+                OgtRoute.CommunityRules -> ({ route = rulesBack })
+                OgtRoute.Permissions, OgtRoute.AnimatedSvg ->
+                    if (settingsResume) ({ route = OgtRoute.Settings }) else null
                 OgtRoute.Gps -> ({
                     gpsAwaiting = false
                     session.askLocationScope = false
@@ -331,11 +406,70 @@ fun App() {
             }
         }
         OgtBackHandler(enabled = stackBack != null) { stackBack?.invoke() }
-        CompositionLocalProvider(LocalOgtLocation provides location) {
+        val chrome = rememberOgtChromeHost()
+        chrome.fallbackBack = stackBack
+        val chromeScroll = remember(chrome) { chrome.nestedScrollConnection() }
+        LaunchedEffect(route) { chrome.revealNow() }
+        val settingsLeaves = setOf(
+            OgtRoute.Language, OgtRoute.Wallet, OgtRoute.Ranking, OgtRoute.Sponsors,
+            OgtRoute.SplashSponsors, OgtRoute.CommunityRules, OgtRoute.Gps,
+            OgtRoute.AnimatedSvg, OgtRoute.Invite, OgtRoute.Messages, OgtRoute.Milestone,
+            OgtRoute.Vehicle,
+            OgtRoute.Chat,
+        )
+        val keepSettings = route == OgtRoute.Settings || (settingsResume && route in settingsLeaves)
+        val closeSettingsLeaf: () -> Unit = { route = OgtRoute.Settings }
+        CompositionLocalProvider(
+            LocalOgtLocation provides location,
+            LocalOgtChrome provides chrome,
+        ) {
         Scaffold(
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
         ) {
-            Box(Modifier.fillMaxSize().ogtDismissImeOnScroll()) {
+            Box(Modifier.fillMaxSize().nestedScroll(chromeScroll).ogtDismissImeOnScroll()) {
+                Box(OgtChromePad(chrome, Modifier.fillMaxSize())) {
+                if (keepSettings) {
+                    SettingsScreen(
+                        onLogout = {
+                            scope.launch {
+                                settingsResume = false
+                                auth.signOut()
+                                route = OgtRoute.Login
+                            }
+                        },
+                        onBack = {
+                            settingsResume = false
+                            route = OgtRoute.Feed
+                        },
+                    ) { key ->
+                        settingsResume = true
+                        route = when (key) {
+                            "language" -> OgtRoute.Language
+                            "rules" -> {
+                                rulesBack = OgtRoute.Settings
+                                OgtRoute.CommunityRules
+                            }
+                            "wallet" -> OgtRoute.Wallet
+                            "ranking" -> OgtRoute.Ranking
+                            "invite" -> OgtRoute.Invite
+                            "messages" -> OgtRoute.Messages
+                            "sponsors" -> OgtRoute.Sponsors
+                            "milestone" -> OgtRoute.Milestone
+                            "splashSponsors" -> OgtRoute.SplashSponsors
+                            "animatedSvg" -> OgtRoute.AnimatedSvg
+                            "car" -> {
+                                editVehicleId = null
+                                OgtRoute.Vehicle
+                            }
+                            else -> if (key.startsWith("car:")) {
+                                editVehicleId = key.removePrefix("car:")
+                                OgtRoute.Vehicle
+                            } else {
+                                OgtRoute.Settings
+                            }
+                        }
+                    }
+                }
                 when (route) {
                     OgtRoute.Splash -> SplashScreen {
                         scope.launch {
@@ -349,8 +483,15 @@ fun App() {
                             session.persistPublishedAnimals()
                         }
                     }
-                    OgtRoute.AnimatedSvg -> AnimatedSvgScreen()
-                    OgtRoute.SplashSponsors -> SplashSponsorsScreen { route = OgtRoute.Onboarding }
+                    OgtRoute.AnimatedSvg -> AnimatedSvgScreen(
+                        onBack = if (settingsResume) closeSettingsLeaf else null,
+                    )
+                    OgtRoute.SplashSponsors -> SplashSponsorsScreen(
+                        onContinue = {
+                            if (settingsResume) closeSettingsLeaf() else route = OgtRoute.Onboarding
+                        },
+                        onBack = if (settingsResume) closeSettingsLeaf else null,
+                    )
                     OgtRoute.OnboardingFeatures -> OnboardingScreen(
                         onDone = { route = OgtRoute.SignUp },
                         onLogin = { route = OgtRoute.Login },
@@ -390,15 +531,22 @@ fun App() {
                     )
                     OgtRoute.Permissions -> PermissionsScreen(
                         onContinue = {
-                            gpsReturn = OgtRoute.Identity
-                            route = OgtRoute.Gps
+                            if (settingsResume) {
+                                closeSettingsLeaf()
+                            } else {
+                                gpsReturn = OgtRoute.Identity
+                                route = OgtRoute.Gps
+                            }
                         },
                         onRequestNotify = notify.requestPermission,
+                        onBack = if (settingsResume) closeSettingsLeaf else null,
                     )
                     OgtRoute.Gps -> LocationScopeDialog(
                         onConfirm = { scope ->
                             gpsAwaiting = true
                             session.askLocationScope = false
+                            session.applyGpsEnabled(true)
+                            session.applyLocationScope(scope)
                             location.requestPermission(scope)
                             location.ensureServices()
                             location.refreshNow()
@@ -410,8 +558,14 @@ fun App() {
                         onSkip = {
                             gpsAwaiting = false
                             session.askLocationScope = false
+                            session.applyGpsEnabled(false)
                             session.locationGranted = false
                             session.deviceLocation = null
+                            route = gpsReturn
+                        },
+                        onBack = {
+                            gpsAwaiting = false
+                            session.askLocationScope = false
                             route = gpsReturn
                         },
                     )
@@ -420,14 +574,17 @@ fun App() {
                         route = OgtRoute.Feed
                     }
                     OgtRoute.Feed, OgtRoute.PostDetail, OgtRoute.NeighborProfile -> {
-                        // El río sigue compuesto bajo la ficha: atrás vuelve a la misma tarjeta.
+                        // El feed sigue compuesto bajo la ficha: atrás vuelve a la misma tarjeta.
                         FeedScreen(
                             onOpenPost = { id ->
                                 selectedPostId = id
                                 route = OgtRoute.PostDetail
                             },
                             onNotifications = { route = OgtRoute.Notifications },
-                            onProfile = { route = OgtRoute.Settings },
+                            onProfile = {
+                                settingsResume = false
+                                route = OgtRoute.Settings
+                            },
                             onMessages = { route = OgtRoute.Messages },
                             onInvite = { route = OgtRoute.Invite },
                             onOpenNeighbor = { userId ->
@@ -436,12 +593,13 @@ fun App() {
                             },
                             onPetsMap = { route = OgtRoute.PetsMap },
                             onAdopt = { route = OgtRoute.Animals },
-                            onEditAdoption = { id ->
-                                editAdoptionPostId = id
+                            onEditPost = { id ->
                                 selectedPostId = id
-                                animalPublishKind = ComposePostKind.ADOPT
-                                reportBack = OgtRoute.Feed
-                                route = OgtRoute.ReportAnimal
+                                openEditPost(id)
+                            },
+                            onOpenRules = {
+                                rulesBack = OgtRoute.Feed
+                                route = OgtRoute.CommunityRules
                             },
                         )
                         if (route == OgtRoute.NeighborProfile) {
@@ -460,11 +618,10 @@ fun App() {
                                 onBack = { route = OgtRoute.Feed },
                                 onPetsMap = { route = OgtRoute.PetsMap },
                                 onAdopt = { route = OgtRoute.AdoptApply },
-                                onEdit = {
-                                    editAdoptionPostId = selectedPostId
-                                    animalPublishKind = ComposePostKind.ADOPT
-                                    reportBack = OgtRoute.PostDetail
-                                    route = OgtRoute.ReportAnimal
+                                onEdit = { openEditPost(selectedPostId, from = OgtRoute.PostDetail) },
+                                onOpenRules = {
+                                    rulesBack = OgtRoute.PostDetail
+                                    route = OgtRoute.CommunityRules
                                 },
                                 onInvite = { route = OgtRoute.Invite },
                                 onOpenLostChat = { matchId ->
@@ -477,8 +634,15 @@ fun App() {
                     }
                     OgtRoute.Publish -> PublishActionScreen(
                         kind = publishKind,
-                        onDone = { route = OgtRoute.Feed },
-                        onBack = { route = OgtRoute.Feed },
+                        editPostId = editPostId,
+                        onDone = {
+                            editPostId = null
+                            route = OgtRoute.Feed
+                        },
+                        onBack = {
+                            editPostId = null
+                            route = OgtRoute.Feed
+                        },
                     )
                     OgtRoute.Parking -> ParkingScreen(
                         onConfirm = { id ->
@@ -512,7 +676,7 @@ fun App() {
                             route = OgtRoute.ReportAnimal
                         },
                         onReportAdopt = {
-                            editAdoptionPostId = null
+                            editPostId = null
                             animalPublishKind = ComposePostKind.ADOPT
                             reportBack = OgtRoute.Animals
                             route = OgtRoute.ReportAnimal
@@ -523,27 +687,30 @@ fun App() {
                             route = OgtRoute.PostDetail
                         },
                         onEditAdoption = { id ->
-                            editAdoptionPostId = id
                             selectedPostId = id
-                            animalPublishKind = ComposePostKind.ADOPT
-                            reportBack = OgtRoute.Animals
-                            route = OgtRoute.ReportAnimal
+                            openEditPost(id, from = OgtRoute.Animals)
                         },
                     )
                     OgtRoute.ReportAnimal -> if (animalPublishKind == ComposePostKind.ADOPT) {
                         PublishAdoptionScreen(
-                            editPostId = editAdoptionPostId,
+                            editPostId = editPostId,
                             onBack = {
-                                editAdoptionPostId = null
+                                editPostId = null
                                 route = reportBack
                             },
                             onPublished = {
-                                editAdoptionPostId = null
+                                editPostId = null
                                 route = reportBack
                             },
                         )
                     } else {
-                        ReportAnimalScreen { route = reportBack }
+                        ReportAnimalScreen(
+                            editPostId = editPostId,
+                            onDone = {
+                                editPostId = null
+                                route = reportBack
+                            },
+                        )
                     }
                     OgtRoute.AdoptApply -> AdoptApplicationScreen(
                         postId = selectedPostId,
@@ -569,7 +736,7 @@ fun App() {
                             chatBack = OgtRoute.Messages
                             route = OgtRoute.Chat
                         },
-                        onBack = { route = OgtRoute.Feed },
+                        onBack = { if (settingsResume) closeSettingsLeaf() else route = OgtRoute.Feed },
                     )
                     OgtRoute.Chat -> ChatScreen(selectedMatchId) { route = chatBack }
                     OgtRoute.Wallet -> WalletScreen { route = OgtRoute.Settings }
@@ -581,7 +748,9 @@ fun App() {
                             route = OgtRoute.PostDetail
                         },
                     )
-                    OgtRoute.Invite -> InviteScreen { route = OgtRoute.Feed }
+                    OgtRoute.Invite -> InviteScreen {
+                        if (settingsResume) closeSettingsLeaf() else route = OgtRoute.Feed
+                    }
                     OgtRoute.ClaimHonor -> ClaimHonorScreen(
                         onDone = {
                             session.rememberHonorToken(null)
@@ -592,44 +761,33 @@ fun App() {
                             route = if (auth.hasFinishedOnboarding()) OgtRoute.Feed else OgtRoute.Permissions
                         },
                     )
-                    OgtRoute.Settings -> SettingsScreen(
-                        onLogout = {
-                            scope.launch {
-                                auth.signOut()
-                                route = OgtRoute.Login
-                            }
+                    OgtRoute.CommunityRules -> CommunityRulesScreen { route = rulesBack }
+                    OgtRoute.Language -> LanguageSettingsScreen { route = OgtRoute.Settings }
+                    OgtRoute.Vehicle -> VehicleEditorScreen(editVehicleId, closeSettingsLeaf)
+                    OgtRoute.Settings -> Unit
+                    OgtRoute.Sponsors -> SponsorsScreen(closeSettingsLeaf)
+                    OgtRoute.Milestone -> MilestoneScreen(
+                        onBack = { if (settingsResume) closeSettingsLeaf() else route = OgtRoute.Feed },
+                        onGoFeed = {
+                            settingsResume = false
+                            route = OgtRoute.Feed
                         },
-                    ) { key ->
-                        route = when (key) {
-                            "wallet" -> OgtRoute.Wallet
-                            "ranking" -> OgtRoute.Ranking
-                            "invite" -> OgtRoute.Invite
-                            "messages" -> OgtRoute.Messages
-                            "sponsors" -> OgtRoute.Sponsors
-                            "milestone" -> OgtRoute.Milestone
-                            "splashSponsors" -> OgtRoute.SplashSponsors
-                            "gps" -> {
-                                gpsReturn = OgtRoute.Settings
-                                OgtRoute.Gps
-                            }
-                            "permissions" -> OgtRoute.Permissions
-                            "animatedSvg" -> OgtRoute.AnimatedSvg
-                            else -> OgtRoute.Settings
-                        }
-                    }
-                    OgtRoute.Sponsors -> SponsorsScreen { route = OgtRoute.Settings }
-                    OgtRoute.Milestone -> MilestoneScreen { route = OgtRoute.Feed }
+                    )
+                }
                 }
                 if (session.askLocationScope && route != OgtRoute.Gps) {
                     LocationScopeDialog(
                         onConfirm = { scope ->
                             session.askLocationScope = false
                             gpsAwaiting = true
+                            session.applyGpsEnabled(true)
+                            session.applyLocationScope(scope)
                             location.requestPermission(scope)
                             location.ensureServices()
                             location.refreshNow()
                         },
                         onSkip = { session.askLocationScope = false },
+                        onBack = { session.askLocationScope = false },
                     )
                 }
                 if (session.askYieldApproach && detectedManeuver == null) {
@@ -748,6 +906,7 @@ fun App() {
                         onDismiss = { detectedManeuver = null },
                     )
                 }
+                OgtHostedTopBar(chrome)
                 if (showBar) {
                     OgtBottomBar(
                         current = route,
@@ -756,11 +915,12 @@ fun App() {
                             when (kind) {
                                 ComposePostKind.ACTION, ComposePostKind.GATHERING,
                                 ComposePostKind.TERNURA, ComposePostKind.HOMENAJE -> {
+                                    editPostId = null
                                     publishKind = kind
                                     route = OgtRoute.Publish
                                 }
                                 ComposePostKind.LOST, ComposePostKind.ADOPT -> {
-                                    editAdoptionPostId = null
+                                    editPostId = null
                                     animalPublishKind = kind
                                     reportBack = OgtRoute.Feed
                                     route = OgtRoute.ReportAnimal

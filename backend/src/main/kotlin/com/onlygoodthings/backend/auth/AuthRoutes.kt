@@ -1,9 +1,13 @@
 package com.onlygoodthings.backend.auth
 
 import com.onlygoodthings.backend.http.JsonBody
+import com.onlygoodthings.backend.http.optDouble
+import com.onlygoodthings.backend.http.reqDouble
 import com.onlygoodthings.backend.http.reqString
 import com.onlygoodthings.backend.infra.IdentityStore
 import com.onlygoodthings.shared.domain.ApiResponse
+import com.onlygoodthings.shared.domain.AuthMe
+import com.onlygoodthings.shared.domain.communityLevelLabel
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.auth.principal
@@ -30,20 +34,50 @@ fun Route.publicAuthRoutes(verifier: FirebaseTokenVerifier, identity: IdentitySt
 
 }
 
-fun Route.protectedAuthRoutes() {
+fun Route.protectedAuthRoutes(identity: IdentityStore) {
     post("/api/v1/auth/me") {
         val principal = call.principal<AuthPrincipal>() ?: return@post call.respond(
             HttpStatusCode.Unauthorized,
             ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
         )
+        val profile = identity.byId(principal.userId)
+        call.respond(
+            ApiResponse.ok(
+                AuthMe(
+                    userId = principal.userId,
+                    firebaseUid = principal.firebaseUid,
+                    role = principal.role.name,
+                    email = principal.email,
+                    displayName = profile?.displayName ?: principal.email ?: "Vecino",
+                    photoUrl = profile?.photoUrl,
+                    communityPoints = profile?.communityPoints ?: 0,
+                    inviteCode = profile?.inviteCode,
+                    levelLabel = communityLevelLabel(profile?.communityPoints ?: 0),
+                ),
+            ),
+        )
+    }
+
+    post("/api/v1/me/location") {
+        val principal = call.principal<AuthPrincipal>() ?: return@post call.respond(
+            HttpStatusCode.Unauthorized,
+            ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
+        )
+        val objectMapper = JsonBody.objectMapper
+        val data = call.receiveText()
+        val dataMap = objectMapper.readValue(data, object : com.fasterxml.jackson.core.type.TypeReference<Map<String, Any?>>() {})
+        val latitude = dataMap.reqDouble("latitude")
+        val longitude = dataMap.reqDouble("longitude")
+        val accuracyMeters = dataMap.optDouble("accuracyMeters")
+        identity.updateHomeLocation(principal.userId, latitude, longitude, accuracyMeters)
         call.respond(
             ApiResponse.ok(
                 mapOf(
-                    "userId" to principal.userId,
-                    "firebaseUid" to principal.firebaseUid,
-                    "role" to principal.role.name,
-                    "email" to principal.email,
+                    "updated" to true,
+                    "latitude" to latitude,
+                    "longitude" to longitude,
                 ),
+                "Ubicación actualizada",
             ),
         )
     }

@@ -128,6 +128,37 @@ class AnimalSqlRepository(private val db: Database) {
             }
         }
 
+    fun postIdOf(listingId: String): String? = db.withConnection { connection ->
+        connection.prepareStatement(
+            "SELECT id::text FROM social_posts WHERE listing_id = ?::uuid ORDER BY created_at DESC LIMIT 1",
+        ).use { stmt ->
+            stmt.setString(1, listingId)
+            stmt.executeQuery().use { rs -> if (rs.next()) rs.getString(1) else null }
+        }
+    }
+
+    fun reporterOf(listingId: String): String? = db.withConnection { connection ->
+        connection.prepareStatement(
+            "SELECT reporter_user_id::text FROM animal_listings WHERE id = ?::uuid",
+        ).use { stmt ->
+            stmt.setString(1, listingId)
+            stmt.executeQuery().use { rs -> if (rs.next()) rs.getString(1) else null }
+        }
+    }
+
+    fun markResolved(listingId: String): Boolean = db.withConnection { connection ->
+        connection.prepareStatement(
+            "UPDATE animal_listings SET resolved = TRUE WHERE id = ?::uuid AND resolved = FALSE",
+        ).use { stmt ->
+            stmt.setString(1, listingId)
+            stmt.executeUpdate() > 0
+        }
+    }
+
+    fun get(listingId: String): AnimalListingDto? = db.withConnection { connection ->
+        loadByListing(connection, listingId)
+    }
+
     fun open(): List<AnimalListingDto> = db.withConnection { connection ->
         connection.prepareStatement(
             """

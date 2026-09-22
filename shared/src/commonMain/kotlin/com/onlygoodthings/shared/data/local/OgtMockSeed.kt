@@ -84,7 +84,25 @@ object OgtMockSeed {
             LocalSocialPost(OgtIds.PostRita, AuthorKind.USER, OgtIds.Lucas, null, "Núñez", "Hace 2 d", "Adopción", "Rita, tortuga de orejas rojas, llegó a la escuela 12 en una palangana. El club de ciencias busca un adulto que la adopte en serio.", 9, 1, false, null, now - 48 * 60 * 60_000L, listingId = OgtIds.AnimalRita),
             LocalSocialPost(OgtIds.PostPancho, AuthorKind.USER, OgtIds.Mariana, null, "Saavedra", "Hace 6 h", "Adopción", "Pancho, hámster sirio, se escapó del aula y apareció en el guardapolvo. Come pipas y duerme de día. Casa sin gatos curiosos.", 8, 2, false, null, now - 6 * 60 * 60_000L, listingId = OgtIds.AnimalPancho),
             LocalSocialPost(OgtIds.PostTernura, AuthorKind.USER, OgtIds.Camila, null, "Pasaje del Lago", "Hace 40 min", "Cría", "Luna tiene ocho semanas. Duerme en un cesto y se despierta si escuchás el sobre de la comida.", 19, 4, false, null, now - 40 * 60_000L),
-            LocalSocialPost(OgtIds.PostHomenaje, AuthorKind.USER, OgtIds.Mariana, null, "Palermo Soho", "Hace 2 h", "Post mortem", "Don Héctor nos enseñó a no pasar de largo si un vecino necesita una mano. Se extraña su risa en el patio.", 27, 6, false, null, now - 2 * 60 * 60_000L, heartCount = 14),
+            LocalSocialPost(OgtIds.PostHomenaje, AuthorKind.USER, OgtIds.Mariana, null, "Palermo Soho", "Hace 2 h", "Post mortem", "Don Héctor nos enseñó a no pasar de largo si un vecino necesita una mano. Se extraña su risa en el patio.", 27, 6, false, null, now - 2 * 60 * 60_000L, honoreeName = "Don Héctor", heartCount = 14),
+            LocalSocialPost(
+                id = OgtIds.PostAnecdoteShare,
+                authorKind = AuthorKind.USER,
+                authorUserId = OgtIds.Sofia,
+                authorCompanyId = null,
+                place = "Palermo Soho",
+                timeLabel = "Hace 12 min",
+                tag = "Anécdota",
+                body = "Un domingo le llevó sillas a la plaza para que las abuelas no se quedaran de pie. No avisó: las dejó y se fue a comprar facturas.",
+                impactCount = 8,
+                commentCount = 1,
+                isStory = false,
+                storyLabel = null,
+                createdAtEpochMs = now - 12 * 60_000L,
+                sourceUrl = "ogt://p/${OgtIds.PostHomenaje}",
+                honoreeName = "Don Héctor",
+                parentPostId = OgtIds.PostHomenaje,
+            ),
         )
 
         val homeAuthors = listOf(
@@ -111,6 +129,18 @@ object OgtMockSeed {
         )
         db.postPeople += LocalPostPerson(OgtIds.PostHomenaje, OgtIds.Mariana, PostPersonRole.AUTHOR)
         db.postPeople += LocalPostPerson(OgtIds.PostHomenaje, OgtIds.Roberto, PostPersonRole.PROTAGONIST)
+        db.postPeople += LocalPostPerson(OgtIds.PostAnecdoteShare, OgtIds.Sofia, PostPersonRole.AUTHOR)
+        db.anecdotes += LocalAnecdote(
+            id = OgtIds.AnecdoteHectorSillas,
+            postId = OgtIds.PostHomenaje,
+            authorUserId = OgtIds.Sofia,
+            authorName = "Sofía M.",
+            body = "Un domingo le llevó sillas a la plaza para que las abuelas no se quedaran de pie. No avisó: las dejó y se fue a comprar facturas.",
+            sortOrder = 0,
+            createdAtEpochMs = now - 40 * 60_000L,
+            impactCount = 5,
+            heartCount = 2,
+        )
         homeAuthors.forEach { (postId, userId) ->
             db.postPeople += LocalPostPerson(postId, userId, PostPersonRole.AUTHOR)
             db.postPeople += LocalPostPerson(postId, userId, PostPersonRole.PROTAGONIST)
@@ -168,6 +198,7 @@ object OgtMockSeed {
             image(OgtIds.PostLuna, "seed_pet_golden", 1),
             image(OgtIds.PostTernura, "seed_pet_puppy"),
             image(OgtIds.PostHomenaje, "feed_story_donacion"),
+            image(OgtIds.PostAnecdoteShare, "feed_story_donacion"),
             image(OgtIds.PostOliver, "seed_pet_dog"),
             image(OgtIds.PostOliver, "seed_pet_tabby", 1),
             image(OgtIds.PostGrisu, "seed_pet_cat"),
@@ -188,7 +219,7 @@ object OgtMockSeed {
             altText = "Video de la costa",
             durationMs = 24_000,
         )
-        OgtNewsSeed.append(db, now)
+        // El feed editorial vive en la VPS. No sembrar las 40+100 noticias locales inventadas.
 
         db.comments += listOf(
             LocalComment("c-roberto-arboles", OgtIds.PostArboles, OgtIds.Roberto, "¡Gran iniciativa vecina! Mis nietos amaron aprender a regarlos.", "Hace 1 h", null),
@@ -513,17 +544,17 @@ object OgtMockSeed {
         )
 
         db.karma += listOf(
-            LocalKarmaEntry("k1", OgtIds.Mariana, "Ayuda a encontrar perrita extraviada", "Palermo Soho • Hace 2 horas", 100, "Hace 2 h"),
-            LocalKarmaEntry("k2", OgtIds.Mariana, "Espacio de parking liberado", "Av. Santa Fe 3400 • Ayer", 50, "Ayer"),
-            LocalKarmaEntry("k3", OgtIds.Mariana, "Taller gratuito de huerta urbana comunitaria", "Plaza Armenia • Hace 3 días", 150, "Hace 3 días"),
-            LocalKarmaEntry("k4", OgtIds.Mariana, "Donación de semillas a refugio comunitario", "Huerta El Manantial • Hace 5 días", -200, "Hace 5 días"),
+            LocalKarmaEntry("k1", OgtIds.Mariana, "Ayuda a encontrar perrita extraviada", "Palermo Soho • Hace 2 horas", 100, "Hace 2 h", "paw"),
+            LocalKarmaEntry("k2", OgtIds.Mariana, "Espacio de parking liberado", "Av. Santa Fe 3400 • Ayer", 50, "Ayer", "yield"),
+            LocalKarmaEntry("k3", OgtIds.Mariana, "Taller gratuito de huerta urbana comunitaria", "Plaza Armenia • Hace 3 días", 150, "Hace 3 días", "skills"),
+            LocalKarmaEntry("k4", OgtIds.Mariana, "Donación de semillas a refugio comunitario", "Huerta El Manantial • Hace 5 días", -200, "Hace 5 días", "feed"),
         )
 
         db.rewards += listOf(
-            LocalReward("r1", "Café Gratis", 180, "Café El Encuentro • Palermo", "Cappuccino o Flat White artesanal"),
-            LocalReward("r2", "20% OFF", 250, "Vivero Verde Esperanza", "Plantines y tierra agroecológica"),
-            LocalReward("r3", "15% OFF", 120, "Panadería La Espiga • Colegiales", "Pan de masa madre y medialunas"),
-            LocalReward("r4", "Sponsor Impacto", 400, "Santander • Flow Pass", "Pase Cultural + 3 meses bonificados"),
+            LocalReward("r1", "Café Gratis", 180, "Havanna • Palermo", "Cappuccino o alfajor de chocolate", "havanna"),
+            LocalReward("r2", "20% OFF", 250, "Vivero Verde Esperanza", "Plantines y tierra agroecológica", "vivero"),
+            LocalReward("r3", "15% OFF", 120, "Panadería La Espiga • Colegiales", "Pan de masa madre y medialunas", "espiga"),
+            LocalReward("r4", "Sponsor Impacto", 400, "Santander Río", "Pase Cultural + 3 meses bonificados", "santander"),
         )
 
         db.mapPins += listOf(

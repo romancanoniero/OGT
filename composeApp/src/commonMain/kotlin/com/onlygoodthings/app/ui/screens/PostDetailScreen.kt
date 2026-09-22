@@ -68,10 +68,19 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.launch
+import com.onlygoodthings.app.data.LocalAuth
 import com.onlygoodthings.app.data.LocalOgtDb
 import com.onlygoodthings.app.data.LocalOgtSession
+import com.onlygoodthings.app.data.optimisticClapPost
+import com.onlygoodthings.app.data.optimisticDeletePost
+import com.onlygoodthings.app.data.optimisticHeartPost
+import com.onlygoodthings.app.data.optimisticHidePost
+import com.onlygoodthings.app.data.optimisticReportPost
+import com.onlygoodthings.app.data.optimisticThreadComment
 import com.onlygoodthings.app.i18n.LocalOgtCopy
-import com.onlygoodthings.app.platform.sharePlainText
+import com.onlygoodthings.app.ui.components.PostOverflowSheet
+import com.onlygoodthings.app.ui.components.PostReportSheet
+import com.onlygoodthings.app.ui.components.PostShareSheet
 import com.onlygoodthings.app.resources.Res
 import com.onlygoodthings.app.resources.feed_avatar_carlos
 import com.onlygoodthings.app.resources.feed_avatar_mariana
@@ -82,6 +91,7 @@ import com.onlygoodthings.app.resources.feed_avatar_sofia
 import com.onlygoodthings.app.resources.qs_clap
 import com.onlygoodthings.app.resources.qs_close
 import com.onlygoodthings.app.resources.qs_expand
+import com.onlygoodthings.app.resources.qs_anecdote
 import com.onlygoodthings.app.resources.qs_invite
 import com.onlygoodthings.app.resources.qs_map
 import com.onlygoodthings.app.resources.qs_paw
@@ -114,11 +124,15 @@ import com.onlygoodthings.shared.data.local.OgtIds
 import com.onlygoodthings.shared.domain.FeedCardKind
 import com.onlygoodthings.shared.domain.FeedEventKind
 import com.onlygoodthings.shared.domain.MediaKind
-import com.onlygoodthings.shared.domain.SocialComment
+import com.onlygoodthings.shared.domain.anecdoteShareText
+import com.onlygoodthings.shared.domain.canEditSocialPost
 import com.onlygoodthings.shared.domain.canRsvpToGathering
 import com.onlygoodthings.shared.domain.feedCardKind
 import com.onlygoodthings.shared.domain.gatheringWhenWhere
 import com.onlygoodthings.shared.domain.isGatheringPost
+import com.onlygoodthings.shared.data.local.isAnecdoteShare
+import com.onlygoodthings.shared.domain.isHomenajePost
+import com.onlygoodthings.shared.domain.postShareText
 import com.onlygoodthings.shared.realtime.OgtRealtime
 import com.onlygoodthings.shared.realtime.OgtSdk
 import com.onlygoodthings.shared.realtime.currentEpochMs
@@ -134,9 +148,12 @@ fun PostDetailScreen(
     onEdit: () -> Unit = {},
     onInvite: () -> Unit = {},
     onOpenLostChat: (String) -> Unit = {},
+    onOpenRules: () -> Unit = {},
 ) {
     val db = LocalOgtDb.current
-    val me = LocalOgtSession.current.me()
+    val auth = LocalAuth.current
+    val session = LocalOgtSession.current
+    val me = session.me()
     val copy = LocalOgtCopy.current
     val socialTick by db.socialTick.collectAsState()
     val post = remember(postId, socialTick) { db.post(postId) }
@@ -161,11 +178,16 @@ fun PostDetailScreen(
     var commentRev by remember { mutableStateOf(0) }
     var clapRev by remember { mutableStateOf(0) }
     var commentsFocus by remember(post.id) { mutableStateOf(false) }
-    var clapped by remember(post.id) { mutableStateOf(false) }
-    var thanks by remember(post.id) { mutableStateOf(post.impactCount) }
-    var hearted by remember(post.id) { mutableStateOf(false) }
-    var hearts by remember(post.id) { mutableStateOf(post.heartCount) }
+    var clapped by remember(post.id, post.viewerHasImpacted) { mutableStateOf(post.viewerHasImpacted) }
+    var thanks by remember(post.id, post.impactCount) { mutableStateOf(post.impactCount) }
+    var hearted by remember(post.id, post.viewerHasHearted) { mutableStateOf(post.viewerHasHearted) }
+    var hearts by remember(post.id, post.heartCount) { mutableStateOf(post.heartCount) }
+    var overflowOpen by remember { mutableStateOf(false) }
+    var reportOpen by remember { mutableStateOf(false) }
     var shareOpen by remember { mutableStateOf(false) }
+    var shareAnecdoteId by remember { mutableStateOf<String?>(null) }
+    var editCommentId by remember { mutableStateOf<String?>(null) }
+    var editCommentBody by remember { mutableStateOf("") }
     var going by remember(post.id) { mutableStateOf(false) }
     var told by remember(post.id) { mutableStateOf(0) }
     var reposted by remember(post.id) { mutableStateOf(false) }
@@ -187,6 +209,9 @@ fun PostDetailScreen(
     var clapSheetId by remember { mutableStateOf<String?>(null) }
     val comments = remember(post.id, commentRev, clapRev, socialTick) { db.commentsOf(post.id) }
     LaunchedEffect(post.id) {
+        runCatching { auth.feed.loadComments(post.id) }
+            .getOrNull()
+            ?.forEach { if (db.applySocialComment(it)) commentRev += 1 }
         if (!OgtSdk.isStarted()) return@LaunchedEffect
         runCatching {
             OgtRealtime().observePostComments(post.id).collect { live ->
@@ -211,6 +236,13 @@ fun PostDetailScreen(
                 if (db.creditPending(post)) {
                     add(PostExtraAction(Res.drawable.qs_invite, "Invitar a la familia", onClick = onInvite))
                 }
+                if (!post.isAnecdoteShare()) {
+                    add(
+                        PostExtraAction(Res.drawable.qs_anecdote, "Sumar anécdota") {
+                            scope.launch { pageScroll.animateScrollTo(pageScroll.maxValue) }
+                        },
+                    )
+                }
             }
         }
     }
@@ -223,18 +255,24 @@ fun PostDetailScreen(
                 null
             } else {
                 {
-                    clapped = !clapped
-                    thanks += if (clapped) 1 else -1
-                    if (clapped) db.recordFeedEvent(me.id, post.id, FeedEventKind.CLAP)
+                    if (!clapped) {
+                        clapped = true
+                        thanks += 1
+                        optimisticClapPost(db, auth.feed, scope, me.id, post.id) {
+                            session.persistSocialFeed()
+                        }
+                    }
                 }
             },
             hearted = hearted,
             hearts = hearts,
             onHeart = if (kind == FeedCardKind.HOMENAJE) {
                 {
-                    hearted = !hearted
-                    hearts += if (hearted) 1 else -1
-                    if (hearted) db.recordFeedEvent(me.id, post.id, FeedEventKind.HEART)
+                    if (!hearted) {
+                        hearted = true
+                        hearts += 1
+                        optimisticHeartPost(db, auth.feed, scope, me.id, post.id)
+                    }
                 }
             } else {
                 null
@@ -253,12 +291,15 @@ fun PostDetailScreen(
             OgtCaption("Lo compartiste en tu diario.")
         }
     }
-    val shareBody = listOfNotNull(
-        listing?.title?.takeIf { it.isNotBlank() } ?: post.tag,
-        listing?.description?.takeIf { it.isNotBlank() } ?: post.body.takeIf { it.isNotBlank() },
-        gatheringWhenWhere(post.place, post.eventStartsAtEpochMs, currentEpochMs())
+    val shareBody = postShareText(
+        headline = listing?.title?.takeIf { it.isNotBlank() }
+            ?: db.creditName(post).takeIf { isHomenajePost(post.tag) }
+            ?: post.tag,
+        body = listing?.description?.takeIf { it.isNotBlank() } ?: post.body.takeIf { it.isNotBlank() },
+        place = gatheringWhenWhere(post.place, post.eventStartsAtEpochMs, currentEpochMs())
             ?: post.place.takeIf { it.isNotBlank() },
-    ).joinToString("\n")
+        postId = post.id,
+    )
     val collapseComments = rememberUpdatedState {
         commentsFocus = false
         scope.launch { pageScroll.scrollTo((commentsAnchor - 16).coerceAtLeast(0)) }
@@ -307,7 +348,11 @@ fun PostDetailScreen(
                 },
             ),
     ) {
-        OgtTopBar(title = detailTitle(kind, copy, listing), onBack = onBack)
+        OgtTopBar(
+            title = detailTitle(kind, copy, listing),
+            onBack = onBack,
+            onOverflow = { overflowOpen = true },
+        )
         AnimatedContent(
             targetState = commentsFocus,
             modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -379,6 +424,7 @@ fun PostDetailScreen(
                             media = media,
                             actions = actions,
                             onOpenMedia = { mediaPage = it },
+                            onShareAnecdote = { shareAnecdoteId = it },
                         )
                         FeedCardKind.NEWS -> NewsDetail(
                             post = post,
@@ -410,12 +456,12 @@ fun PostDetailScreen(
                         OgtCaption("${comments.size} · Más recientes")
                     }
                     comments.forEach { row ->
-                        val who = db.user(row.authorUserId)
+                        val who = db.userOrNull(row.authorUserId)
                         val mine = myCommentClaps[row.id] == true
                         CommentCard(
                             authorUserId = row.authorUserId,
-                            author = who.displayName,
-                            meta = row.timeLabel,
+                            author = who?.displayName ?: "Alguien de la comunidad",
+                            meta = if (row.edited) "${row.timeLabel} · editado" else row.timeLabel,
                             body = row.body,
                             claps = row.clapCount,
                             clapped = mine,
@@ -427,6 +473,16 @@ fun PostDetailScreen(
                                 }
                             },
                             onShowClappers = { clapSheetId = row.id },
+                            canManage = me.owns(row.authorUserId),
+                            onEdit = {
+                                editCommentId = row.id
+                                editCommentBody = row.body
+                            },
+                            onDelete = {
+                                db.deleteComment(me.id, row.id)
+                                commentRev += 1
+                                scope.launch { runCatching { auth.feed.deleteComment(row.id) } }
+                            },
                         )
                     }
                     Spacer(Modifier.height(12.dp))
@@ -478,12 +534,12 @@ fun PostDetailScreen(
                     Spacer(Modifier.height(6.dp))
                 }
                 items(comments, key = { it.id }) { row ->
-                    val who = db.user(row.authorUserId)
+                    val who = db.userOrNull(row.authorUserId)
                     val mine = myCommentClaps[row.id] == true
                     CommentCard(
                         authorUserId = row.authorUserId,
-                        author = who.displayName,
-                        meta = row.timeLabel,
+                        author = who?.displayName ?: "Alguien de la comunidad",
+                        meta = if (row.edited) "${row.timeLabel} · editado" else row.timeLabel,
                         body = row.body,
                         claps = row.clapCount,
                         clapped = mine,
@@ -495,6 +551,16 @@ fun PostDetailScreen(
                             }
                         },
                         onShowClappers = { clapSheetId = row.id },
+                        canManage = me.owns(row.authorUserId),
+                        onEdit = {
+                            editCommentId = row.id
+                            editCommentBody = row.body
+                        },
+                        onDelete = {
+                            db.deleteComment(me.id, row.id)
+                            commentRev += 1
+                            scope.launch { runCatching { auth.feed.deleteComment(row.id) } }
+                        },
                         modifier = Modifier.animateItem(),
                     )
                 }
@@ -507,29 +573,12 @@ fun PostDetailScreen(
             value = comment,
             onValueChange = { comment = it },
             onSend = {
-                val row = db.addComment(me, post.id, comment)
+                val row = optimisticThreadComment(db, auth.feed, scope, me, post.id, comment)
                 if (row != null) {
                     comment = ""
                     commentRev += 1
                     commentsFocus = true
                     pinToLatest = true
-                    if (OgtSdk.isStarted()) {
-                        scope.launch {
-                            val sockets = OgtRealtime()
-                            db.socialCountersOf(post.id)?.let { sockets.pushSocialCounters(it) }
-                            sockets.pushSocialComment(
-                                SocialComment(
-                                    id = row.id,
-                                    postId = row.postId,
-                                    authorUserId = row.authorUserId,
-                                    authorName = me.displayName,
-                                    parentCommentId = row.parentCommentId,
-                                    body = row.body,
-                                    createdAtEpochMs = currentEpochMs(),
-                                ),
-                            )
-                        }
-                    }
                 }
             },
         )
@@ -540,8 +589,32 @@ fun PostDetailScreen(
             onDismiss = { clapSheetId = null },
         )
     }
-    if (shareOpen) {
-        Dialog(onDismissRequest = { shareOpen = false }) {
+    shareAnecdoteId?.let { anecdoteId ->
+        val story = remember(anecdoteId, socialTick) { db.anecdotes.firstOrNull { it.id == anecdoteId } }
+        if (story != null) {
+            val honoree = db.creditName(post)
+            PostShareSheet(
+                title = "Compartir anécdota",
+                shareText = anecdoteShareText(honoree, story.body, post.id),
+                onDismiss = { shareAnecdoteId = null },
+                onRepost = {
+                    db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE)
+                    scope.launch {
+                        val remote = runCatching { auth.feed.repostAnecdote(story.id) }.getOrNull()
+                        if (remote != null) db.upsertRemoteSocial(remote) else db.repostAnecdote(me, story.id)
+                        reposted = true
+                    }
+                },
+                onInvite = {
+                    db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE)
+                    onInvite()
+                },
+                onExternal = { db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE) },
+            )
+        }
+    }
+    editCommentId?.let { commentId ->
+        Dialog(onDismissRequest = { editCommentId = null }) {
             Column(
                 Modifier
                     .clip(RoundedCornerShape(16.dp))
@@ -549,24 +622,77 @@ fun PostDetailScreen(
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text("Compartir", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = OgtColors.ink)
-                ShareChoice("Repostear en el diario") {
-                    db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE)
-                    reposted = true
-                    shareOpen = false
-                }
-                ShareChoice("Enviar a contactos") {
-                    db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE)
-                    shareOpen = false
-                    onInvite()
-                }
-                ShareChoice("WhatsApp, Telegram y más") {
-                    db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE)
-                    sharePlainText(shareBody)
-                    shareOpen = false
+                Text("Editar comentario", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = OgtColors.ink)
+                OutlinedTextField(
+                    value = editCommentBody,
+                    onValueChange = { editCommentBody = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    shape = RoundedCornerShape(OgtDimens.buttonRadius),
+                    colors = ogtOutlinedFieldColors(),
+                )
+                OgtPrimaryButton("Guardar") {
+                    val body = editCommentBody
+                    db.editComment(me.id, commentId, body)
+                    commentRev += 1
+                    scope.launch { runCatching { auth.feed.editComment(commentId, body) } }
+                    editCommentId = null
                 }
             }
         }
+    }
+    if (reportOpen) {
+        PostReportSheet(
+            kind = kind,
+            onDismiss = { reportOpen = false },
+            onSubmit = { reason, details ->
+                optimisticReportPost(db, auth.feed, scope, me.id, post.id, reason, details) {
+                    session.persistSocialFeed()
+                }
+                onBack()
+            },
+            onOpenRules = onOpenRules,
+        )
+    }
+    if (overflowOpen) {
+        val mine = db.isOwnPost(post, me.aliases())
+        PostOverflowSheet(
+            isAuthor = mine,
+            canEdit = canEditSocialPost(mine, post.authorKind, post.tag, listing?.kind, post.sourceUrl),
+            onDismiss = { overflowOpen = false },
+            onHide = {
+                optimisticHidePost(db, auth.feed, scope, me.id, post.id) { session.persistSocialFeed() }
+                onBack()
+            },
+            onReport = { reportOpen = true },
+            onEdit = onEdit,
+            onDelete = {
+                optimisticDeletePost(
+                    db,
+                    auth.feed,
+                    scope,
+                    me.id,
+                    post.id,
+                    persistFeed = { session.persistSocialFeed() },
+                    onRemoved = onBack,
+                )
+            },
+        )
+    }
+    if (shareOpen) {
+        PostShareSheet(
+            shareText = shareBody,
+            onDismiss = { shareOpen = false },
+            onRepost = {
+                db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE)
+                reposted = true
+            },
+            onInvite = {
+                db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE)
+                onInvite()
+            },
+            onExternal = { db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE) },
+        )
     }
     if (sawOpen && listing != null && !listing.resolved) {
         Dialog(onDismissRequest = { sawOpen = false }) {
@@ -645,16 +771,6 @@ fun PostDetailScreen(
             }
         }
     }
-}
-
-@Composable
-private fun ShareChoice(label: String, onClick: () -> Unit) {
-    Text(
-        label,
-        color = OgtColors.ink,
-        fontSize = 15.sp,
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 6.dp),
-    )
 }
 
 @Composable
@@ -822,10 +938,20 @@ private fun HomenajeDetail(
     media: List<LocalPostMedia>,
     actions: @Composable () -> Unit,
     onOpenMedia: (Int) -> Unit,
+    onShareAnecdote: (String) -> Unit,
 ) {
     val copy = LocalOgtCopy.current
     val db = LocalOgtDb.current
+    val auth = LocalAuth.current
+    val me = LocalOgtSession.current.me()
+    val scope = rememberCoroutineScope()
+    val socialTick by db.socialTick.collectAsState()
     val honoree = db.creditName(post)
+    var draft by remember(post.id) { mutableStateOf("") }
+    var openComments by remember(post.id) { mutableStateOf<String?>(null) }
+    var editAnecdoteId by remember { mutableStateOf<String?>(null) }
+    var editAnecdoteBody by remember { mutableStateOf("") }
+    val stories = remember(post.id, socialTick) { db.anecdotesOf(post.id) }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OgtStitchIcon(Res.drawable.qs_invite, copy.feedTitleHomenaje, tint = OgtColors.secondary)
         OgtPill(post.tag, OgtColors.sand, OgtColors.ink)
@@ -844,7 +970,242 @@ private fun HomenajeDetail(
     }
     DetailMedia(media, post.tag, height = 220.dp, onOpen = onOpenMedia)
     Text(post.body, fontSize = 16.sp, lineHeight = 22.sp, color = OgtColors.ink)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OgtStitchIcon(Res.drawable.qs_anecdote, "Anécdotas", tint = OgtColors.secondary)
+        OgtSectionTitle("Anécdotas")
+    }
+    OgtCaption("${stories.size} · Hechos que lo recuerdan")
+    stories.forEach { story ->
+        HomageAnecdoteCard(
+            story = story,
+            mine = me.owns(story.authorUserId),
+            commentsOpen = openComments == story.id,
+            onToggleComments = { openComments = if (openComments == story.id) null else story.id },
+            onClap = {
+                db.clapAnecdote(me.id, story.id)
+                scope.launch { runCatching { auth.feed.clapAnecdote(story.id) }.onSuccess { db.upsertAnecdote(it) } }
+            },
+            onHeart = {
+                db.heartAnecdote(me.id, story.id)
+                scope.launch { runCatching { auth.feed.heartAnecdote(story.id) }.onSuccess { db.upsertAnecdote(it) } }
+            },
+            onShare = { onShareAnecdote(story.id) },
+            onEdit = {
+                editAnecdoteId = story.id
+                editAnecdoteBody = story.body
+            },
+            onDelete = {
+                db.deleteAnecdote(me.id, story.id)
+                scope.launch { runCatching { auth.feed.deleteAnecdote(story.id) } }
+            },
+            onAddComment = { text ->
+                val row = db.addComment(me, post.id, text, anecdoteId = story.id)
+                if (row != null) {
+                    scope.launch {
+                        runCatching { auth.feed.addComment(post.id, text, null, story.id) }
+                            .onSuccess { remote -> db.replaceComment(row.id, remote) }
+                    }
+                }
+            },
+            onEditComment = { commentId, body ->
+                db.editComment(me.id, commentId, body)
+                scope.launch { runCatching { auth.feed.editComment(commentId, body) } }
+            },
+            onDeleteComment = { commentId ->
+                db.deleteComment(me.id, commentId)
+                scope.launch { runCatching { auth.feed.deleteComment(commentId) } }
+            },
+        )
+    }
+    OutlinedTextField(
+        value = draft,
+        onValueChange = { draft = it },
+        modifier = Modifier.fillMaxWidth(),
+        placeholder = { Text("Sumá una anécdota de $honoree", color = OgtColors.muted) },
+        leadingIcon = {
+            OgtStitchIcon(Res.drawable.qs_anecdote, "Sumar anécdota", tint = OgtColors.secondary)
+        },
+        minLines = 3,
+        shape = RoundedCornerShape(OgtDimens.buttonRadius),
+        colors = ogtOutlinedFieldColors(),
+    )
+    if (draft.isNotBlank()) {
+        OgtPrimaryButton("Publicar anécdota") {
+            val text = draft.trim()
+            val local = db.addAnecdote(me, post.id, text)
+            draft = ""
+            if (local != null) {
+                scope.launch {
+                    runCatching { auth.feed.addAnecdote(post.id, text) }
+                        .onSuccess { remote -> db.replaceAnecdote(local.id, remote) }
+                }
+            }
+        }
+    }
     actions()
+    editAnecdoteId?.let { anecdoteId ->
+        Dialog(onDismissRequest = { editAnecdoteId = null }) {
+            Column(
+                Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(OgtColors.surface)
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("Editar anécdota", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = OgtColors.ink)
+                OutlinedTextField(
+                    value = editAnecdoteBody,
+                    onValueChange = { editAnecdoteBody = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    shape = RoundedCornerShape(OgtDimens.buttonRadius),
+                    colors = ogtOutlinedFieldColors(),
+                )
+                OgtPrimaryButton("Guardar") {
+                    val body = editAnecdoteBody
+                    db.editAnecdote(me.id, anecdoteId, body)
+                    scope.launch { runCatching { auth.feed.editAnecdote(anecdoteId, body) } }
+                    editAnecdoteId = null
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomageAnecdoteCard(
+    story: com.onlygoodthings.shared.data.local.LocalAnecdote,
+    mine: Boolean,
+    commentsOpen: Boolean,
+    onToggleComments: () -> Unit,
+    onClap: () -> Unit,
+    onHeart: () -> Unit,
+    onShare: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onAddComment: (String) -> Unit,
+    onEditComment: (String, String) -> Unit,
+    onDeleteComment: (String) -> Unit,
+) {
+    val db = LocalOgtDb.current
+    val me = LocalOgtSession.current.me()
+    val socialTick by db.socialTick.collectAsState()
+    val replies = remember(story.id, socialTick) { db.commentsOf(story.postId, story.id) }
+    var reply by remember(story.id) { mutableStateOf("") }
+    var editCommentId by remember { mutableStateOf<String?>(null) }
+    var editCommentBody by remember { mutableStateOf("") }
+    val well = RoundedCornerShape(16.dp)
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(well)
+            .background(OgtColors.surface)
+            .border(1.dp, OgtColors.hairline, well)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OgtStitchIcon(Res.drawable.qs_anecdote, "Anécdota", size = 16.dp, tint = OgtColors.secondary)
+            Text(story.authorName, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
+        }
+        Text(story.body, fontSize = 15.sp, lineHeight = 21.sp, color = OgtColors.ink)
+        if (!story.sourceUrl.isNullOrBlank()) {
+            OgtCaption("Fuente en el detalle")
+        }
+        if (mine) {
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(
+                    "Editar",
+                    color = OgtColors.secondary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clickable(onClick = onEdit),
+                )
+                Text(
+                    "Borrar",
+                    color = OgtColors.muted,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clickable(onClick = onDelete),
+                )
+            }
+        }
+        PostActionRow(
+            clapped = story.viewerHasImpacted,
+            thanks = story.impactCount,
+            comments = story.commentCount.coerceAtLeast(replies.size),
+            onClap = onClap,
+            hearted = story.viewerHasHearted,
+            hearts = story.heartCount,
+            onHeart = onHeart,
+            onComments = onToggleComments,
+            onShare = onShare,
+        )
+        if (commentsOpen) {
+            if (replies.isEmpty()) {
+                OgtCaption("Todavía no hay comentarios en esta anécdota.")
+            }
+            replies.forEach { row ->
+                val who = db.userOrNull(row.authorUserId)
+                CommentCard(
+                    authorUserId = row.authorUserId,
+                    author = who?.displayName ?: "Alguien de la comunidad",
+                    meta = if (row.edited) "${row.timeLabel} · editado" else row.timeLabel,
+                    body = row.body,
+                    claps = row.clapCount,
+                    clapped = false,
+                    onClap = { db.clapComment(me.id, row.id) },
+                    onShowClappers = {},
+                    canManage = me.owns(row.authorUserId),
+                    onEdit = {
+                        editCommentId = row.id
+                        editCommentBody = row.body
+                    },
+                    onDelete = { onDeleteComment(row.id) },
+                )
+            }
+            OutlinedTextField(
+                value = reply,
+                onValueChange = { reply = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Comentá esta anécdota", color = OgtColors.muted) },
+                minLines = 2,
+                shape = RoundedCornerShape(OgtDimens.buttonRadius),
+                colors = ogtOutlinedFieldColors(),
+            )
+            if (reply.isNotBlank()) {
+                OgtPrimaryButton("Comentar") {
+                    onAddComment(reply.trim())
+                    reply = ""
+                }
+            }
+        }
+    }
+    editCommentId?.let { commentId ->
+        Dialog(onDismissRequest = { editCommentId = null }) {
+            Column(
+                Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(OgtColors.surface)
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("Editar comentario", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = OgtColors.ink)
+                OutlinedTextField(
+                    value = editCommentBody,
+                    onValueChange = { editCommentBody = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    shape = RoundedCornerShape(OgtDimens.buttonRadius),
+                    colors = ogtOutlinedFieldColors(),
+                )
+                OgtPrimaryButton("Guardar") {
+                    onEditComment(commentId, editCommentBody)
+                    editCommentId = null
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -1019,6 +1380,9 @@ private fun CommentCard(
     onClap: () -> Unit,
     onShowClappers: () -> Unit,
     modifier: Modifier = Modifier,
+    canManage: Boolean = false,
+    onEdit: () -> Unit = {},
+    onDelete: () -> Unit = {},
 ) {
     val well = RoundedCornerShape(16.dp)
     Row(
@@ -1054,6 +1418,24 @@ private fun CommentCard(
                 Text(meta, color = OgtColors.muted, fontSize = 12.sp, maxLines = 1)
             }
             Text(body, color = OgtColors.charcoal, fontSize = 15.sp, lineHeight = 21.sp)
+            if (canManage) {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text(
+                        "Editar",
+                        color = OgtColors.secondary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clickable(onClick = onEdit),
+                    )
+                    Text(
+                        "Borrar",
+                        color = OgtColors.muted,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clickable(onClick = onDelete),
+                    )
+                }
+            }
         }
         ExpressionGlyph(
             art = Res.drawable.qs_clap,

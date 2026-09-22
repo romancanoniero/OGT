@@ -1,0 +1,16 @@
+---
+description: Tras un cambio visible, deployar OGT a la VPS
+alwaysApply: true
+---
+
+# Deploy a la VPS
+
+Después de cada cambio que se pueda probar (web, API, migraciones, feed, auth, media), desplegar a la VPS **sin preguntar**. No esperar a que lo pida.
+
+```bash
+bash scripts/deploy-ogt-vps.sh
+```
+
+Sitio: `https://onlygoodthings.lat`. Health: `http://217.216.82.209:19080/health`.
+
+No subir `.env` ni secretos. No aplica a solo docs, reglas, o un cambio que viva únicamente en el simulador iOS sin tocar backend/web.

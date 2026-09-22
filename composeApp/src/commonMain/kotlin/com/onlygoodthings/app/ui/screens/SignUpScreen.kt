@@ -53,6 +53,7 @@ fun SignUpScreen(onOtp: () -> Unit, onLogin: () -> Unit, onRegistered: () -> Uni
         }
         OgtSectionTitle("Únete a la comunidad")
         OgtCaption("Sumate a quienes usan la app para mejorar y ayudar, cerca o en la red.")
+        AuthFeatureReel()
         AuthProviderRow { provider ->
             scope.launch { if (auth.signInProvider(provider)) onRegistered() }
         }

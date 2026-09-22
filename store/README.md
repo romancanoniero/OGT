@@ -11,8 +11,10 @@
 - Capturas: `store/screenshots/ios/` y `store/screenshots/android/`
 
 ## Pruebas
-- iOS: TestFlight, bundle `com.onlygoodthings.app`, team `WER3D825VB`, Apple ID `6813852319`.
-- Android: pista interna de Play, package `com.onlygoodthings.app`.
+- Versión de prueba: **0.2.0** (iOS build 2 / Android versionCode 2).
+- iOS: TestFlight, bundle `com.onlygoodthings.app`, team `WER3D825VB`, Apple ID `6813852319`. Build `3104bf23-603e-45e9-9359-618d11740b18`.
+- Android: pista interna de Play, package `com.onlygoodthings.app`, app `4974603618070417614`. Enlace: https://play.google.com/apps/internaltest/4701435613898180947
+- Keystore de Play (no está en Git): `/Volumes/DEV_MAC/OGT/secrets/`
 - Capturas 6,5": `store/screenshots/ios-65/` (1284×2778).
 
 ## Login de laboratorio

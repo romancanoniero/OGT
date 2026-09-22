@@ -19,8 +19,11 @@ import com.onlygoodthings.shared.data.local.LocalUser
 import com.onlygoodthings.shared.data.local.OgtIds
 import com.onlygoodthings.shared.data.local.OgtLocalDatabase
 import com.onlygoodthings.shared.domain.GeoPoint
+import com.onlygoodthings.shared.domain.LocationScope
 import com.onlygoodthings.shared.domain.ParkedCar
 import com.onlygoodthings.shared.domain.VehicleProfile
+import com.onlygoodthings.shared.domain.locationScopeFromPref
+import com.onlygoodthings.shared.domain.prefCode
 import com.onlygoodthings.shared.realtime.OgtSdk
 import com.onlygoodthings.shared.realtime.currentEpochMs
 import com.onlygoodthings.shared.realtime.gatewayEndpointFromApiBase
@@ -48,6 +51,14 @@ class OgtPreviewSession(
     var currentUserId by mutableStateOf(initialUserId)
     var overlayUser by mutableStateOf<LocalUser?>(null)
     var radarEnabled by mutableStateOf(true)
+    var gpsEnabled by mutableStateOf(prefs.gpsEnabled)
+    var locationScope by mutableStateOf(locationScopeFromPref(prefs.locationScope))
+    var carbonSaveMode by mutableStateOf(false)
+    var showExactMatchLocation by mutableStateOf(false)
+    var publicProfileVisible by mutableStateOf(true)
+    var animalAlertPush by mutableStateOf(true)
+    var skillAlertPush by mutableStateOf(true)
+    var parkingRadarSounds by mutableStateOf(true)
     var locationGranted by mutableStateOf(false)
     var locationPermission by mutableStateOf(LocationPermissionState.UNKNOWN)
     var locationServicesEnabled by mutableStateOf(false)
@@ -82,6 +93,7 @@ class OgtPreviewSession(
     init {
         db.importHonors(prefs.honorsJson)
         db.importPublishedAnimals(prefs.publishedAnimalsJson)
+        db.importSocialFeed(prefs.feedCacheJson)
         db.postMedia.forEach { row ->
             OgtMediaCache.ingest(row.url)
             row.posterUrl?.let { OgtMediaCache.ingest(it) }
@@ -91,6 +103,10 @@ class OgtPreviewSession(
 
     fun persistPublishedAnimals() {
         prefs.publishedAnimalsJson = db.exportPublishedAnimals()
+    }
+
+    fun persistSocialFeed() {
+        prefs.feedCacheJson = db.exportSocialFeed(me().id)
     }
 
     fun rememberHonorToken(token: String?) {
@@ -111,6 +127,16 @@ class OgtPreviewSession(
     fun applyLanguage(next: OgtLang) {
         language = next
         prefs.appLanguage = next.code
+    }
+
+    fun applyGpsEnabled(on: Boolean) {
+        gpsEnabled = on
+        prefs.gpsEnabled = on
+    }
+
+    fun applyLocationScope(scope: LocationScope) {
+        locationScope = scope
+        prefs.locationScope = scope.prefCode()
     }
     fun me(): LocalUser = overlayUser ?: db.user(currentUserId)
     fun here(): GeoPoint? = deviceLocation
@@ -144,6 +170,16 @@ class OgtPreviewSession(
         val found = vehicles.firstOrNull { it.id == id } ?: return
         selectedVehicleId = found.id
         vehicle = found
+        persistGarage()
+    }
+
+    fun removeVehicle(id: String) {
+        vehicles = vehicles.filterNot { it.id == id }
+        if (selectedVehicleId == id) {
+            val next = vehicles.firstOrNull()
+            selectedVehicleId = next?.id.orEmpty()
+            vehicle = next ?: VehicleProfile()
+        }
         persistGarage()
     }
 

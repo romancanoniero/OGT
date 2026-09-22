@@ -39,6 +39,10 @@ services:
       PORT: "8080"
       OGT_JDBC_URL: jdbc:postgresql://postgres:5432/onlygoodthings
       OGT_REDIS_URL: redis://redis:6379
+      OGT_MEDIA_DIR: /app/media
+      OGT_PUBLIC_BASE: https://onlygoodthings.lat
+    volumes:
+      - ./media:/app/media
     ports:
       - "19080:8080"
     depends_on:
@@ -49,6 +53,29 @@ services:
     networks:
       - ogt
 
+  web:
+    image: nginx:1.28-alpine
+    container_name: ogt-web
+    restart: unless-stopped
+    volumes:
+      - ./web-app:/usr/share/nginx/html:ro
+      - ./web-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "19081:80"
+    depends_on:
+      - api
+    networks:
+      - ogt
+      - edge
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=edge
+      - traefik.http.routers.ogt-web.entrypoints=websecure
+      - traefik.http.routers.ogt-web.rule=Host(`onlygoodthings.lat`) || Host(`www.onlygoodthings.lat`)
+      - traefik.http.routers.ogt-web.tls.certresolver=le
+      - traefik.http.routers.ogt-web.priority=20
+      - traefik.http.services.ogt-web.loadbalancer.server.port=80
+
 volumes:
   ogt_pg_data:
   ogt_redis_data:
@@ -56,3 +83,5 @@ volumes:
 networks:
   ogt:
     name: ogt
+  edge:
+    external: true

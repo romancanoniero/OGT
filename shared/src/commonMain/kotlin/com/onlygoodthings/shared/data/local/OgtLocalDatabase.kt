@@ -14,6 +14,7 @@ import com.onlygoodthings.shared.domain.FeedCardKind
 import com.onlygoodthings.shared.domain.FeedEventKind
 import com.onlygoodthings.shared.domain.FeedMode
 import com.onlygoodthings.shared.domain.FeedTopicFamily
+import com.onlygoodthings.shared.domain.anecdoteParentPostId
 import com.onlygoodthings.shared.domain.feedCardKind
 import com.onlygoodthings.shared.domain.gatheringWhenWhere
 import com.onlygoodthings.shared.domain.GeoMath
@@ -26,11 +27,12 @@ import com.onlygoodthings.shared.domain.ParkingSpot
 import com.onlygoodthings.shared.domain.ParkingStatus
 import com.onlygoodthings.shared.domain.PostMediaItem
 import com.onlygoodthings.shared.domain.PostPersonRole
+import com.onlygoodthings.shared.domain.SocialAnecdote
 import com.onlygoodthings.shared.domain.SocialComment
 import com.onlygoodthings.shared.domain.SocialLiveCounters
+import com.onlygoodthings.shared.domain.SocialPost
 import com.onlygoodthings.shared.domain.AnimalListingDto
 import com.onlygoodthings.shared.domain.OgtCrmDefaults
-import com.onlygoodthings.shared.domain.SocialPost
 import com.onlygoodthings.shared.domain.UserProfile
 import com.onlygoodthings.shared.feed.FeedCandidate
 import com.onlygoodthings.shared.feed.FeedEventSignal
@@ -44,7 +46,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-/** Lo que acabo de publicar queda pinneado arriba del río durante esta ventana. */
+/** Lo que acabo de publicar queda pinneado arriba del feed durante esta ventana. */
 private const val OWN_PIN_WINDOW_MS = 2 * 3_600_000L
 
 /**
@@ -110,7 +112,7 @@ class OgtLocalDatabase {
     var feedEpoch: Int = 0
         private set
     private val _feedTick = MutableStateFlow(0)
-    /** Tick Compose-observable: el río se recarga al publicar o al llegar un post por socket. */
+    /** Tick Compose-observable: el feed se recarga al publicar o al llegar un post por socket. */
     val feedTick: StateFlow<Int> = _feedTick.asStateFlow()
 
     fun bumpFeed() {
@@ -214,14 +216,20 @@ class OgtLocalDatabase {
             body = comment.body,
             timeLabel = "Ahora",
             parentCommentId = comment.parentCommentId,
+            anecdoteId = comment.anecdoteId,
+            edited = comment.edited,
         )
-        val idx = posts.indexOfFirst { it.id == comment.postId }
-        if (idx >= 0) {
-            val current = posts[idx]
-            val count = comments.count { it.postId == comment.postId }
-            if (count > current.commentCount) {
-                posts[idx] = current.copy(commentCount = count)
+        if (comment.anecdoteId.isNullOrBlank()) {
+            val idx = posts.indexOfFirst { it.id == comment.postId }
+            if (idx >= 0) {
+                val current = posts[idx]
+                val count = comments.count { it.postId == comment.postId && it.anecdoteId == null }
+                if (count > current.commentCount) {
+                    posts[idx] = current.copy(commentCount = count)
+                }
             }
+        } else {
+            recountAnecdoteComments(comment.anecdoteId)
         }
         bumpSocial()
         return true
@@ -268,6 +276,7 @@ class OgtLocalDatabase {
     }
 
     val comments = mutableListOf<LocalComment>()
+    val anecdotes = mutableListOf<LocalAnecdote>()
     val adoptRequests = mutableListOf<LocalAdoptRequest>()
     val sightings = mutableListOf<LocalSighting>()
     var lostEpoch: Int = 0
@@ -320,6 +329,83 @@ class OgtLocalDatabase {
     fun match(id: String): LocalTimebankMatch = matches.first { it.id == id }
 
     fun feedPosts(): List<LocalSocialPost> = posts.filter { !it.isStory }
+
+    /** Fusiona un post del servidor sin pisar media local de dispositivo. */
+    fun upsertRemoteSocial(remote: SocialPost, silent: Boolean = false) {
+        val incoming = remote.asLocalPost()
+        val index = posts.indexOfFirst { it.id == incoming.id }
+        if (index >= 0) {
+            val current = posts[index]
+            posts[index] = incoming.copy(
+                place = current.place.ifBlank { incoming.place },
+                timeLabel = current.timeLabel.ifBlank { incoming.timeLabel },
+                listingId = current.listingId ?: incoming.listingId,
+                honoreeName = current.honoreeName ?: incoming.honoreeName,
+                parentPostId = current.parentPostId ?: incoming.parentPostId,
+                heartCount = maxOf(current.heartCount, incoming.heartCount),
+                viewerHasImpacted = incoming.viewerHasImpacted || current.viewerHasImpacted,
+                viewerHasHearted = incoming.viewerHasHearted || current.viewerHasHearted,
+            )
+        } else {
+            posts += incoming
+        }
+        if (remote.media.isNotEmpty()) {
+            postMedia.removeAll { it.postId == remote.id }
+            postMedia += remote.media.map { item ->
+                LocalPostMedia(
+                    id = item.id,
+                    postId = remote.id,
+                    kind = item.kind,
+                    url = item.url,
+                    posterUrl = item.posterUrl,
+                    sortOrder = item.sortOrder,
+                    assetKey = "",
+                    altText = item.altText,
+                    durationMs = item.durationMs,
+                )
+            }
+        }
+        if (remote.anecdotes.isNotEmpty()) {
+            val remoteAnecdoteIds = remote.anecdotes.map { it.id }.toSet()
+            comments.removeAll { it.postId == remote.id && it.anecdoteId != null && it.anecdoteId in remoteAnecdoteIds }
+            remote.anecdotes.forEach { row ->
+                comments += row.comments.map { comment ->
+                    LocalComment(
+                        id = comment.id,
+                        postId = comment.postId,
+                        authorUserId = comment.authorUserId,
+                        body = comment.body,
+                        timeLabel = "Ahora",
+                        parentCommentId = comment.parentCommentId,
+                        anecdoteId = comment.anecdoteId ?: row.id,
+                        edited = comment.edited,
+                    )
+                }
+            }
+            anecdotes.removeAll { it.postId == remote.id }
+            anecdotes += remote.anecdotes.map { row ->
+                LocalAnecdote(
+                    id = row.id,
+                    postId = row.postId,
+                    authorUserId = row.authorUserId,
+                    authorName = row.authorName,
+                    body = row.body,
+                    sourceUrl = row.sourceUrl,
+                    sortOrder = row.sortOrder,
+                    createdAtEpochMs = row.createdAtEpochMs,
+                    impactCount = row.impactCount,
+                    commentCount = row.commentCount,
+                    heartCount = row.heartCount,
+                    viewerHasImpacted = row.viewerHasImpacted,
+                    viewerHasHearted = row.viewerHasHearted,
+                )
+            }
+        }
+        if (!silent) bumpFeed()
+    }
+
+    fun anecdotesOf(postId: String): List<LocalAnecdote> =
+        anecdotes.filter { it.postId == postId }.sortedWith(compareBy({ it.sortOrder }, { it.createdAtEpochMs }))
 
     fun followedIds(userId: String): Set<String> =
         follows.filter { it.followerId == userId }.map { it.followedId }.toSet()
@@ -560,6 +646,75 @@ class OgtLocalDatabase {
         return listing != null && listing.reporterUserId in ids
     }
 
+    /** En producción no te mostramos el momento que vos misma compartiste. */
+    fun hidesOwnAnecdoteShare(viewerId: String, post: LocalSocialPost): Boolean {
+        if (post.id == OgtIds.PostAnecdoteShare) return false
+        return post.isAnecdoteShare() && isOwnPost(post, viewerAliases(viewerId))
+    }
+
+    fun openFeedTarget(post: LocalSocialPost): String {
+        val parent = post.anecdoteParentId()
+        if (parent != null && posts.any { it.id == parent }) return parent
+        return post.id
+    }
+
+    /**
+     * Card de prueba: cómo se ve una anécdota puntual en el feed general.
+     * La escribe Sofía, no el viewer, para que no se confunda con un share propio.
+     */
+    fun ensureFeedAnecdotePreview(): LocalSocialPost {
+        posts.firstOrNull { it.id == OgtIds.PostAnecdoteShare }?.let { return it }
+        val parent = posts.firstOrNull { it.id == OgtIds.PostHomenaje }
+        val author = userOrNull(OgtIds.Sofia) ?: users.firstOrNull()
+        val now = currentEpochMs()
+        val honoree = parent?.honoreeName?.trim()?.takeIf { it.isNotEmpty() } ?: "Don Héctor"
+        val parentId = parent?.id ?: OgtIds.PostHomenaje
+        val post = LocalSocialPost(
+            id = OgtIds.PostAnecdoteShare,
+            authorKind = AuthorKind.USER,
+            authorUserId = author?.id ?: OgtIds.Sofia,
+            authorCompanyId = null,
+            place = author?.barrio ?: "Palermo Soho",
+            timeLabel = "Hace 12 min",
+            tag = "Anécdota",
+            body = "Un domingo le llevó sillas a la plaza para que las abuelas no se quedaran de pie. No avisó: las dejó y se fue a comprar facturas.",
+            impactCount = 8,
+            commentCount = 1,
+            isStory = false,
+            storyLabel = null,
+            createdAtEpochMs = now - 12 * 60_000L,
+            sourceUrl = postDeepLink(parentId),
+            honoreeName = honoree,
+            parentPostId = parentId,
+        )
+        posts += post
+        if (author != null &&
+            postPeople.none { it.postId == post.id && it.userId == author.id && it.role == PostPersonRole.AUTHOR }
+        ) {
+            postPeople += LocalPostPerson(post.id, author.id, PostPersonRole.AUTHOR)
+        }
+        if (postMedia.none { it.postId == post.id }) {
+            val inherited = parent?.let { mediaOf(it.id) }.orEmpty()
+            if (inherited.isNotEmpty()) {
+                postMedia += inherited.map { item ->
+                    item.copy(id = "${item.id}-anecdote", postId = post.id)
+                }
+            } else {
+                postMedia += LocalPostMedia(
+                    id = "${post.id}-m0",
+                    postId = post.id,
+                    kind = MediaKind.IMAGE,
+                    url = "asset://feed_story_donacion",
+                    sortOrder = 0,
+                    assetKey = "feed_story_donacion",
+                    altText = honoree,
+                )
+            }
+        }
+        bumpFeed()
+        return post
+    }
+
     fun claimPublishedAnimals(aliases: Set<String>, localUserId: String) {
         val known = aliases.filter { it.isNotBlank() }.toSet()
         if (known.isEmpty() || localUserId.isBlank()) return
@@ -612,6 +767,8 @@ class OgtLocalDatabase {
                 latitude = viewerUser?.let { postPlaceOrAuthorLat(post) },
                 longitude = viewerUser?.let { postPlaceOrAuthorLng(post) },
                 sourceUrl = post.sourceUrl,
+                achievedCount = post.achievedCount,
+                placement = post.placement,
             )
         }
         val viewer = ViewerContext(
@@ -646,15 +803,19 @@ class OgtLocalDatabase {
         limit: Int = 40,
     ): List<LocalSocialPost> {
         val ranked = rankedFeed(viewerId, mode, nowEpochMs, 0, limit, family)
+            .filter { !hidesOwnAnecdoteShare(viewerId, it) }
         val aliases = viewerAliases(viewerId)
         val pinned = feedPosts()
             .filter { post ->
                 isOwnPost(post, aliases) &&
+                    !hidesOwnAnecdoteShare(viewerId, post) &&
                     (post.listingId != null || nowEpochMs - post.createdAtEpochMs <= OWN_PIN_WINDOW_MS) &&
                     shouldShowInFeed(viewerId, post, mode, family, nowEpochMs)
             }
             .sortedByDescending { it.createdAtEpochMs }
-        return (pinned + ranked).distinctBy { it.id }
+        val preview = feedPosts().firstOrNull { it.id == OgtIds.PostAnecdoteShare }
+            ?.takeIf { shouldShowInFeed(viewerId, it, mode, family, nowEpochMs) }
+        return (pinned + listOfNotNull(preview) + ranked).distinctBy { it.id }
     }
 
     fun shouldShowInFeed(
@@ -665,10 +826,12 @@ class OgtLocalDatabase {
         nowEpochMs: Long = currentEpochMs(),
     ): Boolean {
         if (post.isStory) return false
+        if (hidesOwnAnecdoteShare(viewerId, post)) return false
         if (feedEvents.any { it.viewerId == viewerId && it.postId == post.id && it.kind == FeedEventKind.HIDE }) {
             return false
         }
         if (family != null && feedTopicFamily(post.tag, post.sourceUrl) != family) return false
+        if (post.id == OgtIds.PostAnecdoteShare) return true
         if (isOwnPost(post, viewerAliases(viewerId))) return true
         if (mode == FeedMode.FOLLOWING) {
             val mine = setOfNotNull(post.authorUserId, protagonistOf(post))
@@ -679,15 +842,16 @@ class OgtLocalDatabase {
 
     /**
      * Un post canónico por tipo de card para revisar fichas.
-     * No pagina el río completo: perdido, adopción, historia, noticia y comunidad.
+     * No pagina el feed completo: perdido, adopción, historia, noticia y comunidad.
      */
     fun reviewCatalogFeed(family: FeedTopicFamily? = null): List<LocalSocialPost> {
         val preferred = listOf(
             OgtIds.PostOliver,
             OgtIds.PostLuna,
             OgtIds.PostPatitas,
-            "news-01",
+            "a2000000-0000-4000-8000-000000000001",
             OgtIds.PostTaller,
+            OgtIds.PostHomenaje,
         )
         val available = feedPosts()
         val picks = linkedMapOf<FeedCardKind, LocalSocialPost>()
@@ -714,7 +878,172 @@ class OgtLocalDatabase {
         return userId !in mine && mine.none { it in followed }
     }
 
+    fun snapshotPost(postId: String): LocalSocialPost? = posts.firstOrNull { it.id == postId }
+
+    fun hiddenPostIds(viewerId: String): Set<String> =
+        feedEvents.filter { it.viewerId == viewerId && it.kind == FeedEventKind.HIDE }
+            .map { it.postId }
+            .toSet()
+
+    /** Corrige texto y tema de un post propio. */
+    fun editOwnPost(viewerId: String, postId: String, body: String, tag: String? = null): LocalSocialPost? {
+        val trimmed = body.trim()
+        if (trimmed.isEmpty()) return null
+        val idx = posts.indexOfFirst { it.id == postId }
+        if (idx < 0) return null
+        val current = posts[idx]
+        if (!isOwnPost(current, viewerAliases(viewerId))) return null
+        val updated = current.copy(body = trimmed, tag = tag?.trim()?.takeIf { it.isNotEmpty() } ?: current.tag)
+        posts[idx] = updated
+        bumpFeed()
+        bumpSocial()
+        return updated
+    }
+
+    /** Saca el posteo del feed local. Solo la autora. */
+    fun removeOwnPost(viewerId: String, postId: String): LocalSocialPost? {
+        val idx = posts.indexOfFirst { it.id == postId }
+        if (idx < 0) return null
+        val current = posts[idx]
+        if (!isOwnPost(current, viewerAliases(viewerId))) return null
+        posts.removeAt(idx)
+        bumpFeed()
+        bumpSocial()
+        return current
+    }
+
+    fun restorePost(snapshot: LocalSocialPost) {
+        val idx = posts.indexOfFirst { it.id == snapshot.id }
+        if (idx >= 0) posts[idx] = snapshot else posts += snapshot
+        bumpSocial()
+    }
+
+    /** Aplauso de una vez, como el INSERT del servidor. */
+    fun clapPost(viewerId: String, postId: String): LocalSocialPost? {
+        val idx = posts.indexOfFirst { it.id == postId }
+        if (idx < 0) return null
+        val current = posts[idx]
+        if (current.viewerHasImpacted) return current
+        val updated = current.copy(impactCount = current.impactCount + 1, viewerHasImpacted = true)
+        posts[idx] = updated
+        recordFeedEvent(viewerId, postId, FeedEventKind.CLAP)
+        bumpSocial()
+        return updated
+    }
+
+    fun heartPost(viewerId: String, postId: String): LocalSocialPost? {
+        val idx = posts.indexOfFirst { it.id == postId }
+        if (idx < 0) return null
+        val current = posts[idx]
+        if (current.viewerHasHearted) return current
+        val updated = current.copy(heartCount = current.heartCount + 1, viewerHasHearted = true)
+        posts[idx] = updated
+        recordFeedEvent(viewerId, postId, FeedEventKind.HEART)
+        bumpSocial()
+        return updated
+    }
+
+    /**
+     * Río inmediato: cache + seed + lo propio reciente.
+     * Si hay orden REST, se respeta y se pinnea lo publicado acá.
+     */
+    fun composeVisibleRiver(
+        viewerId: String,
+        mode: FeedMode = FeedMode.HOME,
+        family: FeedTopicFamily? = null,
+        remoteOrder: List<String>? = null,
+    ): List<LocalSocialPost> {
+        val preview = ensureFeedAnecdotePreview()
+        val aliases = viewerAliases(viewerId)
+        val hideShare: (LocalSocialPost) -> Boolean = { hidesOwnAnecdoteShare(viewerId, it) }
+        val hidden = hiddenPostIds(viewerId)
+        fun allowed(post: LocalSocialPost) = post.id !in hidden && !hideShare(post)
+        val body = if (remoteOrder != null) {
+            val byId = posts.associateBy { it.id }
+            remoteOrder.mapNotNull { byId[it] }.filter(::allowed)
+        } else {
+            visibleFeed(viewerId, mode, family).filter(::allowed)
+        }
+        val pinned = feedPosts()
+            .filter { post ->
+                isOwnPost(post, aliases) &&
+                    allowed(post) &&
+                    (post.listingId != null || currentEpochMs() - post.createdAtEpochMs <= OWN_PIN_WINDOW_MS) &&
+                    shouldShowInFeed(viewerId, post, mode, family)
+            }
+            .sortedByDescending { it.createdAtEpochMs }
+        return (listOf(preview).filter(::allowed) + pinned + body.filter { it.id != preview.id })
+            .distinctBy { it.id }
+    }
+
+    fun exportSocialFeed(viewerId: String): String {
+        val cached = feedPosts()
+            .sortedByDescending { it.createdAtEpochMs }
+            .take(80)
+        val postIds = cached.map { it.id }.toSet()
+        return honorJson.encodeToString(
+            SocialFeedSnapshot(
+                posts = cached,
+                media = postMedia.filter { it.postId in postIds },
+                comments = comments.filter { it.postId in postIds },
+                anecdotes = anecdotes.filter { it.postId in postIds },
+                follows = follows.filter { it.followerId == viewerId },
+                hideEvents = feedEvents.filter { it.viewerId == viewerId && it.kind == FeedEventKind.HIDE },
+            ),
+        )
+    }
+
+    fun importSocialFeed(raw: String) {
+        if (raw.isBlank()) return
+        val snap = runCatching { honorJson.decodeFromString<SocialFeedSnapshot>(raw) }.getOrNull() ?: return
+        snap.posts.forEach { row ->
+            val idx = posts.indexOfFirst { it.id == row.id }
+            if (idx >= 0) {
+                val current = posts[idx]
+                posts[idx] = row.copy(
+                    place = row.place.ifBlank { current.place },
+                    timeLabel = row.timeLabel.ifBlank { current.timeLabel },
+                    listingId = row.listingId ?: current.listingId,
+                    viewerHasImpacted = row.viewerHasImpacted || current.viewerHasImpacted,
+                    viewerHasHearted = row.viewerHasHearted || current.viewerHasHearted,
+                )
+            } else {
+                posts += row
+            }
+        }
+        snap.media.forEach { row ->
+            val idx = postMedia.indexOfFirst { it.id == row.id }
+            if (idx >= 0) postMedia[idx] = row else postMedia += row
+        }
+        snap.comments.forEach { row ->
+            if (comments.none { it.id == row.id }) comments += row
+        }
+        snap.anecdotes.forEach { row ->
+            val idx = anecdotes.indexOfFirst { it.id == row.id }
+            if (idx >= 0) anecdotes[idx] = row else anecdotes += row
+        }
+        snap.follows.forEach { row ->
+            if (follows.none { it.followerId == row.followerId && it.followedId == row.followedId }) {
+                follows += row
+            }
+        }
+        snap.hideEvents.forEach { row ->
+            if (feedEvents.none { it.viewerId == row.viewerId && it.postId == row.postId && it.kind == FeedEventKind.HIDE }) {
+                feedEvents += row
+            }
+        }
+        if (snap.posts.isNotEmpty() || snap.hideEvents.isNotEmpty()) {
+            bumpFeed()
+            bumpSocial()
+        }
+    }
+
     fun recordFeedEvent(viewerId: String, postId: String, kind: FeedEventKind, dwellMs: Int? = null) {
+        if (kind == FeedEventKind.HIDE &&
+            feedEvents.any { it.viewerId == viewerId && it.postId == postId && it.kind == FeedEventKind.HIDE }
+        ) {
+            return
+        }
         feedEvents += LocalFeedEvent(
             id = "ev-${feedEvents.size + 1}",
             viewerId = viewerId,
@@ -723,6 +1052,7 @@ class OgtLocalDatabase {
             createdAtEpochMs = currentEpochMs(),
             dwellMs = dwellMs,
         )
+        if (kind == FeedEventKind.HIDE) bumpFeed()
     }
 
     private fun postPlaceOrAuthorLat(post: LocalSocialPost): Double? = userOrNull(post.authorUserId)?.latitude
@@ -751,7 +1081,8 @@ class OgtLocalDatabase {
         return contacts.size
     }
 
-    fun commentsOf(postId: String): List<LocalComment> = comments.filter { it.postId == postId }
+    fun commentsOf(postId: String, anecdoteId: String? = null): List<LocalComment> =
+        comments.filter { it.postId == postId && it.anecdoteId == anecdoteId }
 
     fun clapComment(viewerId: String, commentId: String): LocalComment? {
         val idx = comments.indexOfFirst { it.id == commentId }
@@ -770,26 +1101,232 @@ class OgtLocalDatabase {
     }
 
     /** Publica un comentario si hay texto. Vacío no envía. */
-    fun addComment(viewer: LocalUser, postId: String, body: String): LocalComment? {
+    fun addComment(
+        viewer: LocalUser,
+        postId: String,
+        body: String,
+        anecdoteId: String? = null,
+        parentCommentId: String? = null,
+    ): LocalComment? {
         val trimmed = body.trim()
         if (trimmed.isEmpty()) return null
         val row = LocalComment(
-            id = "c-${comments.size + 1}",
+            id = "c-${comments.size + 1}-${currentEpochMs()}",
             postId = postId,
             authorUserId = viewer.id,
             body = trimmed,
             timeLabel = "Ahora",
-            parentCommentId = null,
+            parentCommentId = parentCommentId,
+            anecdoteId = anecdoteId,
         )
         comments += row
-        val idx = posts.indexOfFirst { it.id == postId }
-        if (idx >= 0) {
-            val current = posts[idx]
-            posts[idx] = current.copy(commentCount = current.commentCount + 1)
+        if (anecdoteId.isNullOrBlank()) {
+            val idx = posts.indexOfFirst { it.id == postId }
+            if (idx >= 0) {
+                val current = posts[idx]
+                posts[idx] = current.copy(commentCount = current.commentCount + 1)
+            }
+        } else {
+            recountAnecdoteComments(anecdoteId)
         }
         recordFeedEvent(viewer.id, postId, FeedEventKind.COMMENT)
         bumpSocial()
         return row
+    }
+
+    fun editComment(viewerId: String, commentId: String, body: String): LocalComment? {
+        val trimmed = body.trim()
+        if (trimmed.isEmpty()) return null
+        val idx = comments.indexOfFirst { it.id == commentId }
+        if (idx < 0) return null
+        val row = comments[idx]
+        if (row.authorUserId != viewerId) return null
+        val updated = row.copy(body = trimmed, edited = true)
+        comments[idx] = updated
+        bumpSocial()
+        return updated
+    }
+
+    fun deleteComment(viewerId: String, commentId: String): Boolean {
+        val row = comments.firstOrNull { it.id == commentId } ?: return false
+        if (row.authorUserId != viewerId) return false
+        comments.removeAll { it.id == commentId }
+        if (row.anecdoteId.isNullOrBlank()) {
+            val idx = posts.indexOfFirst { it.id == row.postId }
+            if (idx >= 0) {
+                val current = posts[idx]
+                posts[idx] = current.copy(commentCount = commentsOf(row.postId).size)
+            }
+        } else {
+            recountAnecdoteComments(row.anecdoteId)
+        }
+        bumpSocial()
+        return true
+    }
+
+    fun addAnecdote(
+        viewer: LocalUser,
+        postId: String,
+        body: String,
+        sourceUrl: String? = null,
+    ): LocalAnecdote? {
+        val trimmed = body.trim()
+        if (trimmed.isEmpty()) return null
+        if (posts.none { it.id == postId }) return null
+        val next = (anecdotesOf(postId).maxOfOrNull { it.sortOrder } ?: -1) + 1
+        val row = LocalAnecdote(
+            id = "a-${anecdotes.size + 1}-${currentEpochMs()}",
+            postId = postId,
+            authorUserId = viewer.id,
+            authorName = viewer.displayName,
+            body = trimmed,
+            sourceUrl = sourceUrl?.trim()?.takeIf { it.isNotEmpty() },
+            sortOrder = next,
+            createdAtEpochMs = currentEpochMs(),
+        )
+        anecdotes += row
+        bumpSocial()
+        return row
+    }
+
+    fun editAnecdote(viewerId: String, anecdoteId: String, body: String): LocalAnecdote? {
+        val trimmed = body.trim()
+        if (trimmed.isEmpty()) return null
+        val idx = anecdotes.indexOfFirst { it.id == anecdoteId }
+        if (idx < 0) return null
+        val row = anecdotes[idx]
+        if (row.authorUserId != viewerId) return null
+        val updated = row.copy(body = trimmed)
+        anecdotes[idx] = updated
+        bumpSocial()
+        return updated
+    }
+
+    fun deleteAnecdote(viewerId: String, anecdoteId: String): Boolean {
+        val row = anecdotes.firstOrNull { it.id == anecdoteId } ?: return false
+        if (row.authorUserId != viewerId) return false
+        anecdotes.removeAll { it.id == anecdoteId }
+        comments.removeAll { it.anecdoteId == anecdoteId }
+        bumpSocial()
+        return true
+    }
+
+    fun clapAnecdote(viewerId: String, anecdoteId: String): LocalAnecdote? =
+        toggleAnecdoteMark(anecdoteId) { row ->
+            if (row.viewerHasImpacted) {
+                row.copy(viewerHasImpacted = false, impactCount = (row.impactCount - 1).coerceAtLeast(0))
+            } else {
+                row.copy(viewerHasImpacted = true, impactCount = row.impactCount + 1)
+            }
+        }.also {
+            if (it != null) recordFeedEvent(viewerId, it.postId, FeedEventKind.CLAP)
+        }
+
+    fun heartAnecdote(viewerId: String, anecdoteId: String): LocalAnecdote? =
+        toggleAnecdoteMark(anecdoteId) { row ->
+            if (row.viewerHasHearted) {
+                row.copy(viewerHasHearted = false, heartCount = (row.heartCount - 1).coerceAtLeast(0))
+            } else {
+                row.copy(viewerHasHearted = true, heartCount = row.heartCount + 1)
+            }
+        }.also {
+            if (it != null) recordFeedEvent(viewerId, it.postId, FeedEventKind.HEART)
+        }
+
+    fun upsertAnecdote(remote: SocialAnecdote) {
+        val incoming = LocalAnecdote(
+            id = remote.id,
+            postId = remote.postId,
+            authorUserId = remote.authorUserId,
+            authorName = remote.authorName,
+            body = remote.body,
+            sourceUrl = remote.sourceUrl,
+            sortOrder = remote.sortOrder,
+            createdAtEpochMs = remote.createdAtEpochMs,
+            impactCount = remote.impactCount,
+            commentCount = remote.commentCount,
+            heartCount = remote.heartCount,
+            viewerHasImpacted = remote.viewerHasImpacted,
+            viewerHasHearted = remote.viewerHasHearted,
+        )
+        val idx = anecdotes.indexOfFirst { it.id == remote.id }
+        if (idx >= 0) anecdotes[idx] = incoming else anecdotes += incoming
+        if (remote.comments.isNotEmpty()) {
+            comments.removeAll { it.anecdoteId == remote.id }
+            comments += remote.comments.map { comment ->
+                LocalComment(
+                    id = comment.id,
+                    postId = comment.postId,
+                    authorUserId = comment.authorUserId,
+                    body = comment.body,
+                    timeLabel = "Ahora",
+                    parentCommentId = comment.parentCommentId,
+                    anecdoteId = comment.anecdoteId ?: remote.id,
+                    edited = comment.edited,
+                )
+            }
+        }
+        bumpSocial()
+    }
+
+    fun replaceAnecdote(localId: String, remote: SocialAnecdote) {
+        anecdotes.removeAll { it.id == localId }
+        comments.filter { it.anecdoteId == localId }.forEach { row ->
+            val idx = comments.indexOf(row)
+            if (idx >= 0) comments[idx] = row.copy(anecdoteId = remote.id)
+        }
+        upsertAnecdote(remote)
+    }
+
+    fun replaceComment(localId: String, remote: SocialComment) {
+        comments.removeAll { it.id == localId }
+        applySocialComment(remote)
+    }
+
+    fun repostAnecdote(viewer: LocalUser, anecdoteId: String): LocalSocialPost? {
+        val story = anecdotes.firstOrNull { it.id == anecdoteId } ?: return null
+        val parent = posts.firstOrNull { it.id == story.postId } ?: return null
+        val now = currentEpochMs()
+        val id = "post-anecdote-$now"
+        val copy = parent.copy(
+            id = id,
+            authorUserId = viewer.id,
+            authorCompanyId = null,
+            authorKind = AuthorKind.USER,
+            body = story.body,
+            tag = "Anécdota",
+            timeLabel = "Ahora",
+            impactCount = 0,
+            commentCount = 0,
+            heartCount = 0,
+            createdAtEpochMs = now,
+            honoreeName = parent.honoreeName,
+            sourceUrl = postDeepLink(parent.id),
+            parentPostId = parent.id,
+        )
+        posts += copy
+        mediaOf(parent.id).forEach { item ->
+            postMedia += item.copy(id = "${item.id}-$now", postId = id)
+        }
+        recordFeedEvent(viewer.id, parent.id, FeedEventKind.SHARE)
+        bumpFeed()
+        return copy
+    }
+
+    private fun toggleAnecdoteMark(anecdoteId: String, update: (LocalAnecdote) -> LocalAnecdote): LocalAnecdote? {
+        val idx = anecdotes.indexOfFirst { it.id == anecdoteId }
+        if (idx < 0) return null
+        val updated = update(anecdotes[idx])
+        anecdotes[idx] = updated
+        bumpSocial()
+        return updated
+    }
+
+    private fun recountAnecdoteComments(anecdoteId: String) {
+        val idx = anecdotes.indexOfFirst { it.id == anecdoteId }
+        if (idx < 0) return
+        val row = anecdotes[idx]
+        anecdotes[idx] = row.copy(commentCount = comments.count { it.anecdoteId == anecdoteId })
     }
 
     /**
@@ -1110,36 +1647,53 @@ class OgtLocalDatabase {
         vaccinated: Boolean = false,
         sterilized: Boolean = false,
         homeNeeds: String = "",
+        marks: String = "",
+        lastSeenPlace: String = "",
+        latitude: Double? = null,
+        longitude: Double? = null,
     ): LocalSocialPost? {
         val name = titleCasePersonName(petName.trim())
         val story = description.trim()
         val barrio = place.trim()
         if (name.isEmpty() || story.isEmpty() || species.isBlank() || size.isBlank()) return null
-        if (ageLabel.trim().isEmpty() || barrio.isEmpty() || temperament.trim().isEmpty()) return null
         val postIdx = posts.indexOfFirst { it.id == postId }
         if (postIdx < 0) return null
         val post = posts[postIdx]
-        if (post.authorUserId != author.id) return null
+        if (!isOwnPost(post, author.aliases())) return null
         val listingId = post.listingId ?: return null
         val animalIdx = animals.indexOfFirst { it.id == listingId }
         if (animalIdx < 0) return null
         val listing = animals[animalIdx]
-        if (listing.reporterUserId != author.id || listing.kind != "ADOPTION") return null
+        if (listing.reporterUserId !in author.aliases()) return null
+        val lost = listing.kind == "LOST"
+        if (lost) {
+            if (marks.trim().isEmpty() || lastSeenPlace.trim().isEmpty()) return null
+        } else if (listing.kind != "ADOPTION") {
+            return null
+        } else if (ageLabel.trim().isEmpty() || barrio.isEmpty() || temperament.trim().isEmpty()) {
+            return null
+        }
+        val seen = lastSeenPlace.trim()
         animals[animalIdx] = listing.copy(
             species = species,
             size = size,
-            title = listOf(name, ageLabel.trim()).filter { it.isNotBlank() }.joinToString(" · "),
+            title = if (lost) "Se busca a $name" else listOf(name, ageLabel.trim()).filter { it.isNotBlank() }.joinToString(" · "),
             description = story,
-            place = barrio,
+            place = if (lost) seen.ifBlank { barrio } else barrio,
             petName = name,
-            ageLabel = ageLabel.trim(),
-            sex = sex.trim(),
-            temperament = temperament.trim(),
-            vaccinated = vaccinated,
-            sterilized = sterilized,
-            homeNeeds = homeNeeds.trim(),
+            marks = if (lost) marks.trim() else listing.marks,
+            lastSeenPlace = if (lost) seen else listing.lastSeenPlace,
+            latitude = latitude ?: listing.latitude,
+            longitude = longitude ?: listing.longitude,
+            lastSeenAtEpochMs = if (lost) currentEpochMs() else listing.lastSeenAtEpochMs,
+            ageLabel = if (lost) listing.ageLabel else ageLabel.trim(),
+            sex = if (lost) listing.sex else sex.trim(),
+            temperament = if (lost) listing.temperament else temperament.trim(),
+            vaccinated = if (lost) listing.vaccinated else vaccinated,
+            sterilized = if (lost) listing.sterilized else sterilized,
+            homeNeeds = if (lost) listing.homeNeeds else homeNeeds.trim(),
         )
-        val updated = post.copy(body = story, place = barrio)
+        val updated = post.copy(body = story, place = if (lost) seen.ifBlank { barrio } else barrio)
         posts[postIdx] = updated
         bumpLost()
         bumpFeed()
@@ -1408,6 +1962,7 @@ class OgtLocalDatabase {
             commentCount = post.commentCount,
             isStory = post.isStory,
             createdAtEpochMs = post.createdAtEpochMs,
+            viewerHasImpacted = post.viewerHasImpacted,
             topic = post.tag,
             protagonistUserId = protagonistOf(post),
             media = mediaOf(post.id).map { row ->
@@ -1423,21 +1978,45 @@ class OgtLocalDatabase {
                 )
             },
             sourceUrl = post.sourceUrl,
+            placement = post.placement,
+            achievedCount = post.achievedCount,
+            empresaQueSuma = post.empresaQueSuma,
+            honoreeName = post.honoreeName,
+            anecdotes = anecdotesOf(post.id).map(::toDomain),
         )
     }
 
     fun toDomain(comment: LocalComment): SocialComment {
-        val author = user(comment.authorUserId)
+        val author = userOrNull(comment.authorUserId)
         return SocialComment(
             id = comment.id,
             postId = comment.postId,
             authorUserId = comment.authorUserId,
-            authorName = author.displayName,
+            authorName = author?.displayName ?: "Alguien de la comunidad",
             parentCommentId = comment.parentCommentId,
             body = comment.body,
             createdAtEpochMs = 0L,
+            anecdoteId = comment.anecdoteId,
+            edited = comment.edited,
         )
     }
+
+    fun toDomain(anecdote: LocalAnecdote): SocialAnecdote = SocialAnecdote(
+        id = anecdote.id,
+        postId = anecdote.postId,
+        authorUserId = anecdote.authorUserId,
+        authorName = anecdote.authorName,
+        body = anecdote.body,
+        sourceUrl = anecdote.sourceUrl,
+        sortOrder = anecdote.sortOrder,
+        createdAtEpochMs = anecdote.createdAtEpochMs,
+        impactCount = anecdote.impactCount,
+        commentCount = anecdote.commentCount,
+        heartCount = anecdote.heartCount,
+        viewerHasImpacted = anecdote.viewerHasImpacted,
+        viewerHasHearted = anecdote.viewerHasHearted,
+        comments = commentsOf(anecdote.postId, anecdote.id).map(::toDomain),
+    )
 
     fun toDomain(spot: LocalParkingSpot, viewerUserId: String? = null): ParkingSpot = ParkingSpot(
         id = spot.id,
@@ -1576,3 +2155,32 @@ private data class RadarDemoSpec(
     val vehicle: String,
     val notes: String,
 )
+
+internal fun SocialPost.asLocalPost(): LocalSocialPost = LocalSocialPost(
+    id = id,
+    authorKind = authorKind,
+    authorUserId = if (authorKind == AuthorKind.USER) authorId else null,
+    authorCompanyId = if (authorKind == AuthorKind.COMPANY) authorId else null,
+    place = "",
+    timeLabel = "",
+    tag = topic,
+    body = body,
+    impactCount = impactCount,
+    commentCount = commentCount,
+    isStory = isStory,
+    storyLabel = null,
+    createdAtEpochMs = createdAtEpochMs,
+    sourceUrl = sourceUrl,
+    honoreeName = honoreeName,
+    placement = placement,
+    achievedCount = achievedCount,
+    empresaQueSuma = empresaQueSuma,
+    parentPostId = anecdoteParentPostId(null, sourceUrl),
+    viewerHasImpacted = viewerHasImpacted,
+)
+
+fun LocalSocialPost.isAnecdoteShare(): Boolean =
+    com.onlygoodthings.shared.domain.isAnecdoteShare(tag, sourceUrl, id, parentPostId)
+
+fun LocalSocialPost.anecdoteParentId(): String? =
+    anecdoteParentPostId(parentPostId, sourceUrl)

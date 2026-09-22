@@ -187,6 +187,8 @@ fun socialCommentFrom(raw: Map<String, Any?>, key: String?, fallbackPostId: Stri
         parentCommentId = raw["parentCommentId"] as? String,
         body = body,
         createdAtEpochMs = (raw["createdAtEpochMs"] as? Number)?.toLong() ?: 0L,
+        anecdoteId = raw["anecdoteId"] as? String,
+        edited = raw["edited"] as? Boolean ?: false,
     )
 }
 
@@ -212,6 +214,8 @@ private fun SocialComment.toTreeMap(): Map<String, Any?> = mapOf(
     "parentCommentId" to parentCommentId,
     "body" to body,
     "createdAtEpochMs" to createdAtEpochMs,
+    "anecdoteId" to anecdoteId,
+    "edited" to edited,
 )
 
 fun LocationTickFrame.Companion.now(

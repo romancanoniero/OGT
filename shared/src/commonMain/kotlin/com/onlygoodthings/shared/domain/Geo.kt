@@ -1,11 +1,20 @@
 package com.onlygoodthings.shared.domain
 
+import kotlinx.serialization.Serializable
 import kotlin.math.asin
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
+
+/** Resultado de Nominatim para última vista (mascota perdida) u otra calle. */
+@Serializable
+data class GeoHit(
+    val label: String,
+    val latitude: Double,
+    val longitude: Double,
+)
 
 object GeoMath {
     private const val EARTH_RADIUS_M = 6_371_000.0

@@ -1,7 +1,10 @@
 package com.onlygoodthings.shared.feed
 
+import com.onlygoodthings.shared.domain.AuthorKind
 import com.onlygoodthings.shared.domain.FeedCardKind
+import com.onlygoodthings.shared.domain.canEditSocialPost
 import com.onlygoodthings.shared.domain.feedCardKind
+import com.onlygoodthings.shared.domain.isAnecdoteShare
 import com.onlygoodthings.shared.domain.canRsvpToGathering
 import com.onlygoodthings.shared.domain.formatGatheringWhen
 import com.onlygoodthings.shared.domain.gatheringWhenWhere
@@ -41,12 +44,26 @@ class FeedCardKindTest {
         assertEquals(FeedCardKind.HOMENAJE, feedCardKind("Enseñanza"))
         assertEquals(FeedCardKind.HOMENAJE, feedCardKind("Anécdota"))
         assertEquals(FeedCardKind.HOMENAJE, feedCardKind("Gracias"))
+        assertTrue(isAnecdoteShare("Anécdota", sourceUrl = "ogt://p/post-homenaje-roberto"))
+        assertTrue(isAnecdoteShare("Homenaje", postId = "post-anecdote-1"))
+        assertFalse(isAnecdoteShare("Post mortem"))
     }
 
     @Test
     fun perdidoPorTagOListado() {
         assertEquals(FeedCardKind.LOST_PET, feedCardKind("Mascota perdida"))
         assertEquals(FeedCardKind.LOST_PET, feedCardKind("Perdidos", listingKind = "LOST"))
+    }
+
+    @Test
+    fun elAutorEditaSalvoNoticiaEditorial() {
+        assertTrue(canEditSocialPost(true, AuthorKind.USER, "Comedor"))
+        assertTrue(canEditSocialPost(true, AuthorKind.USER, "Ternura"))
+        assertTrue(canEditSocialPost(true, AuthorKind.USER, "Mascota perdida", listingKind = "LOST"))
+        assertFalse(canEditSocialPost(false, AuthorKind.USER, "Comedor"))
+        assertFalse(canEditSocialPost(true, AuthorKind.COMPANY, "Comedor"))
+        assertFalse(canEditSocialPost(true, AuthorKind.USER, "Comedor", sourceUrl = "https://diario.test"))
+        assertTrue(canEditSocialPost(true, AuthorKind.USER, "Anécdota", sourceUrl = "ogt://p/homenaje"))
     }
 
     @Test

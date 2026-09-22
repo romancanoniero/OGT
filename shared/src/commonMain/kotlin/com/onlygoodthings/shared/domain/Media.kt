@@ -28,3 +28,12 @@ data class PostMediaItem(
     val altText: String? = null,
     val assetKey: String? = null,
 )
+
+/** Respuesta de `POST /api/v1/media/upload`. El archivo ya está en disco de la API. */
+@Serializable
+data class UploadedMedia(
+    val id: String,
+    val kind: MediaKind,
+    val url: String,
+    val filename: String,
+)

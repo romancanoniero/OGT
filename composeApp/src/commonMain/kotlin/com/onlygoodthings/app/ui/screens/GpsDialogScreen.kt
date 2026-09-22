@@ -13,11 +13,11 @@ import com.onlygoodthings.app.map.LocationPermissionState
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.ui.components.GhostLink
 import com.onlygoodthings.app.ui.components.OgtCaption
-import com.onlygoodthings.app.ui.components.OgtCard
-import com.onlygoodthings.app.ui.components.OgtPill
 import com.onlygoodthings.app.ui.components.OgtPrimaryButton
 import com.onlygoodthings.app.ui.components.OgtSecondaryButton
-import com.onlygoodthings.app.ui.components.OgtSectionTitle
+import com.onlygoodthings.app.ui.components.OgtTopBar
+import com.onlygoodthings.app.ui.components.PrefGroup
+import com.onlygoodthings.app.ui.components.PrefLine
 
 @Composable
 fun GpsDialogScreen(
@@ -25,46 +25,57 @@ fun GpsDialogScreen(
     onSkip: () -> Unit,
     onContinue: () -> Unit = onSkip,
     awaitingSystemDialog: Boolean = false,
+    onBack: (() -> Unit)? = null,
 ) {
     val gps = LocalOgtLocation.current
     val hasFix = gps.hasLiveFix
-    Column(Modifier.fillMaxSize().background(OgtColors.canvas).padding(24.dp)) {
-        OgtPill("GPS de precisión")
+    Column(Modifier.fillMaxSize().background(OgtColors.canvas)) {
+        OgtTopBar(title = "GPS", onBack = onBack, hideOnScroll = false)
+        Column(Modifier.padding(horizontal = 20.dp).weight(1f)) {
+        OgtCaption("Pedimos el GPS del dispositivo para parking y alertas. No usamos la ubicación del perfil ni guardamos rutas.")
         Spacer(Modifier.weight(1f))
-        OgtCard {
-            OgtPill("Requerido para el Asistente de Parking")
-            OgtSectionTitle("¿Permitir a OnlyGoodThings usar tu ubicación en tiempo real?")
-            OgtCaption("Pedimos el GPS del dispositivo (Fused Location / Core Location), incluido el del emulador. No usamos la ubicación del perfil.")
-            OgtCaption("El rastreo corre solo mientras buscás o cedés un lugar. Al confirmar la cesión se apaga. No guardamos el historial de rutas.")
+        PrefGroup {
             when {
                 hasFix -> {
                     val acc = gps.fix?.accuracyMeters?.toInt()
-                    OgtCaption("Fix listo${if (acc != null) " · ±$acc m" else ""}.")
-                    OgtPrimaryButton("Continuar con GPS en vivo") { onContinue() }
+                    PrefLine(
+                        title = "Señal lista",
+                        body = if (acc != null) "±$acc m" else "Fix en vivo",
+                    )
                 }
                 gps.permission == LocationPermissionState.DENIED_FOREVER -> {
-                    OgtCaption("El permiso quedó bloqueado en el sistema.")
-                    OgtPrimaryButton("Abrir ajustes") { gps.openSettings() }
+                    PrefLine(title = "Permiso bloqueado", body = "Hay que habilitarlo en el sistema.")
                 }
                 gps.permission == LocationPermissionState.GRANTED && !gps.servicesEnabled -> {
-                    OgtCaption("El permiso está dado, pero el GPS del sistema está apagado.")
-                    OgtPrimaryButton("Activar GPS") { gps.ensureServices() }
+                    PrefLine(title = "GPS apagado", body = "El permiso está dado, falta el chip del sistema.")
                 }
                 gps.acquiring -> {
-                    OgtCaption("Buscando satélites y red. Esperá un fix real…")
-                    OgtPrimaryButton("Esperando señal GPS…", enabled = false) { }
-                    OgtSecondaryButton("Reintentar") { gps.refreshNow() }
+                    PrefLine(title = "Buscando señal", body = "Esperá un fix real del dispositivo.")
                 }
                 else -> {
-                    OgtPrimaryButton(
-                        if (awaitingSystemDialog) "Esperando permiso del sistema…" else "Permitir al usar la app",
-                        enabled = !awaitingSystemDialog,
-                    ) { onAllow() }
-                    OgtSecondaryButton("Permitir solo esta vez", enabled = !awaitingSystemDialog) { onAllow() }
+                    PrefLine(title = "Sin permiso", body = "Se pide al continuar.")
                 }
             }
-            GhostLink("Ahora no") { onSkip() }
         }
         Spacer(Modifier.weight(1f))
+        when {
+            hasFix -> OgtPrimaryButton("Continuar con GPS en vivo") { onContinue() }
+            gps.permission == LocationPermissionState.DENIED_FOREVER ->
+                OgtPrimaryButton("Abrir ajustes") { gps.openSettings() }
+            gps.permission == LocationPermissionState.GRANTED && !gps.servicesEnabled ->
+                OgtPrimaryButton("Activar GPS") { gps.ensureServices() }
+            gps.acquiring -> {
+                OgtPrimaryButton("Esperando señal…", enabled = false) { }
+                OgtSecondaryButton("Reintentar") { gps.refreshNow() }
+            }
+            else -> {
+                OgtPrimaryButton(
+                    if (awaitingSystemDialog) "Esperando permiso…" else "Permitir al usar la app",
+                    enabled = !awaitingSystemDialog,
+                ) { onAllow() }
+            }
+        }
+        GhostLink("Ahora no") { onSkip() }
+        }
     }
 }

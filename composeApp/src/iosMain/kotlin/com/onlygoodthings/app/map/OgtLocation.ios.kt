@@ -18,8 +18,9 @@ import platform.CoreLocation.kCLAuthorizationStatusDenied
 import platform.CoreLocation.kCLAuthorizationStatusNotDetermined
 import platform.CoreLocation.kCLAuthorizationStatusRestricted
 import platform.CoreLocation.kCLLocationAccuracyBestForNavigation
-import platform.Foundation.NSURL
 import platform.Foundation.NSNotificationCenter
+import platform.Foundation.NSProcessInfo
+import platform.Foundation.NSURL
 import platform.UIKit.UIApplication
 import platform.UIKit.UIApplicationDidBecomeActiveNotification
 import platform.UIKit.UIApplicationOpenSettingsURLString
@@ -29,11 +30,11 @@ import platform.darwin.NSObject
 
 @Composable
 actual fun rememberOgtLocation(track: Boolean): OgtLocationState {
-    val holder = remember { IosLocationHolder() }
+    val holder = IosLocationRuntime
     var permission by remember { mutableStateOf(holder.permission()) }
     var servicesEnabled by remember { mutableStateOf(CLLocationManager.locationServicesEnabled()) }
     var fix by remember { mutableStateOf(holder.lastFix) }
-    var acquiring by remember { mutableStateOf(false) }
+    var acquiring by remember { mutableStateOf(holder.acquiring) }
 
     DisposableEffect(track, permission, servicesEnabled) {
         holder.onChange = {
@@ -44,8 +45,8 @@ actual fun rememberOgtLocation(track: Boolean): OgtLocationState {
         }
         if (track && permission.isGranted() && servicesEnabled) {
             acquiring = true
-            holder.start()
-        } else {
+            holder.start(background = permission == LocationPermissionState.GRANTED_ALWAYS)
+        } else if (!track) {
             holder.stop()
             acquiring = false
         }
@@ -57,12 +58,12 @@ actual fun rememberOgtLocation(track: Boolean): OgtLocationState {
             permission = holder.permission()
             servicesEnabled = CLLocationManager.locationServicesEnabled()
             fix = holder.lastFix
-            if (permission.isGranted() && servicesEnabled) holder.refresh()
+            if (track && permission.isGranted() && servicesEnabled) holder.refresh()
         }
         onDispose {
             NSNotificationCenter.defaultCenter.removeObserver(observer)
             holder.onChange = null
-            holder.stop()
+            // No stop(): el runtime de proceso sigue midiendo en segundo plano.
         }
     }
 
@@ -75,7 +76,9 @@ actual fun rememberOgtLocation(track: Boolean): OgtLocationState {
             holder.request(scope)
             permission = holder.permission()
             servicesEnabled = CLLocationManager.locationServicesEnabled()
-            if (permission.isGranted() && servicesEnabled) holder.start()
+            if (permission.isGranted() && servicesEnabled) {
+                holder.start(background = scope == LocationScope.ALWAYS || permission == LocationPermissionState.GRANTED_ALWAYS)
+            }
         },
         ensureServices = {
             servicesEnabled = CLLocationManager.locationServicesEnabled()
@@ -102,13 +105,15 @@ actual fun rememberOgtLocation(track: Boolean): OgtLocationState {
 }
 
 @OptIn(ExperimentalForeignApi::class)
-private class IosLocationHolder {
+internal object IosLocationRuntime {
     var lastFix: DeviceLocation? = null
     var acquiring: Boolean = false
     var onChange: (() -> Unit)? = null
     var pendingAlways: Boolean = false
+    /** iOS solo muestra “Siempre” una vez; el segundo intento abre Ajustes. */
+    var askedAlways: Boolean = false
     private val manager = CLLocationManager()
-    private val delegate = IosLocationDelegate(this)
+    private val delegate = IosLocationDelegate()
 
     init {
         manager.delegate = delegate
@@ -124,16 +129,30 @@ private class IosLocationHolder {
         when (manager.authorizationStatus) {
             kCLAuthorizationStatusNotDetermined -> manager.requestWhenInUseAuthorization()
             kCLAuthorizationStatusAuthorizedWhenInUse -> {
-                if (scope == LocationScope.ALWAYS) manager.requestAlwaysAuthorization()
-                else start()
+                if (scope != LocationScope.ALWAYS) {
+                    start(background = false)
+                    return
+                }
+                if (askedAlways) {
+                    openSettings()
+                    return
+                }
+                askedAlways = true
+                manager.requestAlwaysAuthorization()
             }
-            kCLAuthorizationStatusAuthorizedAlways -> start()
-            else -> onChange?.invoke()
+            kCLAuthorizationStatusAuthorizedAlways -> start(background = true)
+            else -> openSettings()
         }
     }
 
-    fun start() {
+    fun start(background: Boolean) {
         acquiring = true
+        val always = manager.authorizationStatus == kCLAuthorizationStatusAuthorizedAlways
+        if (background && always) {
+            manager.allowsBackgroundLocationUpdates = true
+            manager.showsBackgroundLocationIndicator = true
+            manager.pausesLocationUpdatesAutomatically = false
+        }
         manager.startUpdatingLocation()
         manager.requestLocation()
         apply(manager.location)
@@ -147,6 +166,9 @@ private class IosLocationHolder {
     }
 
     fun stop() {
+        manager.allowsBackgroundLocationUpdates = false
+        manager.showsBackgroundLocationIndicator = false
+        manager.pausesLocationUpdatesAutomatically = true
         manager.stopUpdatingLocation()
         acquiring = false
     }
@@ -155,6 +177,7 @@ private class IosLocationHolder {
         val next = location.toDeviceOrNull() ?: return
         lastFix = next
         acquiring = false
+        OgtLocationSync.offer(next)
         onChange?.invoke()
     }
 
@@ -164,30 +187,30 @@ private class IosLocationHolder {
     }
 }
 
-private class IosLocationDelegate(
-    private val host: IosLocationHolder,
-) : NSObject(), CLLocationManagerDelegateProtocol {
+private class IosLocationDelegate : NSObject(), CLLocationManagerDelegateProtocol {
     override fun locationManager(manager: CLLocationManager, didUpdateLocations: List<*>) {
         val location = didUpdateLocations.lastOrNull() as? CLLocation ?: return
-        host.apply(location)
+        IosLocationRuntime.apply(location)
     }
 
     override fun locationManager(manager: CLLocationManager, didFailWithError: platform.Foundation.NSError) {
-        host.acquiring = false
-        host.onChange?.invoke()
+        IosLocationRuntime.acquiring = false
+        IosLocationRuntime.onChange?.invoke()
     }
 
     override fun locationManagerDidChangeAuthorization(manager: CLLocationManager) {
-        if (host.pendingAlways && host.permission() == LocationPermissionState.GRANTED) {
-            host.pendingAlways = false
+        if (IosLocationRuntime.pendingAlways && IosLocationRuntime.permission() == LocationPermissionState.GRANTED) {
+            IosLocationRuntime.pendingAlways = false
             manager.requestAlwaysAuthorization()
             return
         }
-        host.onChange?.invoke()
-        if (host.permission().isGranted() &&
+        IosLocationRuntime.onChange?.invoke()
+        if (IosLocationRuntime.permission().isGranted() &&
             CLLocationManager.locationServicesEnabled()
         ) {
-            host.start()
+            IosLocationRuntime.start(
+                background = IosLocationRuntime.permission() == LocationPermissionState.GRANTED_ALWAYS,
+            )
         }
     }
 }
@@ -199,7 +222,8 @@ private fun CLLocation?.toDeviceOrNull(): DeviceLocation? {
     val simulated = runCatching {
         location.sourceInformation?.isSimulatedBySoftware() == true
     }.getOrDefault(false)
-    if (simulated) return null
+    val isSimulator = NSProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != null
+    if (simulated && !isSimulator) return null
     return location.coordinate.useContents {
         DeviceLocation(
             latitude = latitude,

@@ -52,8 +52,6 @@ actual class AuthPlatform actual constructor() {
 
     actual suspend fun signInGoogle(): AuthUser = awaitUser { host().signInGoogle(it) }
 
-    actual suspend fun signInApple(): AuthUser = awaitUser { host().signInApple(it) }
-
     actual suspend fun signInFacebook(): AuthUser = awaitUser { host().signInFacebook(it) }
 
     actual suspend fun unlockBiometric(): Boolean = suspendCancellableCoroutine { cont ->
@@ -143,11 +141,21 @@ actual class AuthPrefs actual constructor() {
             defaults.setObject(value, forKey = "ogt.animals.json")
             defaults.synchronize()
         }
+    actual var feedCacheJson: String
+        get() = defaults.stringForKey("ogt.feed.json").orEmpty()
+        set(value) {
+            defaults.setObject(value, forKey = "ogt.feed.json")
+            defaults.synchronize()
+        }
     actual var honorReferrerConsumed: Boolean
         get() = defaults.boolForKey("ogt.honor.referrer")
         set(value) { defaults.setBool(value, forKey = "ogt.honor.referrer") }
+    actual var gpsEnabled: Boolean
+        get() = defaults.boolForKey("ogt.gps")
+        set(value) { defaults.setBool(value, forKey = "ogt.gps") }
+    actual var locationScope: String
+        get() = defaults.stringForKey("ogt.gps.scope")?.ifBlank { null } ?: "while"
+        set(value) { defaults.setObject(value, forKey = "ogt.gps.scope") }
 }
 
 actual fun defaultApiBaseUrl(): String = OGT_DEFAULT_API_BASE
-
-actual fun showsAppleSignIn(): Boolean = true

@@ -3,6 +3,7 @@ package com.onlygoodthings.app.map
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.onlygoodthings.shared.domain.GeoPoint
+import com.onlygoodthings.shared.domain.LocationScope
 
 enum class LocationPermissionState {
     UNKNOWN,
@@ -15,6 +16,12 @@ enum class LocationPermissionState {
 
 fun LocationPermissionState.isGranted(): Boolean =
     this == LocationPermissionState.GRANTED || this == LocationPermissionState.GRANTED_ALWAYS
+
+/** “Siempre” no alcanza con el permiso de primer plano. */
+fun LocationPermissionState.covers(scope: LocationScope): Boolean = when (scope) {
+    LocationScope.ALWAYS -> this == LocationPermissionState.GRANTED_ALWAYS
+    LocationScope.WHILE_USING -> isGranted()
+}
 
 /** Fix real del chip GPS / Fused Location. Nunca coordenadas de seed. */
 data class DeviceLocation(
@@ -43,6 +50,19 @@ data class OgtLocationState(
     val hasLiveFix: Boolean = fix != null
     val canTrack: Boolean = permission.isGranted() && servicesEnabled
     val alwaysGranted: Boolean = permission == LocationPermissionState.GRANTED_ALWAYS
+
+    fun ensureScope(scope: LocationScope) {
+        if (permission.covers(scope)) {
+            if (!servicesEnabled) ensureServices()
+            return
+        }
+        if (permission == LocationPermissionState.DENIED_FOREVER) {
+            openSettings()
+            return
+        }
+        requestPermission(scope)
+        if (!servicesEnabled) ensureServices()
+    }
 }
 
 val LocalOgtLocation = staticCompositionLocalOf<OgtLocationState> {
