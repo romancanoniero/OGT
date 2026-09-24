@@ -161,7 +161,7 @@ fun Application.module() {
             animalRoutes(db, hub)
             geoRoutes()
             timebankRoutes(db)
-            neighborRoutes(db)
+            neighborRoutes(db, hub)
             csrRoutes(db)
             crowdfundingRoutes(db)
         }

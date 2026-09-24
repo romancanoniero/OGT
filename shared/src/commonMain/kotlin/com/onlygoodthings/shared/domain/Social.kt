@@ -33,6 +33,14 @@ data class SocialPost(
     val urgency: String? = null,
     val honoreeName: String? = null,
     val anecdotes: List<SocialAnecdote> = emptyList(),
+    val needId: String? = null,
+    val needLabel: String? = null,
+    val giveLabel: String? = null,
+    val giveLabels: List<String> = emptyList(),
+    val supportCount: Int = 0,
+    val viewerSupported: Boolean = false,
+    val viewerInvited: Boolean = false,
+    val matchesMyOffer: Boolean = false,
 )
 
 @Serializable

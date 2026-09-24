@@ -158,6 +158,25 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
         call.respond(ApiResponse.ok(card))
     }
 
+    post("/api/v1/users/profile/update") {
+        val principal = call.principal<AuthPrincipal>() ?: return@post call.respond(
+            HttpStatusCode.Unauthorized,
+            ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
+        )
+        val dataMap = JsonBody.receiveMap(call)
+        val name = dataMap.optString("displayName")?.trim().orEmpty()
+        if (name.length < 2) {
+            return@post call.respond(
+                HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("El nombre es muy corto", "BAD_REQUEST"),
+            )
+        }
+        repository.updateOwnProfile(principal.userId, dataMap)
+        val card = repository.neighborCard(principal.userId, principal.userId)
+            ?: return@post call.respond(HttpStatusCode.NotFound, ApiResponse.fail<Unit>("Vecino inexistente", "NOT_FOUND"))
+        call.respond(ApiResponse.ok(card, "Perfil actualizado"))
+    }
+
     post("/api/v1/social/promote") {
         val principal = call.principal<AuthPrincipal>() ?: return@post call.respond(
             HttpStatusCode.Unauthorized,

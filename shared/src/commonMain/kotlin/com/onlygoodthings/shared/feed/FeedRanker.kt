@@ -30,6 +30,7 @@ data class FeedCandidate(
     val trustScore: Double = 0.0,
     val urgencyRank: Int = 0,
     val placement: PostPlacement = PostPlacement.ORGANIC,
+    val needTagId: String? = null,
 ) {
     fun family(): FeedTopicFamily = feedTopicFamily(topic, sourceUrl)
 }
@@ -47,6 +48,7 @@ data class ViewerContext(
     val events: List<FeedEventSignal> = emptyList(),
     val latitude: Double? = null,
     val longitude: Double? = null,
+    val offeredTagIds: Set<String> = emptySet(),
 )
 
 data class RankedFeedItem(
@@ -126,17 +128,22 @@ object FeedRanker {
         }
         return visible
             .sortedWith(
-                compareByDescending<FeedCandidate> { it.createdAtEpochMs }.thenBy { it.postId },
+                compareByDescending<FeedCandidate> { skillMatch(it, viewer) && inGraph(it, viewer) }
+                    .thenByDescending { it.createdAtEpochMs }
+                    .thenBy { it.postId },
             )
             .drop(offset.coerceAtLeast(0))
             .take(limit.coerceAtLeast(0))
             .map { post ->
                 val fromGraph = inGraph(post, viewer)
+                val canHelp = skillMatch(post, viewer) && fromGraph
                 RankedFeedItem(
                     postId = post.postId,
                     score = post.createdAtEpochMs.toDouble(),
                     discovery = query.mode == FeedMode.HOME && !fromGraph,
-                    reason = if (query.mode == FeedMode.FOLLOWING) {
+                    reason = if (canHelp) {
+                        FeedShowReason.SKILL_MATCH
+                    } else if (query.mode == FeedMode.FOLLOWING) {
                         if (query.family != null) FeedShowReason.FILTER else FeedShowReason.GRAPH
                     } else {
                         reasonFor(query, profile, post, fromGraph)
@@ -190,6 +197,11 @@ object FeedRanker {
             W_URGENCY * (post.urgencyRank.coerceIn(0, 3) / 3.0) -
             SKIP_PENALTY * skipCount -
             hide
+    }
+
+    private fun skillMatch(post: FeedCandidate, viewer: ViewerContext): Boolean {
+        val tag = post.needTagId ?: return false
+        return tag in viewer.offeredTagIds
     }
 
     private fun inGraph(post: FeedCandidate, viewer: ViewerContext): Boolean {

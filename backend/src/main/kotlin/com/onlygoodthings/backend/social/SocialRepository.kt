@@ -1,5 +1,7 @@
 package com.onlygoodthings.backend.social
 
+import com.onlygoodthings.backend.http.optBoolean
+import com.onlygoodthings.backend.http.optString
 import com.onlygoodthings.backend.infra.Database
 import com.onlygoodthings.backend.infra.stringOrNull
 import com.onlygoodthings.shared.domain.AuthorKind
@@ -33,7 +35,7 @@ class SocialSqlRepository(private val db: Database) {
     ): List<SocialPost> {
         val offset = cursor?.toIntOrNull() ?: 0
         val viewer = loadViewer(userId)
-        val candidates = loadCandidates()
+        val candidates = (loadCandidates() + loadMatchedFriendNeeds(viewer)).distinctBy { it.postId }
         val ranked = FeedRanker.rank(candidates, viewer, mode, System.currentTimeMillis(), offset, pageSize, family)
         if (ranked.isEmpty()) return emptyList()
         val hydrated = hydratePosts(ranked.map { it.postId }, userId).associateBy { it.id }
@@ -294,6 +296,43 @@ class SocialSqlRepository(private val db: Database) {
                 posts = hydratePosts(postIds, viewerId),
                 people = people,
             )
+        }
+    }
+
+    fun updateOwnProfile(userId: String, data: Map<String, Any?>) {
+        val name = data.optString("displayName")?.trim().orEmpty()
+        val photo = data.optString("photoUrl")?.trim().orEmpty()
+        val settings = mapOf(
+            "language" to (data.optString("language") ?: "es"),
+            "barrio" to (data.optString("barrio") ?: ""),
+            "publicProfileVisible" to data.optBoolean("publicProfileVisible", true),
+            "showExactMatchLocation" to data.optBoolean("showExactMatchLocation", false),
+            "animalAlertPush" to data.optBoolean("animalAlertPush", true),
+            "skillAlertPush" to data.optBoolean("skillAlertPush", true),
+            "parkingRadarSounds" to data.optBoolean("parkingRadarSounds", true),
+            "radarEnabled" to data.optBoolean("radarEnabled", true),
+            "carbonSaveMode" to data.optBoolean("carbonSaveMode", false),
+        )
+        val payload = com.onlygoodthings.backend.http.JsonBody.objectMapper.writeValueAsString(
+            mapOf("settings" to settings),
+        )
+        db.withConnection { connection ->
+            connection.prepareStatement(
+                """
+                UPDATE users
+                SET display_name = COALESCE(NULLIF(?, ''), display_name),
+                    photo_url = COALESCE(NULLIF(?, ''), photo_url),
+                    metadata = metadata || ?::jsonb,
+                    updated_at = now()
+                WHERE id = ?::uuid
+                """.trimIndent(),
+            ).use { stmt ->
+                stmt.setString(1, name)
+                stmt.setString(2, photo)
+                stmt.setString(3, payload)
+                stmt.setString(4, userId)
+                stmt.executeUpdate()
+            }
         }
     }
 
@@ -795,7 +834,15 @@ class SocialSqlRepository(private val db: Database) {
                 }
             }
         }
-        ViewerContext(userId, followed, events, lat, lng)
+        val offered = connection.prepareStatement(
+            "SELECT tag_id::text FROM user_skills WHERE user_id = ?::uuid AND offered",
+        ).use { stmt ->
+            stmt.setString(1, userId)
+            stmt.executeQuery().use { rs ->
+                buildSet { while (rs.next()) add(rs.getString(1)) }
+            }
+        }
+        ViewerContext(userId, followed, events, lat, lng, offeredTagIds = offered)
     }
 
     private fun loadCandidates(): List<FeedCandidate> = db.withConnection { connection ->
@@ -814,10 +861,12 @@ class SocialSqlRepository(private val db: Database) {
                    (
                        SELECT pp.user_id::text FROM post_people pp
                        WHERE pp.post_id = p.id AND pp.role = 'PROTAGONIST' LIMIT 1
-                   ) AS protagonist_id
+                   ) AS protagonist_id,
+                   tn.tag_id::text AS need_tag_id
             FROM social_posts p
             LEFT JOIN users u ON u.id = p.author_user_id
             LEFT JOIN animal_listings a ON a.id = p.listing_id
+            LEFT JOIN timebank_needs tn ON tn.post_id = p.id AND tn.open
             WHERE p.moderation_status = 'VISIBLE' AND p.is_story = FALSE
             ORDER BY p.created_at DESC
             LIMIT 200
@@ -846,8 +895,77 @@ class SocialSqlRepository(private val db: Database) {
                                 urgencyRank = rs.getInt("urgency_rank"),
                                 placement = runCatching { PostPlacement.valueOf(rs.getString("placement")) }
                                     .getOrDefault(PostPlacement.ORGANIC),
+                                needTagId = rs.stringOrNull("need_tag_id"),
                             ),
                         )
+                    }
+                }
+            }
+        }
+    }
+
+    /** Pedidos abiertos de gente que seguís y que vos podés cubrir. Entran al feed aunque no estén entre los 200 más nuevos. */
+    private fun loadMatchedFriendNeeds(viewer: ViewerContext): List<FeedCandidate> {
+        if (viewer.followedIds.isEmpty() || viewer.offeredTagIds.isEmpty()) return emptyList()
+        val people = viewer.followedIds.joinToString(",") { "?::uuid" }
+        val tags = viewer.offeredTagIds.joinToString(",") { "?::uuid" }
+        return db.withConnection { connection ->
+            connection.prepareStatement(
+                """
+                SELECT p.id, p.author_user_id, p.author_company_id, COALESCE(p.topic, '') AS topic,
+                       p.impact_count, p.comment_count, p.source_url,
+                       EXTRACT(EPOCH FROM p.created_at) * 1000 AS created_ms,
+                       ST_Y(p.location) AS lat, ST_X(p.location) AS lng,
+                       COALESCE(p.achieved_count, 0) AS achieved_count,
+                       COALESCE(p.placement::text, 'ORGANIC') AS placement,
+                       COALESCE(u.trust_score, 0) AS trust_score,
+                       0 AS urgency_rank,
+                       p.author_user_id::text AS protagonist_id,
+                       n.tag_id::text AS need_tag_id
+                FROM timebank_needs n
+                JOIN social_posts p ON p.id = n.post_id
+                LEFT JOIN users u ON u.id = p.author_user_id
+                WHERE n.open
+                  AND p.moderation_status = 'VISIBLE'
+                  AND p.is_story = FALSE
+                  AND n.user_id IN ($people)
+                  AND n.tag_id IN ($tags)
+                  AND n.user_id <> ?::uuid
+                ORDER BY n.created_at DESC
+                LIMIT 20
+                """.trimIndent(),
+            ).use { stmt ->
+                var i = 1
+                viewer.followedIds.forEach { stmt.setString(i++, it) }
+                viewer.offeredTagIds.forEach { stmt.setString(i++, it) }
+                stmt.setString(i, viewer.userId)
+                stmt.executeQuery().use { rs ->
+                    buildList {
+                        while (rs.next()) {
+                            val authorUser = rs.getString("author_user_id")
+                            val companyId = rs.getString("author_company_id")
+                            add(
+                                FeedCandidate(
+                                    postId = rs.getString("id"),
+                                    authorKey = authorUser ?: "company:${companyId.orEmpty()}",
+                                    authorUserId = authorUser,
+                                    protagonistUserId = rs.getString("protagonist_id") ?: authorUser,
+                                    topic = rs.getString("topic"),
+                                    createdAtEpochMs = rs.getLong("created_ms"),
+                                    impactCount = rs.getInt("impact_count"),
+                                    commentCount = rs.getInt("comment_count"),
+                                    latitude = rs.optDouble("lat"),
+                                    longitude = rs.optDouble("lng"),
+                                    sourceUrl = rs.stringOrNull("source_url"),
+                                    achievedCount = rs.getInt("achieved_count"),
+                                    trustScore = rs.getDouble("trust_score"),
+                                    urgencyRank = rs.getInt("urgency_rank"),
+                                    placement = runCatching { PostPlacement.valueOf(rs.getString("placement")) }
+                                        .getOrDefault(PostPlacement.ORGANIC),
+                                    needTagId = rs.stringOrNull("need_tag_id"),
+                                ),
+                            )
+                        }
                     }
                 }
             }
@@ -879,15 +997,48 @@ class SocialSqlRepository(private val db: Database) {
                        (
                            SELECT pp.user_id::text FROM post_people pp
                            WHERE pp.post_id = p.id AND pp.role = 'PROTAGONIST' LIMIT 1
-                       ) AS protagonist_id
+                       ) AS protagonist_id,
+                       tn.id::text AS need_id,
+                       nt.label AS need_label,
+                       (
+                           SELECT COUNT(*)::int FROM timebank_need_supports s WHERE s.need_id = tn.id
+                       ) AS support_count,
+                       EXISTS (
+                           SELECT 1 FROM timebank_need_supports s
+                           WHERE s.need_id = tn.id AND s.user_id = ?::uuid
+                       ) AS viewer_supported,
+                       EXISTS (
+                           SELECT 1 FROM timebank_need_invites i
+                           WHERE i.need_id = tn.id AND i.invitee_id = ?::uuid
+                       ) AS viewer_invited,
+                       EXISTS (
+                           SELECT 1 FROM user_skills us
+                           WHERE us.user_id = ?::uuid AND us.offered AND us.tag_id = tn.tag_id
+                       ) AS matches_my_offer,
+                       COALESCE((
+                           SELECT array_agg(DISTINCT st.label ORDER BY st.label)
+                           FROM (
+                               SELECT tn.user_id AS uid
+                               UNION
+                               SELECT s.user_id FROM timebank_need_supports s WHERE s.need_id = tn.id
+                           ) people
+                           JOIN user_skills us ON us.user_id = people.uid AND us.offered
+                           JOIN skill_tags st ON st.id = us.tag_id AND st.slug <> 'mensaje'
+                           WHERE us.tag_id IS DISTINCT FROM tn.tag_id
+                       ), ARRAY[]::text[]) AS give_labels
                 FROM social_posts p
                 LEFT JOIN users u ON u.id = p.author_user_id
                 LEFT JOIN companies c ON c.id = p.author_company_id
+                LEFT JOIN timebank_needs tn ON tn.post_id = p.id
+                LEFT JOIN skill_tags nt ON nt.id = tn.tag_id
                 WHERE p.id IN ($placeholders)
                 """.trimIndent(),
             ).use { stmt ->
                 stmt.setString(1, viewerId)
-                ids.forEachIndexed { index, id -> stmt.setString(index + 2, id) }
+                stmt.setString(2, viewerId)
+                stmt.setString(3, viewerId)
+                stmt.setString(4, viewerId)
+                ids.forEachIndexed { index, id -> stmt.setString(index + 5, id) }
                 val posts = stmt.executeQuery().use { rs ->
                     buildList { while (rs.next()) add(rs.toPost()) }
                 }
@@ -1219,6 +1370,20 @@ class SocialSqlRepository(private val db: Database) {
             achievedCount = runCatching { getInt("achieved_count") }.getOrDefault(0),
             empresaQueSuma = runCatching { getBoolean("empresa_que_suma") }.getOrDefault(false),
             honoreeName = runCatching { stringOrNull("honoree_name") }.getOrNull(),
+            needId = runCatching { stringOrNull("need_id") }.getOrNull(),
+            needLabel = runCatching { stringOrNull("need_label") }.getOrNull(),
+            giveLabels = runCatching {
+                (getArray("give_labels")?.array as? Array<*>)?.mapNotNull { it as? String } ?: emptyList()
+            }.getOrDefault(emptyList()),
+            giveLabel = runCatching {
+                (getArray("give_labels")?.array as? Array<*>)?.mapNotNull { it as? String }
+                    ?.joinToString(" · ")
+                    ?.ifBlank { null }
+            }.getOrNull(),
+            supportCount = runCatching { getInt("support_count") }.getOrDefault(0),
+            viewerSupported = runCatching { getBoolean("viewer_supported") }.getOrDefault(false),
+            viewerInvited = runCatching { getBoolean("viewer_invited") }.getOrDefault(false),
+            matchesMyOffer = runCatching { getBoolean("matches_my_offer") }.getOrDefault(false),
         )
     }
 

@@ -118,6 +118,20 @@ class FeedRankerTest {
     }
 
     @Test
+    fun pedidoDeUnSeguidoQuePuedoCubrirSaleAntes() {
+        val fresco = post("foto", "ana", hoursAgo = 1)
+        val pedido = post("trueque", "sofia", hoursAgo = 20, topic = "Trueque", needTagId = "albanil")
+        val ranked = FeedRanker.rank(
+            candidates = listOf(fresco, pedido),
+            viewer = ViewerContext("me", followedIds = setOf("sofia"), offeredTagIds = setOf("albanil")),
+            mode = FeedMode.HOME,
+            nowEpochMs = now,
+        )
+        assertEquals(listOf("trueque", "foto"), ranked.map { it.postId })
+        assertEquals(FeedShowReason.SKILL_MATCH, ranked.first().reason)
+    }
+
+    @Test
     fun adsNoEntranAlHome() {
         val ad = post("ad", "ana", placement = PostPlacement.AD)
         val organic = post("og", "sofia")
@@ -138,6 +152,7 @@ class FeedRankerTest {
         impact: Int = 10,
         achieved: Int = 0,
         placement: PostPlacement = PostPlacement.ORGANIC,
+        needTagId: String? = null,
     ) = FeedCandidate(
         postId = id,
         authorKey = author,
@@ -149,5 +164,6 @@ class FeedRankerTest {
         commentCount = 2,
         achievedCount = achieved,
         placement = placement,
+        needTagId = needTagId,
     )
 }

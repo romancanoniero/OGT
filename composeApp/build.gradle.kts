@@ -67,11 +67,13 @@ kotlin {
 
 val ogtReleaseProps = Properties().apply {
     val local = rootProject.file("key.properties")
-    val devMac = File("/Volumes/DEV_MAC/OGT/secrets/ogt-release.properties")
+    val devMac = File("/Volumes/DEV_MAC/secrets/OGT/ogt-release.properties")
+    val devMacLegacy = File("/Volumes/DEV_MAC/OGT/secrets/ogt-release.properties")
     val home = File(System.getProperty("user.home"), ".android/ogt-release.properties")
     when {
         local.exists() -> local.inputStream().use { load(it) }
         devMac.exists() -> devMac.inputStream().use { load(it) }
+        devMacLegacy.exists() -> devMacLegacy.inputStream().use { load(it) }
         home.exists() -> home.inputStream().use { load(it) }
     }
 }
@@ -89,8 +91,13 @@ android {
     signingConfigs {
         if (ogtReleaseProps.isNotEmpty()) {
             create("release") {
-                val canonical = File("/Volumes/DEV_MAC/OGT/secrets/ogt-release.jks")
-                storeFile = if (canonical.exists()) canonical else file(ogtReleaseProps.getProperty("storeFile"))
+                val canonical = File("/Volumes/DEV_MAC/secrets/OGT/ogt-release.jks")
+                val legacy = File("/Volumes/DEV_MAC/OGT/secrets/ogt-release.jks")
+                storeFile = when {
+                    canonical.exists() -> canonical
+                    legacy.exists() -> legacy
+                    else -> file(ogtReleaseProps.getProperty("storeFile"))
+                }
                 storePassword = ogtReleaseProps.getProperty("storePassword")
                 keyAlias = ogtReleaseProps.getProperty("keyAlias")
                 keyPassword = ogtReleaseProps.getProperty("keyPassword")

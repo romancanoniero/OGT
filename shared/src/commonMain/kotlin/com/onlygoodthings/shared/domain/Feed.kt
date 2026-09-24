@@ -150,6 +150,7 @@ enum class FeedShowReason {
     EXPLORE,
     FILTER,
     PROMOTED,
+    SKILL_MATCH,
 }
 
 /** Home rankeado vs tubo cronológico del grafo. */

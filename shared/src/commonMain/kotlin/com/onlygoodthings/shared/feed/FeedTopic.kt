@@ -75,6 +75,7 @@ fun FeedShowReason.labelEs(): String = when (this) {
     FeedShowReason.EXPLORE -> "Para que explores"
     FeedShowReason.FILTER -> "Filtro"
     FeedShowReason.PROMOTED -> "Promocionado"
+    FeedShowReason.SKILL_MATCH -> "Podés dar lo que pide"
 }
 
 private val PET_TAGS = setOf(

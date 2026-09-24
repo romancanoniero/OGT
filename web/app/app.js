@@ -14,14 +14,9 @@ function isCompany() {
 
 const NAV = [
   ["inicio", "Inicio", "qs-feed"],
-  ["buscar", "Buscar", "qs-search"],
-  ["mascotas", "Mascotas", "qs-paw"],
-  ["ayuda", "Ayuda", "qs-skills"],
-  ["mensajes", "Mensajes", "qs-send"],
-  ["avisos", "Notificaciones", "qs-notifications"],
-  ["publicar", "Publicar", "qs-plus"],
+  ["buscar", "Buscar", "qs-lupa"],
+  ["ayuda", "Trueque", "qs-skills"],
   ["billetera", "Billetera", "qs-wallet"],
-  ["perfil", "Perfil", "qs-feed"],
 ];
 const NAV_EMPRESA = [
   ["empresa", "Panel", "qs-wallet"],
@@ -107,6 +102,9 @@ function persistHidden() {
 }
 
 let realtime = null;
+let lastInbox = [];
+let lastChat = { matchId: "", rows: [] };
+let stopChatLive = null;
 
 function startRealtime() {
   if (!window.OgtRealtime || realtime) return;
@@ -116,6 +114,75 @@ function startRealtime() {
     const live = typeof raw === "string" ? JSON.parse(raw) : raw;
     applyLive(live);
   });
+  if (typeof realtime.observeUserProfiles === "function") {
+    realtime.observeUserProfiles(function (raw) {
+      const live = typeof raw === "string" ? JSON.parse(raw) : raw;
+      applyProfileLive(live);
+    });
+  }
+  if (typeof realtime.observeChatThreads === "function") {
+    realtime.observeChatThreads(function (raw) {
+      const live = typeof raw === "string" ? JSON.parse(raw) : raw;
+      applyChatThreadLive(live);
+    });
+  }
+}
+
+function stopWatchingChat() {
+  if (typeof stopChatLive === "function") stopChatLive();
+  stopChatLive = null;
+}
+
+function watchChat(matchId) {
+  stopWatchingChat();
+  if (!realtime || typeof realtime.observeChatMessages !== "function" || !matchId) return;
+  stopChatLive = realtime.observeChatMessages(matchId, function (raw) {
+    const live = typeof raw === "string" ? JSON.parse(raw) : raw;
+    applyChatMessageLive(live);
+  });
+}
+
+function threadFromLive(live) {
+  if (!live || !live.matchId || !me.userId) return null;
+  const mine = live.requesterId === me.userId;
+  if (!mine && live.providerId !== me.userId) return null;
+  return {
+    matchId: live.matchId,
+    peerUserId: mine ? live.providerId : live.requesterId,
+    peerName: mine ? live.providerName : live.requesterName,
+    photoUrl: mine ? live.providerPhotoUrl : live.requesterPhotoUrl,
+    tag: live.tag || "",
+    tagLabel: live.tagLabel || "",
+    lastBody: live.lastBody || "",
+    lastAtEpochMs: Number(live.lastAtEpochMs) || 0,
+    status: live.status || "ACTIVE",
+  };
+}
+
+function applyChatThreadLive(live) {
+  const thread = threadFromLive(live);
+  if (!thread) return;
+  const idx = lastInbox.findIndex((row) => row.matchId === thread.matchId);
+  if (idx < 0) lastInbox.push(thread);
+  else lastInbox[idx] = Object.assign({}, lastInbox[idx], thread);
+  lastInbox.sort((a, b) => (Number(b.lastAtEpochMs) || 0) - (Number(a.lastAtEpochMs) || 0));
+  if (document.getElementById("inbox")) paintInbox(document.getElementById("inbox-q")?.value || "");
+  paintChromeState();
+}
+
+function applyChatMessageLive(live) {
+  if (!live || !live.id || live.matchId !== lastChat.matchId) return;
+  if (lastChat.rows.some((row) => row.id === live.id)) return;
+  lastChat.rows.push({
+    id: live.id,
+    matchId: live.matchId,
+    senderId: live.senderId,
+    senderName: live.senderName,
+    body: live.body,
+    createdAtEpochMs: Number(live.createdAtEpochMs) || Date.now(),
+    mine: live.senderId === me.userId,
+  });
+  paintChatLog();
 }
 
 function newestFirst(a, b) {
@@ -138,6 +205,61 @@ function mergePost(next) {
   return lastFeed.find((p) => p.id === clean.id) || clean;
 }
 
+function applyProfileLive(live) {
+  if (!live || !live.id) return;
+  const mine = live.id === me.userId;
+  if (mine) {
+    me.displayName = live.displayName || me.displayName;
+    if (live.photoUrl) me.photoUrl = live.photoUrl;
+    me.communityPoints = live.communityPoints != null ? live.communityPoints : me.communityPoints;
+    me.settings = Object.assign({}, me.settings || defaultSettings(), {
+      language: live.language || (me.settings && me.settings.language),
+      barrio: live.barrio != null ? live.barrio : (me.settings && me.settings.barrio),
+      publicProfileVisible: live.publicProfileVisible,
+      showExactMatchLocation: live.showExactMatchLocation,
+      animalAlertPush: live.animalAlertPush,
+      skillAlertPush: live.skillAlertPush,
+      parkingRadarSounds: live.parkingRadarSounds,
+      radarEnabled: live.radarEnabled,
+      carbonSaveMode: live.carbonSaveMode,
+    });
+    paintRail();
+    const nameField = document.querySelector("#profile-form [name=displayName]");
+    if (nameField && document.activeElement !== nameField) nameField.value = me.displayName;
+    const barrioField = document.querySelector("#profile-form [name=barrio]");
+    if (barrioField && document.activeElement !== barrioField && live.barrio != null) {
+      barrioField.value = live.barrio;
+    }
+    const strong = document.querySelector(".profile-head strong");
+    if (strong) strong.textContent = me.displayName;
+    const av = document.querySelector(".profile-head .avatar, .profile-edit .avatar.lg");
+    if (av && me.photoUrl) av.src = mediaUrl(me.photoUrl);
+  }
+  lastFeed.forEach((post) => {
+    if (post.authorId === live.id) {
+      post.authorName = live.displayName;
+      if (live.photoUrl) post.authorPhotoUrl = live.photoUrl;
+      paintPost(post);
+    }
+    (post.anecdotes || []).forEach((story) => {
+      if (story.authorUserId === live.id) {
+        story.authorName = live.displayName;
+        paintStory(story);
+      }
+    });
+  });
+  document.querySelectorAll(`a[href="#/perfil/${live.id}"]`).forEach((a) => {
+    a.textContent = live.displayName;
+  });
+  if (live.photoUrl) {
+    document.querySelectorAll(`img.avatar[alt]`).forEach((img) => {
+      const card = img.closest("[data-post], .profile-head, .me");
+      const link = card && card.querySelector(`a[href="#/perfil/${live.id}"]`);
+      if (link) img.src = mediaUrl(live.photoUrl);
+    });
+  }
+}
+
 function applyLive(live) {
   if (!live || !live.id || hiddenIds.has(live.id)) return;
   const idx = lastFeed.findIndex((p) => p.id === live.id);
@@ -151,6 +273,10 @@ function applyLive(live) {
     topic: live.tag || lastFeed[idx].topic,
   });
   paintPost(merged);
+  paintPulse();
+  if (document.getElementById("feed-list") && !document.querySelector(`[data-post="${merged.id}"]`)) {
+    paintFeedList();
+  }
 }
 
 function paintPost(post) {
@@ -222,12 +348,35 @@ function icon(id) {
   return `<svg aria-hidden="true"><use href="#${id}"></use></svg>`;
 }
 
+const INTRO_VIDEO = "https://onlygoodthings.lat/media/u/c2000000-0000-4000-8000-000000000100.mp4";
+const INTRO_SEEN_KEY = "ogt.introSeen";
+
+function sawIntro() {
+  return sessionStorage.getItem(INTRO_SEEN_KEY) === "1";
+}
+
+function markIntroSeen() {
+  sessionStorage.setItem(INTRO_SEEN_KEY, "1");
+}
+
+/** Raíz o login por defecto: el video primero, salvo sesión activa. */
+function wantsIntro() {
+  if (hasSession()) return false;
+  if (sessionStorage.getItem("ogt.justAuthed") === "1") return false;
+  if (sessionStorage.getItem("ogt.authRedirect") === "1") return false;
+  const hash = location.hash || "";
+  if (!hash || hash === "#" || hash === "#/" || hash === "#/intro") return true;
+  return hash === "#/entrar" && !sawIntro();
+}
+
 function route() {
-  const raw = (location.hash || "#/inicio").replace(/^#\/?/, "") || "inicio";
+  if (wantsIntro()) return { page: "intro", id: "", query: {} };
+  const fallback = hasSession() ? "#/inicio" : "#/intro";
+  const raw = (location.hash || fallback).replace(/^#\/?/, "") || (hasSession() ? "inicio" : "intro");
   const [path, qs] = raw.split("?");
   const parts = path.split("/").filter(Boolean);
   const query = Object.fromEntries(new URLSearchParams(qs || ""));
-  return { page: parts[0] || "inicio", id: parts[1] || "", query };
+  return { page: parts[0] || (hasSession() ? "inicio" : "intro"), id: parts[1] || "", query };
 }
 
 function renderNav(page) {
@@ -238,9 +387,281 @@ function renderNav(page) {
   document.getElementById("nav-links").innerHTML = items.map(([id, label, ic]) => {
     const on = id === current ? " on" : "";
     return `<a class="${on}" href="#/${id}"><span class="glyph">${icon(ic)}</span><span>${label}</span></a>`;
-  }).join("") + `<button type="button" class="nav-item" id="nav-sign-out"><span class="glyph">${icon("qs-more")}</span><span>Salir</span></button>`;
-  document.getElementById("nav-sign-out")?.addEventListener("click", () => leaveSession());
+  }).join("");
 }
+
+function hasChromeMessages() {
+  return lastInbox.length > 0;
+}
+
+function hasChromeNotices() {
+  return chromeNotices.length > 0;
+}
+
+function chromeIcon(href, page, ic, label, badge, enabled) {
+  const { page: current } = route();
+  const on = enabled && current === page ? " on" : "";
+  const off = enabled ? "" : " off";
+  const count = enabled && badge > 0 ? (badge > 9 ? "9+" : String(badge)) : "";
+  const dead = enabled ? "" : ` aria-disabled="true" tabindex="-1"`;
+  return `<a class="section-icon${on}${off}" href="${href}" title="${label}" aria-label="${label}" data-chrome="${page}"${dead}>
+    ${icon(ic)}
+    <span class="chrome-badge" data-badge="${page}"${count ? "" : " hidden"}>${count}</span>
+  </a>`;
+}
+
+function paintSectionTools(head) {
+  const box = (head || document.querySelector(".section-head"))?.querySelector(".section-tools");
+  if (!box) return;
+  const inbox = isCompany() ? "" : `${chromeIcon("#/mensajes", "mensajes", "qs-send", "Mensajes", 0, hasChromeMessages())}${chromeIcon("#/avisos", "avisos", "qs-notifications", "Notificaciones", noticeUnread(), hasChromeNotices())}`;
+  box.innerHTML = `
+    ${inbox}
+    <a class="section-avatar" href="#/perfil" title="Perfil">${avatarHtml(me.userId, me.displayName, "", me.photoUrl)}</a>
+    <button type="button" class="section-signout" id="section-sign-out">Salir</button>`;
+  box.querySelectorAll("[data-chrome]").forEach((a) => {
+    a.addEventListener("click", (ev) => {
+      if (a.classList.contains("off")) ev.preventDefault();
+    });
+  });
+  document.getElementById("section-sign-out")?.addEventListener("click", () => leaveSession());
+  paintChromeState();
+}
+
+function ensureSectionHead() {
+  const main = document.getElementById("main");
+  if (!main) return;
+  let head = main.querySelector(":scope > .section-head");
+  if (!head) {
+    const raw = main.querySelector(":scope > h1, :scope > .chrome");
+    if (!raw) return;
+    if (raw.classList.contains("chrome")) {
+      raw.classList.add("section-head");
+      if (!raw.querySelector(".section-tools")) {
+        raw.insertAdjacentHTML("beforeend", `<div class="section-tools"></div>`);
+      }
+      head = raw;
+    } else {
+      head = document.createElement("div");
+      head.className = "chrome section-head";
+      raw.replaceWith(head);
+      head.appendChild(raw);
+      head.insertAdjacentHTML("beforeend", `<div class="section-tools"></div>`);
+    }
+  }
+  paintSectionTools(head);
+}
+
+function withSectionTools(task) {
+  return Promise.resolve(task).then(() => {
+    ensureSectionHead();
+    paintPublishFab();
+    refreshChromeBadges();
+  });
+}
+
+let chromeNotices = [];
+let chromeNoticeAt = 0;
+
+function noticeUnread() {
+  return chromeNotices.filter((n) => !n.read).length;
+}
+
+function paintChromeBadges() {
+  const n = noticeUnread();
+  document.querySelectorAll("[data-badge=avisos]").forEach((el) => {
+    el.textContent = n > 9 ? "9+" : String(n);
+    el.hidden = n < 1;
+  });
+}
+
+function paintChromeState() {
+  paintChromeBadges();
+  syncChromeIcon("mensajes", hasChromeMessages());
+  syncChromeIcon("avisos", hasChromeNotices());
+}
+
+function syncChromeIcon(page, enabled) {
+  document.querySelectorAll(`[data-chrome="${page}"]`).forEach((el) => {
+    el.classList.toggle("off", !enabled);
+    el.classList.toggle("on", enabled && route().page === page);
+    if (enabled) {
+      el.removeAttribute("aria-disabled");
+      el.removeAttribute("tabindex");
+    } else {
+      el.setAttribute("aria-disabled", "true");
+      el.setAttribute("tabindex", "-1");
+      el.classList.remove("on");
+    }
+  });
+}
+
+async function refreshChromeBadges() {
+  if (!hasSession() || isCompany()) return;
+  if (chromeNoticeAt && Date.now() - chromeNoticeAt < 15000) {
+    paintChromeState();
+    return;
+  }
+  try {
+    const [notices, threads] = await Promise.all([
+      api("/api/v1/notifications/inbox", {}),
+      api("/api/v1/timebank/inbox", {}),
+    ]);
+    chromeNotices = Array.isArray(notices) ? notices : [];
+    if (Array.isArray(threads)) lastInbox = threads;
+    chromeNoticeAt = Date.now();
+    paintChromeState();
+  } catch (_) { /* el chrome no bloquea la pantalla */ }
+}
+
+const FAB_POS_KEY = "ogt.fabPos";
+const FAB_SIZE = 56;
+
+function railVisible(rail) {
+  if (!rail) return false;
+  const style = getComputedStyle(rail);
+  return style.display !== "none" && style.visibility !== "hidden";
+}
+
+/** Recuadro donde puede vivir el +: columna central + riel derecho. */
+function fabStage() {
+  const col = document.getElementById("center-col");
+  if (!col) return null;
+  const colBox = col.getBoundingClientRect();
+  const rail = document.getElementById("civic-rail");
+  const right = railVisible(rail) ? Math.max(colBox.right, rail.getBoundingClientRect().right) : colBox.right;
+  return {
+    left: colBox.left + 12,
+    right: right - 12,
+    top: 72,
+    bottom: window.innerHeight - 24,
+  };
+}
+
+function clampFabPos(left, top) {
+  const box = fabStage();
+  if (!box) return { left, top };
+  return {
+    left: Math.min(Math.max(box.left, box.right - FAB_SIZE), Math.max(box.left, left)),
+    top: Math.min(Math.max(box.top, box.bottom - FAB_SIZE), Math.max(box.top, top)),
+  };
+}
+
+function applyFabPos(fab, pos) {
+  fab.style.left = `${pos.left}px`;
+  fab.style.top = `${pos.top}px`;
+  fab.style.right = "auto";
+}
+
+function saveFabPos(fab) {
+  const box = fabStage();
+  if (!box) return;
+  const rect = fab.getBoundingClientRect();
+  const spanX = Math.max(1, box.right - box.left - FAB_SIZE);
+  const spanY = Math.max(1, box.bottom - box.top - FAB_SIZE);
+  localStorage.setItem(FAB_POS_KEY, JSON.stringify({
+    rx: (rect.left - box.left) / spanX,
+    ry: (rect.top - box.top) / spanY,
+  }));
+}
+
+function loadFabPos() {
+  const box = fabStage();
+  const col = document.getElementById("center-col");
+  if (!box || !col) return { left: 20, top: 80 };
+  try {
+    const raw = JSON.parse(localStorage.getItem(FAB_POS_KEY) || "null");
+    if (raw && Number.isFinite(raw.rx) && Number.isFinite(raw.ry)) {
+      const spanX = Math.max(1, box.right - box.left - FAB_SIZE);
+      const spanY = Math.max(1, box.bottom - box.top - FAB_SIZE);
+      return clampFabPos(box.left + raw.rx * spanX, box.top + raw.ry * spanY);
+    }
+  } catch (_) { /* posición por defecto */ }
+  const colBox = col.getBoundingClientRect();
+  return clampFabPos(colBox.right - 20 - FAB_SIZE, window.innerHeight - 80);
+}
+
+function bindPublishFab(fab) {
+  if (fab.dataset.bound === "1") return;
+  fab.dataset.bound = "1";
+  let drag = null;
+  let pointer = false;
+  function startAt(x, y) {
+    const rect = fab.getBoundingClientRect();
+    drag = { x, y, left: rect.left, top: rect.top, moved: false };
+  }
+  function moveTo(x, y, ev) {
+    if (!drag) return;
+    const dx = x - drag.x;
+    const dy = y - drag.y;
+    if (!drag.moved && (dx * dx + dy * dy) < 36) return;
+    drag.moved = true;
+    fab.classList.add("dragging");
+    ev.preventDefault();
+    applyFabPos(fab, clampFabPos(drag.left + dx, drag.top + dy));
+  }
+  function endDrag(ev) {
+    if (!drag) return;
+    const moved = drag.moved;
+    fab.classList.remove("dragging");
+    if (moved) {
+      ev.preventDefault();
+      fab.dataset.dragged = "1";
+      saveFabPos(fab);
+    }
+    drag = null;
+    pointer = false;
+  }
+  fab.addEventListener("pointerdown", (ev) => {
+    if (ev.button !== 0) return;
+    pointer = true;
+    startAt(ev.clientX, ev.clientY);
+    try { fab.setPointerCapture(ev.pointerId); } catch (_) { /* el mouse sigue el arrastre */ }
+  });
+  fab.addEventListener("pointermove", (ev) => moveTo(ev.clientX, ev.clientY, ev));
+  fab.addEventListener("pointerup", endDrag);
+  fab.addEventListener("pointercancel", endDrag);
+  fab.addEventListener("mousedown", (ev) => {
+    if (ev.button !== 0 || pointer) return;
+    startAt(ev.clientX, ev.clientY);
+    const onMove = (e) => moveTo(e.clientX, e.clientY, e);
+    const onUp = (e) => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      endDrag(e);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  });
+  fab.addEventListener("click", (ev) => {
+    if (fab.dataset.dragged === "1") {
+      ev.preventDefault();
+      fab.dataset.dragged = "";
+    }
+  });
+  fab.addEventListener("dragstart", (ev) => ev.preventDefault());
+}
+
+function paintPublishFab() {
+  const layer = document.getElementById("fab-layer");
+  const fab = document.getElementById("publish-fab");
+  if (!layer || !fab || !document.getElementById("center-col")) return;
+  const { page, id } = route();
+  const hide = !hasSession() || isCompany() || page === "publicar" || (page === "mensajes" && Boolean(id));
+  layer.hidden = hide;
+  if (hide) return;
+  fab.innerHTML = icon("qs-plus");
+  fab.title = "Publicar · arrastrá para mover";
+  applyFabPos(fab, loadFabPos());
+  bindPublishFab(fab);
+}
+
+window.addEventListener("resize", () => {
+  const fab = document.getElementById("publish-fab");
+  const layer = document.getElementById("fab-layer");
+  if (!fab || !layer || layer.hidden) return;
+  const rect = fab.getBoundingClientRect();
+  applyFabPos(fab, clampFabPos(rect.left, rect.top));
+});
 
 /** Tiles Quiet Studio. El mapa nombra a los de Stitch; el resto se reparte estable por id. */
 const AVATAR_TILES = ["mariana", "carlos", "sofia", "roberto", "me", "reply"];
@@ -360,6 +781,14 @@ function httpSource(url) {
   return /^https?:\/\//i.test(String(url || ""));
 }
 
+function isAuthExpired(err, status, errorCode) {
+  const code = String(errorCode || "").toUpperCase();
+  const msg = String((err && err.message) || err || "");
+  if (status === 401) return true;
+  if (code === "UNAUTHENTICATED" || code === "INVALID_TOKEN") return true;
+  return /token firebase vencido|token requerido|token inválido|token invalido|unauthenticated/i.test(msg);
+}
+
 async function api(path, body) {
   const res = await fetch(`${API}${path}`, {
     method: "POST",
@@ -369,8 +798,17 @@ async function api(path, body) {
     },
     body: JSON.stringify(body || {}),
   });
-  const json = await res.json();
-  if (!json.success) throw new Error(json.message || "Error");
+  let json = {};
+  try {
+    json = await res.json();
+  } catch (_) {
+    json = { success: false, message: "Respuesta inválida del servidor" };
+  }
+  if (!json.success) {
+    const err = new Error(json.message || "Error");
+    if (isAuthExpired(err, res.status, json.errorCode)) await expireSession();
+    throw err;
+  }
   return json.data;
 }
 
@@ -1081,9 +1519,11 @@ function postCard(post, { openable = true, previewStories = true, compose = fals
     ${pill ? `<div class="pill-row">${pill}</div>` : ""}
     ${honoreeLine}
     ${lostExtrasHtml(post)}
-    ${post.body ? `<p class="body">${escapeHtml(post.body)}</p>` : ""}
+    ${truequeExtrasHtml(post)}
+    ${truequeBodyHtml(post)}
     ${img}
     ${lostMapHtml(post)}
+    ${truequeActionsHtml(post)}
     <div class="actions">
       <button class="act${post.viewerHasImpacted ? " on" : ""}" data-clap="${escapeHtml(post.id)}" aria-label="Aplauso">${icon("qs-clap")}</button>
       <span class="count">${post.impactCount || 0}</span>
@@ -1094,6 +1534,74 @@ function postCard(post, { openable = true, previewStories = true, compose = fals
     ${storiesBlock(post, { preview: previewStories, compose })}
     ${lostActionsHtml(post, { onDetail: compose && !openable })}
   </article>`;
+}
+
+function isTrueque(post) {
+  return tagOf(post) === "trueque" || Boolean(post.needId || post.needLabel);
+}
+
+function giveListOf(row) {
+  if (Array.isArray(row.giveLabels) && row.giveLabels.length) return row.giveLabels;
+  if (row.giveLabel) return String(row.giveLabel).split(/\s*[·,]\s*/).filter(Boolean);
+  return [];
+}
+
+function offerPillsHtml(labels) {
+  if (!labels.length) return `<p class="caption">Cuando sume oficios, se ven acá.</p>`;
+  return `<div class="chips">${labels.map((label) => `<span class="pill">${escapeHtml(label)}</span>`).join("")}</div>`;
+}
+
+function truequeExchange(post) {
+  const need = String(post.needLabel || "").trim();
+  const give = giveListOf(post);
+  const body = String(post.body || "").trim();
+  let note = body;
+  if (need) {
+    const prefix = give.length
+      ? `Necesito ${need}. A cambio: ${give.join(", ")}.`
+      : `Necesito ${need}.`;
+    if (note.startsWith(prefix)) note = note.slice(prefix.length).trim();
+    else if (note.startsWith(`Necesito ${need}.`)) note = note.slice(`Necesito ${need}.`.length).trim();
+  }
+  return { need, give, note };
+}
+
+function truequeExtrasHtml(post) {
+  if (!isTrueque(post)) return "";
+  const { need, give } = truequeExchange(post);
+  const count = post.supportCount || 0;
+  const invited = post.viewerInvited && !post.viewerSupported;
+  const canHelp = Boolean(post.matchesMyOffer);
+  return `<div class="trueque-extras">
+    <div class="pill-row"><span class="stories-head">${icon("qs-skills")}<span class="pill">Trueque</span></span></div>
+    ${canHelp ? `<p class="caption">Podés dar lo que pide</p>` : ""}
+    ${need ? `<p class="swap"><span><em>Necesita</em> ${escapeHtml(need)}</span></p>` : ""}
+    <p class="hint">A cambio se puede recibir</p>
+    ${offerPillsHtml(give)}
+    <p class="support-line">${count} ${count === 1 ? "apoyo" : "apoyos"}${invited ? " · te invitaron" : ""}</p>
+  </div>`;
+}
+
+function truequeBodyHtml(post) {
+  if (!isTrueque(post)) {
+    return post.body ? `<p class="body">${escapeHtml(post.body)}</p>` : "";
+  }
+  const { note } = truequeExchange(post);
+  return note ? `<p class="body">${escapeHtml(note)}</p>` : "";
+}
+
+function truequeActionsHtml(post) {
+  if (!isTrueque(post) || !post.needId) return "";
+  const mine = isAuthor(post);
+  if (mine) {
+    return `<div class="trueque-acts">
+      <button type="button" class="ghost-cta" data-need-invite="${escapeHtml(post.needId)}" data-post="${escapeHtml(post.id)}">${icon("qs-invite")} Invitar</button>
+    </div>`;
+  }
+  const on = post.viewerSupported;
+  return `<div class="trueque-acts">
+    <button type="button" class="ghost-cta${on ? " on" : ""}" data-need-support="${escapeHtml(post.needId)}" data-on="${on ? "0" : "1"}">${on ? "Dejar de apoyar" : "Apoyar"}</button>
+  </div>`;
 }
 
 function lostState(post) {
@@ -1172,6 +1680,24 @@ function bindSocial(root, { onDetail = false } = {}) {
       } catch (e) {
         alert(e.message);
       }
+    });
+  });
+  root.querySelectorAll("[data-need-support]").forEach((btn) => {
+    btn.addEventListener("click", async (ev) => {
+      ev.stopPropagation();
+      ev.preventDefault();
+      try {
+        await toggleNeedSupport(btn.dataset.needSupport, btn.dataset.on !== "0");
+      } catch (e) {
+        toast(e.message);
+      }
+    });
+  });
+  root.querySelectorAll("[data-need-invite]").forEach((btn) => {
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      ev.preventDefault();
+      openInviteDialog(btn.dataset.needInvite, btn.dataset.post);
     });
   });
   root.querySelectorAll("[data-share]").forEach((btn) => {
@@ -1253,8 +1779,7 @@ function bindSocial(root, { onDetail = false } = {}) {
 
 async function loadSession() {
   if (!me.userId) {
-    me = await api("/api/v1/auth/me");
-    paintRail();
+    await reloadSession();
   }
   if (!following.size) {
     const ids = await api("/api/v1/social/following").catch(() => []);
@@ -1262,27 +1787,173 @@ async function loadSession() {
   }
 }
 
-function paintRail() {
-  const who = document.querySelector(".rail .who");
-  const hint = document.querySelector(".rail .me .hint");
-  const av = document.querySelector(".rail .me .avatar");
-  if (who) who.textContent = me.displayName || "Vecino";
-  if (hint) {
-    const role = me.role === "COMPANY_ADMIN" ? "Empresa" : (me.levelLabel || "Vecino");
-    hint.textContent = [me.communityPoints != null ? `${me.communityPoints} pts` : "", role].filter(Boolean).join(" · ");
-  }
-  if (av) {
-    av.src = avatarSrc(me.userId, me.photoUrl);
-    av.alt = me.displayName || "Vecino";
-  }
+async function reloadSession() {
+  me = await api("/api/v1/auth/me");
+  paintRail();
 }
 
-async function loadFeed() {
-  const posts = await api("/api/v1/social/feed", { pageSize: 40, mode: "HOME" });
+let lastRanking = [];
+
+function isParkingSignal(post) {
+  const listing = String(post.listingKind || post.kind || "").toUpperCase();
+  if (listing === "PARK" || listing === "PARKING" || listing === "YIELD" || listing === "SPOT") return true;
+  const t = tagOf(post);
+  return /estacion|parking|ceder lugar|plaza solidaria|radar/.test(t);
+}
+
+function pulseLabel(post) {
+  const kind = cardKind(post);
+  if (kind === "LOST_PET" || kind === "ADOPTION" || kind === "PET_STORY" || kind === "TERNURA") return "Animales";
+  if (kind === "HOMENAJE") return "Homenaje";
+  if (GATHERING_TAGS.has(tagOf(post))) return "Avisos";
+  return "Comunidad";
+}
+
+function pulseDetail(post) {
+  if (post.petName) return post.petName;
+  if (post.honoreeName) return post.honoreeName;
+  const body = String(post.body || post.topic || "").replace(/\s+/g, " ").trim();
+  return body.length > 42 ? `${body.slice(0, 41)}…` : (body || "Publicación del barrio");
+}
+
+function pulseMeta(post) {
+  const place = post.place || post.lastSeenPlace || (me.settings && me.settings.barrio);
+  if (place) return place;
+  return ago(post.createdAtEpochMs) || "Barrio";
+}
+
+function civicPulseItems() {
+  const fromListings = lastListings
+    .filter((row) => !row.resolved && !isParkingSignal(row))
+    .map((row) => listingToPost(row));
+  const fromFeed = lastFeed.filter((post) => !isParkingSignal(post) && !hiddenIds.has(post.id));
+  const seen = new Set();
+  const merged = [];
+  [...fromListings, ...fromFeed].forEach((post) => {
+    if (!post.id || seen.has(post.id)) return;
+    seen.add(post.id);
+    merged.push(post);
+  });
+  merged.sort(newestFirst);
+  return merged.slice(0, 3);
+}
+
+function isSelfNeighbor(id, name) {
+  if (!id) return true;
+  if (id === me.userId || id === me.firebaseUid) return true;
+  const email = String(me.email || "").toLowerCase();
+  if (email && (id.toLowerCase() === email || String(name || "").toLowerCase() === email)) return true;
+  return false;
+}
+
+function neighborCandidates() {
+  const fromRank = lastRanking.filter((row) => row.userId && !isSelfNeighbor(row.userId, row.displayName));
+  if (fromRank.length) return fromRank.slice(0, 2);
+  const seen = new Set();
+  const fromFeed = [];
+  lastFeed.forEach((post) => {
+    if (!post.authorId || isSelfNeighbor(post.authorId, post.authorName) || seen.has(post.authorId) || isParkingSignal(post)) return;
+    seen.add(post.authorId);
+    fromFeed.push({
+      userId: post.authorId,
+      displayName: post.authorName || "Vecino",
+      photoUrl: post.authorPhotoUrl,
+      levelLabel: post.topic || "Sumó una acción",
+      viewerFollows: following.has(post.authorId),
+    });
+  });
+  return fromFeed.slice(0, 2);
+}
+
+function paintPulse() {
+  const box = document.getElementById("rail-pulse");
+  if (!box) return;
+  const rows = civicPulseItems();
+  box.innerHTML = rows.length
+    ? `<div class="rail-pulse">${rows.map((post) => `
+        <a class="rail-pulse-row" href="#/p/${escapeHtml(post.id)}">
+          <i class="rail-dot"></i>
+          <div><strong>${escapeHtml(pulseLabel(post))}</strong><em>${escapeHtml(pulseDetail(post))}</em></div>
+          <span class="rail-meta">${escapeHtml(pulseMeta(post))}</span>
+        </a>`).join("")}</div>`
+    : `<p class="rail-empty">Mascotas, avisos y hechos del barrio se leen acá. El estacionamiento vive en la app, que sí tiene GPS.</p>`;
+}
+
+function paintNeighbors() {
+  const box = document.getElementById("rail-neighbors");
+  if (!box) return;
+  const rows = neighborCandidates();
+  box.innerHTML = rows.length
+    ? rows.map((row) => `
+        <div class="rail-neighbor">
+          <a href="#/perfil/${escapeHtml(row.userId)}">${avatarHtml(row.userId, row.displayName, "", row.photoUrl)}</a>
+          <a class="copy" href="#/perfil/${escapeHtml(row.userId)}">
+            <strong>${escapeHtml(row.displayName)}</strong>
+            <span>${escapeHtml(row.levelLabel || (row.communityPoints != null ? `${row.communityPoints} pts` : "Sumó una acción"))}</span>
+          </a>
+          ${row.viewerFollows || following.has(row.userId)
+            ? ""
+            : `<button type="button" class="sumar-link" data-sumar="${escapeHtml(row.userId)}">Sumar</button>`}
+        </div>`).join("")
+    : `<p class="rail-empty">Cuando alguien sume cerca, aparece acá.</p>`;
+}
+
+function paintRail() {
+  const code = document.getElementById("rail-code");
+  if (code) code.textContent = me.inviteCode || "—";
+  const av = document.querySelector(".section-avatar .avatar");
+  if (av) {
+    av.src = avatarSrc(me.userId, me.photoUrl);
+    av.alt = me.displayName || "Perfil";
+  }
+  paintPulse();
+  paintNeighbors();
+  if (lastRanking.length) return;
+  api("/api/v1/wallet/summary", {}).then((w) => {
+    lastRanking = w.ranking || [];
+    paintNeighbors();
+  }).catch(() => {});
+}
+
+const FEED_TYPES = [
+  ["", "Todas"],
+  ["COMMUNITY", "Acciones"],
+  ["HOMENAJE", "Homenajes"],
+  ["TERNURA", "Ternura"],
+  ["PETS", "Mascotas"],
+  ["NEWS", "Noticias"],
+];
+let feedType = "";
+
+function familyOfFeedType(type) {
+  if (!type) return "";
+  if (type === "NEWS") return "NEWS";
+  if (type === "PETS" || type === "TERNURA") return "PETS";
+  return "COMMUNITY";
+}
+
+function matchesFeedType(post, type) {
+  if (!type) return !isParkingSignal(post);
+  const kind = cardKind(post);
+  if (type === "PETS") return kind === "LOST_PET" || kind === "ADOPTION" || kind === "PET_STORY";
+  return kind === type;
+}
+
+function visibleFeed(type) {
+  return lastFeed.filter((p) => !hiddenIds.has(p.id) && matchesFeedType(p, type));
+}
+
+async function loadFeed(type) {
+  const next = type === undefined ? "" : type;
+  const payload = { pageSize: 40, mode: "HOME" };
+  const family = familyOfFeedType(next);
+  if (family) payload.family = family;
+  const posts = await api("/api/v1/social/feed", payload);
   lastFeed = (Array.isArray(posts) ? posts : posts?.items || []).filter((p) => !hiddenIds.has(p.id));
   sortFeed();
   await loadListings();
   startRealtime();
+  paintRail();
   return lastFeed;
 }
 
@@ -1297,18 +1968,56 @@ async function loadListings() {
   return lastListings;
 }
 
+function feedPillsHtml() {
+  return `<div class="chips feed-pills" id="feed-type" role="tablist" aria-label="Tipo de publicación">
+    ${FEED_TYPES.map(([id, label]) => `<button type="button" class="chip${id === feedType ? " on" : ""}" data-type="${id}" role="tab" aria-selected="${id === feedType ? "true" : "false"}">${escapeHtml(label)}</button>`).join("")}
+  </div>`;
+}
+
+function paintFeedList() {
+  const box = document.getElementById("feed-list");
+  if (!box) return;
+  const list = visibleFeed(feedType);
+  box.innerHTML = list.length
+    ? list.map((p) => postCard(p, { previewStories: false })).join("")
+    : `<p class="empty">No hay publicaciones de este tipo.</p>`;
+  bindSocial(box);
+}
+
+function bindFeedPills() {
+  document.getElementById("feed-type")?.querySelectorAll("[data-type]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const next = btn.dataset.type || "";
+      if (next === feedType) return;
+      feedType = next;
+      document.querySelectorAll("#feed-type .chip").forEach((el) => {
+        const on = el === btn;
+        el.classList.toggle("on", on);
+        el.setAttribute("aria-selected", on ? "true" : "false");
+      });
+      const box = document.getElementById("feed-list");
+      if (box) box.innerHTML = `<p class="empty">Cargando…</p>`;
+      try {
+        await loadFeed(feedType);
+        paintFeedList();
+      } catch (e) {
+        if (box) box.innerHTML = `<p class="err">${escapeHtml(e.message)}</p>`;
+      }
+    });
+  });
+}
+
 async function renderInicio() {
   const main = document.getElementById("main");
-  main.innerHTML = `<h1>Inicio</h1><p class="empty">Cargando…</p>`;
+  main.innerHTML = `<h1>Inicio</h1>${feedPillsHtml()}<div id="feed-list"><p class="empty">Cargando…</p></div>`;
+  bindFeedPills();
   try {
     await loadSession();
-    const list = await loadFeed();
-    main.innerHTML = `<h1>Inicio</h1>${
-      list.length ? list.map((p) => postCard(p, { previewStories: false })).join("") : `<p class="empty">Todavía no hay publicaciones.</p>`
-    }`;
-    bindSocial(main);
+    await loadFeed(feedType);
+    paintFeedList();
   } catch (e) {
-    main.innerHTML = `<h1>Inicio</h1><p class="err">${escapeHtml(e.message)}. ¿El API está en ${API}?</p>`;
+    const box = document.getElementById("feed-list");
+    if (box) box.innerHTML = `<p class="err">${escapeHtml(e.message)}. ¿El API está en ${API}?</p>`;
   }
 }
 
@@ -1340,6 +2049,7 @@ async function renderPost(id) {
 const PUBLISH_KINDS = [
   { id: "accion", title: "Buena acción", icon: "qs-feed", hint: "Lo que hizo un vecino, o lo que hiciste vos." },
   { id: "convocatoria", title: "Convocatoria", icon: "qs-attend", hint: "Una juntada: huerta, merienda, limpieza." },
+  { id: "trueque", title: "Trueque", icon: "qs-skills", hint: "Pedí un saber o una tarea. Se publica en el tablero.", timebank: true },
   { id: "homenaje", title: "Homenaje", icon: "qs-invite", hint: "Una enseñanza, una anécdota o las gracias." },
   { id: "ternura", title: "Ternura", icon: "qs-pets", hint: "Un gesto o un animal que enterneció el día." },
   { id: "perdida", title: "Mascota perdida", icon: "qs-paw", hint: "Alerta con señas, última vista y el punto en el mapa.", animal: "LOST" },
@@ -1783,6 +2493,92 @@ function bindAnimalForm(kind, editing) {
   });
 }
 
+function bindSkillSuggest(input, hitsBox) {
+  if (!input || !hitsBox) return;
+  let timer = 0;
+  let last = [];
+  async function run() {
+    const q = (input.value || "").trim();
+    try {
+      last = await api("/api/v1/timebank/suggest", { query: q });
+    } catch (_) {
+      last = [];
+    }
+    if (!Array.isArray(last) || !last.length) {
+      hitsBox.innerHTML = "";
+      return;
+    }
+    hitsBox.innerHTML = last.map((hit, i) => {
+      const who = hit.offeredCount > 1
+        ? `La dan ${hit.offeredCount} vecinos`
+        : hit.offeredCount === 1
+          ? "La da 1 vecino"
+          : hit.slug
+            ? "Todavía nadie la ofrece"
+            : "Oficio nuevo";
+      return `<button type="button" class="place-hit" data-i="${i}">
+        <strong>${escapeHtml(hit.label)}</strong>
+        <span>${who}</span>
+      </button>`;
+    }).join("");
+    hitsBox.querySelectorAll("[data-i]").forEach((btn) => {
+      btn.addEventListener("mousedown", (ev) => ev.preventDefault());
+      btn.addEventListener("click", () => {
+        const hit = last[Number(btn.dataset.i)];
+        if (!hit) return;
+        input.value = hit.label;
+        hitsBox.innerHTML = "";
+      });
+    });
+  }
+  input.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(run, 220);
+  });
+  input.addEventListener("focus", () => run());
+}
+
+function bindGiveChips(tags, input, chipsBox) {
+  if (!chipsBox) return;
+  const mine = offeredSkills(tags);
+  chipsBox.innerHTML = mine.map((t) => `<button type="button" class="chip" data-give="${escapeHtml(t.label)}">${escapeHtml(t.label)}</button>`).join("");
+  chipsBox.querySelectorAll("[data-give]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (input) input.value = btn.dataset.give || "";
+      chipsBox.querySelectorAll("[data-give]").forEach((el) => el.classList.toggle("on", el === btn));
+    });
+  });
+}
+
+function bindTruequeNeedForm() {
+  const form = document.getElementById("publish-form");
+  const submit = form?.querySelector("[data-submit]");
+  if (!form || !submit) return;
+  bindSkillSuggest(form.querySelector("[name=label]"), document.getElementById("need-hits"));
+  const offerBox = document.getElementById("offer-live");
+  api("/api/v1/timebank/tags", {}).then((tags) => {
+    if (offerBox) offerBox.innerHTML = skillPillsHtml(tags) || `<p class="empty">Todavía no contaste qué das. <a href="#/perfil">Sumalo en el perfil</a>.</p>`;
+  }).catch(() => {});
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const label = String(form.label?.value || "").trim();
+    const note = String(form.note?.value || "").trim();
+    if (label.length < 2) {
+      toast("Escribí qué necesitás");
+      return;
+    }
+    submit.disabled = true;
+    try {
+      await api("/api/v1/timebank/need", { label, note: note || undefined });
+      toast("Quedó publicado en Trueque");
+      location.hash = "#/ayuda";
+    } catch (e) {
+      submit.disabled = false;
+      toast(e.message || "No se pudo publicar");
+    }
+  });
+}
+
 function bindPublishForm(kind) {
   const spec = PUBLISH_KINDS.find((k) => k.id === kind);
   const form = document.getElementById("publish-form");
@@ -1957,6 +2753,25 @@ async function renderPublicar(kind) {
     bindAnimalForm(kind, editing);
     return;
   }
+  if (spec.timebank) {
+    main.innerHTML = `<div class="chrome"><a href="#/publicar">Publicar</a><h1>Trueque</h1></div>
+      <form class="publish" id="publish-form">
+        <p class="hint">Pedís un oficio. A cambio se ve lo que ya das; si sumás uno, el aviso se actualiza. Después podés invitar a un vecino a apoyar.</p>
+        <label class="field">¿Qué necesitás?
+          <input name="label" type="text" maxlength="40" placeholder="Ej. Albañil, costura, una mudanza" required autocomplete="off">
+        </label>
+        <div class="place-hits" id="need-hits"></div>
+        <p class="hint section">A cambio se puede recibir</p>
+        <div id="offer-live"></div>
+        <p class="hint"><a href="#/perfil">Cambiar oficios en el perfil</a></p>
+        <label class="field">Nota (opcional)
+          <textarea name="note" maxlength="200" placeholder="Cuándo, para qué, algo que ayude a entender."></textarea>
+        </label>
+        <button type="submit" class="publish-cta" data-submit>${icon("qs-skills")} Publicar pedido</button>
+      </form>`;
+    bindTruequeNeedForm();
+    return;
+  }
   main.innerHTML = `<div class="chrome"><a href="#/publicar">Publicar</a><h1>${escapeHtml(spec.title)}</h1></div>
     <form class="publish" id="publish-form">
       ${kind === "accion" ? `
@@ -2036,8 +2851,9 @@ async function renderBuscar() {
     ["NEWS", "Noticias"],
   ];
   main.innerHTML = `<h1>Buscar</h1>
-    <div class="page">
+    <div class="page search">
       <label class="field search-field">
+        <span class="search-icon" aria-hidden="true">${icon("qs-lupa")}</span>
         <input id="search-q" type="search" placeholder="Personas, homenajes, acciones…" autofocus>
       </label>
       <div class="chips" id="search-family">
@@ -2129,81 +2945,153 @@ async function renderMascotas() {
   await paint();
 }
 
-async function renderAyuda() {
-  await loadSession();
-  const main = document.getElementById("main");
-  main.innerHTML = `<h1>Ayuda</h1>
-    <div class="page">
-      <p class="hint">Pedí un saber o ofrecé el tuyo. El día y la hora se hablan en privado.</p>
-      <p class="hint section">Doy</p>
-      <div class="chips" id="skill-offered"></div>
-      <p class="hint section">Necesito</p>
-      <div class="chips" id="skill-needed"></div>
-      <div id="skill-matches"></div>
-    </div>`;
-  let tags = [];
-  async function loadTags() {
-    tags = await api("/api/v1/timebank/tags", {});
-    paintTags();
-    await loadMatches();
-  }
-  function paintTags() {
-    const offered = document.getElementById("skill-offered");
-    const needed = document.getElementById("skill-needed");
-    offered.innerHTML = tags.map((t) => `<button type="button" class="chip${t.offered ? " on" : ""}" data-slug="${escapeHtml(t.slug)}" data-side="offered">${escapeHtml(t.label)}</button>`).join("");
-    needed.innerHTML = tags.map((t) => `<button type="button" class="chip${t.requested ? " on" : ""}" data-slug="${escapeHtml(t.slug)}" data-side="requested">${escapeHtml(t.label)}</button>`).join("");
-    [...offered.querySelectorAll("button"), ...needed.querySelectorAll("button")].forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const slug = btn.dataset.slug;
-        const tag = tags.find((t) => t.slug === slug) || { offered: false, requested: false };
-        const next = { tagSlug: slug, offered: tag.offered, requested: tag.requested };
-        if (btn.dataset.side === "offered") next.offered = !tag.offered;
-        else next.requested = !tag.requested;
-        if (!next.offered && !next.requested) {
-          next.offered = false;
-          next.requested = false;
-        }
-        try {
-          tags = await api("/api/v1/timebank/skill", next);
-          paintTags();
-          await loadMatches();
-        } catch (e) {
-          alert(e.message);
-        }
-      });
+function skillCatalog(tags) {
+  return (tags || []).filter((t) => t.slug !== "mensaje");
+}
+
+function offeredSkills(tags) {
+  return skillCatalog(tags).filter((t) => t.offered);
+}
+
+function skillPillsHtml(tags) {
+  const rows = offeredSkills(tags);
+  if (!rows.length) return "";
+  return `<div class="chips">${rows.map((t) => `<span class="pill">${escapeHtml(t.label)}</span>`).join("")}</div>`;
+}
+
+function bindSkillPeople(box) {
+  box.querySelectorAll("[data-start]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      try {
+        const thread = await api("/api/v1/timebank/start", { userId: btn.dataset.start, tagSlug: btn.dataset.tag });
+        location.hash = `#/mensajes/${thread.matchId}`;
+      } catch (e) {
+        alert(e.message);
+      }
     });
-  }
-  async function loadMatches() {
-    const box = document.getElementById("skill-matches");
-    const wanted = tags.filter((t) => t.requested);
-    if (!wanted.length) {
-      box.innerHTML = `<p class="hint section">Marcá qué necesitás para ver vecinos que lo dan.</p>`;
-      return;
+  });
+}
+
+function skillPersonRow(row, tagSlug, tagLabel) {
+  return `<div class="person">
+    ${avatarHtml(row.userId, row.displayName)}
+    <span class="copy"><strong>${escapeHtml(row.displayName)}</strong><span>${escapeHtml(tagLabel || row.tagLabel || row.tag)}</span></span>
+    <button type="button" class="ghost-cta" data-start="${escapeHtml(row.userId)}" data-tag="${escapeHtml(tagSlug || row.tag)}">Escribir</button>
+  </div>`;
+}
+
+function needCard(row) {
+  const labels = giveListOf(row);
+  const count = row.supportCount || 0;
+  const faces = (row.supporters || []).slice(0, 4)
+    .map((s) => avatarHtml(s.userId, s.displayName, "", s.photoUrl))
+    .join("");
+  const mine = row.mine;
+  const supported = row.viewerSupported;
+  const actions = mine
+    ? `<button type="button" class="ghost-cta" data-need-invite="${escapeHtml(row.needId)}" data-post="${escapeHtml(row.postId || "")}">${icon("qs-invite")} Invitar</button>
+       <button type="button" class="ghost-cta" data-close="${escapeHtml(row.tag)}">Cerrar</button>`
+    : `${row.matchesMyOffer ? `<button type="button" class="ghost-cta" data-start="${escapeHtml(row.userId)}" data-tag="${escapeHtml(row.tag)}">Escribir</button>` : ""}
+       <button type="button" class="ghost-cta${supported ? " on" : ""}" data-need-support="${escapeHtml(row.needId)}" data-on="${supported ? "0" : "1"}">${supported ? "Dejar de apoyar" : "Apoyar"}</button>`;
+  return `<article class="need-card${row.matchesMyOffer ? " match" : ""}${row.viewerInvited ? " invited" : ""}">
+    <div class="person">
+      <a href="#/perfil/${escapeHtml(row.userId)}">${avatarHtml(row.userId, row.displayName, "", row.photoUrl)}</a>
+      <span class="copy">
+        <strong>${escapeHtml(mine ? "Tu pedido" : row.displayName)}</strong>
+        <span>Necesita ${escapeHtml(row.tagLabel)}</span>
+      </span>
+    </div>
+    <p class="hint">A cambio se puede recibir</p>
+    ${offerPillsHtml(labels)}
+    ${row.note ? `<p class="need-body">${escapeHtml(row.note)}</p>` : ""}
+    <p class="support-line">${faces}<span>${count} ${count === 1 ? "apoyo" : "apoyos"}${row.viewerInvited && !supported ? " · te invitaron" : ""}</span></p>
+    <div class="trueque-acts">${actions}</div>
+  </article>`;
+}
+
+async function applyNeedBoard(board) {
+  if (!board) return board;
+  const rows = [...(board.mine || []), ...(board.seekingMine || []), ...(board.others || [])];
+  rows.forEach((row) => {
+    if (!row.postId) return;
+    mergePost({
+      id: row.postId,
+      needId: row.needId,
+      needLabel: row.tagLabel,
+      giveLabels: row.giveLabels || [],
+      giveLabel: row.giveLabel,
+      supportCount: row.supportCount || 0,
+      viewerSupported: Boolean(row.viewerSupported),
+      viewerInvited: Boolean(row.viewerInvited),
+      body: row.body,
+      topic: "Trueque",
+    });
+    const card = document.querySelector(`[data-post="${row.postId}"]`);
+    if (card) {
+      const next = document.createElement("div");
+      next.innerHTML = postCard(lastFeed.find((p) => p.id === row.postId) || { id: row.postId, topic: "Trueque" }, {
+        openable: card.classList.contains("open"),
+        previewStories: false,
+      });
+      const node = next.firstElementChild;
+      if (node) {
+        card.replaceWith(node);
+        bindSocial(node);
+      }
     }
-    box.innerHTML = `<p class="empty">Buscando coincidencias…</p>`;
+  });
+  return board;
+}
+
+async function toggleNeedSupport(needId, join) {
+  const board = await api(join ? "/api/v1/timebank/need/support" : "/api/v1/timebank/need/unsupport", { needId });
+  await applyNeedBoard(board);
+  if (document.getElementById("skill-mine")) {
+    window.dispatchEvent(new CustomEvent("ogt-trueque-reload", { detail: board }));
+  }
+  toast(join ? "Apoyaste el pedido" : "Sacaste el apoyo");
+  return board;
+}
+
+function openInviteDialog(needId, postId) {
+  openDialog(`
+    <h2>Invitar a apoyar</h2>
+    <p>El vecino recibe un aviso. Si se suma, lo que da aparece en el pedido.</p>
+    <label class="field">
+      <input id="invite-q" type="search" placeholder="Nombre del vecino" autocomplete="off" autofocus>
+    </label>
+    <div id="invite-hits"><p class="empty">Buscando…</p></div>
+    <div class="row">
+      ${postId ? `<button type="button" class="ghost" id="invite-copy">Copiar enlace</button>` : ""}
+      <button type="button" class="ghost" data-close-dialog>Cerrar</button>
+    </div>
+  `);
+  const host = document.getElementById("dialog");
+  const box = document.getElementById("invite-hits");
+  const input = document.getElementById("invite-q");
+  async function run() {
+    const q = (input?.value || "").trim();
     try {
-      const groups = [];
-      for (const tag of wanted) {
-        const rows = await api("/api/v1/timebank/match", { tagSlug: tag.slug });
-        (Array.isArray(rows) ? rows : []).forEach((row) => groups.push({ ...row, tagLabel: tag.label, tagSlug: tag.slug }));
-      }
-      if (!groups.length) {
-        box.innerHTML = `<p class="empty">Todavía no hay alguien que ofrezca eso.</p>`;
-        return;
-      }
-      box.innerHTML = `<p class="hint section">Pueden ayudarte</p>${groups.map((row) => `
-        <div class="person">
-          ${avatarHtml(row.userId, row.displayName)}
-          <span class="copy"><strong>${escapeHtml(row.displayName)}</strong><span>${escapeHtml(row.tagLabel || row.tag)}</span></span>
-          <button type="button" class="ghost-cta" data-start="${escapeHtml(row.userId)}" data-tag="${escapeHtml(row.tagSlug)}">Escribir</button>
-        </div>`).join("")}`;
-      box.querySelectorAll("[data-start]").forEach((btn) => {
+      const people = await api("/api/v1/timebank/need/invite/suggest", { query: q });
+      const list = Array.isArray(people) ? people : [];
+      box.innerHTML = list.length
+        ? list.map((card) => `<button type="button" class="person invite-hit" data-invitee="${escapeHtml(card.userId)}">
+            ${avatarHtml(card.userId, card.displayName, "", card.photoUrl)}
+            <span class="copy"><strong>${escapeHtml(card.displayName)}</strong><span>${escapeHtml(card.levelLabel || "")}</span></span>
+          </button>`).join("")
+        : `<p class="empty">${q ? "No encontramos a esa persona." : "Seguí a alguien o buscá por nombre."}</p>`;
+      box.querySelectorAll("[data-invitee]").forEach((btn) => {
         btn.addEventListener("click", async () => {
           try {
-            const thread = await api("/api/v1/timebank/start", { userId: btn.dataset.start, tagSlug: btn.dataset.tag });
-            location.hash = `#/mensajes/${thread.matchId}`;
+            const board = await api("/api/v1/timebank/need/invite", { needId, userId: btn.dataset.invitee });
+            await applyNeedBoard(board);
+            closeDialog();
+            toast("Quedó la invitación");
+            if (document.getElementById("skill-mine")) {
+              window.dispatchEvent(new CustomEvent("ogt-trueque-reload", { detail: board }));
+            }
           } catch (e) {
-            alert(e.message);
+            toast(e.message);
           }
         });
       });
@@ -2211,68 +3099,412 @@ async function renderAyuda() {
       box.innerHTML = `<p class="err">${escapeHtml(e.message)}</p>`;
     }
   }
-  try {
-    await loadTags();
-  } catch (e) {
-    main.innerHTML = `<h1>Ayuda</h1><p class="err">${escapeHtml(e.message)}</p>`;
+  let timer = 0;
+  input?.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(run, 220);
+  });
+  document.getElementById("invite-copy")?.addEventListener("click", () => {
+    copyText(`${location.origin}/#/p/${postId}`, "Enlace copiado");
+  });
+  host.querySelector("[data-close-dialog]")?.addEventListener("click", closeDialog);
+  host.querySelector(".dialog-back")?.addEventListener("click", closeDialog);
+  run();
+}
+
+async function renderAyuda() {
+  await loadSession();
+  const main = document.getElementById("main");
+  main.innerHTML = `<h1>Trueque</h1>
+    <div class="page">
+      <p class="hint">Pedís un oficio. A cambio se ve lo que das. Invitá a un vecino a apoyar: se suma lo que él puede dar.</p>
+      <p class="hint section">Podés dar</p>
+      <div id="skill-offered"></div>
+      <div class="skill-add">
+        <div class="skill-suggest">
+          <input id="skill-new" type="text" maxlength="40" placeholder="Ej. Carpintero, costura" autocomplete="off">
+          <div class="place-hits" id="skill-hits"></div>
+        </div>
+        <button type="button" class="ghost-cta" id="skill-add-btn">Agregar</button>
+      </div>
+      <p class="hint section">Necesito</p>
+      <div class="skill-add">
+        <div class="skill-suggest">
+          <input id="need-new" type="text" maxlength="40" placeholder="Ej. Albañil, costura, una mudanza" autocomplete="off">
+          <div class="place-hits" id="need-hits"></div>
+        </div>
+        <button type="button" class="ghost-cta" id="need-add-btn">Publicar</button>
+      </div>
+      <div class="chips" id="skill-needed"></div>
+      <div id="skill-mine"></div>
+      <div id="skill-seekers"></div>
+      <div id="skill-board"></div>
+      <div id="skill-matches"></div>
+    </div>`;
+  let board = { tags: [], mine: [], seekingMine: [], others: [], helpers: [] };
+  function tags() {
+    return board.tags || [];
   }
+  function paint() {
+    const offered = document.getElementById("skill-offered");
+    const needed = document.getElementById("skill-needed");
+    const mineBox = document.getElementById("skill-mine");
+    const seekers = document.getElementById("skill-seekers");
+    const rest = document.getElementById("skill-board");
+    const helpers = document.getElementById("skill-matches");
+    const mineOffered = offeredSkills(tags());
+    offered.innerHTML = mineOffered.length
+      ? `${skillPillsHtml(tags())}<p class="hint">Esto es lo que se ve a cambio en tus pedidos.</p>`
+      : `<p class="empty">Todavía no contaste qué podés dar. Sumalo acá y se ve en el aviso.</p>`;
+    const wanted = skillCatalog(tags()).filter((t) => t.requested);
+    needed.innerHTML = wanted.length
+      ? wanted.map((t) => `<button type="button" class="chip on" data-slug="${escapeHtml(t.slug)}">${escapeHtml(t.label)}</button>`).join("")
+      : "";
+    needed.querySelectorAll("button").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const slug = btn.dataset.slug;
+        const tag = tags().find((t) => t.slug === slug) || { offered: false, requested: true };
+        try {
+          await api("/api/v1/timebank/skill", {
+            tagSlug: slug,
+            offered: Boolean(tag.offered),
+            requested: false,
+          });
+          await reload();
+        } catch (e) {
+          toast(e.message);
+        }
+      });
+    });
+    mineBox.innerHTML = board.mine?.length
+      ? board.mine.map(needCard).join("")
+      : "";
+    seekers.innerHTML = board.seekingMine?.length
+      ? `<p class="hint section">Piden lo que vos das</p>${board.seekingMine.map(needCard).join("")}`
+      : mineOffered.length
+        ? `<p class="hint">Nadie pidió todavía lo que sabés dar.</p>`
+        : "";
+    rest.innerHTML = board.others?.length
+      ? `<p class="hint section">Otros pedidos</p>${board.others.map(needCard).join("")}`
+      : "";
+    helpers.innerHTML = board.helpers?.length
+      ? `<p class="hint section">Pueden ayudarte</p>${board.helpers.map((row) => skillPersonRow(row, row.tag, row.tagLabel)).join("")}`
+      : wanted.length
+        ? `<p class="empty">Todavía no hay alguien que ofrezca eso.</p>`
+        : "";
+    bindSkillPeople(main);
+    bindSocial(main);
+    main.querySelectorAll("[data-close]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const slug = btn.dataset.close;
+        const tag = tags().find((t) => t.slug === slug) || { offered: false };
+        try {
+          await api("/api/v1/timebank/skill", {
+            tagSlug: slug,
+            offered: Boolean(tag.offered),
+            requested: false,
+          });
+          await reload();
+        } catch (e) {
+          toast(e.message);
+        }
+      });
+    });
+  }
+  function onTruequeReload(ev) {
+    if (ev.detail) board = ev.detail;
+    paint();
+  }
+  if (window.__ogtTruequeReload) window.removeEventListener("ogt-trueque-reload", window.__ogtTruequeReload);
+  window.__ogtTruequeReload = onTruequeReload;
+  window.addEventListener("ogt-trueque-reload", onTruequeReload);
+  async function reload() {
+    board = await api("/api/v1/timebank/board", {});
+    paint();
+  }
+  const addBtn = document.getElementById("need-add-btn");
+  const field = document.getElementById("need-new");
+  const skillField = document.getElementById("skill-new");
+  const skillBtn = document.getElementById("skill-add-btn");
+  bindSkillSuggest(field, document.getElementById("need-hits"));
+  bindSkillSuggest(skillField, document.getElementById("skill-hits"));
+  async function addOffered() {
+    const label = (skillField?.value || "").trim();
+    if (!label) {
+      toast("Escribí un oficio o una tarea");
+      return;
+    }
+    skillBtn.disabled = true;
+    try {
+      board.tags = await api("/api/v1/timebank/tag/create", { label });
+      skillField.value = "";
+      board = await api("/api/v1/timebank/board", {});
+      paint();
+      toast("Quedó en lo que das y en el aviso");
+    } catch (e) {
+      toast(e.message || "No se pudo agregar");
+    } finally {
+      skillBtn.disabled = false;
+    }
+  }
+  skillBtn?.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    addOffered();
+  });
+  skillField?.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Enter") return;
+    ev.preventDefault();
+    addOffered();
+  });
+  async function publishNeed() {
+    const label = (field?.value || "").trim();
+    if (!label) {
+      toast("Escribí qué necesitás");
+      return;
+    }
+    addBtn.disabled = true;
+    try {
+      board = await api("/api/v1/timebank/need", { label });
+      field.value = "";
+      paint();
+      toast("Quedó publicado");
+    } catch (e) {
+      toast(e.message || "No se pudo publicar");
+    } finally {
+      addBtn.disabled = false;
+    }
+  }
+  addBtn?.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    publishNeed();
+  });
+  field?.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Enter") return;
+    ev.preventDefault();
+    publishNeed();
+  });
+  try {
+    await reload();
+  } catch (e) {
+    main.innerHTML = `<h1>Trueque</h1><p class="err">${escapeHtml(e.message)}</p>`;
+  }
+}
+
+function inboxQuery() {
+  return (document.getElementById("inbox-q")?.value || "").trim();
+}
+
+function filteredInbox(q) {
+  const needle = (q || "").trim().toLowerCase();
+  if (!needle) return lastInbox;
+  return lastInbox.filter((t) => {
+    const name = (t.peerName || "").toLowerCase();
+    const preview = (t.lastBody || "").toLowerCase();
+    const tag = (t.tagLabel || "").toLowerCase();
+    return name.includes(needle) || preview.includes(needle) || tag.includes(needle);
+  });
+}
+
+function threadRow(t) {
+  const skill = t.tag && t.tag !== "mensaje" ? `<span class="pill">${escapeHtml(t.tagLabel || t.tag)}</span>` : "";
+  const preview = t.lastBody || (t.tagLabel && t.tag !== "mensaje" ? `Trueque · ${t.tagLabel}` : "Conversación nueva");
+  return `<a class="person thread" href="#/mensajes/${escapeHtml(t.matchId)}">
+    ${avatarHtml(t.peerUserId, t.peerName, "", t.photoUrl)}
+    <span class="copy">
+      <strong>${escapeHtml(t.peerName || "Vecino")}</strong>
+      <span class="preview">${escapeHtml(preview)}</span>
+    </span>
+    <span class="meta">${ago(t.lastAtEpochMs)}${skill}</span>
+  </a>`;
+}
+
+function paintInbox(q) {
+  const box = document.getElementById("inbox");
+  if (!box) return;
+  const rows = filteredInbox(q);
+  box.innerHTML = rows.length
+    ? rows.map(threadRow).join("")
+    : lastInbox.length
+      ? `<p class="empty">Ningún hilo coincide con esa búsqueda.</p>`
+      : `<p class="empty">Todavía no hay conversaciones. Buscá un vecino o abrí un trueque desde <a href="#/ayuda">Trueque</a>.</p>`;
+}
+
+function peopleWriteRow(card) {
+  return `<div class="person">
+    <a href="#/perfil/${escapeHtml(card.userId)}">${avatarHtml(card.userId, card.displayName, "", card.photoUrl)}</a>
+    <span class="copy"><strong>${escapeHtml(card.displayName)}</strong><span>${escapeHtml(card.levelLabel || "")}</span></span>
+    <button type="button" class="ghost-cta" data-start="${escapeHtml(card.userId)}">Escribir</button>
+  </div>`;
+}
+
+async function openChatWith(userId) {
+  const thread = await api("/api/v1/timebank/start", { userId });
+  if (thread && thread.matchId) {
+    const idx = lastInbox.findIndex((row) => row.matchId === thread.matchId);
+    if (idx < 0) lastInbox.unshift(thread);
+    else lastInbox[idx] = Object.assign({}, lastInbox[idx], thread);
+    location.hash = `#/mensajes/${thread.matchId}`;
+  }
+}
+
+function paintChatLog() {
+  const log = document.getElementById("chat-log");
+  if (!log) return;
+  const rows = lastChat.rows;
+  log.innerHTML = rows.length
+    ? rows.map((m) => `<div class="bubble${m.mine ? " mine" : ""}" data-msg="${escapeHtml(m.id)}">
+        ${m.mine ? "" : `<strong>${escapeHtml(m.senderName)}</strong>`}
+        <p>${escapeHtml(m.body)}</p>
+        <time>${ago(m.createdAtEpochMs)}</time>
+      </div>`).join("")
+    : `<p class="empty">Decí hola. Acá se habla el día y la hora.</p>`;
+  log.scrollTop = log.scrollHeight;
 }
 
 async function renderMensajes(matchId) {
   await loadSession();
   const main = document.getElementById("main");
   if (!matchId) {
-    main.innerHTML = `<h1>Mensajes</h1><div class="page" id="inbox"><p class="empty">Cargando…</p></div>`;
+    stopWatchingChat();
+    lastChat = { matchId: "", rows: [] };
+    main.innerHTML = `<h1>Mensajes</h1>
+      <div class="page inbox">
+        <label class="field search-field">
+          <span class="search-icon" aria-hidden="true">${icon("qs-lupa")}</span>
+          <input id="inbox-q" type="search" placeholder="Buscar un vecino…" autocomplete="off">
+        </label>
+        <div id="inbox-people" hidden></div>
+        <div id="inbox"><p class="empty">Cargando…</p></div>
+      </div>`;
+    const peopleBox = document.getElementById("inbox-people");
+    async function searchPeople(q) {
+      if (!q || q.length < 2) {
+        peopleBox.hidden = true;
+        peopleBox.innerHTML = "";
+        return;
+      }
+      try {
+        const page = await api("/api/v1/social/search", { query: q, pageSize: 8 });
+        const people = (page.people || []).filter((card) => card.userId !== me.userId);
+        if (!people.length) {
+          peopleBox.hidden = true;
+          peopleBox.innerHTML = "";
+          return;
+        }
+        peopleBox.hidden = false;
+        peopleBox.innerHTML = `<p class="hint">Personas</p>${people.map(peopleWriteRow).join("")}`;
+        peopleBox.querySelectorAll("[data-start]").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            btn.disabled = true;
+            try {
+              await openChatWith(btn.dataset.start);
+            } catch (e) {
+              toast(e.message || "No se pudo abrir el chat");
+              btn.disabled = false;
+            }
+          });
+        });
+      } catch (e) {
+        peopleBox.hidden = false;
+        peopleBox.innerHTML = `<p class="err">${escapeHtml(e.message)}</p>`;
+      }
+    }
+    document.getElementById("inbox-q")?.addEventListener("input", () => {
+      const q = inboxQuery();
+      paintInbox(q);
+      clearTimeout(searchPeople.timer);
+      searchPeople.timer = setTimeout(() => searchPeople(q), 280);
+    });
     try {
-      const threads = await api("/api/v1/timebank/inbox", {});
-      const box = document.getElementById("inbox");
-      box.innerHTML = threads.length
-        ? threads.map((t) => `<a class="person" href="#/mensajes/${escapeHtml(t.matchId)}">
-            ${avatarHtml(t.peerUserId, t.peerName)}
-            <span class="copy"><strong>${escapeHtml(t.peerName)}</strong><span>${escapeHtml(t.tagLabel)}${t.lastBody ? " · " + escapeHtml(t.lastBody) : ""}</span></span>
-          </a>`).join("")
-        : `<p class="empty">Todavía no hay hilos. Un trueque de Ayuda abre el chat.</p>`;
+      lastInbox = await api("/api/v1/timebank/inbox", {});
+      if (!Array.isArray(lastInbox)) lastInbox = [];
+      paintInbox("");
     } catch (e) {
       document.getElementById("inbox").innerHTML = `<p class="err">${escapeHtml(e.message)}</p>`;
     }
     return;
   }
-  main.innerHTML = `<div class="chrome"><a href="#/mensajes">Mensajes</a><h1>Chat</h1></div>
+  let thread = lastInbox.find((row) => row.matchId === matchId);
+  main.innerHTML = `<div class="chrome">
+      <a href="#/mensajes">Mensajes</a>
+      ${thread ? avatarHtml(thread.peerUserId, thread.peerName, "", thread.photoUrl) : ""}
+      <h1>${escapeHtml(thread?.peerName || "Chat")}</h1>
+    </div>
     <div class="page chat">
+      <p class="chat-safety">Recomendamos coordinar en lugares públicos y de día. Nunca compartas datos bancarios ni contraseñas.</p>
+      ${thread && thread.tag && thread.tag !== "mensaje" ? `<p class="hint" id="chat-tag">${escapeHtml(thread.tagLabel || thread.tag)}</p>` : ""}
       <div id="chat-log"><p class="empty">Cargando…</p></div>
-      <form class="composer" id="chat-form">
-        <textarea name="body" rows="2" placeholder="Escribí el mensaje"></textarea>
+      <form class="composer chat-composer" id="chat-form">
+        <textarea name="body" rows="1" placeholder="Mensaje…"></textarea>
         <button type="submit">${icon("qs-send")} Enviar</button>
       </form>
     </div>`;
-  const log = document.getElementById("chat-log");
-  async function paint() {
-    const rows = await api("/api/v1/timebank/messages", { matchId });
-    const peer = rows.find((m) => !m.mine)?.senderName || "Trueque";
-    const title = document.querySelector(".chrome h1");
-    if (title) title.textContent = peer;
-    log.innerHTML = rows.length
-      ? rows.map((m) => `<div class="bubble${m.mine ? " mine" : ""}"><strong>${escapeHtml(m.senderName)}</strong><p>${escapeHtml(m.body)}</p></div>`).join("")
-      : `<p class="empty">Decí hola. Acá se habla el día y la hora.</p>`;
-    log.scrollTop = log.scrollHeight;
+  lastChat = { matchId, rows: [] };
+  async function loadThread() {
+    if (thread) return thread;
+    try {
+      lastInbox = await api("/api/v1/timebank/inbox", {});
+      if (!Array.isArray(lastInbox)) lastInbox = [];
+    } catch (_) { /* el hilo igual se abre con los mensajes */ }
+    thread = lastInbox.find((row) => row.matchId === matchId);
+    if (thread) {
+      const title = document.querySelector("#main .chrome h1");
+      if (title) title.textContent = thread.peerName || "Chat";
+      const chrome = document.querySelector("#main .chrome");
+      if (chrome && !chrome.querySelector(".avatar")) {
+        title?.insertAdjacentHTML("beforebegin", avatarHtml(thread.peerUserId, thread.peerName, "", thread.photoUrl));
+      }
+      if (thread.tag && thread.tag !== "mensaje" && !document.getElementById("chat-tag")) {
+        document.getElementById("chat-log")?.insertAdjacentHTML(
+          "beforebegin",
+          `<p class="hint" id="chat-tag">${escapeHtml(thread.tagLabel || thread.tag)}</p>`,
+        );
+      }
+    }
+    return thread;
   }
-  document.getElementById("chat-form").addEventListener("submit", async (ev) => {
+  async function loadMessages() {
+    const rows = await api("/api/v1/timebank/messages", { matchId });
+    lastChat.rows = (Array.isArray(rows) ? rows : []).map((m) => ({
+      ...m,
+      mine: m.senderId === me.userId || m.mine,
+    }));
+    if (!thread) {
+      const peer = lastChat.rows.find((m) => !m.mine);
+      const title = document.querySelector("#main .chrome h1");
+      if (title && peer) title.textContent = peer.senderName;
+    }
+    paintChatLog();
+  }
+  document.getElementById("chat-form")?.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const field = ev.target.querySelector("[name=body]");
     const body = field.value.trim();
     if (!body) return;
     field.value = "";
     try {
-      await api("/api/v1/timebank/message/send", { matchId, body });
-      await paint();
+      const saved = await api("/api/v1/timebank/message/send", { matchId, body });
+      if (saved && saved.id && !lastChat.rows.some((row) => row.id === saved.id)) {
+        lastChat.rows.push({ ...saved, mine: true });
+        paintChatLog();
+      }
     } catch (e) {
-      alert(e.message);
+      toast(e.message || "No se pudo enviar");
+      field.value = body;
+    }
+  });
+  document.querySelector("#chat-form [name=body]")?.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" && !ev.shiftKey) {
+      ev.preventDefault();
+      document.getElementById("chat-form")?.requestSubmit();
     }
   });
   try {
-    await paint();
+    await Promise.all([loadThread(), loadMessages()]);
+    watchChat(matchId);
   } catch (e) {
-    log.innerHTML = `<p class="err">${escapeHtml(e.message)}</p>`;
+    const log = document.getElementById("chat-log");
+    if (log) log.innerHTML = `<p class="err">${escapeHtml(e.message)}</p>`;
   }
 }
 
@@ -2297,6 +3529,7 @@ async function renderAvisos() {
   function hrefOf(item) {
     if (item.matchId) return `#/mensajes/${item.matchId}`;
     if (item.postId) return `#/p/${item.postId}`;
+    if (String(item.id || "").startsWith("invite:")) return "#/ayuda";
     return "#/avisos";
   }
   function paint() {
@@ -2311,7 +3544,10 @@ async function renderAvisos() {
       : `<p class="empty">No hay avisos en este filtro.</p>`;
     box.querySelectorAll("[data-notice]").forEach((a) => {
       a.addEventListener("click", () => {
-        api("/api/v1/notifications/read", { noticeId: a.dataset.notice }).catch(() => {});
+        const id = a.dataset.notice;
+        api("/api/v1/notifications/read", { noticeId: id }).catch(() => {});
+        chromeNotices = chromeNotices.map((n) => (n.id === id ? { ...n, read: true } : n));
+        paintChromeBadges();
       });
     });
   }
@@ -2325,12 +3561,18 @@ async function renderAvisos() {
   document.getElementById("mark-read").addEventListener("click", async () => {
     await api("/api/v1/notifications/read", {});
     rows = rows.map((r) => ({ ...r, read: true }));
+    chromeNotices = rows;
+    chromeNoticeAt = Date.now();
     paint();
+    paintChromeBadges();
     toast("Marcadas como leídas");
   });
   try {
     rows = await api("/api/v1/notifications/inbox", {});
+    chromeNotices = Array.isArray(rows) ? rows : [];
+    chromeNoticeAt = Date.now();
     paint();
+    paintChromeBadges();
   } catch (e) {
     box.innerHTML = `<p class="err">${escapeHtml(e.message)}</p>`;
   }
@@ -2377,7 +3619,7 @@ async function renderPerfil(userId) {
     }
     const followBtn = !mine
       ? `<button type="button" class="publish-cta" id="follow-btn">${card.viewerFollows ? "Siguiendo" : "Seguir"}</button>`
-      : `<a class="ghost-cta" href="#/publicar">Publicar</a>`;
+      : `<a class="ghost-cta" href="#/ajustes">Configurar</a>`;
     box.innerHTML = `
       <div class="profile-head">
         ${avatarHtml(id, card.displayName, "lg", card.photoUrl)}
@@ -2389,10 +3631,13 @@ async function renderPerfil(userId) {
         ${followBtn}
       </div>
       <p class="stats">${card.postsCount} publicaciones · ${card.followerCount} seguidores · ${card.followingCount} seguidos</p>
+      <p class="hint section">${mine ? "Qué podés dar" : "Puede dar"}</p>
+      <div id="profile-skills"><p class="empty">Cargando oficios…</p></div>
       <div id="profile-posts">${
         posts.length ? posts.map((p) => postCard(p)).join("") : `<p class="empty">Todavía no hay publicaciones.</p>`
       }</div>`;
     bindSocial(document.getElementById("profile-posts"));
+    paintProfileSkills(id, mine);
     document.getElementById("follow-btn")?.addEventListener("click", async () => {
       try {
         if (card.viewerFollows) {
@@ -2412,17 +3657,301 @@ async function renderPerfil(userId) {
   }
 }
 
+async function paintProfileSkills(userId, mine) {
+  const box = document.getElementById("profile-skills");
+  if (!box) return;
+  try {
+    let tags = await api("/api/v1/timebank/tags", mine ? {} : { userId });
+    function paint() {
+      const shown = skillCatalog(tags);
+      if (mine) {
+        box.innerHTML = `
+          <div class="chips" id="profile-skill-chips">
+            ${shown.map((t) => `<button type="button" class="chip${t.offered ? " on" : ""}" data-slug="${escapeHtml(t.slug)}">${escapeHtml(t.label)}</button>`).join("")}
+          </div>
+          <div class="skill-add">
+            <div class="skill-suggest">
+              <input id="skill-new" type="text" maxlength="40" placeholder="Ej. Carpintero, costura" autocomplete="off">
+              <div class="place-hits" id="skill-hits"></div>
+            </div>
+            <button type="button" class="ghost-cta" id="skill-add-btn">Agregar</button>
+          </div>`;
+        box.querySelectorAll("#profile-skill-chips button").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const slug = btn.dataset.slug;
+            const tag = tags.find((t) => t.slug === slug) || { offered: false, requested: false };
+            try {
+              tags = await api("/api/v1/timebank/skill", {
+                tagSlug: slug,
+                offered: !tag.offered,
+                requested: Boolean(tag.requested),
+              });
+              paint();
+            } catch (e) {
+              alert(e.message);
+            }
+          });
+        });
+        const addBtn = document.getElementById("skill-add-btn");
+        const field = document.getElementById("skill-new");
+        bindSkillSuggest(field, document.getElementById("skill-hits"));
+        async function addSkill() {
+          const label = (field?.value || "").trim();
+          if (!label) {
+            toast("Escribí un oficio o una tarea");
+            return;
+          }
+          addBtn.disabled = true;
+          try {
+            tags = await api("/api/v1/timebank/tag/create", { label });
+            paint();
+            toast("Quedó en lo que das");
+          } catch (e) {
+            toast(e.message || "No se pudo agregar");
+            addBtn.disabled = false;
+          }
+        }
+        addBtn?.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          addSkill();
+        });
+        field?.addEventListener("keydown", (ev) => {
+          if (ev.key !== "Enter") return;
+          ev.preventDefault();
+          addSkill();
+        });
+        return;
+      }
+      const mineOffered = offeredSkills(tags);
+      box.innerHTML = mineOffered.length
+        ? skillPillsHtml(tags)
+        : `<p class="hint">Todavía no contó qué puede dar.</p>`;
+    }
+    paint();
+  } catch (e) {
+    box.innerHTML = `<p class="err">${escapeHtml(e.message)}</p>`;
+  }
+}
+
+function defaultSettings() {
+  return {
+    language: "es",
+    barrio: "",
+    publicProfileVisible: true,
+    showExactMatchLocation: false,
+    animalAlertPush: true,
+    skillAlertPush: true,
+    parkingRadarSounds: true,
+    radarEnabled: true,
+    carbonSaveMode: false,
+  };
+}
+
+function prefSwitch(name, checked, title, hint) {
+  return `<label class="pref-switch">
+    <input type="checkbox" name="${name}" ${checked ? "checked" : ""}>
+    <span>${escapeHtml(title)}${hint ? `<small>${escapeHtml(hint)}</small>` : ""}</span>
+  </label>`;
+}
+
+async function renderAjustes() {
+  await loadSession();
+  if (!me.settings) {
+    await reloadSession();
+  }
+  const settings = { ...defaultSettings(), ...(me.settings || {}) };
+  const main = document.getElementById("main");
+  main.innerHTML = `<div class="chrome"><a href="#/perfil">Perfil</a><h1>Configuración</h1></div>
+    <form class="profile-edit" id="profile-form">
+      <div class="avatar-edit">
+        ${avatarHtml(me.userId, me.displayName, "lg", me.photoUrl)}
+        <div>
+          <button type="button" class="ghost-cta" id="pick-photo">Cambiar foto</button>
+          <p class="hint">JPG, PNG o WebP. Se usa en la web y en la app.</p>
+        </div>
+        <input id="photo-file" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+      </div>
+      <label class="field">Nombre
+        <input name="displayName" type="text" maxlength="80" required value="${escapeHtml(me.displayName || "")}">
+      </label>
+      <label class="field">Barrio
+        <input name="barrio" type="text" maxlength="80" placeholder="Palermo, Villa Crespo…" value="${escapeHtml(settings.barrio || "")}">
+      </label>
+      <div class="pref-block">
+        <h2>Qué podés dar</h2>
+        <p class="hint">Tocá un oficio o escribí uno nuevo. Se guarda al instante.</p>
+        <div id="profile-skills"><p class="empty">Cargando oficios…</p></div>
+      </div>
+      <label class="field">Idioma
+        <select name="language">
+          <option value="es" ${settings.language === "en" ? "" : "selected"}>Español (Latinoamérica)</option>
+          <option value="en" ${settings.language === "en" ? "selected" : ""}>English</option>
+        </select>
+      </label>
+      <div class="pref-block">
+        <h2>Privacidad</h2>
+        <p class="hint">Las mismas opciones que en la app.</p>
+        ${prefSwitch("publicProfileVisible", settings.publicProfileVisible !== false, "Perfil visible", "Permite validar donaciones comunitarias")}
+        ${prefSwitch("showExactMatchLocation", settings.showExactMatchLocation === true, "Ubicación exacta en matches", "Si está apagado, solo se ve la distancia")}
+      </div>
+      <div class="pref-block">
+        <h2>Avisos y radar</h2>
+        ${prefSwitch("animalAlertPush", settings.animalAlertPush !== false, "Animales en riesgo", "Alertas push inmediatas")}
+        ${prefSwitch("skillAlertPush", settings.skillAlertPush !== false, "Intercambio de ayuda", "Avisos de una mano por otra")}
+        ${prefSwitch("parkingRadarSounds", settings.parkingRadarSounds !== false, "Sonidos de radar", "Aviso al ceder o pedir un lugar")}
+        ${prefSwitch("radarEnabled", settings.radarEnabled !== false, "Radar de estacionamiento", "Detecta plazas solidarias cerca")}
+        ${prefSwitch("carbonSaveMode", settings.carbonSaveMode === true, "Ahorro de huella", "Agrupa trayectos y avisos eco")}
+      </div>
+      <button type="submit" class="publish-cta" id="save-profile">Guardar</button>
+      <p class="save-ok" id="profile-ok" hidden>Perfil actualizado</p>
+    </form>`;
+  let pendingPhoto = null;
+  const preview = main.querySelector(".avatar.lg");
+  document.getElementById("pick-photo")?.addEventListener("click", () => {
+    document.getElementById("photo-file")?.click();
+  });
+  preview?.addEventListener("click", () => document.getElementById("photo-file")?.click());
+  document.getElementById("photo-file")?.addEventListener("change", (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    pendingPhoto = file;
+    preview.src = URL.createObjectURL(file);
+  });
+  document.getElementById("profile-form")?.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const form = ev.currentTarget;
+    const btn = document.getElementById("save-profile");
+    const ok = document.getElementById("profile-ok");
+    const data = new FormData(form);
+    btn.disabled = true;
+    btn.textContent = "Guardando…";
+    ok.hidden = true;
+    try {
+      let photoUrl = me.photoUrl || "";
+      if (pendingPhoto) {
+        const uploaded = await api("/api/v1/media/upload", {
+          filename: pendingPhoto.name || "avatar.jpg",
+          contentType: pendingPhoto.type || "image/jpeg",
+          bytesBase64: await fileToBase64(pendingPhoto),
+        });
+        photoUrl = uploaded.url;
+      }
+      const payload = {
+        displayName: String(data.get("displayName") || "").trim(),
+        barrio: String(data.get("barrio") || "").trim(),
+        language: String(data.get("language") || "es"),
+        publicProfileVisible: form.publicProfileVisible.checked,
+        showExactMatchLocation: form.showExactMatchLocation.checked,
+        animalAlertPush: form.animalAlertPush.checked,
+        skillAlertPush: form.skillAlertPush.checked,
+        parkingRadarSounds: form.parkingRadarSounds.checked,
+        radarEnabled: form.radarEnabled.checked,
+        carbonSaveMode: form.carbonSaveMode.checked,
+      };
+      if (photoUrl) payload.photoUrl = photoUrl;
+      await api("/api/v1/users/profile/update", payload);
+      if (window.OgtAuth && window.OgtAuth.syncFirebaseProfile) {
+        await window.OgtAuth.syncFirebaseProfile(payload.displayName, photoUrl).catch(() => {});
+      }
+      await reloadSession();
+      pendingPhoto = null;
+      ok.hidden = false;
+      toast("Perfil actualizado");
+    } catch (e) {
+      toast(e.message || "No se pudo guardar");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Guardar";
+    }
+  });
+  paintProfileSkills(me.userId, true);
+}
+
+const COMMUNITY_RULES = {
+  title: "Reglas de la comunidad",
+  kicker: "Cómo se publica acá",
+  preamble: "Only Good Things nació para que se vea lo que alguien hizo por otra persona: ceder un lugar, encontrar un animal, dar una mano, honrar a alguien, contar que algo salió bien. No es un púlpito ni una campaña. Quien entra, entra a sumar. No a convertir a nadie.",
+  sections: [
+    ["Se cuenta lo que se hizo, no lo que hay que creer", "Hechos e invitaciones concretas. No doctrinas."],
+    ["El aplauso no prueba el bien", "La reputación sale de lo que se logró, no de lo que se pagó ni de cuántos aplauden."],
+    ["La ayuda de cerca tiene que ser cierta", "Mascotas y convocatorias viven de la confianza. El estacionamiento se resuelve en la app, con GPS."],
+    ["Las personas y los animales no son contenido", "Nadie se usa de gancho. Nadie se cobra por ser adoptado."],
+    ["El homenaje es de quien se honra", "Se recuerda una vida. No se predica sobre ella."],
+    ["Si no suma, no va", "Hay otros lugares de internet para la pelea y la marca."],
+  ],
+};
+
+async function renderReglas() {
+  await loadSession();
+  const main = document.getElementById("main");
+  main.innerHTML = `<div class="chrome"><a href="#/inicio">Inicio</a><h1>${escapeHtml(COMMUNITY_RULES.title)}</h1></div>
+    <div class="page rules">
+      <p class="hint">${escapeHtml(COMMUNITY_RULES.kicker)}</p>
+      <p>${escapeHtml(COMMUNITY_RULES.preamble)}</p>
+      ${COMMUNITY_RULES.sections.map(([title, lead]) => `
+        <p class="hint section">${escapeHtml(title)}</p>
+        <p>${escapeHtml(lead)}</p>`).join("")}
+    </div>`;
+}
+
 function soon(title, body) {
   document.getElementById("main").innerHTML =
     `<h1>${title}</h1><p class="soon">${body}</p>`;
 }
 
-const AUTH_PAGES = new Set(["entrar", "registro", "recuperar"]);
+const AUTH_PAGES = new Set(["intro", "portal", "entrar", "registro", "recuperar", "telefono", "sms"]);
+const AUTH_STILL = "auth-still.png";
+const OGT_LOGO = "ogt-logo.png?v=mark";
+const PHONE_KEY = "ogt.phonePending";
+
+const SCREEN_REF = {
+  intro: 1,
+  entrar: 2,
+  registro: 3,
+  recuperar: 4,
+  inicio: 5,
+  p: 6,
+  publicar: 7,
+  buscar: 8,
+  mascotas: 9,
+  ayuda: 10,
+  mensajes: 11,
+  avisos: 12,
+  billetera: 13,
+  perfil: 14,
+  ajustes: 21,
+  reglas: 22,
+  empresa: 15,
+  "empresa/campanas": 16,
+  "empresa/comunidad": 17,
+  telefono: 18,
+  sms: 19,
+  portal: 20,
+};
+
+function markScreen(key) {
+  const node = document.getElementById("screen-ref");
+  if (!node) return;
+  const n = SCREEN_REF[key];
+  node.textContent = n != null ? String(n).padStart(2, "0") : "—";
+  node.hidden = false;
+}
 
 function setShell(on) {
-  document.getElementById("auth-root").hidden = on;
-  document.getElementById("app-shell").hidden = !on;
+  const auth = document.getElementById("auth-root");
+  const shell = document.getElementById("app-shell");
+  if (auth) auth.hidden = on;
+  if (shell) shell.hidden = !on;
   document.body.classList.toggle("gated", !on);
+  if (on) {
+    document.body.classList.remove("intro");
+    document.body.classList.remove("auth-split");
+    return;
+  }
+  const main = document.getElementById("main");
+  if (main) main.innerHTML = "";
+  const layer = document.getElementById("fab-layer");
+  if (layer) layer.hidden = true;
 }
 
 function pesos(cents) {
@@ -2430,89 +3959,409 @@ function pesos(cents) {
     .format((Number(cents) || 0) / 100);
 }
 
-async function leaveSession() {
+async function clearClientSession() {
   if (window.OgtAuth) await OgtAuth.signOut();
   me = { userId: "", role: "USER" };
   lastFeed = [];
+  lastRanking = [];
   following.clear();
   realtime = null;
-  if (location.hash !== "#/entrar") location.hash = "#/entrar";
+  lastInbox = [];
+  lastChat = { matchId: "", rows: [] };
+  chromeNotices = [];
+  chromeNoticeAt = 0;
+  stopWatchingChat();
+  sessionStorage.removeItem("ogt.justAuthed");
+}
+
+async function leaveSession() {
+  await clearClientSession();
+  sessionStorage.removeItem(INTRO_SEEN_KEY);
+  if (location.hash !== "#/intro") location.hash = "#/intro";
   else show();
 }
 
+let sessionExpiring = false;
+
+async function expireSession() {
+  if (sessionExpiring || !authToken()) return;
+  sessionExpiring = true;
+  try {
+    markIntroSeen();
+    await clearClientSession();
+    if (location.hash !== "#/entrar") {
+      history.replaceState(null, "", `${location.pathname}${location.search}#/entrar`);
+    }
+    await show();
+  } finally {
+    sessionExpiring = false;
+  }
+}
+
 function authErrorBox(err) {
-  return err ? `<p class="err">${escapeHtml(err)}</p>` : "";
+  if (!err) return "";
+  return `<p class="err" role="alert">${escapeHtml(String(err))}</p>`;
+}
+
+function leaveIntro() {
+  if (leaveIntro.busy) return;
+  leaveIntro.busy = true;
+  markIntroSeen();
+  document.removeEventListener("keydown", holdIntroKeys);
+  const video = document.querySelector(".intro-stage video");
+  if (video) {
+    video.removeEventListener("ended", leaveIntro);
+    video.pause();
+    video.removeAttribute("src");
+    try { video.load(); } catch (_) {}
+  }
+  if (location.hash !== "#/entrar") {
+    history.replaceState(null, "", `${location.pathname}${location.search}#/entrar`);
+  }
+  renderAuth("entrar");
+}
+
+function holdIntroKeys(ev) {
+  if (ev.code === "Space" || ev.key === " ") ev.preventDefault();
+}
+
+function playIntroClip(video) {
+  const run = video.play();
+  if (run && run.catch) run.catch(() => {});
+}
+
+function unmuteNearEnd(video) {
+  const arm = () => {
+    const dur = Number(video.duration);
+    if (!dur || !Number.isFinite(dur)) return;
+    const wait = Math.max(0, (dur - 10) * 1000);
+    window.setTimeout(() => {
+      if (leaveIntro.busy) return;
+      video.muted = false;
+      playIntroClip(video);
+    }, wait);
+  };
+  if (video.readyState >= 1) arm();
+  else video.addEventListener("loadedmetadata", arm, { once: true });
+}
+
+function bindIntroVideo(video, frame, miss) {
+  const loader = frame.querySelector(".intro-loader");
+  video.controls = false;
+  video.defaultMuted = false;
+  video.muted = false;
+  video.playsInline = true;
+  video.preload = "auto";
+  video.disablePictureInPicture = true;
+  video.setAttribute("playsinline", "");
+  video.setAttribute("webkit-playsinline", "");
+  video.setAttribute("controlslist", "nodownload nofullscreen noremoteplayback");
+  video.setAttribute("disablepictureinpicture", "");
+
+  const reveal = () => {
+    if (leaveIntro.busy) return;
+    frame.classList.add("is-playing");
+    if (loader) loader.hidden = true;
+  };
+
+  const start = async () => {
+    if (leaveIntro.busy || start.busy) return;
+    start.busy = true;
+    try {
+      video.muted = false;
+      await video.play();
+    } catch (_) {
+      video.muted = true;
+      playIntroClip(video);
+      unmuteNearEnd(video);
+    }
+    reveal();
+  };
+
+  video.addEventListener("canplay", start, { once: true });
+  video.addEventListener("playing", reveal);
+  video.addEventListener("ended", leaveIntro);
+  video.addEventListener("error", () => {
+    if (miss) miss.hidden = false;
+    if (loader) loader.hidden = true;
+  });
+  video.addEventListener("pause", () => {
+    if (leaveIntro.busy) return;
+    playIntroClip(video);
+  });
+  video.addEventListener("loadedmetadata", () => {
+    const ms = Math.round((Number(video.duration) || 10) * 1000 + 300);
+    window.setTimeout(() => leaveIntro(), ms);
+  });
+  if (video.readyState >= 3) start();
+  else if (video.ended) leaveIntro();
+}
+
+function renderIntro() {
+  leaveIntro.busy = false;
+  markScreen("intro");
+  setShell(false);
+  document.body.classList.add("intro");
+  const root = document.getElementById("auth-root");
+  root.innerHTML = `
+    <div class="intro-stage">
+      <img class="ogt-mark ogt-mark--intro" src="${OGT_LOGO}" alt="Only Good Things">
+      <p class="intro-kicker">ONLY GOOD THINGS</p>
+      <div class="intro-frame">
+        <div class="intro-loader" aria-hidden="true"></div>
+        <video src="${INTRO_VIDEO}" playsinline disablepictureinpicture controlslist="nodownload nofullscreen noremoteplayback" preload="auto"></video>
+      </div>
+      <h1>Las buenas acciones se encuentran.</h1>
+      <p class="hint">Vecinos, empresas y hechos que suman.</p>
+      <p class="hint intro-miss" hidden>El archivo todavía no está en /media.</p>
+      <button type="button" class="ghost-cta intro-skip">Saltar</button>
+    </div>`;
+  const frame = root.querySelector(".intro-frame");
+  const video = root.querySelector("video");
+  const miss = root.querySelector(".intro-miss");
+  document.addEventListener("keydown", holdIntroKeys);
+  if (video && frame) bindIntroVideo(video, frame, miss);
+  root.querySelector(".intro-skip")?.addEventListener("click", leaveIntro);
+}
+
+function ogtMark(kind) {
+  return `<img class="ogt-mark ogt-mark--${kind}" src="${OGT_LOGO}" alt="">`;
+}
+
+function authBar(backHref, backLabel) {
+  return `<header class="auth-bar">
+    <a class="auth-brand" href="#/portal">${ogtMark("bar")}ONLY GOOD THINGS</a>
+    ${backHref ? `<a class="auth-back" href="${backHref}">${backLabel}</a>` : `<span></span>`}
+  </header>`;
+}
+
+function authFoot() {
+  return `<footer class="auth-foot">
+    <p class="auth-foot-brand">${ogtMark("foot")}OGT · 2025 · Plataforma de confianza cívica</p>
+    <p><a href="privacy.html">Privacidad</a> · Términos · Centro de ayuda</p>
+  </footer>`;
+}
+
+function authStill(title, sub) {
+  return `<section class="auth-still">
+    <img src="${AUTH_STILL}" alt="Composición Quiet Studio: perro, manos, plantín y placa cívica" onerror="this.remove()">
+    ${title ? `<p class="auth-still-title">${title}</p>` : ""}
+    ${sub ? `<p class="auth-still-sub">${sub}</p>` : ""}
+  </section>`;
+}
+
+function authProviders() {
+  const google = `<svg class="auth-social-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>`;
+  const facebook = `<svg class="auth-social-mark" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="5" fill="#1877F2"/><path fill="#fff" d="M16.4 12.4h-2.3v7.8h-3.2v-7.8H9.2V9.7h1.7V8.1c0-1.4.6-3.5 3.4-3.5l2.5.01v2.8h-1.8c-.3 0-.7.15-.7.78v1.5h2.6l-.5 2.71z"/></svg>`;
+  return `<p class="auth-or"><span>O CONTINUÁ</span></p>
+    <div class="auth-providers">
+      <button type="button" class="auth-social" data-prov="google">${google}<span>Continuar con Google</span></button>
+      <button type="button" class="auth-social" data-prov="facebook">${facebook}<span>Continuar con Facebook</span></button>
+    </div>`;
+}
+
+function paintAuth(key, still, panel, card) {
+  markScreen(key);
+  setShell(false);
+  document.body.classList.remove("intro");
+  document.body.classList.add("auth-split");
+  const back = key === "portal"
+    ? ["", ""]
+    : key === "registro" || key === "recuperar" || key === "telefono" || key === "sms"
+      ? ["#/entrar", "Volver a entrar"]
+      : ["#/portal", "Volver al portal"];
+  document.getElementById("auth-root").innerHTML = `
+    <div class="auth-desk">
+      ${authBar(back[0], back[1])}
+      <div class="auth-grid">
+        ${still}
+        <section class="auth-panel${card ? " is-card" : ""}">${panel}</section>
+      </div>
+      ${authFoot()}
+    </div>`;
+}
+
+function normalizePhone(raw) {
+  const trimmed = String(raw || "").trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("+")) return trimmed.replace(/\s+/g, "");
+  const digits = trimmed.replace(/\D/g, "").replace(/^0/, "");
+  if (digits.startsWith("54")) return `+${digits}`;
+  return `+54${digits}`;
+}
+
+function renderPortal() {
+  paintAuth("portal", authStill("", "Archivo cívico · Comunidad mutua · 2025"), `
+    ${ogtMark("portal")}
+    <p class="auth-kicker">ONLY GOOD THINGS</p>
+    <h1>Entrá a tu comunidad.</h1>
+    <p class="hint">Vecinos, empresas y hechos que suman.</p>
+    <a class="auth-primary" href="#/entrar">Ingresar</a>
+    <a class="auth-secondary" href="#/registro">Crear cuenta</a>
+    <a class="auth-text" href="#/telefono">Entrar con teléfono</a>
+    <div class="auth-metrics">
+      <p><strong>4.8k</strong> acciones verificadas</p>
+      <p><strong>100%</strong> impacto local</p>
+      <p><strong>Red</strong> abierta</p>
+    </div>`);
 }
 
 function renderAuth(page, err) {
-  setShell(false);
-  const root = document.getElementById("auth-root");
-  const providers = `
-    <div class="auth-providers">
-      <button type="button" class="ghost-cta" data-prov="google">Continuar con Google</button>
-      <button type="button" class="ghost-cta" data-prov="facebook">Continuar con Facebook</button>
-    </div>`;
-  const lab = `
-    <p class="hint">Laboratorio (VPS)</p>
-    <div class="auth-providers">
-      <button type="button" class="ghost-cta" data-lab="vecino">Entrar como vecino</button>
-      <button type="button" class="ghost-cta" data-lab="empresa">Entrar como empresa</button>
-    </div>`;
-  let body = "";
-  if (page === "registro") {
-    body = `<form class="auth-form" id="auth-form">
-      <label class="field">Nombre y apellido <input name="name" required placeholder="Ej. Martín Soler"></label>
-      <label class="field">Correo <input name="email" type="email" required placeholder="correo@comunidad.org"></label>
-      <label class="field">Contraseña <input name="password" type="password" required minlength="6" placeholder="••••••••"></label>
-      <button type="submit" class="publish-cta">Crear cuenta</button>
-    </form>
-    ${providers}
-    <p class="hint"><a href="#/entrar">Ya soy parte de la red</a></p>`;
-  } else if (page === "recuperar") {
-    body = `<form class="auth-form" id="auth-form">
-      <label class="field">Correo <input name="email" type="email" required placeholder="correo@comunidad.org"></label>
-      <button type="submit" class="publish-cta">Enviar enlace</button>
-    </form>
-    <p class="hint"><a href="#/entrar">Volver a entrar</a></p>`;
+  const key = page === "registro" || page === "recuperar" ? page : "entrar";
+  let panel = "";
+  if (key === "registro") {
+    panel = `
+      ${ogtMark("panel")}
+      <p class="auth-kicker">ÚNETE</p>
+      <h1>Únete a la comunidad</h1>
+      <p class="hint">Ingresá tus datos para sumarte a la red cívica de colaboración y confianza local.</p>
+      ${authErrorBox(err)}
+      <form class="auth-form" id="auth-form">
+        <label class="auth-field">Nombre y apellido <input name="name" required autocomplete="name" placeholder="ej. María Florencia Gómez"></label>
+        <label class="auth-field">Correo electrónico <input name="email" type="email" required autocomplete="email" placeholder="ejemplo@vecino.org"></label>
+        <label class="auth-field">Contraseña <input name="password" type="password" required minlength="6" autocomplete="new-password" placeholder="Mínimo 8 caracteres alfanuméricos"></label>
+        <button type="submit" class="auth-primary">Crear cuenta</button>
+      </form>
+      ${authProviders()}
+      <p class="auth-links"><a href="#/entrar">¿Ya tenés cuenta? Entrar</a></p>`;
+  } else if (key === "recuperar") {
+    panel = `
+      <p class="auth-kicker">RECUPERAR</p>
+      <h1>Recuperar acceso</h1>
+      <p class="hint">Te enviamos un enlace al correo.</p>
+      ${authErrorBox(err)}
+      <form class="auth-form" id="auth-form">
+        <label class="auth-field">Correo electrónico <input name="email" type="email" required autocomplete="email" placeholder="ejemplo@vecino.org"></label>
+        <p class="auth-help">Ingresá la casilla asociada a tu cuenta para recibir las instrucciones.</p>
+        <button type="submit" class="auth-primary">Enviar enlace</button>
+      </form>
+      <p class="auth-links"><a href="#/entrar">Volver a entrar</a></p>`;
   } else {
-    body = `<form class="auth-form" id="auth-form">
-      <label class="field">Correo <input name="email" type="email" required placeholder="correo@comunidad.org"></label>
-      <label class="field">Contraseña <input name="password" type="password" required placeholder="Tu clave"></label>
-      <button type="submit" class="publish-cta">Ingresar a mi comunidad</button>
-    </form>
-    ${providers}
-    <form class="auth-form" id="phone-form">
-      <label class="field">Teléfono <input name="phone" placeholder="+5491112345678"></label>
-      <div class="row-actions">
-        <button type="submit" class="ghost-cta">Pedir código SMS</button>
-      </div>
-      <label class="field">Código <input name="code" inputmode="numeric" placeholder="123456"></label>
-      <button type="button" class="ghost-cta" id="phone-confirm">Confirmar SMS</button>
-    </form>
-    ${lab}
-    <p class="hint"><a href="#/recuperar">¿Olvidaste tu contraseña?</a> · <a href="#/registro">Registrate</a></p>`;
+    panel = `
+      ${ogtMark("panel")}
+      <p class="auth-kicker">ACCESO SEGURO</p>
+      <h1>Bienvenido de vuelta</h1>
+      <p class="hint">Ingresá tus credenciales para continuar.</p>
+      ${authErrorBox(err)}
+      <form class="auth-form" id="auth-form">
+        <label class="auth-field">Correo electrónico <input name="email" type="email" required autocomplete="email" placeholder="ejemplo@vecino.org"></label>
+        <label class="auth-field">Contraseña <input name="password" type="password" required autocomplete="current-password" placeholder="••••••••"></label>
+        <button type="submit" class="auth-primary">Ingresar</button>
+      </form>
+      ${authProviders()}
+      <p class="auth-links">
+        <a href="#/recuperar">¿Olvidaste tu contraseña?</a>
+        <a href="#/registro">Crear cuenta</a>
+        <a href="#/telefono">Entrar con teléfono</a>
+      </p>
+      <p class="auth-lab">Laboratorio
+        <button type="button" data-lab="vecino">vecino</button>
+        <button type="button" data-lab="empresa">empresa</button>
+      </p>`;
   }
-  root.innerHTML = `<div class="auth-card">
-    <p class="pill">Red de impacto comunitario</p>
-    <h1>${page === "registro" ? "Únete a la comunidad" : page === "recuperar" ? "Recuperar acceso" : "Bienvenido de vuelta"}</h1>
-    <p class="hint">Vecinos al feed. Empresas a su escritorio. Mismos medios que en la app, sin Apple.</p>
+  const stillTitle = key === "entrar" ? "Las buenas acciones se encuentran." : "";
+  const stillSub = key === "registro"
+    ? "Archivo cívico · Registro de miembros · 2025"
+    : key === "recuperar"
+      ? "Acciones que transforman la comunidad."
+      : "Archivo cívico · Red de confianza y colaboración comunitaria";
+  paintAuth(key, authStill(stillTitle, stillSub), panel, true);
+  bindAuth(key);
+}
+
+function renderPhone(err) {
+  paintAuth("telefono", authStill("Las buenas acciones se encuentran.", "Archivo cívico vecinal"), `
+    <p class="auth-kicker">TELÉFONO</p>
+    <h1>Entrar con teléfono</h1>
+    <p class="hint">Te enviamos un código por SMS para verificar tu cuenta en la red cívica.</p>
     ${authErrorBox(err)}
-    ${body}
-  </div>`;
-  bindAuth(page);
+    <form class="auth-form" id="phone-form">
+      <label class="auth-field">Teléfono
+        <span class="auth-phone">
+          <span>+54</span>
+          <input name="phone" inputmode="tel" autocomplete="tel" required placeholder="11 2345 6789">
+        </span>
+      </label>
+      <p class="auth-help">Ingresá el número con código de área, sin 0 ni 15.</p>
+      <button type="submit" class="auth-primary">Pedir código SMS</button>
+    </form>
+    <p class="auth-links"><a href="#/entrar">Volver al correo</a> <a href="#/registro">Crear cuenta</a></p>`, true);
+  bindAuth("telefono");
+}
+
+function renderSms(err) {
+  paintAuth("sms", authStill("", "Archivo cívico · Verificación de identidad · 2025"), `
+    <p class="auth-kicker">PASO 2 · VERIFICACIÓN</p>
+    <h1>Confirmá el SMS</h1>
+    <p class="hint">Ingresá el código de 6 dígitos enviado a tu teléfono para continuar.</p>
+    ${authErrorBox(err)}
+    <form class="auth-form" id="sms-form">
+      <label class="auth-field">Código <input name="code" inputmode="numeric" autocomplete="one-time-code" required maxlength="6" placeholder="123456"></label>
+      <button type="submit" class="auth-primary">Confirmar SMS</button>
+    </form>
+    <p class="auth-help" id="sms-resend">¿No lo recibiste? Reenviar en <span>42</span>s</p>
+    <p class="auth-links"><a href="#/telefono">Volver al teléfono</a></p>`, true);
+  bindAuth("sms");
+  startSmsTimer();
+}
+
+function startSmsTimer() {
+  const node = document.querySelector("#sms-resend span");
+  const line = document.getElementById("sms-resend");
+  if (!node || !line) return;
+  let left = 42;
+  const tick = window.setInterval(() => {
+    left -= 1;
+    if (left > 0) {
+      node.textContent = String(left);
+      return;
+    }
+    window.clearInterval(tick);
+    line.innerHTML = `<button type="button" class="auth-text" id="sms-again">Reenviar código</button>`;
+    document.getElementById("sms-again")?.addEventListener("click", async () => {
+      try {
+        const phone = sessionStorage.getItem(PHONE_KEY) || "";
+        if (!phone) throw new Error("Volvé al teléfono para pedir el código");
+        await window.OgtAuth.startPhone(phone);
+        toast("Código enviado");
+        renderSms();
+      } catch (e) {
+        renderSms(e.message || String(e));
+      }
+    });
+  }, 1000);
+}
+
+function setAuthBusy(busy, label) {
+  document.querySelectorAll("#auth-form button, #phone-form button, #sms-form button, [data-prov], [data-lab]")
+    .forEach((btn) => {
+      btn.disabled = Boolean(busy);
+      if (btn.matches(".auth-primary") && label) {
+        btn.dataset.idle = btn.dataset.idle || btn.textContent;
+        btn.textContent = busy ? label : btn.dataset.idle;
+      }
+    });
 }
 
 function bindAuth(page) {
   const auth = window.OgtAuth;
-  const fail = (e) => renderAuth(page, e.message || String(e));
+  const fail = (e) => {
+    setAuthBusy(false);
+    const msg = e.message || String(e);
+    if (page === "telefono") return renderPhone(msg);
+    if (page === "sms") return renderSms(msg);
+    return renderAuth(page, msg);
+  };
   document.getElementById("auth-form")?.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const data = Object.fromEntries(new FormData(ev.target));
     try {
       if (!auth) throw new Error("Auth no cargó");
+      setAuthBusy(true, page === "registro" ? "Creando cuenta…" : page === "recuperar" ? "Enviando…" : "Ingresando…");
       if (page === "registro") await auth.signUpEmail(titleCasePersonName(data.name || ""), data.email, data.password);
       else if (page === "recuperar") {
         await auth.resetPassword(data.email);
+        setAuthBusy(false);
         toast("Revisá el correo");
         return;
       } else await auth.signInEmail(data.email, data.password);
@@ -2522,6 +4371,8 @@ function bindAuth(page) {
   document.querySelectorAll("[data-prov]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       try {
+        if (!auth) throw new Error("Auth no cargó");
+        setAuthBusy(true, "Ingresando…");
         if (btn.dataset.prov === "google") await auth.signInGoogle();
         else await auth.signInFacebook();
         await enterAfterAuth();
@@ -2531,6 +4382,7 @@ function bindAuth(page) {
   document.querySelectorAll("[data-lab]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       try {
+        setAuthBusy(true, "Ingresando…");
         if (btn.dataset.lab === "empresa") await auth.signInLab("dev-admin-diego", "COMPANY_ADMIN");
         else await auth.signInLab("dev-user-ana", "USER");
         await enterAfterAuth();
@@ -2539,25 +4391,53 @@ function bindAuth(page) {
   });
   document.getElementById("phone-form")?.addEventListener("submit", async (ev) => {
     ev.preventDefault();
-    const phone = new FormData(ev.target).get("phone");
+    const phone = normalizePhone(new FormData(ev.target).get("phone"));
     try {
-      await auth.startPhone(String(phone || "").trim());
+      if (!auth) throw new Error("Auth no cargó");
+      setAuthBusy(true, "Enviando…");
+      await auth.startPhone(phone);
+      sessionStorage.setItem(PHONE_KEY, phone);
       toast("Código enviado");
+      location.hash = "#/sms";
     } catch (e) { fail(e); }
   });
-  document.getElementById("phone-confirm")?.addEventListener("click", async () => {
-    const code = document.querySelector("#phone-form [name=code]")?.value;
+  document.getElementById("sms-form")?.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const code = String(new FormData(ev.target).get("code") || "").trim();
     try {
-      await auth.confirmPhone(String(code || "").trim());
+      if (!auth) throw new Error("Auth no cargó");
+      setAuthBusy(true, "Confirmando…");
+      await auth.confirmPhone(code);
+      sessionStorage.removeItem(PHONE_KEY);
       await enterAfterAuth();
     } catch (e) { fail(e); }
   });
 }
 
+let enteringHome = false;
+
 async function enterAfterAuth() {
-  me = { userId: "", role: "USER" };
-  await loadSession();
-  location.hash = isCompany() ? "#/empresa" : "#/inicio";
+  if (enteringHome) return;
+  enteringHome = true;
+  try {
+    me = { userId: "", role: "USER" };
+    try {
+      await loadSession();
+    } catch (e) {
+      if (isAuthExpired(e) || !hasSession()) {
+        await expireSession();
+        return;
+      }
+      toast(e.message || "La sesión está, el perfil tarda en responder");
+    }
+    sessionStorage.removeItem("ogt.justAuthed");
+    sessionStorage.removeItem("ogt.authRedirect");
+    const next = isCompany() ? "#/empresa" : "#/inicio";
+    if (location.hash === next) return show();
+    location.hash = next;
+  } finally {
+    enteringHome = false;
+  }
 }
 
 function moneyCards(company) {
@@ -2680,22 +4560,40 @@ async function show() {
   closeMenu();
   const { page, id } = route();
   if (!hasSession()) {
-    if (!AUTH_PAGES.has(page)) {
-      if (location.hash !== "#/entrar") {
-        location.hash = "#/entrar";
-        return;
-      }
+    if (sessionStorage.getItem("ogt.justAuthed") === "1" || sessionStorage.getItem("ogt.authRedirect") === "1") {
+      return;
     }
-    return renderAuth(page === "registro" || page === "recuperar" ? page : "entrar");
+    if (wantsIntro() || page === "intro") {
+      if (location.hash !== "#/intro") {
+        history.replaceState(null, "", `${location.pathname}${location.search}#/intro`);
+      }
+      return renderIntro();
+    }
+    if (!AUTH_PAGES.has(page)) {
+      history.replaceState(null, "", `${location.pathname}${location.search}#/intro`);
+      return renderIntro();
+    }
+    const authErr = window.OgtAuth && window.OgtAuth.takeError ? window.OgtAuth.takeError() : "";
+    if (page === "portal") return renderPortal();
+    if (page === "telefono") return renderPhone(authErr);
+    if (page === "sms") return renderSms(authErr);
+    return renderAuth(page === "registro" || page === "recuperar" ? page : "entrar", authErr);
   }
   try {
     await loadSession();
   } catch (e) {
-    await leaveSession();
-    return renderAuth("entrar", e.message);
+    if (isAuthExpired(e) || !hasSession()) {
+      await expireSession();
+      return;
+    }
+    toast(e.message || "No se pudo cargar el perfil");
   }
   if (AUTH_PAGES.has(page)) {
-    location.hash = isCompany() ? "#/empresa" : "#/inicio";
+    const home = isCompany() ? "#/empresa" : "#/inicio";
+    if (location.hash === home) {
+      return withSectionTools(page === "empresa" ? renderEmpresaPanel() : renderInicio());
+    }
+    location.hash = home;
     return;
   }
   if (isCompany() && page !== "empresa" && page !== "p") {
@@ -2709,25 +4607,64 @@ async function show() {
   setShell(true);
   document.body.classList.toggle("desk", isCompany());
   renderNav(page === "p" ? "inicio" : page);
-  if (page === "empresa" && id === "campanas") return renderEmpresaCampanas();
-  if (page === "empresa" && id === "comunidad") return renderEmpresaComunidad();
-  if (page === "empresa") return renderEmpresaPanel();
-  if (page === "inicio") return renderInicio();
-  if (page === "p" && id) return renderPost(id);
-  if (page === "publicar") return renderPublicar(id);
-  if (page === "buscar") return renderBuscar();
-  if (page === "mascotas") return renderMascotas();
-  if (page === "ayuda") return renderAyuda();
-  if (page === "mensajes") return renderMensajes(id);
-  if (page === "avisos") return renderAvisos();
-  if (page === "billetera") return renderBilletera();
-  if (page === "perfil") return renderPerfil(id);
+  const screenKey = page === "empresa" && id ? `empresa/${id}` : page;
+  markScreen(screenKey);
+  if (!(page === "mensajes" && id)) stopWatchingChat();
+  if (page === "empresa" && id === "campanas") return withSectionTools(renderEmpresaCampanas());
+  if (page === "empresa" && id === "comunidad") return withSectionTools(renderEmpresaComunidad());
+  if (page === "empresa") return withSectionTools(renderEmpresaPanel());
+  if (page === "inicio") return withSectionTools(renderInicio());
+  if (page === "p" && id) return withSectionTools(renderPost(id));
+  if (page === "publicar") return withSectionTools(renderPublicar(id));
+  if (page === "buscar") return withSectionTools(renderBuscar());
+  if (page === "mascotas") return withSectionTools(renderMascotas());
+  if (page === "ayuda") return withSectionTools(renderAyuda());
+  if (page === "mensajes") return withSectionTools(renderMensajes(id));
+  if (page === "avisos") return withSectionTools(renderAvisos());
+  if (page === "billetera") return withSectionTools(renderBilletera());
+  if (page === "perfil") return withSectionTools(renderPerfil(id));
+  if (page === "ajustes") return withSectionTools(renderAjustes());
+  if (page === "reglas") return withSectionTools(renderReglas());
   soon("Only Good Things", "");
+  ensureSectionHead();
+  paintPublishFab();
 }
 
 document.addEventListener("click", (ev) => {
   if (!ev.target.closest(".menu, .more")) closeMenu();
 });
 window.addEventListener("hashchange", () => show());
-document.getElementById("sign-out-rail")?.addEventListener("click", () => leaveSession());
-show();
+window.addEventListener("ogt:authed", () => {
+  if (hasSession()) enterAfterAuth();
+});
+document.getElementById("rail-copy")?.addEventListener("click", () => {
+  if (!me.inviteCode) return toast("Todavía no hay código");
+  copyText(me.inviteCode, "Código copiado");
+});
+document.getElementById("rail-neighbors")?.addEventListener("click", async (ev) => {
+  const btn = ev.target.closest("[data-sumar]");
+  if (!btn) return;
+  const userId = btn.dataset.sumar;
+  try {
+    await api("/api/v1/social/follow", { userId });
+    following.add(userId);
+    lastRanking = lastRanking.map((row) => row.userId === userId ? { ...row, viewerFollows: true } : row);
+    paintNeighbors();
+    toast("Ahora lo seguís");
+  } catch (e) {
+    toast(e.message);
+  }
+});
+Promise.resolve(window.OgtAuth && window.OgtAuth.ready).catch(() => {}).then(async () => {
+  if (window.OgtAuth) await OgtAuth.ensureSession();
+  const page = route().page;
+  if (hasSession() && (
+    sessionStorage.getItem("ogt.justAuthed") === "1" ||
+    AUTH_PAGES.has(page) ||
+    page === "intro" ||
+    !location.hash
+  )) {
+    return enterAfterAuth();
+  }
+  return show();
+});

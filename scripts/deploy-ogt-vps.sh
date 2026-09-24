@@ -45,8 +45,10 @@ docker compose up -d --build
 # nginx no recarga /db si solo cambió el bind-mount: recrear el contenedor web.
 docker compose up -d --force-recreate --no-deps web
 echo "Aplicando migraciones incrementales…"
-for f in database/migrations/17_web_community.sql; do
+# 01–16 ya están en la VPS. Desde 17 en adelante, cada archivo nuevo.
+for f in database/migrations/1[7-9]_*.sql database/migrations/[2-9][0-9]_*.sql; do
   if [[ -f "$f" ]]; then
+    echo "  $f"
     docker exec -i ogt-postgres psql -U ogt -d onlygoodthings < "$f"
   fi
 done
