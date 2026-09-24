@@ -11,6 +11,7 @@ alwaysApply: true
 - REST POST: parsear body a `Map<String, Any?>` con Jackson (`JsonBody`).
 - Respuesta: `ApiResponse<T>`.
 - Postgres + PostGIS es la fuente de verdad. El árbol WS es proyección.
+- Toda escritura visible en más de un módulo se proyecta por sockets a app y web. Ver `ogt-realtime-propagate.mdc`.
 - Las pantallas Compose viven en otro repo; no duplicar UI aquí.
 - Iconos: generarlos en Stitch y reutilizar los que ya existan. Ver `ogt-stitch-icons.mdc`.
 - Paleta: solo tokens `OgtColors`. Ver `ogt-palette.mdc`.

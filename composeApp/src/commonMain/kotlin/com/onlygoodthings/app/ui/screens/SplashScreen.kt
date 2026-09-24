@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -67,8 +66,8 @@ fun SplashScreen(onContinue: () -> Unit) {
         Text("RED SOLIDARIA DE COMUNIDAD", color = OgtColors.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
         Text("OnlyGoodThings", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = OgtColors.ink)
         OgtCaption("Las buenas noticias, la ayuda mutua y los actos solidarios de tu comunidad.")
-        Spacer(Modifier.height(24.dp))
-        FeatureGrid()
+        Spacer(Modifier.height(16.dp))
+        AuthFeatureReel()
         Spacer(Modifier.weight(1f))
         Text(status, color = OgtColors.muted, fontSize = 13.sp)
         Box(
@@ -84,30 +83,5 @@ fun SplashScreen(onContinue: () -> Unit) {
         ) { onContinue() }
         Spacer(Modifier.height(8.dp))
         Text("Red comunitaria positiva · Sin algoritmo invasivo", color = OgtColors.muted, fontSize = 12.sp)
-    }
-}
-
-@Composable
-private fun FeatureGrid() {
-    val items = listOf(
-        "Ayuda comunitaria" to "Favores y tiempo",
-        "Buenas noticias" to "Hechos de la comunidad",
-        "Donaciones" to "Ropa, merienda",
-        "Mascotas" to "Rescate y adopción",
-    )
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        items.chunked(2).forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                row.forEach { (title, sub) ->
-                    Column(
-                        Modifier.weight(1f).clip(RoundedCornerShape(20.dp)).background(OgtColors.surface)
-                            .padding(12.dp),
-                    ) {
-                        Text(title, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                        Text(sub, color = OgtColors.muted, fontSize = 12.sp)
-                    }
-                }
-            }
-        }
     }
 }

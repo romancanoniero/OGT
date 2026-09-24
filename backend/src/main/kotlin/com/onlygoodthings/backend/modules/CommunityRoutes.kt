@@ -9,10 +9,20 @@ import com.onlygoodthings.backend.http.optString
 import com.onlygoodthings.backend.http.reqDouble
 import com.onlygoodthings.backend.http.reqString
 import com.onlygoodthings.backend.infra.Database
+import com.onlygoodthings.backend.infra.stringOrNull
 import com.onlygoodthings.backend.realtime.RealtimeHub
+import com.onlygoodthings.backend.social.OutcomeSqlRepository
+import com.onlygoodthings.shared.domain.ActionOutcomeKind
 import com.onlygoodthings.shared.domain.AnimalListingDto
+import com.onlygoodthings.shared.domain.CampaignDesk
+import com.onlygoodthings.shared.domain.CompanyDesk
+import com.onlygoodthings.shared.domain.PromoIssued
+import com.onlygoodthings.shared.domain.AnimalResolveResult
 import com.onlygoodthings.shared.domain.ApiResponse
+import com.onlygoodthings.shared.domain.UserRole
+import com.onlygoodthings.shared.domain.VerificationMethod
 import com.onlygoodthings.shared.domain.OgtCrmDefaults
+import com.onlygoodthings.shared.domain.titleCasePersonName
 import com.onlygoodthings.shared.domain.MediaKind
 import com.onlygoodthings.shared.domain.PostMediaItem
 import com.onlygoodthings.shared.domain.SocialLiveCounters
@@ -78,6 +88,7 @@ fun Route.referralRoutes(db: Database) {
 
 fun Route.animalRoutes(db: Database, hub: RealtimeHub) {
     val animals = AnimalSqlRepository(db)
+    val outcomes = OutcomeSqlRepository(db)
     post("/api/v1/animals/publish") {
         val principal = requireUser(call) ?: return@post
         val objectMapper = JsonBody.objectMapper
@@ -104,9 +115,57 @@ fun Route.animalRoutes(db: Database, hub: RealtimeHub) {
         call.respond(ApiResponse.ok(saved, "Ficha actualizada"))
     }
 
+    post("/api/v1/animals/resolve") {
+        val principal = requireUser(call) ?: return@post
+        val dataMap = JsonBody.receiveMap(call)
+        val listingId = dataMap.reqString("listingId")
+        val reporter = animals.reporterOf(listingId)
+            ?: return@post call.respond(HttpStatusCode.NotFound, ApiResponse.fail<Unit>("Ficha inexistente", "NOT_FOUND"))
+        if (!animals.markResolved(listingId)) {
+            return@post call.respond(ApiResponse.ok("ok", "La ficha ya estaba resuelta"))
+        }
+        val outcome = if (principal.userId != reporter) {
+            outcomes.award(
+                OutcomeSqlRepository.Draft(
+                    kind = ActionOutcomeKind.ANIMAL_RESOLVED,
+                    method = VerificationMethod.WITNESS,
+                    actorUserId = principal.userId,
+                    beneficiaryUserId = reporter,
+                    postId = animals.postIdOf(listingId),
+                    sourceTable = "animal_listings",
+                    sourceId = listingId,
+                    points = 40,
+                ),
+            )
+        } else {
+            null
+        }
+        call.respond(
+            ApiResponse.ok(
+                AnimalResolveResult(
+                    listingId = listingId,
+                    verifiedOutcome = outcome != null,
+                    message = if (outcome == null) {
+                        "Marcado resuelto. El autor no se auto-verifica: no hay se logró ni puntos."
+                    } else {
+                        "Se logró: otra persona confirmó el reencuentro."
+                    },
+                ),
+            ),
+        )
+    }
+
     post("/api/v1/animals/open") {
         requireUser(call) ?: return@post
         call.respond(ApiResponse.ok(animals.open()))
+    }
+
+    post("/api/v1/animals/get") {
+        requireUser(call) ?: return@post
+        val dataMap = JsonBody.receiveMap(call)
+        val listing = animals.get(dataMap.reqString("listingId"))
+            ?: return@post call.respond(HttpStatusCode.NotFound, ApiResponse.fail<Unit>("Ficha inexistente", "NOT_FOUND"))
+        call.respond(ApiResponse.ok(listing))
     }
 
     post("/api/v1/animals/nearby") {
@@ -165,13 +224,20 @@ fun Route.animalRoutes(db: Database, hub: RealtimeHub) {
 
 private fun animalWriteFrom(dataMap: Map<String, Any?>, home: Pair<Double, Double>?): AnimalWrite {
     val kind = (dataMap.optString("kind") ?: "LOST").uppercase()
-    val petName = dataMap.optString("petName").orEmpty()
+    val petName = titleCasePersonName(dataMap.optString("petName").orEmpty())
     val age = dataMap.optString("ageLabel").orEmpty()
-    val title = dataMap.optString("title")?.takeIf { it.isNotBlank() }
-        ?: if (kind == "LOST") "Se busca a $petName" else listOf(petName, age).filter { it.isNotBlank() }.joinToString(" · ")
-    val lat = dataMap.optDouble("latitude") ?: home?.first ?: -34.6037
-    val lng = dataMap.optDouble("longitude") ?: home?.second ?: -58.3816
     val lost = kind == "LOST"
+    val title = dataMap.optString("title")?.takeIf { it.isNotBlank() }
+        ?: if (lost) "Se busca a $petName" else listOf(petName, age).filter { it.isNotBlank() }.joinToString(" · ")
+    val marks = dataMap.optString("marks").orEmpty()
+    val lastSeenPlace = dataMap.optString("lastSeenPlace").orEmpty()
+    val lat = dataMap.optDouble("latitude") ?: if (lost) null else home?.first ?: -34.6037
+    val lng = dataMap.optDouble("longitude") ?: if (lost) null else home?.second ?: -58.3816
+    if (lost) {
+        require(marks.isNotBlank()) { "Campo requerido: marks" }
+        require(lastSeenPlace.isNotBlank()) { "Campo requerido: lastSeenPlace" }
+        require(lat != null && lng != null) { "Falta el punto de última vista" }
+    }
     return AnimalWrite(
         kind = if (lost) "LOST" else "ADOPTION",
         species = dataMap.reqString("species"),
@@ -186,11 +252,11 @@ private fun animalWriteFrom(dataMap: Map<String, Any?>, home: Pair<Double, Doubl
         vaccinated = dataMap.optBoolean("vaccinated"),
         sterilized = dataMap.optBoolean("sterilized"),
         homeNeeds = dataMap.optString("homeNeeds").orEmpty(),
-        marks = dataMap.optString("marks").orEmpty(),
-        lastSeenPlace = dataMap.optString("lastSeenPlace").orEmpty(),
-        place = dataMap.optString("place") ?: dataMap.optString("lastSeenPlace").orEmpty(),
-        latitude = lat,
-        longitude = lng,
+        marks = marks,
+        lastSeenPlace = lastSeenPlace,
+        place = dataMap.optString("place") ?: lastSeenPlace,
+        latitude = lat ?: -34.6037,
+        longitude = lng ?: -58.3816,
         alertRadiusM = if (lost) OgtCrmDefaults.LOST_ALERT_RADIUS_M else 0,
         media = dataMap.optMediaItems(),
     )
@@ -304,9 +370,83 @@ Authorization: Bearer {{jwt}}
 POST {{base}}/api/v1/animals/open
 Authorization: Bearer {{jwt}}
 {}
+
+POST {{base}}/api/v1/animals/get
+Authorization: Bearer {{jwt}}
+{ "listingId": "{{listingId}}" }
+
+POST {{base}}/api/v1/geo/search
+Authorization: Bearer {{jwt}}
+{ "query": "Plaza Italia Palermo", "lang": "es" }
+
+POST {{base}}/api/v1/geo/reverse
+Authorization: Bearer {{jwt}}
+{ "latitude": -34.5812, "longitude": -58.4214, "lang": "es" }
 */
 
 fun Route.timebankRoutes(db: Database) {
+    val outcomes = OutcomeSqlRepository(db)
+
+    post("/api/v1/volunteer/check-in") {
+        val principal = requireUser(call) ?: return@post
+        val dataMap = JsonBody.receiveMap(call)
+        val callId = dataMap.reqString("callId")
+        val lat = dataMap.reqDouble("latitude")
+        val lng = dataMap.reqDouble("longitude")
+        val inside = db.withConnection { connection ->
+            connection.prepareStatement(
+                """
+                SELECT ST_DWithin(
+                    location::geography,
+                    ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography,
+                    geofence_radius_m
+                ) AS inside
+                FROM volunteer_calls
+                WHERE id = ?::uuid AND now() BETWEEN starts_at AND ends_at
+                """.trimIndent(),
+            ).use { stmt ->
+                stmt.setDouble(1, lng)
+                stmt.setDouble(2, lat)
+                stmt.setString(3, callId)
+                stmt.executeQuery().use { rs -> if (rs.next()) rs.getBoolean("inside") else null }
+            }
+        }
+        when (inside) {
+            null -> return@post call.respond(HttpStatusCode.NotFound, ApiResponse.fail<Unit>("Convocatoria inexistente o fuera de horario", "NOT_FOUND"))
+            false -> return@post call.respond(HttpStatusCode.Forbidden, ApiResponse.fail<Unit>("Tenés que estar en el lugar. No se autodeclara.", "GEO_REQUIRED"))
+            true -> Unit
+        }
+        db.withConnection { connection ->
+            connection.prepareStatement(
+                """
+                INSERT INTO volunteer_signups (call_id, user_id, attendance, check_in_location)
+                VALUES (?::uuid, ?::uuid, 'CHECKED_IN', ST_SetSRID(ST_MakePoint(?, ?), 4326))
+                ON CONFLICT (call_id, user_id) DO UPDATE
+                    SET attendance = 'CHECKED_IN',
+                        check_in_location = ST_SetSRID(ST_MakePoint(?, ?), 4326)
+                """.trimIndent(),
+            ).use { stmt ->
+                stmt.setString(1, callId)
+                stmt.setString(2, principal.userId)
+                stmt.setDouble(3, lng)
+                stmt.setDouble(4, lat)
+                stmt.setDouble(5, lng)
+                stmt.setDouble(6, lat)
+                stmt.executeUpdate()
+            }
+        }
+        val outcome = outcomes.award(
+            OutcomeSqlRepository.Draft(
+                kind = ActionOutcomeKind.VOLUNTEER_CHECKED_IN,
+                method = VerificationMethod.GEO,
+                actorUserId = principal.userId,
+                sourceTable = "volunteer_calls",
+                sourceId = callId,
+                points = 30,
+            ),
+        )
+        call.respond(ApiResponse.ok(outcome, "Check-in verificado. Se logró."))
+    }
     post("/api/v1/timebank/match") {
         val principal = requireUser(call) ?: return@post
         val objectMapper = JsonBody.objectMapper
@@ -334,11 +474,11 @@ fun Route.timebankRoutes(db: Database) {
                     buildList {
                         while (rs.next()) {
                             add(
-                                mapOf(
-                                    "userId" to rs.getString("id"),
-                                    "displayName" to rs.getString("display_name"),
-                                    "tag" to rs.getString("slug"),
-                                    "chatEnabledHint" to "El chat se habilita tras match mutuo, sin costo.",
+                                com.onlygoodthings.shared.domain.TimebankMatchHit(
+                                    userId = rs.getString("id"),
+                                    displayName = rs.getString("display_name"),
+                                    tag = rs.getString("slug"),
+                                    chatEnabledHint = "El chat se habilita tras match mutuo, sin costo.",
                                 ),
                             )
                         }
@@ -348,9 +488,121 @@ fun Route.timebankRoutes(db: Database) {
         }
         call.respond(ApiResponse.ok(matches))
     }
+
+    post("/api/v1/timebank/close") {
+        val principal = requireUser(call) ?: return@post
+        val dataMap = JsonBody.receiveMap(call)
+        val matchId = dataMap.reqString("matchId")
+        val pair = db.withConnection { connection ->
+            connection.prepareStatement(
+                """
+                UPDATE timebank_matches
+                SET status = 'CLOSED', chat_enabled = FALSE
+                WHERE id = ?::uuid AND requester_id = ?::uuid AND status <> 'CLOSED'
+                RETURNING provider_id::text, requester_id::text
+                """.trimIndent(),
+            ).use { stmt ->
+                stmt.setString(1, matchId)
+                stmt.setString(2, principal.userId)
+                stmt.executeQuery().use { rs ->
+                    if (!rs.next()) null else rs.getString(1) to rs.getString(2)
+                }
+            }
+        } ?: return@post call.respond(
+            HttpStatusCode.Forbidden,
+            ApiResponse.fail<Unit>("Solo quien pidió la ayuda puede cerrar el trueque.", "FORBIDDEN"),
+        )
+        val outcome = outcomes.award(
+            OutcomeSqlRepository.Draft(
+                kind = ActionOutcomeKind.TIMEBANK_CLOSED,
+                method = VerificationMethod.ORGANIZER,
+                actorUserId = pair.first,
+                beneficiaryUserId = pair.second,
+                sourceTable = "timebank_matches",
+                sourceId = matchId,
+                points = 25,
+            ),
+        )
+        call.respond(ApiResponse.ok(outcome, "Trueque cerrado. Los puntos van a quien ayudó."))
+    }
 }
 
 fun Route.csrRoutes(db: Database) {
+    val outcomes = OutcomeSqlRepository(db)
+
+    post("/api/v1/companies/mine") {
+        val principal = requireUser(call) ?: return@post
+        if (principal.role != UserRole.COMPANY_ADMIN) {
+            return@post call.respond(HttpStatusCode.Forbidden, ApiResponse.fail<Unit>("Solo COMPANY_ADMIN", "FORBIDDEN"))
+        }
+        val card = db.withConnection { connection ->
+            connection.prepareStatement(
+                """
+                SELECT c.id::text, c.legal_name, c.trade_name, c.verification_status::text,
+                       c.campaign_balance_cents, c.impact_score, c.logo_url, c.tax_id
+                FROM companies c
+                JOIN company_admins a ON a.company_id = c.id
+                WHERE a.user_id = ?::uuid
+                ORDER BY a.is_primary DESC
+                LIMIT 1
+                """.trimIndent(),
+            ).use { stmt ->
+                stmt.setString(1, principal.userId)
+                stmt.executeQuery().use { rs ->
+                    if (!rs.next()) return@use null
+                    CompanyDesk(
+                        id = rs.getString("id"),
+                        legalName = rs.getString("legal_name"),
+                        tradeName = rs.stringOrNull("trade_name"),
+                        verified = rs.getString("verification_status") == "VERIFIED",
+                        campaignBalanceCents = rs.getLong("campaign_balance_cents"),
+                        impactScore = rs.getDouble("impact_score"),
+                        logoUrl = rs.stringOrNull("logo_url"),
+                        taxId = rs.stringOrNull("tax_id"),
+                    )
+                }
+            }
+        } ?: return@post call.respond(HttpStatusCode.NotFound, ApiResponse.fail<Unit>("No hay empresa a tu cargo", "NOT_FOUND"))
+        call.respond(ApiResponse.ok(card))
+    }
+
+    post("/api/v1/companies/impact") {
+        requireUser(call) ?: return@post
+        val dataMap = JsonBody.receiveMap(call)
+        val card = outcomes.companyImpact(dataMap.reqString("companyId"))
+            ?: return@post call.respond(HttpStatusCode.NotFound, ApiResponse.fail<Unit>("Empresa inexistente", "NOT_FOUND"))
+        call.respond(ApiResponse.ok(card))
+    }
+
+    post("/api/v1/csr/finance-action") {
+        val principal = requireUser(call) ?: return@post
+        if (principal.role != UserRole.COMPANY_ADMIN) {
+            return@post call.respond(HttpStatusCode.Forbidden, ApiResponse.fail<Unit>("Solo COMPANY_ADMIN", "FORBIDDEN"))
+        }
+        val dataMap = JsonBody.receiveMap(call)
+        val campaignId = dataMap.reqString("campaignId")
+        val amountCents = (dataMap["amountCents"] as? Number)?.toLong() ?: error("Campo requerido: amountCents")
+        require(amountCents > 0)
+        db.withConnection { connection ->
+            connection.prepareStatement(
+                """
+                INSERT INTO money_ledgers (kind, amount_cents, payer_user_id, company_id, campaign_id, note)
+                SELECT 'ACTION_FINANCE', ?, ?::uuid, c.company_id, c.id, 'Financia un hecho. El sello llega cuando se verifica.'
+                FROM campaigns c
+                JOIN company_admins a ON a.company_id = c.company_id
+                WHERE c.id = ?::uuid AND a.user_id = ?::uuid
+                """.trimIndent(),
+            ).use { stmt ->
+                stmt.setLong(1, amountCents)
+                stmt.setString(2, principal.userId)
+                stmt.setString(3, campaignId)
+                stmt.setString(4, principal.userId)
+                val rows = stmt.executeUpdate()
+                if (rows == 0) error("Campaña inexistente o no es tuya")
+            }
+        }
+        call.respond(ApiResponse.ok("ok", "Presupuesto reservado. Empresa que suma se gana al verificarse el hecho."))
+    }
     post("/api/v1/csr/campaigns") {
         val principal = requireUser(call) ?: return@post
         if (principal.role.name != "COMPANY_ADMIN") {
@@ -359,7 +611,7 @@ fun Route.csrRoutes(db: Database) {
         val rows = db.withConnection { connection ->
             connection.prepareStatement(
                 """
-                SELECT c.id, c.title, c.status, c.social_goal, c.social_progress, c.budget_cents, c.spent_cents
+                SELECT c.id::text, c.title, c.status::text, c.social_goal, c.social_progress, c.budget_cents, c.spent_cents
                 FROM campaigns c
                 JOIN company_admins a ON a.company_id = c.company_id
                 WHERE a.user_id = ?::uuid
@@ -371,14 +623,14 @@ fun Route.csrRoutes(db: Database) {
                     buildList {
                         while (rs.next()) {
                             add(
-                                mapOf(
-                                    "id" to rs.getString("id"),
-                                    "title" to rs.getString("title"),
-                                    "status" to rs.getString("status"),
-                                    "socialGoal" to rs.getInt("social_goal"),
-                                    "socialProgress" to rs.getInt("social_progress"),
-                                    "budgetCents" to rs.getLong("budget_cents"),
-                                    "spentCents" to rs.getLong("spent_cents"),
+                                CampaignDesk(
+                                    id = rs.getString("id"),
+                                    title = rs.getString("title"),
+                                    status = rs.getString("status"),
+                                    socialGoal = rs.getInt("social_goal"),
+                                    socialProgress = rs.getInt("social_progress"),
+                                    budgetCents = rs.getLong("budget_cents"),
+                                    spentCents = rs.getLong("spent_cents"),
                                 ),
                             )
                         }
@@ -415,11 +667,12 @@ fun Route.csrRoutes(db: Database) {
                 stmt.executeUpdate()
             }
         }
-        call.respond(ApiResponse.ok(mapOf("code" to code), "Cupón emitido"))
+        call.respond(ApiResponse.ok(PromoIssued(code), "Cupón emitido"))
     }
 }
 
 fun Route.crowdfundingRoutes(db: Database) {
+    val outcomes = OutcomeSqlRepository(db)
     post("/api/v1/causes/progress") {
         requireUser(call) ?: return@post
         val objectMapper = JsonBody.objectMapper
@@ -452,9 +705,47 @@ fun Route.crowdfundingRoutes(db: Database) {
         } ?: return@post call.respond(HttpStatusCode.NotFound, ApiResponse.fail<Unit>("Causa inexistente", "NOT_FOUND"))
         call.respond(ApiResponse.ok(row))
     }
+
+    post("/api/v1/causes/deliver") {
+        val principal = requireUser(call) ?: return@post
+        if (principal.role != UserRole.COMMUNITY_MODERATOR) {
+            return@post call.respond(
+                HttpStatusCode.Forbidden,
+                ApiResponse.fail<Unit>("Solo un moderador confirma la entrega. El organizador no se auto-verifica.", "FORBIDDEN"),
+            )
+        }
+        val dataMap = JsonBody.receiveMap(call)
+        val causeId = dataMap.reqString("causeId")
+        val organizer = db.withConnection { connection ->
+            connection.prepareStatement(
+                """
+                UPDATE community_causes SET status = 'CLOSED'
+                WHERE id = ?::uuid AND status IN ('LIVE', 'FUNDED')
+                RETURNING organizer_user_id::text, sponsor_company_id::text
+                """.trimIndent(),
+            ).use { stmt ->
+                stmt.setString(1, causeId)
+                stmt.executeQuery().use { rs ->
+                    if (!rs.next()) null else rs.getString(1) to rs.getString(2)
+                }
+            }
+        } ?: return@post call.respond(HttpStatusCode.NotFound, ApiResponse.fail<Unit>("Causa inexistente o ya cerrada", "NOT_FOUND"))
+        val outcome = outcomes.award(
+            OutcomeSqlRepository.Draft(
+                kind = ActionOutcomeKind.CAUSE_DELIVERED,
+                method = VerificationMethod.ORGANIZER,
+                actorUserId = organizer.first ?: principal.userId,
+                companyId = organizer.second,
+                sourceTable = "community_causes",
+                sourceId = causeId,
+                points = 60,
+            ),
+        )
+        call.respond(ApiResponse.ok(outcome, "Causa entregada. Se logró."))
+    }
 }
 
-private suspend fun requireUser(call: ApplicationCall): AuthPrincipal? {
+internal suspend fun requireUser(call: ApplicationCall): AuthPrincipal? {
     val principal = call.principal<AuthPrincipal>()
     if (principal == null) {
         call.respond(HttpStatusCode.Unauthorized, ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"))

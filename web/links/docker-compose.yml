@@ -9,7 +9,7 @@ services:
     networks:
       - edge
     labels:
-      - traefik.enable=true
+      - traefik.enable=false
       - traefik.docker.network=edge
       - traefik.http.routers.ogt-acme.entrypoints=websecure
       - traefik.http.routers.ogt-acme.priority=10000

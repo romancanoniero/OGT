@@ -30,9 +30,19 @@
         "oAuthBrandDisplayName": "Only Good Things",
         "supportEmail": "romancanoniero@gmail.com",
         "authorizedRedirectUris": [
-          "https://goodthings-55612.firebaseapp.com/__/auth/handler"
+          "https://goodthings-55612.firebaseapp.com/__/auth/handler",
+          "https://onlygoodthings.lat",
+          "http://localhost"
         ]
       }
-    }
+    },
+    "authorizedDomains": [
+      "localhost",
+      "127.0.0.1",
+      "onlygoodthings.lat",
+      "www.onlygoodthings.lat",
+      "goodthings-55612.firebaseapp.com",
+      "goodthings-55612.web.app"
+    ]
   }
 }

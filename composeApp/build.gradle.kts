@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -64,15 +65,43 @@ kotlin {
     }
 }
 
+val ogtReleaseProps = Properties().apply {
+    val local = rootProject.file("key.properties")
+    val devMac = File("/Volumes/DEV_MAC/OGT/secrets/ogt-release.properties")
+    val home = File(System.getProperty("user.home"), ".android/ogt-release.properties")
+    when {
+        local.exists() -> local.inputStream().use { load(it) }
+        devMac.exists() -> devMac.inputStream().use { load(it) }
+        home.exists() -> home.inputStream().use { load(it) }
+    }
+}
+
 android {
     namespace = "com.onlygoodthings.app"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "com.onlygoodthings.app"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        targetSdk = 36
+        versionCode = 2
+        versionName = "0.2.0"
+    }
+    signingConfigs {
+        if (ogtReleaseProps.isNotEmpty()) {
+            create("release") {
+                val canonical = File("/Volumes/DEV_MAC/OGT/secrets/ogt-release.jks")
+                storeFile = if (canonical.exists()) canonical else file(ogtReleaseProps.getProperty("storeFile"))
+                storePassword = ogtReleaseProps.getProperty("storePassword")
+                keyAlias = ogtReleaseProps.getProperty("keyAlias")
+                keyPassword = ogtReleaseProps.getProperty("keyPassword")
+            }
+        }
+    }
+    buildTypes {
+        getByName("release") {
+            signingConfigs.findByName("release")?.let { signingConfig = it }
+            isMinifyEnabled = false
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

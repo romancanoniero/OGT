@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Only Good Things</title>
+  <link rel="icon" href="ogt-logo.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=skill-offer">
+</head>
+<body>
+  <div id="auth-root" hidden></div>
+  <div class="shell" id="app-shell">
+    <aside class="nav">
+      <div class="brand">
+        <img class="ogt-mark ogt-mark--nav" src="ogt-logo.png?v=crop" alt="">
+        <span class="brand-name">Only Good Things</span>
+      </div>
+      <div id="nav-links"></div>
+    </aside>
+    <div class="center" id="center-col">
+      <main class="main" id="main"></main>
+    </div>
+    <aside class="rail" id="civic-rail">
+      <section class="rail-block">
+        <div class="rail-kicker"><span>Pulso cercano</span><span>En vivo</span></div>
+        <div id="rail-pulse"></div>
+      </section>
+      <section class="rail-block">
+        <div class="rail-kicker"><span>Vecinos que suman</span></div>
+        <div id="rail-neighbors"></div>
+      </section>
+      <section class="rail-block">
+        <div class="rail-kicker"><span>Tu código</span><span>Folio cívico</span></div>
+        <div class="rail-folio">
+          <strong id="rail-code">—</strong>
+          <button type="button" id="rail-copy">Copiar</button>
+        </div>
+        <p class="rail-note">Compartilo. Es el código de confianza para un vecino más.</p>
+      </section>
+      <section class="rail-block">
+        <div class="rail-kicker"><span>Regla de la casa</span></div>
+        <p class="rail-rule">Quien entra, entra a sumar. Se cuenta lo que se hizo, no lo que hay que creer.</p>
+        <a class="rail-link" href="#/reglas">Leer manifiesto</a>
+      </section>
+    </aside>
+    <div class="fab-layer" id="fab-layer" hidden>
+      <a class="publish-fab" id="publish-fab" href="#/publicar" title="Publicar · arrastrá para mover" aria-label="Publicar" draggable="false"></a>
+    </div>
+  </div>
+  <div id="icons"></div>
+  <div id="dialog" hidden></div>
+  <div id="recaptcha"></div>
+  <p id="toast" class="toast" hidden></p>
+  <p id="screen-ref" hidden></p>
+  <script>
+    (function () {
+      // Firebase Auth autoriza `localhost`, no `127.0.0.1`.
+      if (location.hostname === "127.0.0.1") {
+        location.replace("http://localhost:" + location.port + location.pathname + location.search + location.hash);
+        return;
+      }
+      const local = location.hostname === "localhost";
+      window.OGT_API_BASE = local ? "https://onlygoodthings.lat" : "";
+    })();
+  </script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+  <script src="auth.js?v=google-home"></script>
+  <script>
+    fetch("icons/qs.svg?v=lupa").then((r) => r.text()).then((svg) => {
+      document.getElementById("icons").innerHTML = svg;
+    }).then(() => {
+      const db = document.createElement("script");
+      db.src = "ogt-sdk.js?v=chat-live";
+      db.onload = function () {
+        const s = document.createElement("script");
+        s.src = "app.js?v=skill-offer";
+        document.body.appendChild(s);
+      };
+      document.body.appendChild(db);
+    });
+  </script>
+</body>
+</html>

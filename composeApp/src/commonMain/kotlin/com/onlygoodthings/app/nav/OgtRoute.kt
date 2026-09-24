@@ -34,6 +34,9 @@ enum class OgtRoute(val title: String) {
     Invite("Invitar amigos"),
     ClaimHonor("Reivindicar mención"),
     Settings("Configuración"),
+    Vehicle("Auto"),
+    Language("Idioma"),
+    CommunityRules("Reglas de la comunidad"),
     NeighborProfile("Perfil"),
     Sponsors("Beneficios RSE"),
     Milestone("Hito comunitario"),
@@ -43,7 +46,6 @@ val OgtBottomTabs = listOf(
     OgtRoute.Feed,
     OgtRoute.Parking,
     OgtRoute.Skills,
-    OgtRoute.Settings,
 )
 
 /** Tipos de aviso que se publican desde el + del dock. */

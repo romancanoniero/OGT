@@ -42,3 +42,5 @@ internal actual fun writeMediaCacheFile(name: String, bytes: ByteArray) {
         data.writeToFile("${cacheDir()}/$name", atomically = true)
     }
 }
+
+internal actual fun mediaCacheFilePath(name: String): String = "${cacheDir()}/$name"

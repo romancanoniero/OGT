@@ -10,10 +10,24 @@ import io.ktor.websocket.Frame
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 class RealtimeHub(private val redis: RedisCache) {
     private val mutex = Mutex()
     private val sessions = ConcurrentHashMap<String, MutableSet<DefaultWebSocketSession>>()
+    private val treeListeners = CopyOnWriteArrayList<(path: String, payload: String) -> Unit>()
+
+    fun addTreeListener(listener: (path: String, payload: String) -> Unit) {
+        treeListeners.add(listener)
+    }
+
+    fun removeTreeListener(listener: (path: String, payload: String) -> Unit) {
+        treeListeners.remove(listener)
+    }
+
+    private fun fanoutTree(path: String, payload: String) {
+        treeListeners.forEach { runCatching { it(path, payload) } }
+    }
 
     suspend fun register(userId: String, session: DefaultWebSocketSession) {
         mutex.withLock {
@@ -45,10 +59,38 @@ class RealtimeHub(private val redis: RedisCache) {
     }
 
     fun projectSocialPost(postId: String, payloadJson: String) {
-        redis.publish("ogt:tree:${OgtDbPaths.socialPost(postId)}", payloadJson)
+        val path = OgtDbPaths.socialPost(postId)
+        redis.publish("ogt:tree:$path", payloadJson)
+        fanoutTree(path, payloadJson)
     }
 
     fun projectSocialComment(postId: String, commentId: String, payloadJson: String) {
-        redis.publish("ogt:tree:${OgtDbPaths.socialComment(postId, commentId)}", payloadJson)
+        val path = OgtDbPaths.socialComment(postId, commentId)
+        redis.publish("ogt:tree:$path", payloadJson)
+        fanoutTree(path, payloadJson)
+    }
+
+    fun projectUser(userId: String, payloadJson: String) {
+        val path = OgtDbPaths.user(userId)
+        redis.publish("ogt:tree:$path", payloadJson)
+        fanoutTree(path, payloadJson)
+    }
+
+    fun projectChatThread(matchId: String, payloadJson: String) {
+        val path = OgtDbPaths.chatThread(matchId)
+        redis.publish("ogt:tree:$path", payloadJson)
+        fanoutTree(path, payloadJson)
+    }
+
+    fun projectChatMessage(matchId: String, messageId: String, payloadJson: String) {
+        val path = OgtDbPaths.chatMessage(matchId, messageId)
+        redis.publish("ogt:tree:$path", payloadJson)
+        fanoutTree(path, payloadJson)
+    }
+
+    fun ingestTreeChannel(channel: String, payloadJson: String) {
+        val path = channel.removePrefix("ogt:tree:")
+        if (path == channel) return
+        fanoutTree(path, payloadJson)
     }
 }

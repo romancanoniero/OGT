@@ -20,23 +20,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.onlygoodthings.app.auth.showsAppleSignIn
 import com.onlygoodthings.app.theme.OgtColors
 
-/** Fila de proveedores. Apple solo en iPhone/iPad. */
+/** Fila de proveedores. Google y Facebook; el mismo par que en la web. */
 @Composable
 fun AuthProviderRow(onPick: (String) -> Unit = {}) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         AuthProviderChip("Google", Modifier.weight(1f), onClick = { onPick("google") }) { GoogleMark() }
-        if (showsAppleSignIn()) {
-            AuthProviderChip("Apple", Modifier.weight(1f), onClick = { onPick("apple") }) { AppleMark() }
-        }
         AuthProviderChip("Facebook", Modifier.weight(1f), onClick = { onPick("facebook") }) { FacebookMark() }
     }
 }
@@ -80,33 +75,6 @@ private fun GoogleMark() {
             topLeft = Offset(s * 0.50f, s * 0.44f),
             size = Size(s * 0.42f, stroke),
         )
-    }
-}
-
-@Composable
-private fun AppleMark() {
-    Canvas(Modifier.size(20.dp)) {
-        val s = size.minDimension
-        val body = Path().apply {
-            moveTo(s * 0.78f, s * 0.36f)
-            cubicTo(s * 0.62f, s * 0.34f, s * 0.56f, s * 0.50f, s * 0.50f, s * 0.50f)
-            cubicTo(s * 0.42f, s * 0.50f, s * 0.34f, s * 0.34f, s * 0.20f, s * 0.38f)
-            cubicTo(s * 0.06f, s * 0.42f, s * 0.02f, s * 0.62f, s * 0.10f, s * 0.80f)
-            cubicTo(s * 0.18f, s * 0.98f, s * 0.32f, s * 1.04f, s * 0.42f, s * 0.96f)
-            cubicTo(s * 0.46f, s * 0.93f, s * 0.54f, s * 0.93f, s * 0.58f, s * 0.96f)
-            cubicTo(s * 0.70f, s * 1.04f, s * 0.82f, s * 0.96f, s * 0.88f, s * 0.82f)
-            cubicTo(s * 0.76f, s * 0.76f, s * 0.72f, s * 0.58f, s * 0.84f, s * 0.50f)
-            cubicTo(s * 0.82f, s * 0.44f, s * 0.80f, s * 0.38f, s * 0.78f, s * 0.36f)
-            close()
-        }
-        drawPath(body, Color(0xFF111111))
-        val leaf = Path().apply {
-            moveTo(s * 0.62f, s * 0.10f)
-            cubicTo(s * 0.70f, s * 0.22f, s * 0.62f, s * 0.34f, s * 0.50f, s * 0.34f)
-            cubicTo(s * 0.46f, s * 0.22f, s * 0.54f, s * 0.10f, s * 0.62f, s * 0.10f)
-            close()
-        }
-        drawPath(leaf, Color(0xFF111111))
     }
 }
 

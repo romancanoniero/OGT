@@ -40,6 +40,14 @@ enum class LocationScope {
     ALWAYS,
 }
 
+fun LocationScope.prefCode(): String = when (this) {
+    LocationScope.ALWAYS -> "always"
+    LocationScope.WHILE_USING -> "while"
+}
+
+fun locationScopeFromPref(raw: String): LocationScope =
+    if (raw == "always") LocationScope.ALWAYS else LocationScope.WHILE_USING
+
 enum class ParkingManeuver {
     LATERAL,
     HEAD_IN,

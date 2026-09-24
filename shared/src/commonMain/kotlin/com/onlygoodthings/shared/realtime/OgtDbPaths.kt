@@ -9,7 +9,10 @@ object OgtDbPaths {
     const val PARKING_TICKS = "ogt/parking/ticks"
     const val IMPACT_ALERTS = "ogt/alerts"
     const val SOCIAL_FEED = "ogt/social/posts"
+    const val USERS = "ogt/users"
     const val PRESENCE = "ogt/presence"
+    const val CHAT_THREADS = "ogt/chat/threads"
+    const val CHAT_MESSAGES = "ogt/chat/messages"
 
     fun parkingSpot(spotId: String): String = "$PARKING_SPOTS/$spotId"
     fun parkingTick(spotId: String, role: String): String = "$PARKING_TICKS/$spotId/$role"
@@ -17,7 +20,10 @@ object OgtDbPaths {
     fun socialPost(postId: String): String = "$SOCIAL_FEED/$postId"
     fun socialComments(postId: String): String = "${socialPost(postId)}/comments"
     fun socialComment(postId: String, commentId: String): String = "${socialComments(postId)}/$commentId"
+    fun user(userId: String): String = "$USERS/$userId"
     fun presence(userId: String): String = "$PRESENCE/$userId"
+    fun chatThread(matchId: String): String = "$CHAT_THREADS/$matchId"
+    fun chatMessage(matchId: String, messageId: String): String = "$CHAT_MESSAGES/$matchId/$messageId"
 }
 
 /** REST `http(s)://host` → socket `ws(s)://host/db` de db-kmp-sdk. */

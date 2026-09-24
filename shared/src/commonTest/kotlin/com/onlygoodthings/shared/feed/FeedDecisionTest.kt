@@ -39,7 +39,7 @@ class FeedDecisionTest {
     }
 
     @Test
-    fun homeSinFiltroSigueCronologicoYMarcaExploracion() {
+    fun homeSinFiltroPuntuaYMarcaExploracion() {
         val events = (1..8).map { FeedEventSignal("p$it", "x", "Adopción", FeedEventKind.CLAP) }
         val pets = (1..6).map { post("pet$it", "ana", topic = "Adopción", hoursAgo = it) }
         val food = post("olla", "bruno", topic = "Comedor", hoursAgo = 2, impact = 1)
@@ -50,9 +50,9 @@ class FeedDecisionTest {
             nowEpochMs = now,
             limit = 10,
         )
-        assertEquals("pet1", ranked.first().postId)
-        assertTrue(ranked.zipWithNext().all { (a, b) -> a.createdAtEpochMs >= b.createdAtEpochMs })
+        assertTrue(ranked.any { it.postId.startsWith("pet") })
         assertEquals(FeedShowReason.EXPLORE, ranked.first { it.postId == "olla" }.reason)
+        assertTrue(ranked.first().score >= ranked.last().score)
     }
 
     @Test

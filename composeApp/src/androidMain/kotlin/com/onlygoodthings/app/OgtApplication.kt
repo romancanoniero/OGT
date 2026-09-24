@@ -5,6 +5,8 @@ import android.content.Context
 import androidx.activity.ComponentActivity
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
+import com.onlygoodthings.app.auth.AuthPrefs
+import com.onlygoodthings.app.map.OgtBackgroundLocation
 import java.lang.ref.WeakReference
 
 class OgtApplication : Application() {
@@ -14,6 +16,9 @@ class OgtApplication : Application() {
         FirebaseApp.initializeApp(this)
         // Emuladores: sin SafetyNet/Play Integrity. El SMS real se reemplaza por números de prueba.
         FirebaseAuth.getInstance().firebaseAuthSettings.setAppVerificationDisabledForTesting(true)
+        if (AuthPrefs().gpsEnabled) {
+            runCatching { OgtBackgroundLocation.start() }
+        }
     }
 
     companion object {

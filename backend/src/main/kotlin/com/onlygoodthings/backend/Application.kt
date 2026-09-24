@@ -3,6 +3,7 @@ package com.onlygoodthings.backend
 import com.onlygoodthings.backend.auth.AuthPrincipal
 import com.onlygoodthings.backend.auth.CompositeTokenVerifier
 import com.onlygoodthings.backend.auth.FirebaseAdminTokenVerifier
+import com.onlygoodthings.backend.auth.FirebaseJwksTokenVerifier
 import com.onlygoodthings.backend.auth.FirebaseTokenVerifier
 import com.onlygoodthings.backend.auth.protectedAuthRoutes
 import com.onlygoodthings.backend.auth.publicAuthRoutes
@@ -10,14 +11,17 @@ import com.onlygoodthings.backend.infra.Database
 import com.onlygoodthings.backend.infra.IdentityStore
 import com.onlygoodthings.backend.infra.RedisCache
 import com.onlygoodthings.backend.modules.animalRoutes
+import com.onlygoodthings.backend.modules.geoRoutes
 import com.onlygoodthings.backend.modules.crowdfundingRoutes
 import com.onlygoodthings.backend.modules.csrRoutes
 import com.onlygoodthings.backend.modules.referralRoutes
+import com.onlygoodthings.backend.community.neighborRoutes
 import com.onlygoodthings.backend.modules.timebankRoutes
 import com.onlygoodthings.backend.parking.ParkingSqlRepository
 import com.onlygoodthings.backend.parking.parkingRoutes
 import com.onlygoodthings.backend.routing.FootRoutingService
 import com.onlygoodthings.backend.realtime.RealtimeHub
+import com.onlygoodthings.backend.realtime.dbGatewayRoutes
 import com.onlygoodthings.backend.notify.NoticeSqlRepository
 import com.onlygoodthings.backend.notify.noticeRoutes
 import com.onlygoodthings.backend.social.HonorSqlRepository
@@ -25,7 +29,11 @@ import com.onlygoodthings.backend.social.SocialSqlRepository
 import com.onlygoodthings.backend.social.honorRoutes
 import com.onlygoodthings.backend.social.publicHonorRoutes
 import com.onlygoodthings.backend.social.socialRoutes
+import com.onlygoodthings.backend.media.MediaStore
+import com.onlygoodthings.backend.media.mediaRoutes
+import com.onlygoodthings.backend.media.publicMediaRoutes
 import com.onlygoodthings.shared.domain.ApiResponse
+import java.nio.file.Path
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
@@ -68,17 +76,23 @@ fun Application.module() {
     val allowDev = env("OGT_ALLOW_DEV_TOKENS", "true").toBoolean()
     val parkingProximity = env("OGT_PARKING_PROXIMITY_METERS", "40").toDoubleOrNull()
         ?: com.onlygoodthings.shared.domain.ParkingRules.PROXIMITY_METERS
+    val mediaStore = MediaStore(
+        root = Path.of(env("OGT_MEDIA_DIR", "data/media")),
+        publicBase = env("OGT_PUBLIC_BASE", "http://217.216.82.209:19080"),
+    )
 
     val db = Database(jdbcUrl, dbUser, dbPassword)
     val redis = RedisCache(redisUrl)
     val identity = IdentityStore(db)
     val hub = RealtimeHub(redis)
+    redis.subscribeTree { channel, payload -> hub.ingestTreeChannel(channel, payload) }
     val verifier: FirebaseTokenVerifier = CompositeTokenVerifier(
         allowDev = allowDev,
         production = if (credentials.isNotBlank()) {
-            FirebaseAdminTokenVerifier(firebaseProject, credentials)
+            runCatching { FirebaseAdminTokenVerifier(firebaseProject, credentials) }
+                .getOrElse { FirebaseJwksTokenVerifier(firebaseProject) }
         } else {
-            null
+            FirebaseJwksTokenVerifier(firebaseProject)
         },
     )
 
@@ -136,15 +150,20 @@ fun Application.module() {
         val honors = HonorSqlRepository(db)
         publicAuthRoutes(verifier, identity)
         publicHonorRoutes(honors)
+        publicMediaRoutes(mediaStore)
+        dbGatewayRoutes(verifier, identity, hub)
         authenticate("firebase") {
-            protectedAuthRoutes()
+            protectedAuthRoutes(identity, hub)
             parkingRoutes(ParkingSqlRepository(db), redis, hub, FootRoutingService.fromEnv(), parkingProximity)
             socialRoutes(SocialSqlRepository(db), hub)
+            mediaRoutes(mediaStore)
             honorRoutes(honors)
             noticeRoutes(NoticeSqlRepository(db))
             referralRoutes(db)
             animalRoutes(db, hub)
+            geoRoutes()
             timebankRoutes(db)
+            neighborRoutes(db, hub)
             csrRoutes(db)
             crowdfundingRoutes(db)
         }

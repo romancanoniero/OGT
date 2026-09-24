@@ -14,6 +14,7 @@ import com.onlygoodthings.shared.domain.ParkingRules
 import com.onlygoodthings.shared.domain.ParkingSpot
 import com.onlygoodthings.shared.domain.ParkingStatus
 import kotlin.random.Random
+import com.onlygoodthings.shared.domain.SocialAnecdote
 import com.onlygoodthings.shared.domain.SocialComment
 import com.onlygoodthings.shared.domain.SocialPost
 import com.onlygoodthings.shared.protocol.frames.LocationRole
@@ -47,31 +48,103 @@ class LocalFeedRepository(
     override suspend fun loadComments(postId: String): List<SocialComment> =
         db.commentsOf(postId).map(db::toDomain)
 
-    override suspend fun addComment(postId: String, body: String, parentCommentId: String?): SocialComment {
-        val comment = LocalComment(
-            id = "c-${db.comments.size + 1}",
+    override suspend fun addComment(
+        postId: String,
+        body: String,
+        parentCommentId: String?,
+        anecdoteId: String?,
+    ): SocialComment {
+        val comment = db.addComment(
+            viewer = db.user(currentUserId),
             postId = postId,
-            authorUserId = currentUserId,
             body = body,
-            timeLabel = "Ahora",
+            anecdoteId = anecdoteId,
             parentCommentId = parentCommentId,
-        )
-        db.comments += comment
-        val idx = db.posts.indexOfFirst { it.id == postId }
-        if (idx >= 0) {
-            val post = db.posts[idx]
-            db.posts[idx] = post.copy(commentCount = post.commentCount + 1)
-        }
-        db.recordFeedEvent(currentUserId, postId, FeedEventKind.COMMENT)
+        ) ?: error("El comentario no puede estar vacío")
         return db.toDomain(comment)
     }
 
+    override suspend fun editComment(commentId: String, body: String): SocialComment =
+        db.toDomain(db.editComment(currentUserId, commentId, body) ?: error("No se pudo editar"))
+
+    override suspend fun deleteComment(commentId: String) {
+        db.deleteComment(currentUserId, commentId)
+    }
+
+    override suspend fun addAnecdote(postId: String, body: String, sourceUrl: String?): SocialAnecdote =
+        db.toDomain(db.addAnecdote(db.user(currentUserId), postId, body, sourceUrl) ?: error("Anécdota vacía"))
+
+    override suspend fun editAnecdote(anecdoteId: String, body: String): SocialAnecdote =
+        db.toDomain(db.editAnecdote(currentUserId, anecdoteId, body) ?: error("No se pudo editar"))
+
+    override suspend fun deleteAnecdote(anecdoteId: String) {
+        db.deleteAnecdote(currentUserId, anecdoteId)
+    }
+
+    override suspend fun clapAnecdote(anecdoteId: String): SocialAnecdote =
+        db.toDomain(db.clapAnecdote(currentUserId, anecdoteId) ?: error("Anécdota inexistente"))
+
+    override suspend fun heartAnecdote(anecdoteId: String): SocialAnecdote =
+        db.toDomain(db.heartAnecdote(currentUserId, anecdoteId) ?: error("Anécdota inexistente"))
+
+    override suspend fun repostAnecdote(anecdoteId: String): SocialPost =
+        db.toDomain(db.repostAnecdote(db.user(currentUserId), anecdoteId) ?: error("No se pudo repostear"))
+
+    override suspend fun editPost(postId: String, body: String, topic: String?): SocialPost =
+        db.toDomain(db.editOwnPost(currentUserId, postId, body, topic) ?: error("No se pudo editar"))
+
+    override suspend fun deletePost(postId: String) {
+        db.removeOwnPost(currentUserId, postId) ?: error("No se pudo eliminar")
+    }
+
     override suspend fun reportPost(postId: String, reason: String, details: String?) {
-        // Preview local: no hay cola de moderación.
+        db.recordFeedEvent(currentUserId, postId, FeedEventKind.HIDE)
     }
 
     override suspend fun recordFeedEvent(postId: String, kind: FeedEventKind, dwellMs: Int?) {
         db.recordFeedEvent(currentUserId, postId, kind, dwellMs)
+    }
+
+    override suspend fun publishPost(
+        body: String,
+        topic: String,
+        media: List<com.onlygoodthings.shared.domain.PostMediaItem>,
+        latitude: Double?,
+        longitude: Double?,
+        protagonistUserId: String?,
+        participantUserIds: List<String>,
+        honoreeName: String?,
+    ): SocialPost {
+        val now = currentEpochMs()
+        val id = "post-pub-$now"
+        db.posts += LocalSocialPost(
+            id = id,
+            authorKind = com.onlygoodthings.shared.domain.AuthorKind.USER,
+            authorUserId = currentUserId,
+            authorCompanyId = null,
+            place = "",
+            timeLabel = "Ahora",
+            tag = topic,
+            body = body,
+            impactCount = 0,
+            commentCount = 0,
+            isStory = false,
+            storyLabel = null,
+            createdAtEpochMs = now,
+            honoreeName = honoreeName,
+        )
+        db.bumpFeed()
+        return db.toDomain(db.post(id))
+    }
+
+    override suspend fun follow(userId: String) {
+        if (db.follows.none { it.followerId == currentUserId && it.followedId == userId }) {
+            db.follows += LocalFollow(currentUserId, userId)
+        }
+    }
+
+    override suspend fun unfollow(userId: String) {
+        db.follows.removeAll { it.followerId == currentUserId && it.followedId == userId }
     }
 }
 

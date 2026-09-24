@@ -64,7 +64,7 @@ fun feedTopicFamily(tag: String, sourceUrl: String? = null): FeedTopicFamily {
         t in FOOD_TAGS -> FeedTopicFamily.FOOD
         t in OCEAN_TAGS -> FeedTopicFamily.OCEAN
         t in COMMUNITY_TAGS -> FeedTopicFamily.COMMUNITY
-        !sourceUrl.isNullOrBlank() -> FeedTopicFamily.NEWS
+        !sourceUrl.isNullOrBlank() && !sourceUrl.startsWith("ogt://") -> FeedTopicFamily.NEWS
         else -> FeedTopicFamily.OTHER
     }
 }
@@ -74,6 +74,7 @@ fun FeedShowReason.labelEs(): String = when (this) {
     FeedShowReason.AFFINITY -> "Por lo que te gusta"
     FeedShowReason.EXPLORE -> "Para que explores"
     FeedShowReason.FILTER -> "Filtro"
+    FeedShowReason.PROMOTED -> "Promocionado"
 }
 
 private val PET_TAGS = setOf(

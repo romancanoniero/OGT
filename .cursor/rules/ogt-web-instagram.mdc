@@ -1,0 +1,13 @@
+---
+description: Web de vecinos y empresas — patrón Instagram
+globs: web/app/**,design/stitch/web/**
+alwaysApply: false
+---
+
+# Web OGT
+
+- **Vecino** (`USER`): esqueleto Instagram. Nav: Inicio, Buscar, Trueque, Billetera. Columna ~680 px. Publicar es FAB blanco con sombra, arrastrable por la columna central y el riel (oculto en `#/publicar` y en el chat). Mensajes y avisos viven a la derecha del título, junto al avatar y Salir. Si no hay hilos o avisos, el icono va en disabledInk y no navega. Sin parking ni GPS. Mascotas no va en el nav: se publica desde el FAB y se filtra en Inicio. `#/mascotas` queda para avisos y deep links. El riel derecho es libro de barrio (pulso, vecinos, código, regla). El pulso no muestra cesiones ni distancias. Mensajes usa el timebank (no otro canal): se busca un vecino, se reusa el hilo y el envío se proyecta en vivo a app y web. El oficio (Doy) se marca en el perfil o en Configuración; se pueden agregar oficios nuevos. Trueque solo muestra esos oficios y cruza pedidos.
+- **Empresa** (`COMPANY_ADMIN`): escritorio operativo en `#/empresa` (panel, campañas, comunidad de solo lectura). No es un feed de Instagram.
+- Auth: mismos medios que la app (correo, Google, Facebook, teléfono). Sin Apple. Sin token de lab por defecto. Si el JWT de Firebase vence o el API responde UNAUTHENTICATED, se corta la sesión y se va a `#/entrar`.
+
+Paleta Quiet Studio. Lo que matchea se copia; lo operativo de empresa no se fuerza al patrón Instagram.

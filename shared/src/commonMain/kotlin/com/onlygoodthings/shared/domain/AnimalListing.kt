@@ -2,7 +2,7 @@ package com.onlygoodthings.shared.domain
 
 import kotlinx.serialization.Serializable
 
-/** Ficha de mascota persistida en Postgres, con el post del río. */
+/** Ficha de mascota persistida en Postgres, con el post del feed. */
 @Serializable
 data class AnimalListingDto(
     val listingId: String,
@@ -31,4 +31,11 @@ data class AnimalListingDto(
     val longitude: Double? = null,
     val createdAtEpochMs: Long = 0L,
     val media: List<PostMediaItem> = emptyList(),
+)
+
+@Serializable
+data class AnimalResolveResult(
+    val listingId: String,
+    val verifiedOutcome: Boolean,
+    val message: String? = null,
 )

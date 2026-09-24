@@ -19,8 +19,14 @@ import com.onlygoodthings.shared.data.local.LocalUser
 import com.onlygoodthings.shared.data.local.OgtIds
 import com.onlygoodthings.shared.data.local.OgtLocalDatabase
 import com.onlygoodthings.shared.domain.GeoPoint
+import com.onlygoodthings.shared.domain.LocationScope
 import com.onlygoodthings.shared.domain.ParkedCar
+import com.onlygoodthings.shared.domain.ProfileLive
+import com.onlygoodthings.shared.domain.ProfileSettings
 import com.onlygoodthings.shared.domain.VehicleProfile
+import com.onlygoodthings.shared.domain.locationScopeFromPref
+import com.onlygoodthings.shared.domain.prefCode
+import com.onlygoodthings.shared.realtime.OgtRealtime
 import com.onlygoodthings.shared.realtime.OgtSdk
 import com.onlygoodthings.shared.realtime.currentEpochMs
 import com.onlygoodthings.shared.realtime.gatewayEndpointFromApiBase
@@ -48,6 +54,14 @@ class OgtPreviewSession(
     var currentUserId by mutableStateOf(initialUserId)
     var overlayUser by mutableStateOf<LocalUser?>(null)
     var radarEnabled by mutableStateOf(true)
+    var gpsEnabled by mutableStateOf(prefs.gpsEnabled)
+    var locationScope by mutableStateOf(locationScopeFromPref(prefs.locationScope))
+    var carbonSaveMode by mutableStateOf(false)
+    var showExactMatchLocation by mutableStateOf(false)
+    var publicProfileVisible by mutableStateOf(true)
+    var animalAlertPush by mutableStateOf(true)
+    var skillAlertPush by mutableStateOf(true)
+    var parkingRadarSounds by mutableStateOf(true)
     var locationGranted by mutableStateOf(false)
     var locationPermission by mutableStateOf(LocationPermissionState.UNKNOWN)
     var locationServicesEnabled by mutableStateOf(false)
@@ -62,6 +76,8 @@ class OgtPreviewSession(
     var focusParkedCar by mutableStateOf(false)
     var askLocationScope by mutableStateOf(false)
     var language by mutableStateOf(OgtLang.fromCode(prefs.appLanguage))
+    /** Sube cuando llega un perfil por sockets, para que feed y ajustes se pinten. */
+    var identityTick by mutableStateOf(0)
     /** Dijo que iba a dejar el lugar; esperamos que se acerque. */
     var willLeaveParked by mutableStateOf(false)
     var farthestFromParkedMeters by mutableStateOf(0.0)
@@ -82,6 +98,7 @@ class OgtPreviewSession(
     init {
         db.importHonors(prefs.honorsJson)
         db.importPublishedAnimals(prefs.publishedAnimalsJson)
+        db.importSocialFeed(prefs.feedCacheJson)
         db.postMedia.forEach { row ->
             OgtMediaCache.ingest(row.url)
             row.posterUrl?.let { OgtMediaCache.ingest(it) }
@@ -91,6 +108,10 @@ class OgtPreviewSession(
 
     fun persistPublishedAnimals() {
         prefs.publishedAnimalsJson = db.exportPublishedAnimals()
+    }
+
+    fun persistSocialFeed() {
+        prefs.feedCacheJson = db.exportSocialFeed(me().id)
     }
 
     fun rememberHonorToken(token: String?) {
@@ -111,6 +132,66 @@ class OgtPreviewSession(
     fun applyLanguage(next: OgtLang) {
         language = next
         prefs.appLanguage = next.code
+    }
+
+    fun applyRemoteSettings(settings: ProfileSettings) {
+        applyLanguage(OgtLang.fromCode(settings.language))
+        publicProfileVisible = settings.publicProfileVisible
+        showExactMatchLocation = settings.showExactMatchLocation
+        animalAlertPush = settings.animalAlertPush
+        skillAlertPush = settings.skillAlertPush
+        parkingRadarSounds = settings.parkingRadarSounds
+        radarEnabled = settings.radarEnabled
+        carbonSaveMode = settings.carbonSaveMode
+        val barrio = settings.barrio?.trim().orEmpty()
+        if (barrio.isNotEmpty()) {
+            val me = overlayUser ?: return
+            val updated = me.copy(barrio = barrio)
+            val idx = db.users.indexOfFirst { it.id == me.id }
+            if (idx >= 0) db.users[idx] = updated
+            overlayUser = updated
+        }
+    }
+
+    fun applyLiveProfile(live: ProfileLive) {
+        db.applyProfileLive(live)
+        val me = overlayUser
+        val mine = me != null && (live.id in me.aliases() || live.id == currentUserId)
+        if (mine) {
+            val now = overlayUser ?: me
+            if (now != null) {
+                overlayUser = now.copy(
+                    displayName = live.displayName,
+                    photoUrl = live.photoUrl ?: now.photoUrl,
+                    communityPoints = live.communityPoints.takeIf { it > 0 } ?: now.communityPoints,
+                    barrio = live.barrio?.takeIf { it.isNotBlank() } ?: now.barrio,
+                )
+            }
+            applyRemoteSettings(live.toSettings())
+        }
+        identityTick += 1
+    }
+
+    fun snapshotSettings(): ProfileSettings = ProfileSettings(
+        language = language.code,
+        barrio = me().barrio.takeIf { it.isNotBlank() },
+        publicProfileVisible = publicProfileVisible,
+        showExactMatchLocation = showExactMatchLocation,
+        animalAlertPush = animalAlertPush,
+        skillAlertPush = skillAlertPush,
+        parkingRadarSounds = parkingRadarSounds,
+        radarEnabled = radarEnabled,
+        carbonSaveMode = carbonSaveMode,
+    )
+
+    fun applyGpsEnabled(on: Boolean) {
+        gpsEnabled = on
+        prefs.gpsEnabled = on
+    }
+
+    fun applyLocationScope(scope: LocationScope) {
+        locationScope = scope
+        prefs.locationScope = scope.prefCode()
     }
     fun me(): LocalUser = overlayUser ?: db.user(currentUserId)
     fun here(): GeoPoint? = deviceLocation
@@ -144,6 +225,16 @@ class OgtPreviewSession(
         val found = vehicles.firstOrNull { it.id == id } ?: return
         selectedVehicleId = found.id
         vehicle = found
+        persistGarage()
+    }
+
+    fun removeVehicle(id: String) {
+        vehicles = vehicles.filterNot { it.id == id }
+        if (selectedVehicleId == id) {
+            val next = vehicles.firstOrNull()
+            selectedVehicleId = next?.id.orEmpty()
+            vehicle = next ?: VehicleProfile()
+        }
         persistGarage()
     }
 
@@ -227,6 +318,11 @@ fun OgtPreviewStore(content: @Composable () -> Unit) {
     LaunchedEffect(Unit) {
         auth.hydratePublishedAnimals(db)
         session.persistPublishedAnimals()
+        if (OgtSdk.isStarted()) {
+            runCatching {
+                OgtRealtime().observeUserProfiles().collect { session.applyLiveProfile(it) }
+            }
+        }
     }
     CompositionLocalProvider(
         LocalOgtDb provides db,

@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.onlygoodthings.app",
+      "sha256_cert_fingerprints": [
+        "0D:B7:97:43:4D:57:AC:85:F0:22:00:8D:A0:68:95:36:82:A3:81:3D:89:E3:98:6D:3B:8E:07:15:0A:70:D2:44"
+      ]
+    }
+  }
+]

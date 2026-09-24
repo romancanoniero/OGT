@@ -41,8 +41,15 @@ fun Map<String, Any?>.optDouble(key: String): Double? =
     (this[key] as? Number)?.toDouble()
 
 fun Map<String, Any?>.optBoolean(key: String, default: Boolean = false): Boolean =
+    optBooleanOrNull(key) ?: default
+
+fun Map<String, Any?>.optBooleanOrNull(key: String): Boolean? =
     when (val value = this[key]) {
         is Boolean -> value
-        is String -> value.equals("true", ignoreCase = true)
-        else -> default
+        is String -> when {
+            value.equals("true", ignoreCase = true) -> true
+            value.equals("false", ignoreCase = true) -> false
+            else -> null
+        }
+        else -> null
     }

@@ -18,45 +18,40 @@ import com.onlygoodthings.app.data.LocalOgtSession
 import com.onlygoodthings.app.platform.sharePlainText
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.ui.components.OgtCaption
-import com.onlygoodthings.app.ui.components.OgtCard
-import com.onlygoodthings.app.ui.components.OgtPill
 import com.onlygoodthings.app.ui.components.OgtPrimaryButton
-import com.onlygoodthings.app.ui.components.OgtSectionTitle
 import com.onlygoodthings.app.ui.components.OgtTopBar
+import com.onlygoodthings.app.ui.components.PrefCategory
+import com.onlygoodthings.app.ui.components.PrefDivider
+import com.onlygoodthings.app.ui.components.PrefGroup
+import com.onlygoodthings.app.ui.components.PrefLine
 import com.onlygoodthings.app.ui.components.ScreenColumn
 
 @Composable
 fun InviteScreen(onBack: () -> Unit = {}) {
     val db = LocalOgtDb.current
     val me = LocalOgtSession.current.me()
+    val link = "https://onlygoodthings.lat/join/${me.firebaseUid.removePrefix("dev-user-")}"
     Column(Modifier.fillMaxSize().background(OgtColors.canvas).verticalScroll(rememberScrollState())) {
-        OgtTopBar(title = "Impacto compartido", onBack = onBack)
+        OgtTopBar(title = "Invitar", onBack = onBack)
         ScreenColumn {
-            OgtSectionTitle("Invita a tu comunidad")
-            OgtCaption("Una red comunitaria crece con personas de buen corazón. Por cada persona que se sume, ambos reciben +100 puntos y una donación automática de un árbol.")
-            OgtCard {
-                Text("Tu bosque comunitario", fontWeight = FontWeight.Bold)
-                Text("7 árboles donados · +700 pts", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = OgtColors.primary)
+            OgtCaption("Por cada persona que se sume, ambos reciben +100 puntos y se dona un árbol.")
+            Text("7 árboles donados", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = OgtColors.primary)
+            OgtCaption("+700 pts · Código ${me.inviteCode}")
+            OgtCaption(link.removePrefix("https://"))
+            OgtPrimaryButton("Copiar enlace") {
+                sharePlainText("Sumate a Only Good Things con ${me.displayName}: $link")
             }
-            OgtCaption("Comunidad ${me.displayName}")
-            OgtPill(me.inviteCode)
-            Text("onlygoodthings.lat/join/${me.firebaseUid.removePrefix("dev-user-")}", color = OgtColors.muted, fontSize = 13.sp)
-            OgtPrimaryButton("Copiar Enlace") {
-                sharePlainText("Sumate a Only Good Things con ${me.displayName}: https://onlygoodthings.lat/join/${me.firebaseUid.removePrefix("dev-user-")}")
-            }
-            OgtSectionTitle("Compartir Rápido")
             OgtPrimaryButton("Compartir por WhatsApp") {
-                sharePlainText("Sumate a Only Good Things con ${me.displayName}: https://onlygoodthings.lat/join/${me.firebaseUid.removePrefix("dev-user-")}")
+                sharePlainText("Sumate a Only Good Things con ${me.displayName}: $link")
             }
-            OgtCaption("Telegram · SMS tradicional · Código QR de la comunidad")
-            OgtSectionTitle("Contactos de Confianza")
-            db.inviteContacts.forEach { contact ->
-                OgtCard {
-                    Text(contact.name, fontWeight = FontWeight.SemiBold)
-                    OgtCaption(contact.detail)
+            PrefCategory("Contactos de confianza")
+            PrefGroup {
+                db.inviteContacts.forEachIndexed { index, contact ->
+                    if (index > 0) PrefDivider()
+                    PrefLine(title = contact.name, body = contact.detail)
                 }
             }
-            OgtCaption("No enviamos correos masivos ni spam. Cada invitación es un acto personal entre personas de la comunidad.")
+            OgtCaption("Cada invitación es personal. No mandamos correos masivos.")
             Spacer(Modifier.height(24.dp))
         }
     }

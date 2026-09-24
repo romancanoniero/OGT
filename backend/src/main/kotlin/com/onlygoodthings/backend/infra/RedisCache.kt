@@ -1,8 +1,12 @@
 package com.onlygoodthings.backend.infra
 
+import redis.clients.jedis.Jedis
 import redis.clients.jedis.JedisPooled
+import redis.clients.jedis.JedisPubSub
+import java.net.URI
+import kotlin.concurrent.thread
 
-class RedisCache(redisUrl: String) {
+class RedisCache(private val redisUrl: String) {
     private val jedis = JedisPooled(redisUrl)
 
     fun setPresence(userId: String, ttlSeconds: Long = 45) {
@@ -19,5 +23,21 @@ class RedisCache(redisUrl: String) {
 
     fun publish(channel: String, payload: String) {
         jedis.publish(channel, payload)
+    }
+
+    /** Escucha `ogt:tree:*` para el gateway `/db` (db-kmp-sdk). */
+    fun subscribeTree(onMessage: (channel: String, payload: String) -> Unit) {
+        thread(name = "ogt-tree-fanout", isDaemon = true) {
+            Jedis(URI.create(redisUrl)).use { conn ->
+                conn.psubscribe(
+                    object : JedisPubSub() {
+                        override fun onPMessage(pattern: String?, channel: String?, message: String?) {
+                            if (!channel.isNullOrBlank() && message != null) onMessage(channel, message)
+                        }
+                    },
+                    "ogt:tree:*",
+                )
+            }
+        }
     }
 }

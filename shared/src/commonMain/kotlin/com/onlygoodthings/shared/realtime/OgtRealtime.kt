@@ -4,9 +4,12 @@ import com.iyr.db.database.ChildEventListener
 import com.iyr.db.database.DataSnapshot
 import com.iyr.db.database.DatabaseError
 import com.iyr.db.database.DbDatabase
+import com.onlygoodthings.shared.domain.ChatLive
+import com.onlygoodthings.shared.domain.ChatThreadLive
 import com.onlygoodthings.shared.domain.GeoPoint
 import com.onlygoodthings.shared.domain.ParkingSpot
 import com.onlygoodthings.shared.domain.ParkingStatus
+import com.onlygoodthings.shared.domain.ProfileLive
 import com.onlygoodthings.shared.domain.SocialComment
 import com.onlygoodthings.shared.domain.SocialLiveCounters
 import com.onlygoodthings.shared.protocol.frames.ImpactAlertFrame
@@ -39,6 +42,19 @@ class OgtRealtime(
     fun observePostComments(postId: String): Flow<SocialComment> =
         observeChildren(OgtDbPaths.socialComments(postId)) { snap ->
             snap.toSocialComment(postId)
+        }
+
+    fun observeUserProfiles(): Flow<ProfileLive> = observeChildren(OgtDbPaths.USERS) { snap ->
+        snap.toProfileLive()
+    }
+
+    fun observeChatThreads(): Flow<ChatThreadLive> = observeChildren(OgtDbPaths.CHAT_THREADS) { snap ->
+        snap.toChatThreadLive()
+    }
+
+    fun observeChatMessages(matchId: String): Flow<ChatLive> =
+        observeChildren("${OgtDbPaths.CHAT_MESSAGES}/$matchId") { snap ->
+            snap.toChatLive(matchId)
         }
 
     suspend fun pushSocialCounters(live: SocialLiveCounters) {
@@ -174,6 +190,78 @@ fun socialLiveCountersFrom(raw: Map<String, Any?>, key: String?): SocialLiveCoun
     )
 }
 
+@Suppress("UNCHECKED_CAST")
+private fun DataSnapshot.toProfileLive(): ProfileLive? {
+    val raw = getValue() as? Map<String, Any?> ?: return null
+    return profileLiveFrom(raw, key())
+}
+
+fun profileLiveFrom(raw: Map<String, Any?>, key: String?): ProfileLive? {
+    val id = raw["id"] as? String ?: key ?: return null
+    val name = raw["displayName"] as? String ?: return null
+    return ProfileLive(
+        id = id,
+        displayName = name,
+        photoUrl = raw["photoUrl"] as? String,
+        communityPoints = (raw["communityPoints"] as? Number)?.toInt() ?: 0,
+        inviteCode = raw["inviteCode"] as? String,
+        language = raw["language"] as? String ?: "es",
+        barrio = raw["barrio"] as? String,
+        publicProfileVisible = raw["publicProfileVisible"] as? Boolean ?: true,
+        showExactMatchLocation = raw["showExactMatchLocation"] as? Boolean ?: false,
+        animalAlertPush = raw["animalAlertPush"] as? Boolean ?: true,
+        skillAlertPush = raw["skillAlertPush"] as? Boolean ?: true,
+        parkingRadarSounds = raw["parkingRadarSounds"] as? Boolean ?: true,
+        radarEnabled = raw["radarEnabled"] as? Boolean ?: true,
+        carbonSaveMode = raw["carbonSaveMode"] as? Boolean ?: false,
+    )
+}
+
+@Suppress("UNCHECKED_CAST")
+private fun DataSnapshot.toChatLive(fallbackMatchId: String): ChatLive? {
+    val raw = getValue() as? Map<String, Any?> ?: return null
+    return chatLiveFrom(raw, key(), fallbackMatchId)
+}
+
+fun chatLiveFrom(raw: Map<String, Any?>, key: String?, fallbackMatchId: String?): ChatLive? {
+    val id = raw["id"] as? String ?: key ?: return null
+    val matchId = raw["matchId"] as? String ?: fallbackMatchId ?: return null
+    val senderId = raw["senderId"] as? String ?: return null
+    val body = raw["body"] as? String ?: return null
+    return ChatLive(
+        id = id,
+        matchId = matchId,
+        senderId = senderId,
+        senderName = raw["senderName"] as? String ?: "",
+        body = body,
+        createdAtEpochMs = (raw["createdAtEpochMs"] as? Number)?.toLong() ?: 0L,
+    )
+}
+
+@Suppress("UNCHECKED_CAST")
+private fun DataSnapshot.toChatThreadLive(): ChatThreadLive? {
+    val raw = getValue() as? Map<String, Any?> ?: return null
+    return chatThreadLiveFrom(raw, key())
+}
+
+fun chatThreadLiveFrom(raw: Map<String, Any?>, key: String?): ChatThreadLive? {
+    val matchId = raw["matchId"] as? String ?: key ?: return null
+    return ChatThreadLive(
+        matchId = matchId,
+        lastBody = raw["lastBody"] as? String ?: "",
+        lastAtEpochMs = (raw["lastAtEpochMs"] as? Number)?.toLong() ?: 0L,
+        tag = raw["tag"] as? String ?: "",
+        tagLabel = raw["tagLabel"] as? String ?: "",
+        status = raw["status"] as? String ?: "ACTIVE",
+        requesterId = raw["requesterId"] as? String ?: "",
+        providerId = raw["providerId"] as? String ?: "",
+        requesterName = raw["requesterName"] as? String ?: "",
+        providerName = raw["providerName"] as? String ?: "",
+        requesterPhotoUrl = raw["requesterPhotoUrl"] as? String,
+        providerPhotoUrl = raw["providerPhotoUrl"] as? String,
+    )
+}
+
 fun socialCommentFrom(raw: Map<String, Any?>, key: String?, fallbackPostId: String?): SocialComment? {
     val id = raw["id"] as? String ?: key ?: return null
     val postId = raw["postId"] as? String ?: fallbackPostId ?: return null
@@ -187,6 +275,8 @@ fun socialCommentFrom(raw: Map<String, Any?>, key: String?, fallbackPostId: Stri
         parentCommentId = raw["parentCommentId"] as? String,
         body = body,
         createdAtEpochMs = (raw["createdAtEpochMs"] as? Number)?.toLong() ?: 0L,
+        anecdoteId = raw["anecdoteId"] as? String,
+        edited = raw["edited"] as? Boolean ?: false,
     )
 }
 
@@ -212,6 +302,8 @@ private fun SocialComment.toTreeMap(): Map<String, Any?> = mapOf(
     "parentCommentId" to parentCommentId,
     "body" to body,
     "createdAtEpochMs" to createdAtEpochMs,
+    "anecdoteId" to anecdoteId,
+    "edited" to edited,
 )
 
 fun LocationTickFrame.Companion.now(

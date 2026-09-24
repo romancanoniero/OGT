@@ -2,6 +2,8 @@ package com.onlygoodthings.shared.feed
 
 import com.onlygoodthings.shared.domain.FeedEventKind
 import com.onlygoodthings.shared.domain.FeedMode
+import com.onlygoodthings.shared.domain.FeedShowReason
+import com.onlygoodthings.shared.domain.PostPlacement
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -35,16 +37,16 @@ class FeedRankerTest {
     }
 
     @Test
-    fun elGrafoPesaMasQueUnDesconocidoIdentico() {
-        val stranger = post("x", "ana", hoursAgo = 2, impact = 10)
-        val friend = post("y", "sofia", hoursAgo = 2, impact = 10)
+    fun loMasNuevoVaPrimeroAunqueNoSeaDelGrafo() {
+        val stranger = post("x", "ana", hoursAgo = 1, impact = 10)
+        val friend = post("y", "sofia", hoursAgo = 10, impact = 10)
         val ranked = FeedRanker.rank(
             candidates = listOf(stranger, friend),
             viewer = ViewerContext("me", followedIds = setOf("sofia")),
             mode = FeedMode.HOME,
             nowEpochMs = now,
         )
-        assertEquals("y", ranked.first().postId)
+        assertEquals(listOf("x", "y"), ranked.map { it.postId })
     }
 
     @Test
@@ -63,7 +65,7 @@ class FeedRankerTest {
     }
 
     @Test
-    fun homeOrdenaDeNuevoAViejoAunqueElViejoTengaMasImpacto() {
+    fun homeEsEstrictamenteCronologico() {
         val sameAuthor = (1..4).map { post("p$it", "ana", hoursAgo = it.toDouble(), impact = 200 - it) }
         val other = post("otro", "lucas", hoursAgo = 20, impact = 1)
         val ranked = FeedRanker.rank(
@@ -73,23 +75,6 @@ class FeedRankerTest {
             nowEpochMs = now,
         )
         assertEquals(listOf("p1", "p2", "p3", "p4", "otro"), ranked.map { it.postId })
-    }
-
-    @Test
-    fun loNuevoVaAntesAunqueElLikeSeaDeOtroTema() {
-        val huerta = post("huerta", "ana", topic = "Huerta", hoursAgo = 8, impact = 5)
-        val rse = post("rse", "acme", topic = "RSE", hoursAgo = 1, impact = 5)
-        val events = listOf(
-            FeedEventSignal("old", "x", "Huerta", FeedEventKind.CLAP),
-            FeedEventSignal("old2", "x", "Huerta", FeedEventKind.COMMENT),
-        )
-        val ranked = FeedRanker.rank(
-            candidates = listOf(rse, huerta),
-            viewer = ViewerContext("me", followedIds = emptySet(), events = events),
-            mode = FeedMode.HOME,
-            nowEpochMs = now,
-        )
-        assertEquals(listOf("rse", "huerta"), ranked.map { it.postId })
     }
 
     @Test
@@ -103,7 +88,46 @@ class FeedRankerTest {
             nowEpochMs = now,
         )
         assertEquals("fresh", ranked.first().postId)
-        assertTrue(ranked.zipWithNext().all { (a, b) -> a.createdAtEpochMs >= b.createdAtEpochMs })
+    }
+
+    @Test
+    fun laFechaGanaALosClapsYAloLogrado() {
+        val claps = post("claps", "ana", hoursAgo = 1, impact = 250, achieved = 0)
+        val done = post("done", "sofia", hoursAgo = 8, impact = 0, achieved = 3)
+        val ranked = FeedRanker.rank(
+            candidates = listOf(claps, done),
+            viewer = ViewerContext("me", followedIds = emptySet()),
+            mode = FeedMode.HOME,
+            nowEpochMs = now,
+        )
+        assertEquals(listOf("claps", "done"), ranked.map { it.postId })
+    }
+
+    @Test
+    fun promocionadoQuedaEnSuFecha() {
+        val promo = post("promo", "ana", hoursAgo = 1, impact = 200, achieved = 8, placement = PostPlacement.PROMOTED)
+        val organic = post("og", "sofia", hoursAgo = 3, impact = 2, achieved = 1)
+        val ranked = FeedRanker.rank(
+            candidates = listOf(promo, organic),
+            viewer = ViewerContext("me", followedIds = emptySet()),
+            mode = FeedMode.HOME,
+            nowEpochMs = now,
+        )
+        assertEquals(listOf("promo", "og"), ranked.map { it.postId })
+        assertEquals(FeedShowReason.PROMOTED, ranked.first { it.postId == "promo" }.reason)
+    }
+
+    @Test
+    fun adsNoEntranAlHome() {
+        val ad = post("ad", "ana", placement = PostPlacement.AD)
+        val organic = post("og", "sofia")
+        val ranked = FeedRanker.rank(
+            candidates = listOf(ad, organic),
+            viewer = ViewerContext("me", followedIds = emptySet()),
+            mode = FeedMode.HOME,
+            nowEpochMs = now,
+        )
+        assertEquals(listOf("og"), ranked.map { it.postId })
     }
 
     private fun post(
@@ -112,6 +136,8 @@ class FeedRankerTest {
         topic: String = "Huerta",
         hoursAgo: Number = 2,
         impact: Int = 10,
+        achieved: Int = 0,
+        placement: PostPlacement = PostPlacement.ORGANIC,
     ) = FeedCandidate(
         postId = id,
         authorKey = author,
@@ -121,5 +147,7 @@ class FeedRankerTest {
         createdAtEpochMs = now - (hoursAgo.toDouble() * 3_600_000).toLong(),
         impactCount = impact,
         commentCount = 2,
+        achievedCount = achieved,
+        placement = placement,
     )
 }

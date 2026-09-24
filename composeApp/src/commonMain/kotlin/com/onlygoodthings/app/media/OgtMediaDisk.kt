@@ -4,3 +4,5 @@ package com.onlygoodthings.app.media
 internal expect fun readMediaCacheFile(name: String): ByteArray?
 
 internal expect fun writeMediaCacheFile(name: String, bytes: ByteArray)
+
+internal expect fun mediaCacheFilePath(name: String): String

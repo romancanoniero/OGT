@@ -14,7 +14,7 @@ data class SocialPost(
     val authorKind: AuthorKind,
     val authorId: String,
     val authorName: String,
-    val authorPhotoUrl: String?,
+    val authorPhotoUrl: String? = null,
     val body: String,
     val mediaUrls: List<String>,
     val impactCount: Int,
@@ -27,6 +27,30 @@ data class SocialPost(
     val protagonistUserId: String? = null,
     val media: List<PostMediaItem> = emptyList(),
     val sourceUrl: String? = null,
+    val placement: PostPlacement = PostPlacement.ORGANIC,
+    val achievedCount: Int = 0,
+    val empresaQueSuma: Boolean = false,
+    val urgency: String? = null,
+    val honoreeName: String? = null,
+    val anecdotes: List<SocialAnecdote> = emptyList(),
+)
+
+@Serializable
+data class SocialAnecdote(
+    val id: String,
+    val postId: String,
+    val authorUserId: String,
+    val authorName: String,
+    val body: String,
+    val sourceUrl: String? = null,
+    val sortOrder: Int = 0,
+    val createdAtEpochMs: Long = 0L,
+    val impactCount: Int = 0,
+    val commentCount: Int = 0,
+    val heartCount: Int = 0,
+    val viewerHasImpacted: Boolean = false,
+    val viewerHasHearted: Boolean = false,
+    val comments: List<SocialComment> = emptyList(),
 )
 
 @Serializable
@@ -35,10 +59,12 @@ data class SocialComment(
     val postId: String,
     val authorUserId: String,
     val authorName: String,
-    val parentCommentId: String?,
+    val parentCommentId: String? = null,
     val body: String,
     val createdAtEpochMs: Long,
     val replies: List<SocialComment> = emptyList(),
+    val anecdoteId: String? = null,
+    val edited: Boolean = false,
 )
 
 /**

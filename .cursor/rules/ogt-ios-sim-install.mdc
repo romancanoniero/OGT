@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Instalar en el simulador iOS
 
-Después de cada cambio que el usuario pueda probar (UI, navegación, datos locales, icono, auth), compilar e instalar en el simulador **iPhone 17 Pro** (`B8D6D203-C781-446E-B85B-07631CE9A9FC`) y lanzar `com.onlygoodthings.app`. No esperar a que lo pida.
+Después de cada cambio que el usuario pueda probar (UI, navegación, datos locales, icono, auth), compilar e instalar en el simulador **iPhone 17 Pro** (`B8D6D203-C781-446E-B85B-07631CE9A9FC`) y lanzar `com.onlygoodthings.app`. No esperar a que lo pida. No usar IAN Test.
 
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode_26.app/Contents/Developer

@@ -10,8 +10,10 @@ import com.onlygoodthings.shared.data.createPlatformHttpClient
 import com.onlygoodthings.shared.data.local.LocalUser
 import com.onlygoodthings.shared.data.local.OgtLocalDatabase
 import com.onlygoodthings.shared.data.remote.RestAnimalsRepository
+import com.onlygoodthings.shared.data.remote.RestFeedRepository
 import com.onlygoodthings.shared.data.remote.RestHonorRepository
 import com.onlygoodthings.shared.data.remote.RestNoticeRepository
+import com.onlygoodthings.shared.domain.ProfileSettings
 import com.onlygoodthings.shared.domain.UserRole
 import com.onlygoodthings.shared.domain.titleCasePersonName
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,6 +30,17 @@ class AuthController(
     val honor = RestHonorRepository(createPlatformHttpClient(), session)
     val notices = RestNoticeRepository(createPlatformHttpClient(), session)
     val animals = RestAnimalsRepository(createPlatformHttpClient(), session)
+    val feed = RestFeedRepository(createPlatformHttpClient(), session)
+
+    suspend fun updateMyLocation(latitude: Double, longitude: Double, accuracyMeters: Double?) {
+        val ok = api.updateLocation(latitude, longitude, accuracyMeters)
+        if (!ok) return
+        val me = preview.overlayUser ?: return
+        val updated = me.copy(latitude = latitude, longitude = longitude)
+        val idx = db.users.indexOfFirst { it.id == me.id }
+        if (idx >= 0) db.users[idx] = updated
+        preview.overlayUser = updated
+    }
 
     var pendingPhone by mutableStateOf<PendingPhoneAuth?>(null)
     var busy by mutableStateOf(false)
@@ -108,10 +121,6 @@ class AuthController(
     suspend fun signInProvider(provider: String): Boolean = wrap {
         val user = when (provider) {
             "google" -> platform.signInGoogle()
-            "apple" -> {
-                require(showsAppleSignIn()) { "Sign in with Apple solo está disponible en iPhone o iPad" }
-                platform.signInApple()
-            }
             "facebook" -> platform.signInFacebook()
             else -> error("Proveedor no soportado")
         }
@@ -222,13 +231,15 @@ class AuthController(
             it.firebaseUid == user.firebaseUid ||
                 (user.email != null && it.email == user.email)
         }
+        val resolvedId = profile?.id ?: existing?.id ?: user.firebaseUid
         val local = existing?.copy(
+            id = resolvedId,
             displayName = user.displayName ?: existing.displayName,
             email = user.email ?: existing.email,
             phoneE164 = user.phone ?: existing.phoneE164,
             photoUrl = user.photoUrl ?: existing.photoUrl,
         ) ?: LocalUser(
-            id = user.firebaseUid,
+            id = resolvedId,
             firebaseUid = user.firebaseUid,
             email = user.email,
             phoneE164 = user.phone,
@@ -249,6 +260,15 @@ class AuthController(
         }
         preview.currentUserId = local.id
         preview.overlayUser = local
+        profile?.settings?.let { preview.applyRemoteSettings(it) }
+        profile?.displayName?.takeIf { it.isNotBlank() }?.let { applyDisplayName(it) }
+        profile?.photoUrl?.let { url ->
+            val named = preview.overlayUser ?: local
+            val withPhoto = named.copy(photoUrl = url)
+            val photoIdx = db.users.indexOfFirst { it.id == named.id }
+            if (photoIdx >= 0) db.users[photoIdx] = withPhoto
+            preview.overlayUser = withPhoto
+        }
         db.claimPublishedAnimals(
             setOfNotNull(user.firebaseUid, profile?.id, existing?.id, local.id),
             local.id,
@@ -261,6 +281,34 @@ class AuthController(
         val idx = db.users.indexOfFirst { it.id == me.id }
         if (idx >= 0) db.users[idx] = updated
         preview.overlayUser = updated
+    }
+
+    suspend fun saveProfile(
+        displayName: String? = null,
+        photoUrl: String? = null,
+        settings: ProfileSettings? = preview.snapshotSettings(),
+    ): Boolean {
+        val updated = api.updateProfile(displayName, photoUrl, settings) ?: return false
+        if (!updated.displayName.isBlank()) applyDisplayName(updated.displayName)
+        updated.photoUrl?.let { url ->
+            val me = preview.overlayUser ?: return@let
+            val next = me.copy(photoUrl = url)
+            val idx = db.users.indexOfFirst { it.id == me.id }
+            if (idx >= 0) db.users[idx] = next
+            preview.overlayUser = next
+        }
+        preview.applyRemoteSettings(updated.settings)
+        return true
+    }
+
+    suspend fun persistSettings() {
+        saveProfile(settings = preview.snapshotSettings())
+    }
+
+    suspend fun uploadAvatar(filename: String, contentType: String, bytes: ByteArray): String? {
+        val uploaded = api.uploadBytes(filename, contentType, bytes) ?: return null
+        saveProfile(photoUrl = uploaded.url)
+        return uploaded.url
     }
 
     private fun applyDisplayName(name: String) {

@@ -1,0 +1,32 @@
+---
+description: Toda escritura se proyecta por sockets a todos los módulos
+alwaysApply: true
+---
+
+# Propagación en vivo
+
+Cualquier dato que el vecino o la empresa pueda ver en más de un módulo (app, web, feed, perfil, parking, avisos) se actualiza **en todos** al escribir. No esperar relanzar la app ni recargar.
+
+## Cómo
+
+1. Postgres sigue siendo la fuente de verdad.
+2. Tras el REST que persiste, proyectar el nodo en `OgtDbPaths` vía `RealtimeHub` (`ogt:tree:…`).
+3. App (`OgtRealtime` + `OgtSdk`) y web (`OgtWebRealtime`) escuchan ese path y pintan el cambio.
+4. Si un módulo lee el dato (feed, rail, ficha, ajustes), también debe reaccionar al live. No dejar una copia muerta.
+
+## No hacer
+
+- Guardar solo en local / `localStorage` un campo que otra superficie muestra.
+- Inventar un WebSocket aparte. Usar `db-kmp-sdk`.
+- Escuchar en una sola pantalla y olvidar las demás.
+
+```kotlin
+// MAL: el nombre queda en la web hasta el próximo login
+identity.updateProfile(...)
+call.respond(ApiResponse.ok(updated))
+
+// BIEN
+identity.updateProfile(...)
+hub.projectUser(updated.id, WsCodec.json.encodeToString(updated.toLive()))
+call.respond(ApiResponse.ok(updated))
+```

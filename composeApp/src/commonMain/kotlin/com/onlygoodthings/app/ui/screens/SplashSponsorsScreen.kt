@@ -18,38 +18,41 @@ import androidx.compose.ui.unit.sp
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.theme.OgtLogo
 import com.onlygoodthings.app.ui.components.OgtCaption
-import com.onlygoodthings.app.ui.components.OgtCard
-import com.onlygoodthings.app.ui.components.OgtPill
 import com.onlygoodthings.app.ui.components.OgtPrimaryButton
-import com.onlygoodthings.app.ui.components.OgtSectionTitle
+import com.onlygoodthings.app.ui.components.OgtTopBar
+import com.onlygoodthings.app.ui.components.PrefCategory
+import com.onlygoodthings.app.ui.components.PrefDivider
+import com.onlygoodthings.app.ui.components.PrefGroup
+import com.onlygoodthings.app.ui.components.PrefLine
 
 @Composable
-fun SplashSponsorsScreen(onContinue: () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().background(OgtColors.canvas).verticalScroll(rememberScrollState()).padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
+fun SplashSponsorsScreen(onContinue: () -> Unit, onBack: (() -> Unit)? = null) {
+    Column(Modifier.fillMaxSize().background(OgtColors.canvas)) {
+        OgtTopBar(title = "Sponsors", onBack = onBack, hideOnScroll = false)
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
         OgtLogo(size = 96.dp)
         Spacer(Modifier.height(12.dp))
-        OgtSectionTitle("OnlyGoodThings")
-        Text("La red comunitaria donde hacer el bien transforma tu comunidad, cerca o en la red.", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-        Spacer(Modifier.height(8.dp))
-        OgtPill("Geolocalización activa · CABA y Gran Buenos Aires")
-        OgtCaption("210 acciones vecinales coordinándose hoy en tu zona")
-        OgtCaption("Cargando mapa de impacto de la comunidad…")
-        OgtSectionTitle("Impulsado por Sponsors Regionales")
-        OgtCaption("Alianzas 2025")
-        OgtCard {
-            Text("Banco Santander", fontWeight = FontWeight.Bold)
-            OgtCaption("Compromiso Verde y Finanzas Sustentables. Financiando puntos de reciclaje urbano y microcréditos para cooperativas de la comunidad en Buenos Aires.")
+        Text("OnlyGoodThings", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = OgtColors.ink)
+        OgtCaption("La red donde hacer el bien transforma tu comunidad.")
+        PrefCategory("Sponsors regionales")
+        PrefGroup {
+            PrefLine(
+                title = "Banco Santander",
+                body = "Puntos de reciclaje urbano y microcréditos para cooperativas.",
+            )
+            PrefDivider()
+            PrefLine(
+                title = "Cablevisión Flow",
+                body = "Wi-Fi en plazas recuperadas y capacitaciones comunitarias.",
+            )
         }
-        OgtCard {
-            Text("Cablevisión Flow", fontWeight = FontWeight.Bold)
-            OgtCaption("Conectividad e Inclusión Digital Vecinal. Puntos Wi-Fi libres en plazas recuperadas y capacitaciones comunitarias.")
-        }
-        OgtCaption("Red federal de 34 municipios adheridos a OnlyGoodThings")
+        OgtCaption("34 municipios adheridos.")
         Spacer(Modifier.height(12.dp))
         OgtPrimaryButton("Explorar iniciativas cercanas") { onContinue() }
         Spacer(Modifier.height(16.dp))
+        }
     }
 }

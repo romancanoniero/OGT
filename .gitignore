@@ -26,6 +26,9 @@ google-services.json
 GoogleService-Info.plist
 **/serviceAccount*.json
 firebase-adminsdk*.json
+*.jks
+*.keystore
+key.properties
 
 # Kotlin / Native
 *.xcuserstate
@@ -36,3 +39,7 @@ kotlin-js-store/
 # Logs
 *.log
 out/
+
+# Multimedia subida / importada (vive en la VPS)
+data/media/
+deploy/vps/media/

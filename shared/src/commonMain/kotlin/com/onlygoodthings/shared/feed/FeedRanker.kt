@@ -6,6 +6,7 @@ import com.onlygoodthings.shared.domain.FeedShowReason
 import com.onlygoodthings.shared.domain.FeedTopicFamily
 import com.onlygoodthings.shared.domain.GeoMath
 import com.onlygoodthings.shared.domain.GeoPoint
+import com.onlygoodthings.shared.domain.PostPlacement
 import kotlin.math.ln
 import kotlin.math.pow
 
@@ -25,6 +26,10 @@ data class FeedCandidate(
     val latitude: Double? = null,
     val longitude: Double? = null,
     val sourceUrl: String? = null,
+    val achievedCount: Int = 0,
+    val trustScore: Double = 0.0,
+    val urgencyRank: Int = 0,
+    val placement: PostPlacement = PostPlacement.ORGANIC,
 ) {
     fun family(): FeedTopicFamily = feedTopicFamily(topic, sourceUrl)
 }
@@ -54,23 +59,25 @@ data class RankedFeedItem(
 )
 
 /**
- * Misma forma que el Feed de Instagram: inventario → señales → predicciones → score → diversidad.
- * Los pesos son explícitos a propósito: se pueden sustituir las P_* por un modelo sin cambiar la API.
+ * Inventario del feed: filtros (ocultos, ads, familia, grafo) y orden cronológico.
+ * Lo más nuevo va primero. Siempre.
  */
 object FeedRanker {
     const val MAX_SAME_AUTHOR_STREAK = 3
     const val RECENCY_HALFLIFE_HOURS = 36.0
-    /** El río se pagina de más nuevo a más viejo. El score solo desempata el mismo instante. */
 
-    private const val W_GRAPH = 3.0
-    private const val W_CLAP = 2.0
-    private const val W_COMMENT = 2.0
-    private const val W_PROFILE = 1.5
-    private const val W_SHARE = 1.5
-    private const val W_RECENCY = 1.0
+    private const val W_GRAPH = 2.4
+    private const val W_CLAP = 1.2
+    private const val W_COMMENT = 1.2
+    private const val W_PROFILE = 1.0
+    private const val W_SHARE = 1.0
+    private const val W_RECENCY = 1.2
     private const val W_TOPIC = 0.8
-    private const val W_PROOF = 0.4
-    private const val W_GEO = 0.3
+    private const val W_PROOF = 0.3
+    private const val W_GEO = 0.9
+    private const val W_ACHIEVED = 3.2
+    private const val W_TRUST = 1.6
+    private const val W_URGENCY = 1.4
     private const val SKIP_PENALTY = 0.35
     private const val HIDE_PENALTY = 8.0
 
@@ -110,51 +117,34 @@ object FeedRanker {
     ): List<RankedFeedItem> {
         val profile = FeedInterestProfile.from(viewer.events)
         val hiddenPosts = viewer.events.filter { it.kind == FeedEventKind.HIDE }.map { it.postId }.toSet()
-        var visible = candidates.filter { it.postId !in hiddenPosts }
+        var visible = candidates.filter { it.postId !in hiddenPosts && it.placement != PostPlacement.AD }
         if (query.family != null) {
             visible = visible.filter { it.family() == query.family }
         }
         if (query.mode == FeedMode.FOLLOWING) {
-            return visible.filter { inGraph(it, viewer) }
-                .sortedByDescending { it.createdAtEpochMs }
-                .drop(offset.coerceAtLeast(0))
-                .take(limit.coerceAtLeast(0))
-                .map { post ->
-                    RankedFeedItem(
-                        postId = post.postId,
-                        score = post.createdAtEpochMs.toDouble(),
-                        discovery = false,
-                        reason = if (query.family != null) FeedShowReason.FILTER else FeedShowReason.GRAPH,
-                        family = post.family(),
-                        createdAtEpochMs = post.createdAtEpochMs,
-                    )
-                }
+            visible = visible.filter { inGraph(it, viewer) }
         }
-        val scored = visible.map { post ->
-            val fromGraph = inGraph(post, viewer)
-            Scored(
-                item = RankedFeedItem(
-                    postId = post.postId,
-                    score = score(post, viewer, profile, nowEpochMs, fromGraph),
-                    discovery = !fromGraph,
-                    reason = reasonFor(query, profile, post, fromGraph),
-                    family = post.family(),
-                    createdAtEpochMs = post.createdAtEpochMs,
-                ),
-                authorKey = post.authorKey,
-                family = post.family(),
-                createdAtEpochMs = post.createdAtEpochMs,
-            )
-        }
-        return scored
+        return visible
             .sortedWith(
-                compareByDescending<Scored> { it.createdAtEpochMs }
-                    .thenByDescending { it.item.score }
-                    .thenBy { it.item.postId },
+                compareByDescending<FeedCandidate> { it.createdAtEpochMs }.thenBy { it.postId },
             )
             .drop(offset.coerceAtLeast(0))
             .take(limit.coerceAtLeast(0))
-            .map { it.item }
+            .map { post ->
+                val fromGraph = inGraph(post, viewer)
+                RankedFeedItem(
+                    postId = post.postId,
+                    score = post.createdAtEpochMs.toDouble(),
+                    discovery = query.mode == FeedMode.HOME && !fromGraph,
+                    reason = if (query.mode == FeedMode.FOLLOWING) {
+                        if (query.family != null) FeedShowReason.FILTER else FeedShowReason.GRAPH
+                    } else {
+                        reasonFor(query, profile, post, fromGraph)
+                    },
+                    family = post.family(),
+                    createdAtEpochMs = post.createdAtEpochMs,
+                )
+            }
     }
 
     internal fun score(
@@ -181,6 +171,9 @@ object FeedRanker {
         val pComment = (0.40 * personP + 0.60 * topicP).coerceIn(0.0, 1.0)
         val pProfile = personP
         val pShare = (0.50 * topicP + 0.50 * proof).coerceIn(0.0, 1.0)
+        if (post.placement != PostPlacement.ORGANIC) {
+            return W_RECENCY * recency(post.createdAtEpochMs, nowEpochMs) * 0.45
+        }
         val skipCount = viewer.events.count { it.postId == post.postId && it.kind == FeedEventKind.SKIP }
         val hide = if (viewer.events.any { it.postId == post.postId && it.kind == FeedEventKind.HIDE }) HIDE_PENALTY else 0.0
         return (if (fromGraph) W_GRAPH else 0.0) +
@@ -191,7 +184,10 @@ object FeedRanker {
             W_RECENCY * recency(post.createdAtEpochMs, nowEpochMs) +
             W_TOPIC * topicP +
             W_PROOF * proof +
-            W_GEO * geoBoost(viewer, post) -
+            W_GEO * geoBoost(viewer, post) +
+            W_ACHIEVED * achieved(post.achievedCount) +
+            W_TRUST * post.trustScore.coerceIn(0.0, 1.0) +
+            W_URGENCY * (post.urgencyRank.coerceIn(0, 3) / 3.0) -
             SKIP_PENALTY * skipCount -
             hide
     }
@@ -221,6 +217,7 @@ object FeedRanker {
         post: FeedCandidate,
         fromGraph: Boolean,
     ): FeedShowReason {
+        if (post.placement == PostPlacement.PROMOTED) return FeedShowReason.PROMOTED
         if (query.family != null) return FeedShowReason.FILTER
         if (fromGraph) return FeedShowReason.GRAPH
         if (profile.chosen.isNotEmpty() && !profile.isChosen(post.family())) return FeedShowReason.EXPLORE
@@ -246,6 +243,9 @@ object FeedRanker {
         val ageHours = ((nowEpochMs - createdAtEpochMs).coerceAtLeast(0L)) / 3_600_000.0
         return 2.0.pow(-ageHours / RECENCY_HALFLIFE_HOURS)
     }
+
+    private fun achieved(count: Int): Double =
+        ln(1.0 + count.coerceAtLeast(0)) / ln(1.0 + 10.0)
 
     private fun socialProof(impact: Int, comments: Int): Double {
         val impactN = ln(1.0 + impact.coerceAtLeast(0)) / ln(1.0 + 250.0)

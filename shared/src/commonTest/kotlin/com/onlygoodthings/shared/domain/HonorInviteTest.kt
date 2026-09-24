@@ -21,10 +21,15 @@ class HonorInviteTest {
     @Test
     fun deepLinkDePost() {
         assertEquals("ogt://p/post-taller", postDeepLink("post-taller"))
+        assertEquals("https://onlygoodthings.lat/p/post-taller", postPublicLink("post-taller"))
         assertEquals("post-taller", parsePostDeepLink("ogt://p/post-taller"))
         assertEquals("post-taller", parsePostDeepLink("https://onlygoodthings.app/p/post-taller?src=push"))
         assertNull(parsePostDeepLink("ogt://h/ana.p1a2b3"))
         assertNull(parsePostDeepLink(""))
+        val anecdote = anecdoteShareText("Ana", "Cocinaba los domingos.", "post-taller")
+        assertTrue(anecdote.contains("Anécdota del homenaje a Ana"))
+        assertTrue(anecdote.contains("Cocinaba los domingos."))
+        assertTrue(anecdote.contains("https://onlygoodthings.lat/p/post-taller"))
     }
 
     @Test

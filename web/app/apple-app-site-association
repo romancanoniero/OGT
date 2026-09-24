@@ -1,0 +1,16 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "WER3D825VB.com.onlygoodthings.app",
+        "appIDs": ["WER3D825VB.com.onlygoodthings.app"],
+        "paths": ["/h/*", "/p/*"],
+        "components": [
+          { "/": "/h/*" },
+          { "/": "/p/*" }
+        ]
+      }
+    ]
+  }
+}

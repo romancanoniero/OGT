@@ -1,81 +1,80 @@
 package com.onlygoodthings.app.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.onlygoodthings.app.theme.OgtColors
-import com.onlygoodthings.app.ui.components.OgtCard
-import com.onlygoodthings.app.ui.components.OgtCaption
-import com.onlygoodthings.app.ui.components.OgtPill
 import com.onlygoodthings.app.ui.components.GhostLink
+import com.onlygoodthings.app.ui.components.OgtCaption
 import com.onlygoodthings.app.ui.components.OgtPrimaryButton
 import com.onlygoodthings.app.ui.components.OgtSecondaryButton
-import com.onlygoodthings.app.ui.components.OgtSectionTitle
 import com.onlygoodthings.app.ui.components.OgtTopBar
+import com.onlygoodthings.app.ui.components.PrefCategory
+import com.onlygoodthings.app.ui.components.PrefDivider
+import com.onlygoodthings.app.ui.components.PrefGroup
+import com.onlygoodthings.app.ui.components.PrefLine
 import com.onlygoodthings.app.ui.components.ScreenColumn
 
 @Composable
 fun IdentityScreen(onContinue: () -> Unit) {
     Column(Modifier.fillMaxSize().background(OgtColors.canvas).verticalScroll(rememberScrollState())) {
-        OgtTopBar(title = "Verificación de perfil")
+        OgtTopBar(title = "Verificación")
         ScreenColumn {
-            OgtPill("Validación de Confianza Comunitaria")
-            OgtCaption("Red segura")
-            OgtSectionTitle("Verificá tu perfil en la comunidad")
-            OgtCaption("OnlyGoodThings es una red segura basada en personas reales. Verificá tu identidad para activar todos los beneficios y generar máxima confianza en trueques y alertas, cerca o en la red.")
-            OgtCard {
-                Text("Comunidad activa", fontWeight = FontWeight.Bold)
-                OgtCaption("94% de perfiles verificados")
-                OgtPill("Nivel 2 / 3")
+            OgtCaption("OnlyGoodThings es una red de personas reales. Verificar el perfil abre alertas, trueques y voto comunitario.")
+            PrefCategory("Beneficios")
+            PrefGroup {
+                PrefLine(
+                    title = "Insignia de verificado",
+                    body = "Se ve en el avatar, el perfil, las publicaciones y las respuestas.",
+                )
+                PrefDivider()
+                PrefLine(
+                    title = "Alertas de mascotas",
+                    body = "Aviso geolocalizado cuando hay un extravío cerca.",
+                )
+                PrefDivider()
+                PrefLine(
+                    title = "Trueques y reservas",
+                    body = "Sin comisión y con prioridad en las dársenas de la comunidad.",
+                )
+                PrefDivider()
+                PrefLine(
+                    title = "Presupuesto participativo",
+                    body = "Voz y voto en el fondo ecológico y los proyectos compartidos.",
+                )
             }
-            OgtSectionTitle("Beneficios de estar verificado")
-            Benefit("Insignia de perfil verificado", "Destacado en tu avatar, perfil, publicaciones y respuestas.")
-            Benefit("Alertas urgentes de mascotas", "Notificación push geolocalizada en 2 km para extravíos.")
-            Benefit("Trueques ilimitados y reservas", "Sin comisiones y prioridad en las dársenas de la comunidad.")
-            Benefit("Presupuesto participativo", "Voz y voto en el fondo ecológico y proyectos compartidos.")
-            OgtSectionTitle("Proceso de verificación")
-            OgtCaption("Paso 2 de 3")
-            OgtCard {
-                Text("Paso 1: Confirmación de zona", fontWeight = FontWeight.SemiBold)
-                OgtCaption("Palermo Soho, CABA · Zona validada · Completado")
+            PrefCategory("Proceso", "Paso 2 de 3")
+            PrefGroup {
+                PrefLine(
+                    title = "Confirmación de zona",
+                    body = "Palermo Soho, CABA · Zona validada",
+                    trailing = "Listo",
+                )
+                PrefDivider()
+                PrefLine(
+                    title = "Documento o servicio",
+                    body = "DNI o factura con domicilio. JPG, PNG o PDF. Máx. 10 MB.",
+                    trailing = "En curso",
+                )
+                PrefDivider()
+                PrefLine(
+                    title = "Aval de la comunidad",
+                    body = "Dos perfiles verificados pueden confirmar que formás parte.",
+                    trailing = "Opcional",
+                )
             }
-            OgtCard {
-                OgtPill("En curso")
-                Text("Paso 2: Documento o Servicio de Residencia", fontWeight = FontWeight.Bold)
-                OgtCaption("Subí o escaneá DNI o factura con domicilio coincidente. JPG, PNG o PDF digital. Máx 10 MB.")
-            }
-            OgtCard {
-                OgtPill("Opcional")
-                Text("Paso 3: Aval de la comunidad", fontWeight = FontWeight.SemiBold)
-                OgtCaption("2 perfiles verificados pueden avalar que formás parte de la comunidad.")
-            }
-            OgtCaption("Tus documentos se procesan cifrados y se eliminan tras la validación automática. Nunca vendemos ni compartimos datos con terceros.")
-            OgtPrimaryButton("Escanear Documento con la Cámara") { onContinue() }
-            OgtSecondaryButton("Subir comprobante en PDF o Foto") { onContinue() }
+            OgtCaption("Los documentos se procesan cifrados y se borran al validar. No se venden ni se comparten.")
+            OgtPrimaryButton("Escanear documento") { onContinue() }
+            OgtSecondaryButton("Subir PDF o foto") { onContinue() }
             GhostLink("Continuar sin verificar") { onContinue() }
             Spacer(Modifier.height(24.dp))
         }
-    }
-}
-
-@Composable
-private fun Benefit(title: String, body: String) {
-    OgtCard {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OgtPill("Exclusivo")
-        }
-        Text(title, fontWeight = FontWeight.Bold)
-        OgtCaption(body)
     }
 }

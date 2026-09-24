@@ -37,6 +37,9 @@ object OgtIds {
     const val PostAcmeRse = "66666666-6666-6666-6666-666666666666"
     const val PostTernura = "post-ternura-camila"
     const val PostHomenaje = "post-homenaje-roberto"
+    /** Card de prueba: anécdota puntual de Sofía en el feed (no es un share propio). */
+    const val PostAnecdoteShare = "post-anecdote-sofia-hector"
+    const val AnecdoteHectorSillas = "anecdote-hector-sillas"
     const val SpotCorrientes = "spot-corrientes"
     const val AnimalLuna = "animal-luna"
     const val AnimalOliver = "animal-oliver"
