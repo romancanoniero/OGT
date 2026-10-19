@@ -1,0 +1,12 @@
+--- a/backend/src/main/kotlin/com/onlygoodthings/backend/Application.kt
++++ b/backend/src/main/kotlin/com/onlygoodthings/backend/Application.kt
+@@ -129,7 +129,8 @@
+         bearer("firebase") {
+             realm = "OnlyGoodThings"
+             authenticate { credential ->
+-                val verified = verifier.verify(credential.token)
++                val verified = runCatching { verifier.verify(credential.token) }.getOrNull()
++                    ?: return@authenticate null
+                 val profile = identity.upsertFromFirebase(verified)
+                 AuthPrincipal(
+                     userId = profile.id,

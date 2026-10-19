@@ -1,0 +1,20 @@
+{
+  "scope": "Catch rejected Firebase credentials and return unauthenticated; all non-Application class entries retained from deployed jar",
+  "before": "5f78bef5ef37b55140db84b525cfd8a2e58c9433b78b42bb2bacad26f1b6ae17",
+  "after": "0cece58b37aa0cab1741a4007363c4b16f428a4bb91b77393e34edd59a2f8b4d",
+  "changedEntries": [
+    "com/onlygoodthings/backend/ApplicationKt$module$8$1.class",
+    "com/onlygoodthings/backend/ApplicationKt.class",
+    "com/onlygoodthings/backend/ApplicationKt$module$7$1$1.class",
+    "com/onlygoodthings/backend/ApplicationKt$module$5$2.class",
+    "com/onlygoodthings/backend/ApplicationKt$module$5$1.class"
+  ],
+  "deployed": true,
+  "backup": "/home/iankmp/ogt-backups/auth401-20261019",
+  "rollbackImage": "ogt-backend:pre-auth401-20261019",
+  "publicChecks": {
+    "health": 200,
+    "anonymousAuthMe": 401,
+    "devTokenAuthMe": 401
+  }
+}

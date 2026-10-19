@@ -12,7 +12,7 @@
 <body>
   <div id="auth-root" hidden></div>
   <div class="shell" id="app-shell">
-    <aside class="nav">
+    <aside class="nav" aria-label="Navegación principal">
       <div class="brand">
         <img class="ogt-mark ogt-mark--nav" src="ogt-logo.png?v=mark" alt="">
         <span class="brand-name">Only Good Things</span>
@@ -22,7 +22,7 @@
     <div class="center" id="center-col">
       <main class="main" id="main"></main>
     </div>
-    <aside class="rail" id="civic-rail">
+    <aside class="rail" id="civic-rail" aria-label="Comunidad">
       <section class="rail-block">
         <div class="rail-kicker"><span>Pulso cercano</span><span>En vivo</span></div>
         <div id="rail-pulse"></div>
@@ -45,7 +45,7 @@
         <a class="rail-link" href="#/reglas">Leer manifiesto</a>
       </section>
     </aside>
-    <div class="fab-layer" id="fab-layer" hidden>
+    <div class="fab-layer" id="fab-layer" role="region" aria-label="Crear publicación" hidden>
       <a class="publish-fab" id="publish-fab" href="#/publicar" title="Publicar · arrastrá para mover" aria-label="Publicar" draggable="false"></a>
     </div>
   </div>

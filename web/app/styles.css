@@ -1,7 +1,7 @@
 :root {
   --ink: #111213;
   --primary: #111213;
-  --muted: #6b7280;
+  --muted: #626976;
   --disabled-ink: #8B929A;
   --tertiary: #5b6570;
   --canvas: #ffffff;
@@ -611,7 +611,7 @@ span.avatar svg { width: 18px; height: 18px; }
   text-align: left;
 }
 .who-choice button.on { background: var(--sand); border-color: var(--secondary); }
-.who-choice small { display: block; color: var(--muted); font-size: 12px; font-weight: 400; }
+.who-choice small { display: block; color: #626976; font-size: 12px; font-weight: 400; }
 .media-pick { margin-top: 16px; }
 .media-pick input { display: none; }
 .media-add {
@@ -1460,4 +1460,12 @@ body.desk .center {
   .brand { padding: 0 0 16px; align-items: center; }
   .brand-name { display: none; }
   .brand .ogt-mark--nav { width: 48px; height: 48px; }
+}
+
+/* Keep small status labels legible against the light pill background. */
+.listing .pill, .notice .pill { color: #626976; }
+.listing .pill.lost { color: var(--sunset-text); }
+@media (max-width: 640px) {
+  .section-head { flex-wrap: wrap; }
+  .section-head h1 { flex-basis: 100%; overflow-wrap: anywhere; }
 }

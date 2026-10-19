@@ -1,0 +1,14 @@
+{
+  "scope": "Mobile heading wrapping, notice label and secondary text contrast",
+  "files": {
+    "styles.css": {
+      "before": "91a0a5d154a43f0f157004d78ab32f427a74761ce88efaef401c299dde01c488",
+      "after": "0fce08e5b0314ad39e9ae4d18d0e3f78f624614d21f07e40d596d71c19a8cae8"
+    },
+    "index.html": {
+      "before": "a3f452224409560f61e08a128775f60e6320c859ed1ad7652bad77ee8cfeddcf",
+      "after": "92d7c47970eb600744a642eccdd12faedaeb03f8e0c770beea607921fba61d9e"
+    }
+  },
+  "backup": "/home/iankmp/ogt-backups/mobile-readability-20261019T192442Z"
+}

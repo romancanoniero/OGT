@@ -264,3 +264,54 @@ Regresión local completa posterior: **24/24 pruebas aprobadas** en Chromium y
 WebKit móvil emulado. El control aislado del proxy también pasa. Estos resultados
 no equivalen a E2E autenticado de producción: Firebase Admin y OAuth/SMS reales
 siguen pendientes; la herramienta de navegador continúa bloqueada por su política.
+
+## Auditoría UI y autenticación real (19/10/2026)
+
+Se agregó `tests/ui-readiness.spec.mjs`: recorre 12 pantallas autenticadas en
+Chromium y WebKit móvil emulado, conserva capturas, revisa errores JavaScript,
+desbordamiento horizontal, solapamiento del encabezado y accesibilidad con axe.
+La primera ejecución identificó enlaces móviles sin nombre accesible, regiones
+sin distinguir y contraste insuficiente en etiquetas y opciones de publicación.
+Se corrigieron y publicaron nombres/regiones/contraste con respaldo registrado
+en `baselines/accessibility-deployment-20261019.json`. Las 24 pruebas funcionales
+pasaron y posteriormente las dos auditorías de accesibilidad pasaron. La revisión
+visual detectó además un encabezado móvil superpuesto: se agregó ajuste de filas
+y una comprobación geométrica; su estado debe verificarse en la siguiente ejecución.
+Los informes automáticos no sustituyen teclado, lectores ni dispositivos reales.
+
+La credencial Firebase Admin aportada localmente fue validada sin mostrar claves,
+guardada con permisos 0600 fuera del repositorio y copiada por SSH a la carpeta
+privada `/home/iankmp/ogt-secrets`. Google aceptó la credencial desde Mac y Contabo.
+Un contenedor temporal con la imagen desplegada verificó un ID token real de
+Firebase emitido para una identidad sintética; la identidad Firebase se eliminó
+al finalizar, sin escribir en la base de datos OGT. Esto no prueba OAuth/SMS UI.
+
+Se activó Firebase Admin en el backend existente de Contabo mediante montaje de
+solo lectura y se configuró `OGT_ALLOW_DEV_TOKENS=false`, `OGT_ENV=production`.
+Se recreó solo API y se recargó Nginx. Respaldo de configuración con permisos 0600:
+`/home/iankmp/ogt-backups/firebase-20261019T191747Z`. La salud interna pasó.
+No se desplegaron aún los demás cambios de backend de la rama de lanzamiento.
+
+Comprobación pública tras activar Firebase: `/health` y portada 200, perfil sin
+sesión 401. Un token de laboratorio ya no permite acceder, pero el backend antiguo
+responde 500 en vez de 401: defecto pendiente de desplegar el manejo de excepciones
+ya presente en la rama. No afirmar certificación de producción.
+
+La auditoría ampliada detectó además contraste insuficiente en metadatos del feed
+sobre fondo claro. Se ajustó el gris secundario de #6b7280 a #626976; diferencia
+visual intencional para mejorar legibilidad. El encabezado móvil ahora distribuye
+título y controles en filas separadas. Ambos cambios requieren registrar la
+validación final y desplegarse; no están en el primer parche de accesibilidad.
+
+Nombre público acordado: **OGT** o **Only Good Things**. El ID técnico Firebase
+permanece `goodthings-55612`.
+
+Validación final de UI: las dos auditorías ampliadas pasan (Chromium y WebKit móvil), incluidas las 12 pantallas, contraste y ausencia de solapamiento del encabezado. Captura móvil de Mascotas revisada visualmente.
+
+Se publicó el ajuste móvil y de contraste, con respaldo y hashes en `baselines/mobile-readability-deployment-20261019.json`. La hoja de estilos descargada por HTTPS coincide exactamente con el archivo preparado; salud pública 200.
+
+Parche mínimo de autenticación desplegado: `baselines/auth401-hotfix-20261019.{json,patch}`. Se reconstruyó la base probada de Contabo y se conservaron byte por byte todas las entradas ajenas a ApplicationKt del JAR original. La imagen anterior permanece etiquetada para reversión. Contenedor temporal: salud 200, token inválido 401, anónimo 401; mismos resultados públicos tras despliegue. No hay cambios de esquema ni despliegue del resto de la rama.
+
+Una regresión completa se interrumpió al detenerse el emulador local de autenticación (puerto 19099 sin proceso); no se contabiliza como aprobación. Se reinició el servicio y se repite la suite completa.
+
+Resultado de la repetición completa tras recuperar el emulador: **26/26 pruebas aprobadas en 1,1 minutos**, incluyendo flujos funcionales y auditoría de 12 pantallas en Chromium y WebKit móvil emulado. Persisten pendientes de lanzamiento: OAuth/SMS de usuario real, dispositivos reales y despliegue/regresión de los restantes cambios de backend (incluida compresión de imágenes). No interpretar la sincronización de esta rama como igualdad total con producción ni con main.

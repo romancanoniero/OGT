@@ -386,7 +386,7 @@ function renderNav(page) {
     : page;
   document.getElementById("nav-links").innerHTML = items.map(([id, label, ic]) => {
     const on = id === current ? " on" : "";
-    return `<a class="${on}" href="#/${id}"><span class="glyph">${icon(ic)}</span><span>${label}</span></a>`;
+    return `<a class="${on}" href="#/${id}" aria-label="${escapeHtml(label)}"><span class="glyph">${icon(ic)}</span><span>${label}</span></a>`;
   }).join("");
 }
 
