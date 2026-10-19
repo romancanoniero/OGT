@@ -45,6 +45,7 @@ Pruebas:
 
 ```sh
 node --test qa/auth-unit.test.mjs
+sh qa/check-nginx.sh
 cd qa
 npx playwright install chromium webkit
 npm test
@@ -71,6 +72,11 @@ Para liberar el entorno aislado: detener los procesos de las terminales y ejecut
 | Interfaz anónima Chromium/WebKit móvil | 4 aprobadas |
 | Registro → API → persistencia → avatar → nueva sesión | Aprobado en Chromium y WebKit móvil |
 | API: sesiones falsas y subidas anónimas | Aprobado en ambos proyectos de navegador |
+| Publicación con foto, comentarios y permisos entre cuentas | Aprobado en Chromium y WebKit móvil |
+| Trueque: coincidencias, repetición, apoyo y cierre | Aprobado; conserva historial y retira acciones activas al cerrar |
+| Mensajes privados, roles y subidas concurrentes/inválidas | Aprobado con cuentas sintéticas y API local |
+| Accesibilidad automática del acceso | Cero incidencias axe en ambos navegadores; no certifica otras pantallas |
+| Nginx: sintaxis y rutas de medios/API | Aprobado en contenedor con upstream simulado |
 | Android: compilación completa | Bloqueada por ausencia de `google-services.json` |
 | Android: compilación Kotlin omitiendo generación Firebase | Aprobada; no equivale a APK/configuración verificados |
 | Producción: consulta de configuración sin mutaciones | Laboratorio habilitado; ruta Firebase Admin ausente |
@@ -89,6 +95,17 @@ correctamente. Para alojar navegadores en el disco externo, usar
 `PLAYWRIGHT_BROWSERS_PATH=/Volumes/DEV_MAC/OGT/.recovery/playwright` tanto al instalar
 como al ejecutar Playwright.
 
+La ampliación posterior completa 16 casos Playwright aprobados, con Firebase emulado,
+API y base reales locales. Incluye publicación desde la interfaz y controles de API
+entre cuentas distintas; no todos los pasos se realizan mediante botones. Se repitieron
+los 16 tests de backend y los 5 de sesión web; los 122 del dominio compartido permanecen
+aprobados (Gradle los consideró actualizados). No hubo despliegue.
+
+El volumen DEV_MAC sufrió desconexiones durante la sesión. Tras recuperarlo se reinició
+la API, cuyo directorio de trabajo anterior impedía escribir temporales, y la batería
+completa volvió a pasar. Ante otro desmontaje, reiniciar los procesos de QA antes de
+interpretar los fallos; no reconstruir installDist mientras esa API esté ejecutándose.
+
 La inicialización aislada excluye únicamente `14_elpidio_homenaje.sql`, una importación
 editorial que referencia una identidad existente de producción. Las migraciones originales
 se conservan. El script se copia dentro del contenedor para evitar permisos de ejecución
@@ -100,6 +117,11 @@ del volumen macOS. Esto no certifica una instalación limpia de producción.
   conservan el nombre editado en OGT. Antes el nombre antiguo sobrescribía el cambio
   al recargar. El E2E verifica nombre y foto después de guardar, recargar y volver a entrar.
   Email, teléfono y reclamo de reconocimientos mantienen el comportamiento previo.
+- Los pedidos cerrados de Trueque conservan su publicación histórica, pero el feed
+  deja de ofrecer acciones de pedido activo y coincidencias con habilidades.
+- La pantalla de acceso identifica su contenido principal para lectores de pantalla,
+  manteniendo cabecera y pie fuera de ese bloque. La referencia numérica decorativa
+  se excluye del árbol accesible; el aspecto visual permanece igual.
 - Producción falla al iniciar si permite tokens de laboratorio o emulación Firebase.
   Firebase Admin usa credenciales configuradas o Application Default Credentials;
   los tokens inválidos reciben 401. No se cambió la configuración de la VPS.
@@ -124,7 +146,9 @@ del volumen macOS. Esto no certifica una instalación limpia de producción.
 - El script de despliegue verifica la configuración segura antes de copiar archivos.
 - Se recupera la prioridad `^~ /media/` ya presente en GitHub: las fotos y videos
   subidos deben llegar a la API en lugar de resolverse como archivos estáticos de Nginx.
-  La validación de la configuración modificada dentro de Nginx sigue pendiente de Docker.
+  `sh qa/check-nginx.sh` valida la configuración y el enrutamiento de JPG, WebP,
+  MP4, API y health en un contenedor aislado con upstream simulado. No prueba TLS
+  ni la configuración externa de la VPS.
 
 ## Bloqueos y próximos controles
 

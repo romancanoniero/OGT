@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { writeFile } from 'node:fs/promises';
 
 test.beforeEach(async ({ context }) => {
   // Network safety boundary: no test can reach the production API, OAuth or SMS.
@@ -22,7 +23,9 @@ test('login, registration, recovery and phone remain reachable without lab contr
   await expect(page.getByLabel('Contraseña', { exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('login.png'), fullPage: true });
   const accessibility = await new AxeBuilder({ page }).analyze();
+  await writeFile(testInfo.outputPath('accessibility.json'), JSON.stringify(accessibility.violations, null, 2));
   await testInfo.attach('accessibility-audit', { body: JSON.stringify(accessibility.violations, null, 2), contentType: 'application/json' });
+  expect(accessibility.violations).toEqual([]);
   await page.getByRole('link', { name: 'Crear cuenta', exact: true }).click();
   await expect(page.getByLabel('Nombre y apellido')).toBeVisible();
   await page.goto('/#/recuperar');

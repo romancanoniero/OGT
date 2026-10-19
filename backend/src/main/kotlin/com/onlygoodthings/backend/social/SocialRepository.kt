@@ -1029,7 +1029,7 @@ class SocialSqlRepository(private val db: Database) {
                 FROM social_posts p
                 LEFT JOIN users u ON u.id = p.author_user_id
                 LEFT JOIN companies c ON c.id = p.author_company_id
-                LEFT JOIN timebank_needs tn ON tn.post_id = p.id
+                LEFT JOIN timebank_needs tn ON tn.post_id = p.id AND tn.open
                 LEFT JOIN skill_tags nt ON nt.id = tn.tag_id
                 WHERE p.id IN ($placeholders)
                 """.trimIndent(),

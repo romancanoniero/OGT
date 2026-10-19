@@ -4172,7 +4172,7 @@ function paintAuth(key, still, panel, card) {
   document.getElementById("auth-root").innerHTML = `
     <div class="auth-desk">
       ${authBar(back[0], back[1])}
-      <div class="auth-grid">
+      <div class="auth-grid" role="main" aria-label="Acceso a Only Good Things">
         ${still}
         <section class="auth-panel${card ? " is-card" : ""}">${panel}</section>
       </div>
