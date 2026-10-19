@@ -1571,10 +1571,8 @@ function truequeExtrasHtml(post) {
   const { need, give } = truequeExchange(post);
   const count = post.supportCount || 0;
   const invited = post.viewerInvited && !post.viewerSupported;
-  const canHelp = Boolean(post.matchesMyOffer);
   return `<div class="trueque-extras">
     <div class="pill-row"><span class="stories-head">${icon("qs-skills")}<span class="pill">Trueque</span></span></div>
-    ${canHelp ? `<p class="caption">Podés dar lo que pide</p>` : ""}
     ${need ? `<p class="swap"><span><em>Necesita</em> ${escapeHtml(need)}</span></p>` : ""}
     <p class="hint">A cambio se puede recibir</p>
     ${offerPillsHtml(give)}
