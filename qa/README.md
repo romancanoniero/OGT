@@ -330,3 +330,23 @@ La web pública todavía mostraba controles de laboratorio. Se desplegaron los c
 El intento Google desde el navegador integrado terminó con `auth/network-request-failed` antes del selector de cuenta. Los endpoints públicos Firebase responden; el acceso por correo llega a Firebase. Se solicitó comprobar Google en Safari/Chrome para distinguir el entorno integrado de un defecto de OGT. Google y SMS continúan pendientes de aprobación E2E real.
 
 La corrección del proxy también recuperó el video de introducción existente: HTTP 200, video/mp4, 6.111.790 bytes; no se reemplazó ni eliminó el recurso.
+
+
+## Correcciones compatibles de perfil, mascotas, estacionamiento y cierre (19/10/2026)
+
+Paquete preparado sobre la versión exacta de producción, sin sustituir shared-jvm ni activar cambios adicionales de clasificación del feed. Diferencias intencionales:
+- Un perfil existente conserva el nombre editado en OGT al volver a iniciar sesión con Firebase.
+- La consulta de mascotas cercanas devuelve una estructura serializable con los mismos campos.
+- Un lugar de estacionamiento disponible dura hasta su vencimiento; se corrige la devolución SQL de distancia y confirmación.
+- Las publicaciones de pedidos cerrados permanecen en el historial, pero dejan de incluir una referencia de pedido activo.
+- Los ajustes de producción rechazan explícitamente tokens de laboratorio y emuladores.
+
+La nueva prueba `tests/closed-need.spec.mjs` falló antes de aplicar el cambio porque devolvía un needId cerrado; pasó después en Chromium y WebKit móvil. La corrección mínima de producción está registrada en `baselines/closed-need-production-20261019.patch` (ya está incluida en el código de la rama).
+
+Validación del paquete exacto: 16 pruebas unitarias/HTTP aprobadas; 26 pruebas E2E/UI aprobadas ejecutando `OGT_FULL_E2E=1 npm --prefix qa test -- --grep-invert 'trueque published'`. Esta selección incluye el nuevo cierre; excluye las dos ejecuciones del escenario de coincidencia de habilidades, que pertenece a cambios de feed de la rama aún no desplegados. No se oculta una falla del paquete: esa funcionalidad adicional se conserva pendiente y no se incorpora mediante este parche. El JAR probado utiliza shared-jvm de Contabo, no el de la rama con funcionalidades adicionales.
+
+El contenedor candidato en Contabo respondió salud 200 y sesión falsa 401. También verificó un ID token real de Firebase con identidad sintética eliminada al terminar, sin escribir en la base OGT. El usuario informó que Google abre sesión desde su navegador; una verificación de solo lectura confirmó que el perfil consultado y Firebase comparten identidad, correo verificado y proveedor Google. Esto no sustituye la prueba pendiente de SMS ni de todos los dispositivos.
+
+Despliegue completado con respaldo y hashes en `baselines/readiness-fixes-deployment-20261019.json`. Verificación pública posterior: salud 200; perfil anónimo, token falso y subida sin sesión 401. Se conservaron 155 entradas ajenas al parche y la biblioteca shared de producción.
+
+El usuario realizará la prueba de teléfono/SMS más adelante. Permanece pendiente, no bloquea el trabajo independiente y no se registra como aprobada.

@@ -1,0 +1,30 @@
+{
+  "scope": "Preserve edited profile names, serialize nearby pets, repair parking expiry and SQL returns; forbid insecure production authentication settings; closed needs retain history without active reference",
+  "before": "7914a644393648dab74d1feb3c979b3f02d1146ab9865ff998253f7ec701336f",
+  "after": "2d1a62ec9e1c4ab690eaf99cfffd5e1d82dc73313c9f0b14d65a1f52eb28e7d0",
+  "unchangedEntries": 155,
+  "changedPrefixes": [
+    "com/onlygoodthings/backend/ApplicationKt",
+    "com/onlygoodthings/backend/auth/AuthSettings",
+    "com/onlygoodthings/backend/auth/FirebaseAdminTokenVerifier",
+    "com/onlygoodthings/backend/infra/IdentityStore",
+    "com/onlygoodthings/backend/modules/CommunityRoutesKt",
+    "com/onlygoodthings/backend/modules/NearbyAnimalDto",
+    "com/onlygoodthings/backend/parking/ParkingSqlRepository",
+    "com/onlygoodthings/backend/social/SocialSqlRepository"
+  ],
+  "sharedLibraryUnchanged": true,
+  "backup": "/home/iankmp/ogt-backups/readiness-fixes-20261019T195303Z",
+  "rollbackImage": "ogt-backend:pre-readiness-fixes-20261019",
+  "publicChecks": {
+    "health": 200,
+    "anonymous": 401,
+    "forged": 401,
+    "anonymous_upload": 401
+  },
+  "validation": {
+    "unitAndHttpTests": 16,
+    "e2eAndUiTests": 26,
+    "realFirebaseTokenVerified": true
+  }
+}
