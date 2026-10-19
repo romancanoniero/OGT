@@ -7,6 +7,24 @@ HOST="${OGT_VPS_HOST:-iankmp-vps}"
 REMOTE="${OGT_VPS_DIR:-ogt}"
 PORT="${OGT_VPS_PORT:-19080}"
 
+# Stop before rsync or service changes when production authentication is unsafe.
+ssh -o BatchMode=yes "$HOST" python3 - "$REMOTE" <<'CHECK_AUTH'
+from pathlib import Path
+import sys
+env_path = Path.home() / sys.argv[1] / '.env'
+if not env_path.is_file():
+    sys.exit('Deployment blocked: configure production Firebase credentials and .env first.')
+values = {}
+for line in env_path.read_text().splitlines():
+    if '=' in line and not line.lstrip().startswith('#'):
+        key, value = line.split('=', 1)
+        values[key.strip()] = value.strip().strip('\"\'')
+if values.get('OGT_ENV', 'production') != 'production' or values.get('OGT_ALLOW_DEV_TOKENS', 'false') != 'false' or values.get('FIREBASE_AUTH_EMULATOR_HOST'):
+    sys.exit('Deployment blocked: production must reject laboratory tokens and Firebase emulators.')
+if not (values.get('OGT_FIREBASE_CREDENTIALS') or values.get('GOOGLE_APPLICATION_CREDENTIALS')):
+    sys.exit('Deployment blocked: configure Firebase Admin credentials inside the API container first.')
+CHECK_AUTH
+
 cd "$ROOT"
 echo "Compilando :backend:installDist y el SDK web…"
 ./gradlew :backend:installDist :shared:syncWebSdk --quiet
@@ -35,7 +53,8 @@ if [[ ! -f .env ]]; then
   cat > .env <<EOF
 OGT_DB_USER=ogt
 OGT_DB_PASSWORD=$PASS
-OGT_ALLOW_DEV_TOKENS=true
+OGT_ENV=production
+OGT_ALLOW_DEV_TOKENS=false
 OGT_FIREBASE_PROJECT_ID=goodthings-55612
 OGT_FIREBASE_CREDENTIALS=
 EOF

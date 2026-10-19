@@ -43,3 +43,12 @@ out/
 # Multimedia subida / importada (vive en la VPS)
 data/media/
 deploy/vps/media/
+
+# Local QA tools and evidence (never production data)
+node_modules/
+qa/test-results/
+qa/playwright-report/
+qa/artifacts/
+/.recovery/
+/secrets
+/README.txt

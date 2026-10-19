@@ -1,7 +1,7 @@
 package com.onlygoodthings.shared.data
 
 /** API en la VPS. HTTP de lab, como la demo de Dentastic. */
-const val OGT_DEFAULT_API_BASE = "http://217.216.82.209:19080"
+const val OGT_DEFAULT_API_BASE = "https://onlygoodthings.lat"
 
 class SessionStore {
     var firebaseJwt: String? = null

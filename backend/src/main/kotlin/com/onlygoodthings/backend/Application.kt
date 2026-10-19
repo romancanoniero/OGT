@@ -1,6 +1,7 @@
 package com.onlygoodthings.backend
 
 import com.onlygoodthings.backend.auth.AuthPrincipal
+import com.onlygoodthings.backend.auth.AuthSettings
 import com.onlygoodthings.backend.auth.CompositeTokenVerifier
 import com.onlygoodthings.backend.auth.FirebaseAdminTokenVerifier
 import com.onlygoodthings.backend.auth.FirebaseTokenVerifier
@@ -72,7 +73,8 @@ fun Application.module() {
     val redisUrl = env("OGT_REDIS_URL", "redis://127.0.0.1:6379")
     val firebaseProject = env("OGT_FIREBASE_PROJECT_ID", "goodthings-55612")
     val credentials = env("OGT_FIREBASE_CREDENTIALS", "")
-    val allowDev = env("OGT_ALLOW_DEV_TOKENS", "true").toBoolean()
+    val authSettings = AuthSettings.from(System::getenv)
+    val allowDev = authSettings.allowDevTokens
     val parkingProximity = env("OGT_PARKING_PROXIMITY_METERS", "40").toDoubleOrNull()
         ?: com.onlygoodthings.shared.domain.ParkingRules.PROXIMITY_METERS
     val mediaStore = MediaStore(
@@ -87,7 +89,7 @@ fun Application.module() {
     redis.subscribeTree { channel, payload -> hub.ingestTreeChannel(channel, payload) }
     val verifier: FirebaseTokenVerifier = CompositeTokenVerifier(
         allowDev = allowDev,
-        production = if (credentials.isNotBlank()) {
+        production = if (!allowDev || credentials.isNotBlank()) {
             FirebaseAdminTokenVerifier(firebaseProject, credentials)
         } else {
             null
@@ -129,7 +131,8 @@ fun Application.module() {
         bearer("firebase") {
             realm = "OnlyGoodThings"
             authenticate { credential ->
-                val verified = verifier.verify(credential.token)
+                val verified = runCatching { verifier.verify(credential.token) }.getOrNull()
+                    ?: return@authenticate null
                 val profile = identity.upsertFromFirebase(verified)
                 AuthPrincipal(
                     userId = profile.id,

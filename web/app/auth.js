@@ -1,10 +1,11 @@
 /**
  * Sesión web: mismo Firebase que la app, sin Sign in with Apple.
- * El JWT va a /auth/session; si Admin no está en la VPS, cae al token de lab
- * `dev.<uid>.USER` como hace la app en HTTP.
+ * Una sesión Firebase fallida nunca se convierte en una sesión de laboratorio.
  */
 (function () {
-  const CFG = {
+  const local = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+  const allowDevLogin = local && window.OGT_ALLOW_DEV_LOGIN === true;
+  const CFG = (local && window.OGT_FIREBASE_CONFIG) || {
     apiKey: "AIzaSyB1RV-RbmE-JDpJuczwVed2bV-cnSaPZSQ",
     authDomain: "goodthings-55612.firebaseapp.com",
     projectId: "goodthings-55612",
@@ -16,6 +17,7 @@
   let token = localStorage.getItem("ogt.token") || "";
   let pendingPhone = null;
   let recaptcha = null;
+  let emulatorConfigured = false;
 
   function persist(next) {
     token = next || "";
@@ -26,7 +28,14 @@
   function auth() {
     if (!window.firebase || !firebase.auth) throw new Error("Firebase Auth no cargó");
     if (!firebase.apps.length) firebase.initializeApp(CFG);
-    return firebase.auth();
+    const instance = firebase.auth();
+    if (local && window.OGT_AUTH_EMULATOR && !emulatorConfigured) {
+      const emulator = new URL(window.OGT_AUTH_EMULATOR);
+      if (!["localhost", "127.0.0.1", "[::1]"].includes(emulator.hostname)) throw new Error("El emulador debe ser local");
+      instance.useEmulator(emulator.origin, { disableWarnings: true });
+      emulatorConfigured = true;
+    }
+    return instance;
   }
 
   async function postJson(path, body, bearer) {
@@ -39,7 +48,7 @@
       body: JSON.stringify(body || {}),
     });
     const json = await res.json();
-    if (!json.success) throw new Error(json.message || "Error");
+    if (!res.ok || !json.success) throw new Error(json.message || "Error");
     return json.data;
   }
 
@@ -49,11 +58,9 @@
       await postJson("/api/v1/auth/session", { token: jwt }, jwt);
       persist(jwt);
       return jwt;
-    } catch (_) {
-      const lab = `dev.${user.uid}.USER`;
-      await postJson("/api/v1/auth/session", { token: lab }, lab);
-      persist(lab);
-      return lab;
+    } catch (err) {
+      persist("");
+      throw err;
     }
   }
 
@@ -89,20 +96,40 @@
     return recaptcha;
   }
 
+  if (token.startsWith("dev.") && !allowDevLogin) persist("");
+  const ready = new Promise((resolve) => {
+    try {
+      const unsubscribe = auth().onAuthStateChanged(() => { resolve(); queueMicrotask(() => unsubscribe()); }, () => resolve());
+    } catch (_) { resolve(); }
+  });
+
   window.OgtAuth = {
+    ready,
+    allowDevLogin,
     token() {
       return token;
     },
     async ensureSession() {
-      if (token) return true;
+      await ready;
+      if (allowDevLogin && token.startsWith("dev.")) return true;
       try {
         const user = auth().currentUser;
-        if (!user) return false;
+        if (!user) { persist(""); return false; }
         await openSession(user);
         return true;
       } catch (_) {
-        return Boolean(token);
+        persist("");
+        return false;
       }
+    },
+    async getToken() {
+      await ready;
+      if (allowDevLogin && token.startsWith("dev.")) return token;
+      const user = auth().currentUser;
+      if (!user) { persist(""); return ""; }
+      const jwt = await user.getIdToken(false);
+      persist(jwt);
+      return jwt;
     },
     async signInEmail(email, password) {
       return wrap(async () => {
@@ -155,6 +182,7 @@
       return wrap(async () => auth().fetchSignInMethodsForEmail(email));
     },
     async signInLab(uid, role) {
+      if (!allowDevLogin) throw new Error("El laboratorio no está habilitado");
       const lab = `dev.${uid}.${role || "USER"}`;
       await postJson("/api/v1/auth/session", { token: lab }, lab);
       persist(lab);

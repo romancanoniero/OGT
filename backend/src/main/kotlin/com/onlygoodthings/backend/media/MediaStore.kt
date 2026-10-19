@@ -27,12 +27,19 @@ class MediaStore(
     fun save(bytes: ByteArray, filename: String, contentType: String?, id: String = UUID.randomUUID().toString()): UploadedMedia {
         require(bytes.isNotEmpty()) { "El archivo está vacío" }
         require(bytes.size <= MAX_BYTES) { "El archivo supera ${MAX_BYTES / (1024 * 1024)} MB" }
-        val ext = extensionOf(filename, contentType)
-        val kind = kindOf(ext)
+        val declaredExt = extensionOf(filename, contentType)
+        val kind = kindOf(declaredExt)
+        val optimized = if (kind == MediaKind.IMAGE) ImageOptimizer.optimize(bytes, declaredExt)
+            else ImageOptimizer.Result(bytes, declaredExt)
+        val ext = optimized.extension
         val stored = "$id.$ext"
         require(isSafeName(stored)) { "Nombre de archivo inválido" }
         val dest = uploadsDir().resolve(stored)
-        Files.write(dest, bytes)
+        val temporary = Files.createTempFile(uploadsDir(), ".upload-", ".tmp")
+        try {
+            Files.write(temporary, optimized.bytes)
+            Files.move(temporary, dest)
+        } finally { Files.deleteIfExists(temporary) }
         return UploadedMedia(
             id = id,
             kind = kind,
@@ -79,7 +86,7 @@ class MediaStore(
                     else -> null
                 }
             }
-            return fromType ?: fromName ?: error("Formato no soportado. Usá jpg, png, webp, mp4 o webm")
+            return fromType ?: fromName ?: throw IllegalArgumentException("Formato no soportado. Usá jpg, png, webp, mp4 o webm")
         }
 
         fun kindOf(ext: String): MediaKind = when (ext) {

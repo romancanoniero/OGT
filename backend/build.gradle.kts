@@ -37,8 +37,13 @@ dependencies {
     implementation(libs.logback.classic)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.datetime)
+    implementation("com.twelvemonkeys.imageio:imageio-webp:3.12.0")
+    implementation("com.twelvemonkeys.imageio:imageio-jpeg:3.12.0")
+    implementation("com.drewnoakes:metadata-extractor:2.19.0")
 
     testImplementation(libs.junit.jupiter)
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.12.1")
+    testImplementation("io.ktor:ktor-server-test-host:3.1.3")
 }
 
 tasks.test {

@@ -3,7 +3,7 @@ package com.onlygoodthings.backend.media
 import com.onlygoodthings.backend.auth.AuthPrincipal
 import com.onlygoodthings.backend.http.JsonBody
 import com.onlygoodthings.backend.http.optString
-import com.onlygoodthings.backend.http.reqString
+import com.fasterxml.jackson.core.JsonProcessingException
 import com.onlygoodthings.shared.domain.ApiResponse
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -18,6 +18,8 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import java.nio.file.Files
 import java.util.Base64
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 fun Route.publicMediaRoutes(store: MediaStore) {
     get("/media/u/{name}") {
@@ -35,14 +37,18 @@ fun Route.mediaRoutes(store: MediaStore) {
             HttpStatusCode.Unauthorized,
             ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
         )
-        val dataMap = JsonBody.receiveMap(call)
-        val filename = dataMap.reqString("filename")
+        val dataMap = try { JsonBody.receiveMap(call) } catch (_: JsonProcessingException) {
+            return@post call.respond(HttpStatusCode.BadRequest, ApiResponse.fail<Unit>("JSON inválido", "BAD_REQUEST"))
+        }
+        val filename = requireNotNull(dataMap.optString("filename")) { "Campo requerido: filename" }
         val contentType = dataMap.optString("contentType")
-        val raw = dataMap.reqString("bytesBase64").replace("\\s".toRegex(), "")
+        val encoded = requireNotNull(dataMap.optString("bytesBase64")) { "Campo requerido: bytesBase64" }
+        require(encoded.length <= ((MediaStore.MAX_BYTES + 2) / 3) * 4 + 4096) { "El archivo supera 8 MB" }
+        val raw = encoded.replace("\\s".toRegex(), "")
         val bytes = runCatching { Base64.getDecoder().decode(raw) }.getOrElse {
             return@post call.respond(HttpStatusCode.BadRequest, ApiResponse.fail<Unit>("bytesBase64 inválido", "BAD_REQUEST"))
         }
-        val saved = store.save(bytes, filename, contentType)
+        val saved = withContext(Dispatchers.IO) { store.save(bytes, filename, contentType) }
         call.respond(ApiResponse.ok(saved, "Archivo listo, como una foto subida"))
     }
 }

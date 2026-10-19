@@ -22,6 +22,7 @@ class AuthController(
     private val db: OgtLocalDatabase,
     private val preview: OgtPreviewSession,
     val session: SessionStore = SessionStore().apply { apiBaseUrl = defaultApiBaseUrl() },
+    private val allowDevTokens: Boolean = false,
 ) {
     private val platform = AuthPlatform()
     private val prefs = AuthPrefs()
@@ -168,6 +169,7 @@ class AuthController(
 
     /** Token de lab cuando todavía no hay JWT Firebase, para grabar fichas en el backend local. */
     fun ensureDevBearer() {
+        if (!allowDevTokens) return
         val uid = preview.me().firebaseUid.ifBlank { preview.me().id }
         val lab = "dev.$uid.USER"
         val current = session.firebaseJwt
@@ -197,7 +199,7 @@ class AuthController(
     fun realtimeTokenProvider(): suspend (Boolean) -> String? = { force ->
         platform.idToken(force)
             ?: session.firebaseJwt
-            ?: "dev.${preview.me().firebaseUid.ifBlank { preview.me().id }}.USER"
+            ?: if (allowDevTokens) "dev.${preview.me().firebaseUid.ifBlank { preview.me().id }}.USER" else null
     }
 
     fun markOnboardingDone() {
@@ -213,7 +215,7 @@ class AuthController(
     private suspend fun finishSession(user: AuthUser, keep: Boolean = true) {
         prefs.keepSession = keep
         val token = platform.idToken(true) ?: error("No se pudo obtener el token Firebase")
-        session.firebaseJwt = if (session.apiBaseUrl.startsWith("http://")) {
+        session.firebaseJwt = if (allowDevTokens) {
             "dev.${user.firebaseUid}.USER"
         } else {
             token

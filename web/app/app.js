@@ -790,10 +790,11 @@ function isAuthExpired(err, status, errorCode) {
 }
 
 async function api(path, body) {
+  const bearer = window.OgtAuth?.getToken ? await window.OgtAuth.getToken() : authToken();
   const res = await fetch(`${API}${path}`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${authToken()}`,
+      Authorization: `Bearer ${bearer}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body || {}),
@@ -4252,10 +4253,10 @@ function renderAuth(page, err) {
         <a href="#/registro">Crear cuenta</a>
         <a href="#/telefono">Entrar con teléfono</a>
       </p>
-      <p class="auth-lab">Laboratorio
+      ${window.OgtAuth?.allowDevLogin ? `<p class="auth-lab">Laboratorio
         <button type="button" data-lab="vecino">vecino</button>
         <button type="button" data-lab="empresa">empresa</button>
-      </p>`;
+      </p>` : ""}`;
   }
   const stillTitle = key === "entrar" ? "Las buenas acciones se encuentran." : "";
   const stillSub = key === "registro"

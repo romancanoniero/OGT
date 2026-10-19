@@ -1,0 +1,22 @@
+name: ogt-qa
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    platform: linux/amd64
+    environment:
+      POSTGRES_DB: onlygoodthings
+      POSTGRES_USER: ogt
+      POSTGRES_PASSWORD: ogt_qa_local_only
+    ports:
+      - "127.0.0.1:19432:5432"
+    volumes:
+      - ../database/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ogt -d onlygoodthings"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:19379:6379"

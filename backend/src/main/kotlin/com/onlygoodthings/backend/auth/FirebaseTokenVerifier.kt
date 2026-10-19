@@ -1,6 +1,7 @@
 package com.onlygoodthings.backend.auth
 
 import com.google.auth.oauth2.GoogleCredentials
+import com.google.auth.oauth2.AccessToken
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
@@ -27,10 +28,13 @@ class FirebaseAdminTokenVerifier(
     init {
         if (FirebaseApp.getApps().isEmpty()) {
             val builder = FirebaseOptions.builder().setProjectId(projectId)
-            if (!credentialsPath.isNullOrBlank()) {
-                builder.setCredentials(GoogleCredentials.fromStream(FileInputStream(credentialsPath)))
+            if (!System.getenv("FIREBASE_AUTH_EMULATOR_HOST").isNullOrBlank()) {
+                // Application validates a local emulator and a demo project before initialization.
+                builder.setCredentials(GoogleCredentials.create(AccessToken("owner", java.util.Date(Long.MAX_VALUE))))
+            } else if (!credentialsPath.isNullOrBlank()) {
+                FileInputStream(credentialsPath).use { builder.setCredentials(GoogleCredentials.fromStream(it)) }
             } else {
-                runCatching { builder.setCredentials(GoogleCredentials.getApplicationDefault()) }
+                builder.setCredentials(GoogleCredentials.getApplicationDefault())
             }
             FirebaseApp.initializeApp(builder.build())
         }

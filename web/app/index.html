@@ -61,8 +61,8 @@
         location.replace("http://localhost:" + location.port + location.pathname + location.search + location.hash);
         return;
       }
-      const local = location.hostname === "localhost";
-      window.OGT_API_BASE = local ? "https://onlygoodthings.lat" : "";
+      // Same-origin by default: local QA must never write to production.
+      window.OGT_API_BASE = window.OGT_API_BASE ?? "";
     })();
   </script>
   <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>

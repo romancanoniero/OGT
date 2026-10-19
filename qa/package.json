@@ -1,0 +1,17 @@
+{
+  "name": "ogt-launch-qa",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "auth-emulator": "firebase emulators:start --only auth --project demo-ogt-qa --config firebase.json",
+    "web": "node server.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "firebase-tools": "14.22.0",
+    "firebase": "10.13.2",
+    "sharp": "0.34.5",
+    "@axe-core/playwright": "4.10.2"
+  }
+}

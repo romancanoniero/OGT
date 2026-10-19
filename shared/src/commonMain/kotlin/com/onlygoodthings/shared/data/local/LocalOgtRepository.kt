@@ -167,8 +167,12 @@ class LocalParkingRepository(
         val owner = db.user(currentUserId)
         val from = ownerLocation ?: location
         val ownerEta = if (leftoverNow) 1 else GeoMath.walkEtaSeconds(from, location)
+        val idPrefix = "spot-${now.toString(16)}"
+        var id = idPrefix
+        var suffix = 0
+        while (db.parkingSpots.any { it.id == id }) id = "$idPrefix-${++suffix}"
         val spot = LocalParkingSpot(
-            id = "spot-${now.toString(16)}",
+            id = id,
             ownerUserId = currentUserId,
             claimedByUserId = null,
             latitude = location.latitude,
@@ -186,7 +190,7 @@ class LocalParkingRepository(
             ownerLastLng = from.longitude,
             ownerEtaSeconds = ownerEta,
             interestClosesAtEpochMs = if (leftoverNow) now else ParkingMatch.interestClosesAt(now),
-            ownerWaitDeadlineAtEpochMs = if (leftoverNow) now else ParkingMatch.ownerWaitDeadlineAt(now, ownerEta),
+            ownerWaitDeadlineAtEpochMs = if (leftoverNow) now + ttlMinutes * 60_000L else ParkingMatch.ownerWaitDeadlineAt(now, ownerEta),
             leftoverOpen = leftoverNow,
             matchingResolved = leftoverNow,
         )

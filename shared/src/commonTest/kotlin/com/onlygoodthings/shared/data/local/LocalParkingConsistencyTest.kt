@@ -60,7 +60,7 @@ class LocalParkingConsistencyTest {
     @Test
     fun cancelarElPedidoDelBuscadorDejaLaPlazaFCFS() = runBlocking {
         val (db, owner, firstSeeker) = repos()
-        val sofia = LocalParkingRepository(db, OgtIds.Sofia, Random(1))
+        val sofia = LocalParkingRepository(db, OgtIds.Sofia, Random(1), { 5_000_000L })
         val published = owner.publishVacancy(curb, 12, "Salgo", null, walking, leftoverNow = true)
         firstSeeker.claim(published.id, published.version, walking)
         val released = firstSeeker.cancel(published.id)
