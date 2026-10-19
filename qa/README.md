@@ -77,6 +77,8 @@ Para liberar el entorno aislado: detener los procesos de las terminales y ejecut
 | Mensajes privados, roles y subidas concurrentes/inválidas | Aprobado con cuentas sintéticas y API local |
 | Accesibilidad automática del acceso | Cero incidencias axe en ambos navegadores; no certifica otras pantallas |
 | Nginx: sintaxis y rutas de medios/API | Aprobado en contenedor con upstream simulado |
+| Adopciones: publicación con foto desde UI, edición y cierre propio | Aprobado en Chromium y WebKit móvil |
+| Mascotas perdidas: datos requeridos, cercanía y cierre | Aprobado por API real tras registro UI, en ambos navegadores |
 | Android: compilación completa | Bloqueada por ausencia de `google-services.json` |
 | Android: compilación Kotlin omitiendo generación Firebase | Aprobada; no equivale a APK/configuración verificados |
 | Producción: consulta de configuración sin mutaciones | Laboratorio habilitado; ruta Firebase Admin ausente |
@@ -106,6 +108,12 @@ la API, cuyo directorio de trabajo anterior impedía escribir temporales, y la b
 completa volvió a pasar. Ante otro desmontaje, reiniciar los procesos de QA antes de
 interpretar los fallos; no reconstruir installDist mientras esa API esté ejecutándose.
 
+La tanda de mascotas amplía la batería a 20 casos Playwright, todos aprobados en la
+misma ejecución. Se volvieron a aprobar los 16 tests de backend. Incluye adopción desde
+la interfaz, foto persistente, bloqueo de edición ajena, cierre sin autoasignarse puntos,
+rechazo de alertas sin señas o coordenadas, distancias y exclusión de alertas cerradas.
+No cubre todavía mapas/geocodificación externos ni notificaciones en dispositivos reales.
+
 La inicialización aislada excluye únicamente `14_elpidio_homenaje.sql`, una importación
 editorial que referencia una identidad existente de producción. Las migraciones originales
 se conservan. El script se copia dentro del contenedor para evitar permisos de ejecución
@@ -119,6 +127,9 @@ del volumen macOS. Esto no certifica una instalación limpia de producción.
   Email, teléfono y reclamo de reconocimientos mantienen el comportamiento previo.
 - Los pedidos cerrados de Trueque conservan su publicación histórica, pero el feed
   deja de ofrecer acciones de pedido activo y coincidencias con habilidades.
+- La búsqueda de mascotas cercanas utiliza una respuesta serializable con los mismos
+  campos JSON. Antes fallaba al responder una lista de mapas con tipos mezclados.
+  Se conserva la compatibilidad con fichas antiguas cuyo tamaño es nulo.
 - La pantalla de acceso identifica su contenido principal para lectores de pantalla,
   manteniendo cabecera y pie fuera de ese bloque. La referencia numérica decorativa
   se excluye del árbol accesible; el aspecto visual permanece igual.

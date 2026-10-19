@@ -153,3 +153,69 @@ test('image API rejects invalid content and simultaneous uploads keep distinct r
     expect(await response.body()).toEqual(small);
   }
 });
+
+test('adoption publishes from UI, preserves its photo and restricts edits to the reporter', async ({ page, browser, request }) => {
+  const owner = api(request, await signup(page, 'Vecina QA Mascotas'));
+  await page.goto('/#/publicar/adopcion');
+  await page.locator('[name=petName]').fill('Luna QA');
+  await page.locator('[data-group=species] [data-code=DOG]').click();
+  await page.locator('[data-group=size] [data-code=MEDIUM]').click();
+  await page.getByLabel('Edad', { exact: true }).fill('2 años');
+  await page.getByLabel('Carácter', { exact: true }).fill('Tranquila');
+  await page.getByLabel('Historia y cuidados', { exact: true }).fill('QA necesita un hogar responsable');
+  await page.getByLabel('Barrio', { exact: true }).fill('Palermo');
+  await page.locator('#publish-form [data-file]').setInputFiles({ name: 'pet.jpg', mimeType: 'image/jpeg', buffer: await readFile(new URL('../../backend/src/test/resources/images/rotated.jpg', import.meta.url)) });
+  const published = page.waitForResponse(r => r.url().endsWith('/api/v1/animals/publish'));
+  await page.getByRole('button', { name: 'Publicar en adopción', exact: true }).click();
+  const result = await (await published).json();
+  expect(result.success, JSON.stringify(result)).toBe(true);
+  const listing = result.data;
+  expect(listing.listingId).toBeTruthy();
+  await expect(page).toHaveURL(new RegExp('#/p/' + listing.postId));
+  await page.reload();
+  await expect(page.locator('#main')).toContainText('QA necesita un hogar responsable');
+  const stored = await owner('animals/get', { listingId: listing.listingId });
+  expect(stored.media[0].url).toBe(listing.media[0].url);
+  expect((await request.get(new URL(stored.media[0].url).pathname)).ok()).toBe(true);
+  const context = await browser.newContext();
+  await context.route('**/*', route => ['localhost', '127.0.0.1'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
+  try {
+    const other = api(request, await signup(await context.newPage(), 'Vecino QA Mascotas'));
+    const edit = { ...stored, kind: 'ADOPTION', description: 'QA ficha actualizada' };
+    await other('animals/update', edit, false);
+    expect((await owner('animals/get', { listingId: listing.listingId })).description).toBe(stored.description);
+    expect((await owner('animals/update', edit)).description).toBe(edit.description);
+    const before = await owner('auth/me');
+    const resolved = await owner('animals/resolve', { listingId: listing.listingId });
+    expect(resolved.verifiedOutcome).toBe(false);
+    expect((await owner('auth/me')).communityPoints).toBe(before.communityPoints);
+    await owner('animals/resolve', { listingId: listing.listingId });
+    expect((await owner('animals/open')).some(p => p.listingId === listing.listingId)).toBe(false);
+  } finally { await context.close(); }
+});
+
+test('lost pet requires identifying details and coordinates, appears nearby and closes without self-awards', async ({ page, request }) => {
+  const owner = api(request, await signup(page, 'Vecina QA Alerta'));
+  const draft = { kind: 'LOST', petName: 'Oliver QA', species: 'DOG', size: 'MEDIUM', description: 'QA mascota perdida', marks: 'Collar azul', lastSeenPlace: 'Plaza QA', latitude: -34.6037, longitude: -58.3816 };
+  for (const field of ['marks', 'lastSeenPlace', 'latitude', 'longitude']) {
+    const invalid = { ...draft }; delete invalid[field];
+    await owner('animals/publish', invalid, false);
+  }
+  const listing = await owner('animals/publish', draft);
+  expect(listing.kind).toBe('LOST');
+  expect(listing.marks).toBe(draft.marks);
+  const nearby = await owner('animals/nearby', { latitude: draft.latitude, longitude: draft.longitude, radius: 500 });
+  expect(nearby.some(row => row.id === listing.listingId || row.listingId === listing.listingId)).toBe(true);
+  const found = nearby.find(row => row.id === listing.listingId);
+  expect(found.latitude).toBe(draft.latitude);
+  expect(found.longitude).toBe(draft.longitude);
+  expect(found.distanceMeters).toBeLessThan(1);
+  const far = await owner('animals/nearby', { latitude: 0, longitude: 0, radius: 500 });
+  expect(far.some(row => row.id === listing.listingId)).toBe(false);
+  const before = await owner('auth/me');
+  const closed = await owner('animals/resolve', { listingId: listing.listingId });
+  expect(closed.verifiedOutcome).toBe(false);
+  expect((await owner('auth/me')).communityPoints).toBe(before.communityPoints);
+  expect((await owner('animals/get', { listingId: listing.listingId })).resolved).toBe(true);
+  expect((await owner('animals/nearby', { latitude: draft.latitude, longitude: draft.longitude, radius: 500 })).some(row => row.id === listing.listingId || row.listingId === listing.listingId)).toBe(false);
+});

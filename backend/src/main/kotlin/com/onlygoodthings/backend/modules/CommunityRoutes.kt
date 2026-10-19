@@ -86,6 +86,21 @@ fun Route.referralRoutes(db: Database) {
     }
 }
 
+@kotlinx.serialization.Serializable
+private data class NearbyAnimalDto(
+    val id: String,
+    val kind: String,
+    val species: String,
+    val size: String?,
+    val urgency: String,
+    val title: String,
+    val description: String,
+    val latitude: Double,
+    val longitude: Double,
+    val radiusMeters: Int,
+    val distanceMeters: Double,
+)
+
 fun Route.animalRoutes(db: Database, hub: RealtimeHub) {
     val animals = AnimalSqlRepository(db)
     val outcomes = OutcomeSqlRepository(db)
@@ -199,18 +214,18 @@ fun Route.animalRoutes(db: Database, hub: RealtimeHub) {
                     buildList {
                         while (rs.next()) {
                             add(
-                                mapOf(
-                                    "id" to rs.getString("id"),
-                                    "kind" to rs.getString("kind"),
-                                    "species" to rs.getString("species"),
-                                    "size" to rs.getString("size"),
-                                    "urgency" to rs.getString("urgency"),
-                                    "title" to rs.getString("title"),
-                                    "description" to rs.getString("description"),
-                                    "latitude" to rs.getDouble("lat"),
-                                    "longitude" to rs.getDouble("lng"),
-                                    "radiusMeters" to rs.getInt("alert_radius_m"),
-                                    "distanceMeters" to rs.getDouble("meters"),
+                                NearbyAnimalDto(
+                                    id = rs.getString("id"),
+                                    kind = rs.getString("kind"),
+                                    species = rs.getString("species"),
+                                    size = rs.getString("size"),
+                                    urgency = rs.getString("urgency"),
+                                    title = rs.getString("title"),
+                                    description = rs.getString("description"),
+                                    latitude = rs.getDouble("lat"),
+                                    longitude = rs.getDouble("lng"),
+                                    radiusMeters = rs.getInt("alert_radius_m"),
+                                    distanceMeters = rs.getDouble("meters"),
                                 ),
                             )
                         }
