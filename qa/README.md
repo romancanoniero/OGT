@@ -315,3 +315,18 @@ Parche mínimo de autenticación desplegado: `baselines/auth401-hotfix-20261019.
 Una regresión completa se interrumpió al detenerse el emulador local de autenticación (puerto 19099 sin proceso); no se contabiliza como aprobación. Se reinició el servicio y se repite la suite completa.
 
 Resultado de la repetición completa tras recuperar el emulador: **26/26 pruebas aprobadas en 1,1 minutos**, incluyendo flujos funcionales y auditoría de 12 pantallas en Chromium y WebKit móvil emulado. Persisten pendientes de lanzamiento: OAuth/SMS de usuario real, dispositivos reales y despliegue/regresión de los restantes cambios de backend (incluida compresión de imágenes). No interpretar la sincronización de esta rama como igualdad total con producción ni con main.
+
+
+## Despliegue aislado de multimedia y sesiones web (19/10/2026)
+
+Se desplegó solo el paquete multimedia sobre la imagen de producción con el parche 401, conservando 188 entradas ajenas a multimedia del JAR byte por byte. Se incorporaron nueve bibliotecas de imagen; las bibliotecas anteriores no cambiaron. Respaldo y hashes: `baselines/media-deployment-20261019.json`. Imagen de reversión: `ogt-backend:pre-media-20261019`. Se corrigió la prioridad de `/media/` en Nginx y se validó su configuración.
+
+Validación: 12/12 pruebas de medios (almacenamiento y HTTP) sobre la fuente reconstruida de producción; prueba aislada del proxy aprobada; contenedor candidato con salud 200, token inválido 401 y subida anónima 401. En el runtime de Contabo, JPEG de 6.135.720 bytes reducido a 1.905.840 bytes (1502×2048), con orientación correcta; WebP transparente de 44 bytes conservado sin crecer; WebP animado de 156 bytes preservado; imagen de dimensiones abusivas rechazada. Las animaciones todavía no se recomprimen. No se garantiza reducción de archivos ya optimizados.
+
+Se comprobó por HTTPS una imagen sintética procesada por el almacenamiento de producción: 200, JPEG y coincidencia exacta de bytes. Se eliminó únicamente ese archivo sintético al terminar. Evidencia: `baselines/media-delivery-20261019.json`. Esta comprobación cubre procesamiento y entrega pública, no equivale a una subida autenticada desde navegador en producción.
+
+La web pública todavía mostraba controles de laboratorio. Se desplegaron los cambios de sesión ya probados: eliminar el fallback a tokens de laboratorio, recuperar/renovar sesiones Firebase, permitir laboratorio solo en localhost explícito y región accesible del formulario. Evidencia: `baselines/auth-web-deployment-20261019.json`; 5/5 pruebas unitarias de autenticación aprobadas; app.js y auth.js públicos coinciden con la rama local. En navegador público se confirmó ausencia de laboratorio y rechazo de credenciales sintéticas inexistentes con «Correo o contraseña incorrectos».
+
+El intento Google desde el navegador integrado terminó con `auth/network-request-failed` antes del selector de cuenta. Los endpoints públicos Firebase responden; el acceso por correo llega a Firebase. Se solicitó comprobar Google en Safari/Chrome para distinguir el entorno integrado de un defecto de OGT. Google y SMS continúan pendientes de aprobación E2E real.
+
+La corrección del proxy también recuperó el video de introducción existente: HTTP 200, video/mp4, 6.111.790 bytes; no se reemplazó ni eliminó el recurso.

@@ -1,0 +1,17 @@
+{
+  "files": {
+    "app.js": {
+      "before": "19842ab2d091bf98159751c511f9eba4d82bbf6e525c3fab5ef61bbc215977da",
+      "after": "741cc9322e42a3e4f97210cdae7e2a88bc5eb246529702a39092f3e7b56dbaba"
+    },
+    "auth.js": {
+      "before": "7e55deb7252a148de04647e80f6b76b63f0cb25f4535b519c4981357de8e8a22",
+      "after": "6ca033d9cea021bb4e41d3741f2d0500dd4c69f74259d56d95764c145a7240d1"
+    },
+    "index.html": {
+      "before": "92d7c47970eb600744a642eccdd12faedaeb03f8e0c770beea607921fba61d9e",
+      "after": "3b180fcf829391440dffbbb7221797b9d00de0341a0bc8aa4496a36ce7b50b2d"
+    }
+  },
+  "backup": "/home/iankmp/ogt-backups/auth-web-20261019T193411Z"
+}

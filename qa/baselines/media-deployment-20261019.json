@@ -1,0 +1,42 @@
+{
+  "scope": "Only media package replaced; all other JAR entries preserved from live auth401 build, nine image dependencies added, media proxy precedence fixed",
+  "backendBefore": "0cece58b37aa0cab1741a4007363c4b16f428a4bb91b77393e34edd59a2f8b4d",
+  "backendAfter": "7914a644393648dab74d1feb3c979b3f02d1146ab9865ff998253f7ec701336f",
+  "addedLibraries": [
+    "common-image-3.12.0.jar",
+    "common-io-3.12.0.jar",
+    "common-lang-3.12.0.jar",
+    "imageio-core-3.12.0.jar",
+    "imageio-jpeg-3.12.0.jar",
+    "imageio-metadata-3.12.0.jar",
+    "imageio-webp-3.12.0.jar",
+    "metadata-extractor-2.19.0.jar",
+    "xmpcore-6.1.11.jar"
+  ],
+  "mediaEntries": [
+    "com/onlygoodthings/backend/media/",
+    "com/onlygoodthings/backend/media/MediaStore$Companion.class",
+    "com/onlygoodthings/backend/media/MediaRoutesKt.class",
+    "com/onlygoodthings/backend/media/ImageOptimizer$Result.class",
+    "com/onlygoodthings/backend/media/MediaRoutesKt$mediaRoutes$1.class",
+    "com/onlygoodthings/backend/media/MediaRoutesKt$publicMediaRoutes$1.class",
+    "com/onlygoodthings/backend/media/MediaStore.class",
+    "com/onlygoodthings/backend/media/ImageOptimizer.class",
+    "com/onlygoodthings/backend/media/MediaRoutesKt$mediaRoutes$1$saved$1.class"
+  ],
+  "files": {
+    "bin/backend": "7acbe3cdbd0193278b940ba75eeb3424b96f34780446b1bebcc4e0bc7b683ca2",
+    "nginx.conf": "ef7cd43f5973b0772d95b0eed979e4e7d061254ba7a715ca59bf660bd450499e",
+    "lib/backend.jar": "7914a644393648dab74d1feb3c979b3f02d1146ab9865ff998253f7ec701336f",
+    "lib/common-image-3.12.0.jar": "62a3821c724fadfda346c1e2d83b0c506a0c4074be269a52bf4e3192c7dd92bc",
+    "lib/common-io-3.12.0.jar": "bfacfeb02acac47dbfd1fab0002eaeca65547d04249498b654320c9e0fdf6647",
+    "lib/common-lang-3.12.0.jar": "5c65e504b5b64d80683e0fa70a1dd154dd83d4de7da37f21e950f5a9c03bc66d",
+    "lib/imageio-core-3.12.0.jar": "34c6f91bf3b217ed0115bce8283238fbd0264562aa682b4226a3960d0ede9815",
+    "lib/imageio-jpeg-3.12.0.jar": "fc62f5d7df04d1af27dc7e5b74ea5f93c23b1013064ddd4e74879d709a9d859e",
+    "lib/imageio-metadata-3.12.0.jar": "797d026b67d07e6d5eb00a1ab53a55acaab6f80a71c5ee325572093eb90c0caa",
+    "lib/imageio-webp-3.12.0.jar": "43dc447ccfe34c5c5c6f5d31190270e1f9bf65f60375d697ae2a8ff433468526",
+    "lib/metadata-extractor-2.19.0.jar": "e51bb454ed08ea2bfcc3ad147d088ad1aa73a999e0072563f8ae50021a2fcadb",
+    "lib/xmpcore-6.1.11.jar": "8f7033c579b99fa0d9d6ddcb9448875b5e4b577c350002278ce46997d678b737"
+  },
+  "backup": "/home/iankmp/ogt-backups/media-20261019T193246Z"
+}
