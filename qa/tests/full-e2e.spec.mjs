@@ -63,3 +63,50 @@ test('real API rejects forged sessions, anonymous uploads and laboratory tokens'
   }
   expect((await request.post('/api/v1/media/upload', { data: {} })).status()).toBe(401);
 });
+
+test('password recovery replaces the credential, consumes the link and preserves the profile', async ({ page, request }) => {
+  const email = `qa-reset-${Date.now()}@example.test`;
+  const oldPassword = 'OnlyGoodThings-QA-2468';
+  const newPassword = 'OnlyGoodThings-QA-New-9753';
+  await page.goto('/#/registro');
+  await page.getByLabel('Nombre y apellido').fill('Persona Recuperación');
+  await page.getByLabel('Correo electrónico').fill(email);
+  await page.getByLabel('Contraseña', { exact: true }).fill(oldPassword);
+  await page.getByRole('button', { name: 'Crear cuenta', exact: true }).click();
+  await expect(page).toHaveURL(/#\/inicio/);
+  await page.goto('/#/ajustes');
+  await expect(page.locator('#profile-form')).toBeVisible();
+  await page.getByRole('button', { name: 'Salir', exact: true }).click();
+  await expect(page).toHaveURL(/#\/intro/);
+  await page.getByRole('button', { name: 'Saltar', exact: true }).click();
+  await expect(page).not.toHaveURL(/#\/intro/);
+  await page.goto('/#/recuperar');
+  if (await page.getByRole('button', { name: 'Saltar', exact: true }).isVisible()) {
+    await page.getByRole('button', { name: 'Saltar', exact: true }).click();
+    await page.goto('/#/recuperar');
+  }
+  await page.getByLabel('Correo electrónico').fill(email);
+  await page.getByRole('button', { name: 'Enviar enlace', exact: true }).click();
+  await expect(page.getByText('Revisá el correo', { exact: true })).toBeVisible();
+  // Read only this synthetic user's delivery from the local emulator; no real mail.
+  const codes = await request.get('http://127.0.0.1:19099/emulator/v1/projects/demo-ogt-qa/oobCodes');
+  expect(codes.ok()).toBe(true);
+  const code = (await codes.json()).oobCodes.find(c => c.email === email && c.requestType === 'PASSWORD_RESET');
+  expect(code?.oobCode).toBeTruthy();
+  const endpoint = 'http://127.0.0.1:19099/identitytoolkit.googleapis.com/v1/accounts:resetPassword?key=demo-key';
+  expect((await request.post(endpoint, { data: { oobCode: code.oobCode, newPassword } })).ok()).toBe(true);
+  expect((await request.post(endpoint, { data: { oobCode: code.oobCode, newPassword: oldPassword } })).status()).toBe(400);
+  await page.goto('/#/entrar');
+  await page.getByLabel('Correo electrónico').fill(email);
+  await page.getByLabel('Contraseña', { exact: true }).fill(oldPassword);
+  await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
+  await expect(page.getByText('Correo o contraseña incorrectos', { exact: true })).toBeVisible();
+  await expect(page.locator('#auth-root')).toBeVisible();
+  // Error rendering may replace the form, so explicitly fill both values again.
+  await page.getByLabel('Correo electrónico').fill(email);
+  await page.getByLabel('Contraseña', { exact: true }).fill(newPassword);
+  await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
+  await expect(page).toHaveURL(/#\/inicio/);
+  await page.goto('/#/ajustes');
+  await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('Persona Recuperación');
+});

@@ -9,6 +9,13 @@ simultánea de estacionamiento (un solo ganador), permisos de terceros, liberaci
 cierre por proximidad y confirmación repetida sin duplicar puntos. Las 16 pruebas
 del backend también pasan. No sustituye pruebas de proveedores reales ni dispositivos.
 
+Ampliación posterior: 2/2 pruebas nuevas de recuperación de contraseña pasan en
+ambos navegadores. Se solicita el enlace desde la interfaz, se obtiene únicamente
+del emulador local y se consume mediante su API (no se prueba la página de correo
+alojada por Firebase). Se verifica enlace de un solo uso, rechazo de la contraseña
+anterior, ingreso con la nueva y conservación del perfil. La prueba espera que el
+cierre de sesión llegue a la introducción antes de avanzar. No se modificó la app.
+
 ## Entorno aislado
 
 Requisitos: JDK 17/21, SDK Android 36, Node 22, Docker con espacio disponible y el SDK
@@ -216,3 +223,10 @@ Resultado: 175/175 clases backend normalizadas iguales (174 byte a byte), y 429/
 compartidas iguales byte a byte. No quedan diferencias ejecutables sin explicar en esas
 clases. Esto no implica que dependencias de terceros, datos, infraestructura o despliegue
 estén certificados. Contabo no fue modificado.
+
+`baselines/runtime-libraries-20261019.json` compara por SHA-256 las 165 bibliotecas
+del servidor con la distribución local: las 163 de terceros existentes coinciden
+byte a byte; solo cambian `backend.jar` y `shared-jvm.jar`, como corresponde a las
+correcciones preparadas. Se agregan nueve bibliotecas de procesamiento de imágenes,
+también registradas con su huella. Esta comparación verifica contenido, no ausencia
+de vulnerabilidades ni comportamiento en producción.

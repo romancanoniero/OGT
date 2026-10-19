@@ -1,0 +1,869 @@
+{
+  "scope": "Read-only comparison of current Contabo libraries against launch candidate; application JARs intentionally changed. No production changes.",
+  "libraries": [
+    {
+      "name": "alpn-api-1.1.3.v20160715.jar",
+      "production_sha256": "07be99758b699e194f70fb9784d94202dc6c98212877829e3d72b020f2660576",
+      "local_sha256": "07be99758b699e194f70fb9784d94202dc6c98212877829e3d72b020f2660576"
+    },
+    {
+      "name": "animal-sniffer-annotations-1.24.jar",
+      "production_sha256": "c720e6e5bcbe6b2f48ded75a47bccdb763eede79d14330102e0d352e3d89ed92",
+      "local_sha256": "c720e6e5bcbe6b2f48ded75a47bccdb763eede79d14330102e0d352e3d89ed92"
+    },
+    {
+      "name": "annotations-23.0.0.jar",
+      "production_sha256": "7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05",
+      "local_sha256": "7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05"
+    },
+    {
+      "name": "annotations-4.1.1.4.jar",
+      "production_sha256": "ba734e1e84c09d615af6a09d33034b4f0442f8772dec120efb376d86a565ae15",
+      "local_sha256": "ba734e1e84c09d615af6a09d33034b4f0442f8772dec120efb376d86a565ae15"
+    },
+    {
+      "name": "api-common-2.42.0.jar",
+      "production_sha256": "8737b58db5c35a13c3bab171c60f6280546cd8e5f4816329d4b31d129c563704",
+      "local_sha256": "8737b58db5c35a13c3bab171c60f6280546cd8e5f4816329d4b31d129c563704"
+    },
+    {
+      "name": "atomicfu-jvm-0.25.0.jar",
+      "production_sha256": "91990ec8a7b6b6ad2609fd81d6f3feb08ca695c7502958a0bd61e8a3af2650cb",
+      "local_sha256": "91990ec8a7b6b6ad2609fd81d6f3feb08ca695c7502958a0bd61e8a3af2650cb"
+    },
+    {
+      "name": "auto-value-annotations-1.11.0.jar",
+      "production_sha256": "5a055ce4255333b3346e1a8703da5bf8ff049532286fdcd31712d624abe111dd",
+      "local_sha256": "5a055ce4255333b3346e1a8703da5bf8ff049532286fdcd31712d624abe111dd"
+    },
+    {
+      "name": "backend.jar",
+      "production_sha256": "5f78bef5ef37b55140db84b525cfd8a2e58c9433b78b42bb2bacad26f1b6ae17",
+      "local_sha256": "5e0ad66abb600465f78fc73881f358d9aab3d6917f0240f0dd956ce971eb3229"
+    },
+    {
+      "name": "checker-qual-3.48.3.jar",
+      "production_sha256": "443685b1b232803baaf803c15d6f5a425473c6f7b81c5f276dfcf93288e389a5",
+      "local_sha256": "443685b1b232803baaf803c15d6f5a425473c6f7b81c5f276dfcf93288e389a5"
+    },
+    {
+      "name": "commons-codec-1.17.1.jar",
+      "production_sha256": "f9f6cb103f2ddc3c99a9d80ada2ae7bf0685111fd6bffccb72033d1da4e6ff23",
+      "local_sha256": "f9f6cb103f2ddc3c99a9d80ada2ae7bf0685111fd6bffccb72033d1da4e6ff23"
+    },
+    {
+      "name": "commons-logging-1.2.jar",
+      "production_sha256": "daddea1ea0be0f56978ab3006b8ac92834afeefbd9b7e4e6316fca57df0fa636",
+      "local_sha256": "daddea1ea0be0f56978ab3006b8ac92834afeefbd9b7e4e6316fca57df0fa636"
+    },
+    {
+      "name": "commons-pool2-2.12.0.jar",
+      "production_sha256": "6d3bd18df8410f3e31b031aca582cc109342358a62a2759ebd0c4cdf30d06f8b",
+      "local_sha256": "6d3bd18df8410f3e31b031aca582cc109342358a62a2759ebd0c4cdf30d06f8b"
+    },
+    {
+      "name": "config-1.4.3.jar",
+      "production_sha256": "8ada4c185ce72416712d63e0b5afdc5f009c0cdf405e5f26efecdf156aa5dfb6",
+      "local_sha256": "8ada4c185ce72416712d63e0b5afdc5f009c0cdf405e5f26efecdf156aa5dfb6"
+    },
+    {
+      "name": "conscrypt-openjdk-uber-2.5.2.jar",
+      "production_sha256": "eaf537d98e033d0f0451cd1b8cc74e02d7b55ec882da63c88060d806ba89c348",
+      "local_sha256": "eaf537d98e033d0f0451cd1b8cc74e02d7b55ec882da63c88060d806ba89c348"
+    },
+    {
+      "name": "db-core-jvm-0.1.0-SNAPSHOT.jar",
+      "production_sha256": "0401507b2029818d00a760012724d741da3138a7f4bc5d1ade4fb261a08df15e",
+      "local_sha256": "0401507b2029818d00a760012724d741da3138a7f4bc5d1ade4fb261a08df15e"
+    },
+    {
+      "name": "db-database-jvm-0.1.0-SNAPSHOT.jar",
+      "production_sha256": "89e8c11079d4dbeee062efc8d4afb910b5bf5faa3d8e5b6a5f1b3ab0f97629e3",
+      "local_sha256": "89e8c11079d4dbeee062efc8d4afb910b5bf5faa3d8e5b6a5f1b3ab0f97629e3"
+    },
+    {
+      "name": "detector-resources-support-0.33.0.jar",
+      "production_sha256": "94b0def27754083ceaa67b56a4d483d294e9f17066493df3ef7e81ec5c3bb2c0",
+      "local_sha256": "94b0def27754083ceaa67b56a4d483d294e9f17066493df3ef7e81ec5c3bb2c0"
+    },
+    {
+      "name": "error_prone_annotations-2.36.0.jar",
+      "production_sha256": "77440e270b0bc9a249903c5a076c36a722c4886ca4f42675f2903a1c53ed61a5",
+      "local_sha256": "77440e270b0bc9a249903c5a076c36a722c4886ca4f42675f2903a1c53ed61a5"
+    },
+    {
+      "name": "exporter-metrics-0.33.0.jar",
+      "production_sha256": "7a9ab87683a97357a95389ff3cec9684785648076f9b158d44da3becb93bb036",
+      "local_sha256": "7a9ab87683a97357a95389ff3cec9684785648076f9b158d44da3becb93bb036"
+    },
+    {
+      "name": "failureaccess-1.0.2.jar",
+      "production_sha256": "8a8f81cf9b359e3f6dfa691a1e776985c061ef2f223c9b2c80753e1b458e8064",
+      "local_sha256": "8a8f81cf9b359e3f6dfa691a1e776985c061ef2f223c9b2c80753e1b458e8064"
+    },
+    {
+      "name": "firebase-admin-9.4.3.jar",
+      "production_sha256": "70ad98d19b82ae5284e347a20fc0009a3178bae63f2f77b0c93f1a287bd6c541",
+      "local_sha256": "70ad98d19b82ae5284e347a20fc0009a3178bae63f2f77b0c93f1a287bd6c541"
+    },
+    {
+      "name": "gapic-google-cloud-storage-v2-2.46.0-beta.jar",
+      "production_sha256": "1ca4eaf6d8e988e90a9665e8b37697e351b98d612c42d843cc24cb9e7cb3bf0c",
+      "local_sha256": "1ca4eaf6d8e988e90a9665e8b37697e351b98d612c42d843cc24cb9e7cb3bf0c"
+    },
+    {
+      "name": "gax-2.59.0.jar",
+      "production_sha256": "a6c5406bd6803b3d313ac42d26377f73e9e9cd7b96debb7af6ca266d7dfadd75",
+      "local_sha256": "a6c5406bd6803b3d313ac42d26377f73e9e9cd7b96debb7af6ca266d7dfadd75"
+    },
+    {
+      "name": "gax-grpc-2.59.0.jar",
+      "production_sha256": "4efa1a372e4fabf38385dbac2fe72fc300302f88b2e6fddd27c459358bdb206b",
+      "local_sha256": "4efa1a372e4fabf38385dbac2fe72fc300302f88b2e6fddd27c459358bdb206b"
+    },
+    {
+      "name": "gax-httpjson-2.59.0.jar",
+      "production_sha256": "07246ba5a53e01f1387fe4999b80b406e7a33c7cb9d09d58c2d21c7b4d692f7c",
+      "local_sha256": "07246ba5a53e01f1387fe4999b80b406e7a33c7cb9d09d58c2d21c7b4d692f7c"
+    },
+    {
+      "name": "google-api-client-2.7.1.jar",
+      "production_sha256": "c0b85baef6bd4e0ff11c87e40b808c490cad7a31f7943463016088d7dbc48400",
+      "local_sha256": "c0b85baef6bd4e0ff11c87e40b808c490cad7a31f7943463016088d7dbc48400"
+    },
+    {
+      "name": "google-api-client-gson-2.7.1.jar",
+      "production_sha256": "8f532a14609ac5af0d63183e311a04fcd3b0b4e3dafa09b6dfcf31826b8e0f7e",
+      "local_sha256": "8f532a14609ac5af0d63183e311a04fcd3b0b4e3dafa09b6dfcf31826b8e0f7e"
+    },
+    {
+      "name": "google-api-services-storage-v1-rev20241206-2.0.0.jar",
+      "production_sha256": "551cd561d024c1711a9f43411988f68b73d653e47dbe4a66f551640dbb7e8977",
+      "local_sha256": "551cd561d024c1711a9f43411988f68b73d653e47dbe4a66f551640dbb7e8977"
+    },
+    {
+      "name": "google-auth-library-credentials-1.30.1.jar",
+      "production_sha256": "427399581b27e083489f6f6072f540893ae8bebe623280b093b8d84b0daa700e",
+      "local_sha256": "427399581b27e083489f6f6072f540893ae8bebe623280b093b8d84b0daa700e"
+    },
+    {
+      "name": "google-auth-library-oauth2-http-1.30.1.jar",
+      "production_sha256": "128fd8adc48856e05231c9568cb16b724f9a6a574682a525757f77fe497b4ebd",
+      "local_sha256": "128fd8adc48856e05231c9568cb16b724f9a6a574682a525757f77fe497b4ebd"
+    },
+    {
+      "name": "google-cloud-core-2.49.0.jar",
+      "production_sha256": "01d0ce739bbc846d57586b5733cf4f0c1c5d1fbdb061950124b302053212cb20",
+      "local_sha256": "01d0ce739bbc846d57586b5733cf4f0c1c5d1fbdb061950124b302053212cb20"
+    },
+    {
+      "name": "google-cloud-core-grpc-2.49.0.jar",
+      "production_sha256": "18be2c3afbf750a1218530ef6cd1a497b6358b9dfe34ff8b3bafec3243ac373e",
+      "local_sha256": "18be2c3afbf750a1218530ef6cd1a497b6358b9dfe34ff8b3bafec3243ac373e"
+    },
+    {
+      "name": "google-cloud-core-http-2.49.0.jar",
+      "production_sha256": "8f24fa2e96e206e41d79461c178d224568bb0119fa3e0bf742d7cfed56bffac9",
+      "local_sha256": "8f24fa2e96e206e41d79461c178d224568bb0119fa3e0bf742d7cfed56bffac9"
+    },
+    {
+      "name": "google-cloud-firestore-3.30.2.jar",
+      "production_sha256": "eaea7027bafd63997588400b39fda7a8b7d0b24c4c976552ea7892d0a795f13c",
+      "local_sha256": "eaea7027bafd63997588400b39fda7a8b7d0b24c4c976552ea7892d0a795f13c"
+    },
+    {
+      "name": "google-cloud-monitoring-3.52.0.jar",
+      "production_sha256": "9727aa7d94d8dd036bffccf9abc5d18970b1e5e9827896f9907f7450ed10f5e6",
+      "local_sha256": "9727aa7d94d8dd036bffccf9abc5d18970b1e5e9827896f9907f7450ed10f5e6"
+    },
+    {
+      "name": "google-cloud-storage-2.46.0.jar",
+      "production_sha256": "6e75da630defe9aca3ae7e9b5f3a2799e5d3ab4c029af52f5d4d506ce81ebb31",
+      "local_sha256": "6e75da630defe9aca3ae7e9b5f3a2799e5d3ab4c029af52f5d4d506ce81ebb31"
+    },
+    {
+      "name": "google-http-client-1.45.3.jar",
+      "production_sha256": "2a8d2d747020349561c859392344349d684f85d2cde727056e395f6bc4e94405",
+      "local_sha256": "2a8d2d747020349561c859392344349d684f85d2cde727056e395f6bc4e94405"
+    },
+    {
+      "name": "google-http-client-apache-v2-1.45.3.jar",
+      "production_sha256": "39ded69dfbd8b8297b81050193dfb80862338a32aeeecaa135d7759631e4955b",
+      "local_sha256": "39ded69dfbd8b8297b81050193dfb80862338a32aeeecaa135d7759631e4955b"
+    },
+    {
+      "name": "google-http-client-appengine-1.45.3.jar",
+      "production_sha256": "f6d908317e0ad50a055c3b616ff55ec05ae3fcf831333f2adce7a0f1ca688f65",
+      "local_sha256": "f6d908317e0ad50a055c3b616ff55ec05ae3fcf831333f2adce7a0f1ca688f65"
+    },
+    {
+      "name": "google-http-client-gson-1.45.3.jar",
+      "production_sha256": "9f1c6efc1879c5911b048b5673f523b5238af93dcf157c72cd9ac10f86c2de92",
+      "local_sha256": "9f1c6efc1879c5911b048b5673f523b5238af93dcf157c72cd9ac10f86c2de92"
+    },
+    {
+      "name": "google-http-client-jackson2-1.45.3.jar",
+      "production_sha256": "fffd2009eac7bcf8440cbc2e095daf8c1458b5097d273a06dfcc65fe190ea91b",
+      "local_sha256": "fffd2009eac7bcf8440cbc2e095daf8c1458b5097d273a06dfcc65fe190ea91b"
+    },
+    {
+      "name": "google-oauth-client-1.36.0.jar",
+      "production_sha256": "8fee7bbe7aaee214ce461f0cd983e3c438fd43941697394391aaa01edb7d703b",
+      "local_sha256": "8fee7bbe7aaee214ce461f0cd983e3c438fd43941697394391aaa01edb7d703b"
+    },
+    {
+      "name": "grpc-alts-1.69.0.jar",
+      "production_sha256": "9c9b3e6455ee4568a62cce4d0a251121fbb59ff22974acbf16f3b2cdea0c0d43",
+      "local_sha256": "9c9b3e6455ee4568a62cce4d0a251121fbb59ff22974acbf16f3b2cdea0c0d43"
+    },
+    {
+      "name": "grpc-api-1.69.0.jar",
+      "production_sha256": "ffa9af0f76fb08b4dbcade9dba9805af6b216980cafa0756b4d97b6029077506",
+      "local_sha256": "ffa9af0f76fb08b4dbcade9dba9805af6b216980cafa0756b4d97b6029077506"
+    },
+    {
+      "name": "grpc-auth-1.69.0.jar",
+      "production_sha256": "06577b8c390991b196000153b80fd67861fb98906be26547183df171306dcde8",
+      "local_sha256": "06577b8c390991b196000153b80fd67861fb98906be26547183df171306dcde8"
+    },
+    {
+      "name": "grpc-context-1.69.0.jar",
+      "production_sha256": "e682d036496d4429442955b615b931ee65486bd318d0ab13d9937d11cb36ffd5",
+      "local_sha256": "e682d036496d4429442955b615b931ee65486bd318d0ab13d9937d11cb36ffd5"
+    },
+    {
+      "name": "grpc-core-1.69.0.jar",
+      "production_sha256": "817fbb87f8119c40f2b276f49340effd880e7e574095d3a8fb798a94e3f66652",
+      "local_sha256": "817fbb87f8119c40f2b276f49340effd880e7e574095d3a8fb798a94e3f66652"
+    },
+    {
+      "name": "grpc-googleapis-1.69.0.jar",
+      "production_sha256": "4b5fd5861f07104f71709db0e3942db84493590b387f27ac889b3682a1027d75",
+      "local_sha256": "4b5fd5861f07104f71709db0e3942db84493590b387f27ac889b3682a1027d75"
+    },
+    {
+      "name": "grpc-google-cloud-storage-v2-2.46.0-beta.jar",
+      "production_sha256": "b6be597eea1f2e83b76e9b19177e26f7972f2c174e16048f489d2ceb61278dda",
+      "local_sha256": "b6be597eea1f2e83b76e9b19177e26f7972f2c174e16048f489d2ceb61278dda"
+    },
+    {
+      "name": "grpc-grpclb-1.69.0.jar",
+      "production_sha256": "0c3c99aa353386cf0e03eb1aab913efe939a14cc92483e899f4677b859916e26",
+      "local_sha256": "0c3c99aa353386cf0e03eb1aab913efe939a14cc92483e899f4677b859916e26"
+    },
+    {
+      "name": "grpc-inprocess-1.69.0.jar",
+      "production_sha256": "d057ecd320020baad0f672d1ca80e354d7769960f81c6a094f1399085c93911f",
+      "local_sha256": "d057ecd320020baad0f672d1ca80e354d7769960f81c6a094f1399085c93911f"
+    },
+    {
+      "name": "grpc-netty-shaded-1.69.0.jar",
+      "production_sha256": "958a6b82350ff808d289603eba8f0847dc35f236d109fdfe3c8e5295687e387b",
+      "local_sha256": "958a6b82350ff808d289603eba8f0847dc35f236d109fdfe3c8e5295687e387b"
+    },
+    {
+      "name": "grpc-opentelemetry-1.69.0.jar",
+      "production_sha256": "233cfe9548d10759fdf320def3cf8e49608dbba3f73e2610a086049a99b33a8f",
+      "local_sha256": "233cfe9548d10759fdf320def3cf8e49608dbba3f73e2610a086049a99b33a8f"
+    },
+    {
+      "name": "grpc-protobuf-1.69.0.jar",
+      "production_sha256": "999fa3b9baf4b5e361c91641dcca7594fefcef01bff65d4fe505fa8285dc3600",
+      "local_sha256": "999fa3b9baf4b5e361c91641dcca7594fefcef01bff65d4fe505fa8285dc3600"
+    },
+    {
+      "name": "grpc-protobuf-lite-1.69.0.jar",
+      "production_sha256": "5d0ded291edbb4820209a78786b39646c9c6ca3a89f169e92382bbe5d29d43df",
+      "local_sha256": "5d0ded291edbb4820209a78786b39646c9c6ca3a89f169e92382bbe5d29d43df"
+    },
+    {
+      "name": "grpc-rls-1.69.0.jar",
+      "production_sha256": "a7cca3feda9504872bc7f19bd9b3eb4f6986fc04eb015da1448c29c404f86ec5",
+      "local_sha256": "a7cca3feda9504872bc7f19bd9b3eb4f6986fc04eb015da1448c29c404f86ec5"
+    },
+    {
+      "name": "grpc-services-1.69.0.jar",
+      "production_sha256": "5b855f3820f6578f28bf306482e6b00715743e757bde9c9223444cb7d9b4444d",
+      "local_sha256": "5b855f3820f6578f28bf306482e6b00715743e757bde9c9223444cb7d9b4444d"
+    },
+    {
+      "name": "grpc-stub-1.69.0.jar",
+      "production_sha256": "d515b3680ddc5dd7a25b0db3a72ced719a9a6006dca7810afe354069cc5908fe",
+      "local_sha256": "d515b3680ddc5dd7a25b0db3a72ced719a9a6006dca7810afe354069cc5908fe"
+    },
+    {
+      "name": "grpc-util-1.69.0.jar",
+      "production_sha256": "22b47e755dc271c1738327162366599c4faf25ae1d1356455d6191d472841b94",
+      "local_sha256": "22b47e755dc271c1738327162366599c4faf25ae1d1356455d6191d472841b94"
+    },
+    {
+      "name": "grpc-xds-1.69.0.jar",
+      "production_sha256": "6edabf669e3b4d2ef694b27a5acb8656ca165e9823535c8a32b10e06bc849243",
+      "local_sha256": "6edabf669e3b4d2ef694b27a5acb8656ca165e9823535c8a32b10e06bc849243"
+    },
+    {
+      "name": "gson-2.11.0.jar",
+      "production_sha256": "57928d6e5a6edeb2abd3770a8f95ba44dce45f3b23b7a9dc2b309c581552a78b",
+      "local_sha256": "57928d6e5a6edeb2abd3770a8f95ba44dce45f3b23b7a9dc2b309c581552a78b"
+    },
+    {
+      "name": "guava-33.3.1-jre.jar",
+      "production_sha256": "4bf0e2c5af8e4525c96e8fde17a4f7307f97f8478f11c4c8e35a0e3298ae4e90",
+      "local_sha256": "4bf0e2c5af8e4525c96e8fde17a4f7307f97f8478f11c4c8e35a0e3298ae4e90"
+    },
+    {
+      "name": "HikariCP-6.2.1.jar",
+      "production_sha256": "c659a083727ce9590277357b8c3f63fbae67207bb04beabc964c8f4f15307dbc",
+      "local_sha256": "c659a083727ce9590277357b8c3f63fbae67207bb04beabc964c8f4f15307dbc"
+    },
+    {
+      "name": "httpclient-4.5.14.jar",
+      "production_sha256": "c8bc7e1c51a6d4ce72f40d2ebbabf1c4b68bfe76e732104b04381b493478e9d6",
+      "local_sha256": "c8bc7e1c51a6d4ce72f40d2ebbabf1c4b68bfe76e732104b04381b493478e9d6"
+    },
+    {
+      "name": "httpclient5-5.3.1.jar",
+      "production_sha256": "08346a757c617f6ecc66af9f099260adde1f3a1351fa81cb22fc17482b31f823",
+      "local_sha256": "08346a757c617f6ecc66af9f099260adde1f3a1351fa81cb22fc17482b31f823"
+    },
+    {
+      "name": "httpcore-4.4.16.jar",
+      "production_sha256": "6c9b3dd142a09dc468e23ad39aad6f75a0f2b85125104469f026e52a474e464f",
+      "local_sha256": "6c9b3dd142a09dc468e23ad39aad6f75a0f2b85125104469f026e52a474e464f"
+    },
+    {
+      "name": "httpcore5-5.2.4.jar",
+      "production_sha256": "a7f62496113f66f9e27c26b84c44f5ce4555c6270083cdf2d45f255336cd52af",
+      "local_sha256": "a7f62496113f66f9e27c26b84c44f5ce4555c6270083cdf2d45f255336cd52af"
+    },
+    {
+      "name": "httpcore5-h2-5.2.4.jar",
+      "production_sha256": "dc1a95e73eb04db93451533d390ce02c53b301a10dc343d08c862f2934b3d30e",
+      "local_sha256": "dc1a95e73eb04db93451533d390ce02c53b301a10dc343d08c862f2934b3d30e"
+    },
+    {
+      "name": "j2objc-annotations-3.0.0.jar",
+      "production_sha256": "88241573467ddca44ffd4d74aa04c2bbfd11bf7c17e0c342c94c9de7a70a7c64",
+      "local_sha256": "88241573467ddca44ffd4d74aa04c2bbfd11bf7c17e0c342c94c9de7a70a7c64"
+    },
+    {
+      "name": "jackson-annotations-2.18.3.jar",
+      "production_sha256": "8aa5740d80b5a5025508b41bbadbaa1fb3772267c628b2e30681a4f45f8b8931",
+      "local_sha256": "8aa5740d80b5a5025508b41bbadbaa1fb3772267c628b2e30681a4f45f8b8931"
+    },
+    {
+      "name": "jackson-core-2.18.3.jar",
+      "production_sha256": "056bc4d3e5e53ce821450fa97b3f9e0f8dde125cf6da6884353bb1f09582e1d9",
+      "local_sha256": "056bc4d3e5e53ce821450fa97b3f9e0f8dde125cf6da6884353bb1f09582e1d9"
+    },
+    {
+      "name": "jackson-databind-2.18.3.jar",
+      "production_sha256": "510bdda75a7a6186c5bf33b851239488a1450906ae5757121f2e1cc48a7e108f",
+      "local_sha256": "510bdda75a7a6186c5bf33b851239488a1450906ae5757121f2e1cc48a7e108f"
+    },
+    {
+      "name": "jackson-datatype-jsr310-2.18.3.jar",
+      "production_sha256": "2e1df2feb93683d379969ceaf78b76a0ac115c67d04671958fddf4eed6e6401d",
+      "local_sha256": "2e1df2feb93683d379969ceaf78b76a0ac115c67d04671958fddf4eed6e6401d"
+    },
+    {
+      "name": "jackson-module-kotlin-2.18.3.jar",
+      "production_sha256": "93ba1638bbab8f8ebc750382477fe05754e78d00bff1473611ec33c305e2a197",
+      "local_sha256": "93ba1638bbab8f8ebc750382477fe05754e78d00bff1473611ec33c305e2a197"
+    },
+    {
+      "name": "jansi-2.4.1.jar",
+      "production_sha256": "2e5e775a9dc58ffa6bbd6aa6f099d62f8b62dcdeb4c3c3bbbe5cf2301bc2dcc1",
+      "local_sha256": "2e5e775a9dc58ffa6bbd6aa6f099d62f8b62dcdeb4c3c3bbbe5cf2301bc2dcc1"
+    },
+    {
+      "name": "javax.annotation-api-1.3.2.jar",
+      "production_sha256": "e04ba5195bcd555dc95650f7cc614d151e4bcd52d29a10b8aa2197f3ab89ab9b",
+      "local_sha256": "e04ba5195bcd555dc95650f7cc614d151e4bcd52d29a10b8aa2197f3ab89ab9b"
+    },
+    {
+      "name": "jedis-5.2.0.jar",
+      "production_sha256": "dd4fbda2c103f319ab495adb2bc1906139840746cfd4c66b27710d1af98382d4",
+      "local_sha256": "dd4fbda2c103f319ab495adb2bc1906139840746cfd4c66b27710d1af98382d4"
+    },
+    {
+      "name": "json-20240303.jar",
+      "production_sha256": "3cf6cd6892e32e2b4c1c39e0f52f5248a2f5b37646fdfbb79a66b46b618414ed",
+      "local_sha256": "3cf6cd6892e32e2b4c1c39e0f52f5248a2f5b37646fdfbb79a66b46b618414ed"
+    },
+    {
+      "name": "jsr305-3.0.2.jar",
+      "production_sha256": "766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7",
+      "local_sha256": "766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7"
+    },
+    {
+      "name": "kotlin-reflect-2.1.20.jar",
+      "production_sha256": "419778f2b7a826bad6ee2ca1e4bdebe639ab306d2904fa3ef2a308ecfaab3811",
+      "local_sha256": "419778f2b7a826bad6ee2ca1e4bdebe639ab306d2904fa3ef2a308ecfaab3811"
+    },
+    {
+      "name": "kotlin-stdlib-2.3.0.jar",
+      "production_sha256": "887587c91713250ad52fe14ad9166d042c33835049890e9437f355ffc5a195b1",
+      "local_sha256": "887587c91713250ad52fe14ad9166d042c33835049890e9437f355ffc5a195b1"
+    },
+    {
+      "name": "kotlinx-coroutines-core-jvm-1.10.2.jar",
+      "production_sha256": "5ca175b38df331fd64155b35cd8cae1251fa9ee369709b36d42e0a288ccce3fd",
+      "local_sha256": "5ca175b38df331fd64155b35cd8cae1251fa9ee369709b36d42e0a288ccce3fd"
+    },
+    {
+      "name": "kotlinx-coroutines-slf4j-1.10.2.jar",
+      "production_sha256": "d65dee3cafa6f7bfaefedb493fc68b5c63abe750734fb8af92fac7a0d3101457",
+      "local_sha256": "d65dee3cafa6f7bfaefedb493fc68b5c63abe750734fb8af92fac7a0d3101457"
+    },
+    {
+      "name": "kotlinx-datetime-jvm-0.6.2.jar",
+      "production_sha256": "102764921129e1e44a74f408b7a0b8dac6d1892c6042e0e48f8bdbbbf78c6d2e",
+      "local_sha256": "102764921129e1e44a74f408b7a0b8dac6d1892c6042e0e48f8bdbbbf78c6d2e"
+    },
+    {
+      "name": "kotlinx-io-bytestring-jvm-0.7.0.jar",
+      "production_sha256": "ea38a66b0ff46ed82dded9e81d2dce70e5fbe03bd6cc52b4fc8869381dea7b7d",
+      "local_sha256": "ea38a66b0ff46ed82dded9e81d2dce70e5fbe03bd6cc52b4fc8869381dea7b7d"
+    },
+    {
+      "name": "kotlinx-io-core-jvm-0.7.0.jar",
+      "production_sha256": "6ededc9be4d878aea80c7dd609f91bfc47fcd3d36cc91fd0f3f328fbd6656c8f",
+      "local_sha256": "6ededc9be4d878aea80c7dd609f91bfc47fcd3d36cc91fd0f3f328fbd6656c8f"
+    },
+    {
+      "name": "kotlinx-serialization-core-jvm-1.8.1.jar",
+      "production_sha256": "3565b6d4d789bf70683c45566944287fc1d8dc75c23d98bd87d01059cc76f2b3",
+      "local_sha256": "3565b6d4d789bf70683c45566944287fc1d8dc75c23d98bd87d01059cc76f2b3"
+    },
+    {
+      "name": "kotlinx-serialization-json-io-jvm-1.8.1.jar",
+      "production_sha256": "ab5ec8ea48815197c46a7df9f418a62791fe91cda5023b941ce4de872d810cc1",
+      "local_sha256": "ab5ec8ea48815197c46a7df9f418a62791fe91cda5023b941ce4de872d810cc1"
+    },
+    {
+      "name": "kotlinx-serialization-json-jvm-1.8.1.jar",
+      "production_sha256": "8769e5647557e3700919c32d508f5c5dad53c5d8234cd10846354fbcff14aa24",
+      "local_sha256": "8769e5647557e3700919c32d508f5c5dad53c5d8234cd10846354fbcff14aa24"
+    },
+    {
+      "name": "ktor-client-cio-jvm-3.1.3.jar",
+      "production_sha256": "9a86341588057a23d3ba4562fdc8afcef6facd071678a0c20b3b28a19ec35c88",
+      "local_sha256": "9a86341588057a23d3ba4562fdc8afcef6facd071678a0c20b3b28a19ec35c88"
+    },
+    {
+      "name": "ktor-client-content-negotiation-jvm-3.1.3.jar",
+      "production_sha256": "9cbf59168645f54a9a9c21c1a0f15cd628234b20bbff3ec1bd64680f10aa779d",
+      "local_sha256": "9cbf59168645f54a9a9c21c1a0f15cd628234b20bbff3ec1bd64680f10aa779d"
+    },
+    {
+      "name": "ktor-client-core-jvm-3.1.3.jar",
+      "production_sha256": "746e2a3dece87379d64c40999401969001d373de1458fe851c0d2e0f880b42ef",
+      "local_sha256": "746e2a3dece87379d64c40999401969001d373de1458fe851c0d2e0f880b42ef"
+    },
+    {
+      "name": "ktor-client-logging-jvm-3.1.3.jar",
+      "production_sha256": "ecabf013b137f1a69c39cffeae1ba9e365659357b21688f1876ee6cf50fd00b9",
+      "local_sha256": "ecabf013b137f1a69c39cffeae1ba9e365659357b21688f1876ee6cf50fd00b9"
+    },
+    {
+      "name": "ktor-client-websockets-jvm-3.1.3.jar",
+      "production_sha256": "98e90ecbcbb1a7b193d9e879f43e70541048cad13ade022c6d64518f5d80270b",
+      "local_sha256": "98e90ecbcbb1a7b193d9e879f43e70541048cad13ade022c6d64518f5d80270b"
+    },
+    {
+      "name": "ktor-events-jvm-3.1.3.jar",
+      "production_sha256": "da7069c6e78809d7c37d104e415613cbd4cd5cec1ed54a332cb64ef6a864a060",
+      "local_sha256": "da7069c6e78809d7c37d104e415613cbd4cd5cec1ed54a332cb64ef6a864a060"
+    },
+    {
+      "name": "ktor-http-cio-jvm-3.1.3.jar",
+      "production_sha256": "b04aede18e9c008168096dc53a3fc016177b61a5ec3024afbf8caca0cd5dbf42",
+      "local_sha256": "b04aede18e9c008168096dc53a3fc016177b61a5ec3024afbf8caca0cd5dbf42"
+    },
+    {
+      "name": "ktor-http-jvm-3.1.3.jar",
+      "production_sha256": "8a50d94b46f91bd56580b9169272d6cd636f442032ba078a141da70413465946",
+      "local_sha256": "8a50d94b46f91bd56580b9169272d6cd636f442032ba078a141da70413465946"
+    },
+    {
+      "name": "ktor-io-jvm-3.1.3.jar",
+      "production_sha256": "bb2fb6c00afaa34b539cb30e7584d37bfcba171c266bbdb9990e003579dc24c1",
+      "local_sha256": "bb2fb6c00afaa34b539cb30e7584d37bfcba171c266bbdb9990e003579dc24c1"
+    },
+    {
+      "name": "ktor-network-jvm-3.1.3.jar",
+      "production_sha256": "fa4e6165b5ad4bf5db337ebd5f16f9b596dc5e401fbea343b9deacb6138240af",
+      "local_sha256": "fa4e6165b5ad4bf5db337ebd5f16f9b596dc5e401fbea343b9deacb6138240af"
+    },
+    {
+      "name": "ktor-network-tls-jvm-3.1.3.jar",
+      "production_sha256": "f67507a3e8bf52aa08d753682e6cdda0194e3abe750118b99c9336953e598be9",
+      "local_sha256": "f67507a3e8bf52aa08d753682e6cdda0194e3abe750118b99c9336953e598be9"
+    },
+    {
+      "name": "ktor-serialization-jvm-3.1.3.jar",
+      "production_sha256": "0d704bc1148a8fd9a1f2005e0b5189cdaed3030efe24b8236459c41c356f5620",
+      "local_sha256": "0d704bc1148a8fd9a1f2005e0b5189cdaed3030efe24b8236459c41c356f5620"
+    },
+    {
+      "name": "ktor-serialization-kotlinx-json-jvm-3.1.3.jar",
+      "production_sha256": "9b810f01caa6e3f27e02d71caba8595e2b4b04071dba16e0e426e20115bed354",
+      "local_sha256": "9b810f01caa6e3f27e02d71caba8595e2b4b04071dba16e0e426e20115bed354"
+    },
+    {
+      "name": "ktor-serialization-kotlinx-jvm-3.1.3.jar",
+      "production_sha256": "b4dc2f9d4d1dda8d481a054d7f833ba195f064f5115fde3ab0dfdb8b42f61fda",
+      "local_sha256": "b4dc2f9d4d1dda8d481a054d7f833ba195f064f5115fde3ab0dfdb8b42f61fda"
+    },
+    {
+      "name": "ktor-server-auth-jvm-3.1.3.jar",
+      "production_sha256": "d07acfefe477defb2a40dcdd8c4728babda8f3079da8344bcb48f9126615ea5f",
+      "local_sha256": "d07acfefe477defb2a40dcdd8c4728babda8f3079da8344bcb48f9126615ea5f"
+    },
+    {
+      "name": "ktor-server-call-logging-jvm-3.1.3.jar",
+      "production_sha256": "ed7df52fae362060c8672b9432bb7b909979cfba56aa4b4865b0ef2cd825c513",
+      "local_sha256": "ed7df52fae362060c8672b9432bb7b909979cfba56aa4b4865b0ef2cd825c513"
+    },
+    {
+      "name": "ktor-server-content-negotiation-jvm-3.1.3.jar",
+      "production_sha256": "c356fd5a5afbfb8b4318e1d7729a48f6f0ec60be03c71e9c4ce6a304e4c5276a",
+      "local_sha256": "c356fd5a5afbfb8b4318e1d7729a48f6f0ec60be03c71e9c4ce6a304e4c5276a"
+    },
+    {
+      "name": "ktor-server-core-jvm-3.1.3.jar",
+      "production_sha256": "bf582ba004634d0d343bb2dfa1edd0e8de18cdc2c607a4089db8b79d3085d10a",
+      "local_sha256": "bf582ba004634d0d343bb2dfa1edd0e8de18cdc2c607a4089db8b79d3085d10a"
+    },
+    {
+      "name": "ktor-server-cors-jvm-3.1.3.jar",
+      "production_sha256": "dae80fc6d3ac3bffa2fc33cabbe7776fb1e2867571464b54ae090ee3dab1a0e1",
+      "local_sha256": "dae80fc6d3ac3bffa2fc33cabbe7776fb1e2867571464b54ae090ee3dab1a0e1"
+    },
+    {
+      "name": "ktor-server-double-receive-jvm-3.1.3.jar",
+      "production_sha256": "377e9c419bb1c54d1e05e8e605668faba8264501762b1b31e268a41e0fe9e751",
+      "local_sha256": "377e9c419bb1c54d1e05e8e605668faba8264501762b1b31e268a41e0fe9e751"
+    },
+    {
+      "name": "ktor-server-netty-jvm-3.1.3.jar",
+      "production_sha256": "27dfa96417716317338e09d6e105adc92ef193816b57103406c2cca56907adb3",
+      "local_sha256": "27dfa96417716317338e09d6e105adc92ef193816b57103406c2cca56907adb3"
+    },
+    {
+      "name": "ktor-server-sessions-jvm-3.1.3.jar",
+      "production_sha256": "ae0c44cc4baebdb9fa27e286b7b2cb6ddc723e2d7f5e57e713671c5aab4277bd",
+      "local_sha256": "ae0c44cc4baebdb9fa27e286b7b2cb6ddc723e2d7f5e57e713671c5aab4277bd"
+    },
+    {
+      "name": "ktor-server-status-pages-jvm-3.1.3.jar",
+      "production_sha256": "df2461049fff8d47d67a435244d37ccb1a5807ab34f5ed0cb33f4a74ddf2956f",
+      "local_sha256": "df2461049fff8d47d67a435244d37ccb1a5807ab34f5ed0cb33f4a74ddf2956f"
+    },
+    {
+      "name": "ktor-server-websockets-jvm-3.1.3.jar",
+      "production_sha256": "5d7f905d48aa88d7a98dffec394e1a50c48a703a940d4374b5379825d6025b32",
+      "local_sha256": "5d7f905d48aa88d7a98dffec394e1a50c48a703a940d4374b5379825d6025b32"
+    },
+    {
+      "name": "ktor-sse-jvm-3.1.3.jar",
+      "production_sha256": "a2ae8a338bb1d446d16dcfea2189ef5a5be31a88123b3879562b7955667a5639",
+      "local_sha256": "a2ae8a338bb1d446d16dcfea2189ef5a5be31a88123b3879562b7955667a5639"
+    },
+    {
+      "name": "ktor-utils-jvm-3.1.3.jar",
+      "production_sha256": "33333937b98fc0c8e943ee4b10b3ea66b49782dfb569c44c142da4f32d85dffc",
+      "local_sha256": "33333937b98fc0c8e943ee4b10b3ea66b49782dfb569c44c142da4f32d85dffc"
+    },
+    {
+      "name": "ktor-websocket-serialization-jvm-3.1.3.jar",
+      "production_sha256": "67f0f566e2ed51717f6ed55f6d2b4dee1c84be4ea2cd96fc636d0bdf0fd43067",
+      "local_sha256": "67f0f566e2ed51717f6ed55f6d2b4dee1c84be4ea2cd96fc636d0bdf0fd43067"
+    },
+    {
+      "name": "ktor-websockets-jvm-3.1.3.jar",
+      "production_sha256": "ef28b4f12054ee125765b72fe3230e215a60b73b2ff2072a5c280fcf09329077",
+      "local_sha256": "ef28b4f12054ee125765b72fe3230e215a60b73b2ff2072a5c280fcf09329077"
+    },
+    {
+      "name": "listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar",
+      "production_sha256": "b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99",
+      "local_sha256": "b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99"
+    },
+    {
+      "name": "logback-classic-1.5.18.jar",
+      "production_sha256": "3e1533d0321f8815eef46750aee0111b41554f9a4644c3c4d2d404744b09f60f",
+      "local_sha256": "3e1533d0321f8815eef46750aee0111b41554f9a4644c3c4d2d404744b09f60f"
+    },
+    {
+      "name": "logback-core-1.5.18.jar",
+      "production_sha256": "85139e7b57b464f8e5e36326dd81317648bed199ccc4f98cd42585f8d7571027",
+      "local_sha256": "85139e7b57b464f8e5e36326dd81317648bed199ccc4f98cd42585f8d7571027"
+    },
+    {
+      "name": "netty-buffer-4.1.119.Final.jar",
+      "production_sha256": "32226218d854c2e51d4935a7ebe4663b72ecb9af4da881b86bf518e61aed48d3",
+      "local_sha256": "32226218d854c2e51d4935a7ebe4663b72ecb9af4da881b86bf518e61aed48d3"
+    },
+    {
+      "name": "netty-codec-4.1.119.Final.jar",
+      "production_sha256": "c497934a057444b126a86e06f2b509188e48ca6c5a5e14c182a02f1e8c8d5fdb",
+      "local_sha256": "c497934a057444b126a86e06f2b509188e48ca6c5a5e14c182a02f1e8c8d5fdb"
+    },
+    {
+      "name": "netty-codec-http2-4.1.119.Final.jar",
+      "production_sha256": "5ea89af402b6f59715a84780c4cd0388f4e602e339a5b7b888c17ce9f5537d1a",
+      "local_sha256": "5ea89af402b6f59715a84780c4cd0388f4e602e339a5b7b888c17ce9f5537d1a"
+    },
+    {
+      "name": "netty-codec-http-4.1.119.Final.jar",
+      "production_sha256": "ff48db63e44e273e677832e52cc2a1ce2670da796f22af129a8bd4c3786a2d34",
+      "local_sha256": "ff48db63e44e273e677832e52cc2a1ce2670da796f22af129a8bd4c3786a2d34"
+    },
+    {
+      "name": "netty-common-4.1.119.Final.jar",
+      "production_sha256": "991a69b1594dcad9926e268e7e94530cfdaa89feef42af26922a302d3e2e9212",
+      "local_sha256": "991a69b1594dcad9926e268e7e94530cfdaa89feef42af26922a302d3e2e9212"
+    },
+    {
+      "name": "netty-handler-4.1.119.Final.jar",
+      "production_sha256": "9b49be98e36bb79a2025ffb5159aec87da2720cfa545f56de39c3bc108587b1b",
+      "local_sha256": "9b49be98e36bb79a2025ffb5159aec87da2720cfa545f56de39c3bc108587b1b"
+    },
+    {
+      "name": "netty-resolver-4.1.119.Final.jar",
+      "production_sha256": "3b6c9f9f6f360747213d154971dec1fc8852820dc1a98d055ff09d09676f8836",
+      "local_sha256": "3b6c9f9f6f360747213d154971dec1fc8852820dc1a98d055ff09d09676f8836"
+    },
+    {
+      "name": "netty-transport-4.1.119.Final.jar",
+      "production_sha256": "c0921ea0e79c3b936daabe08a26e926642a4ad24951d6115fb43362c21dfeb10",
+      "local_sha256": "c0921ea0e79c3b936daabe08a26e926642a4ad24951d6115fb43362c21dfeb10"
+    },
+    {
+      "name": "netty-transport-classes-epoll-4.1.119.Final.jar",
+      "production_sha256": "38edbceb4d0f3c1c87bc8db9f812d317342c9c8e95a4a052fb796a2f78ad098e",
+      "local_sha256": "38edbceb4d0f3c1c87bc8db9f812d317342c9c8e95a4a052fb796a2f78ad098e"
+    },
+    {
+      "name": "netty-transport-classes-kqueue-4.1.119.Final.jar",
+      "production_sha256": "af84f71a0bcde9e4ca2d8f1cb7bf6a6d4d249923a79ace14a86fea818a8f90f7",
+      "local_sha256": "af84f71a0bcde9e4ca2d8f1cb7bf6a6d4d249923a79ace14a86fea818a8f90f7"
+    },
+    {
+      "name": "netty-transport-native-epoll-4.1.119.Final.jar",
+      "production_sha256": "96060a5b5a0a3837ea4261e97cfa428bd1d7645a8832c18589ebcd86890b5d18",
+      "local_sha256": "96060a5b5a0a3837ea4261e97cfa428bd1d7645a8832c18589ebcd86890b5d18"
+    },
+    {
+      "name": "netty-transport-native-kqueue-4.1.119.Final.jar",
+      "production_sha256": "174438a6253e75d3db550ebd086271ab96c11d4e7e8da3d6a72af9c6b4a385a7",
+      "local_sha256": "174438a6253e75d3db550ebd086271ab96c11d4e7e8da3d6a72af9c6b4a385a7"
+    },
+    {
+      "name": "netty-transport-native-unix-common-4.1.119.Final.jar",
+      "production_sha256": "8ae5618f69326e6d17b77b0140f9d277118dbd23906ca07638bc01365728c650",
+      "local_sha256": "8ae5618f69326e6d17b77b0140f9d277118dbd23906ca07638bc01365728c650"
+    },
+    {
+      "name": "opencensus-api-0.31.1.jar",
+      "production_sha256": "f1474d47f4b6b001558ad27b952e35eda5cc7146788877fc52938c6eba24b382",
+      "local_sha256": "f1474d47f4b6b001558ad27b952e35eda5cc7146788877fc52938c6eba24b382"
+    },
+    {
+      "name": "opencensus-contrib-http-util-0.31.1.jar",
+      "production_sha256": "3ea995b55a4068be22989b70cc29a4d788c2d328d1d50613a7a9afd13fdd2d0a",
+      "local_sha256": "3ea995b55a4068be22989b70cc29a4d788c2d328d1d50613a7a9afd13fdd2d0a"
+    },
+    {
+      "name": "opentelemetry-api-1.45.0.jar",
+      "production_sha256": "b5903cf245e3a8ddf95b95031529ebcc70884a76b953798d3093a4ada7fcc140",
+      "local_sha256": "b5903cf245e3a8ddf95b95031529ebcc70884a76b953798d3093a4ada7fcc140"
+    },
+    {
+      "name": "opentelemetry-api-incubator-1.45.0-alpha.jar",
+      "production_sha256": "4a664ae100e727c42d22b099b168cdd4f43ed6fec9dc152f2e3afc6aa1143b03",
+      "local_sha256": "4a664ae100e727c42d22b099b168cdd4f43ed6fec9dc152f2e3afc6aa1143b03"
+    },
+    {
+      "name": "opentelemetry-context-1.45.0.jar",
+      "production_sha256": "9b6dd4a2e758b0fd6da81faa882856085821ec60e1407a1113e1ba13a0eff5e0",
+      "local_sha256": "9b6dd4a2e758b0fd6da81faa882856085821ec60e1407a1113e1ba13a0eff5e0"
+    },
+    {
+      "name": "opentelemetry-extension-incubator-1.35.0-alpha.jar",
+      "production_sha256": "5ca38a9ecdf2c93183069dae1d7d76ec12e9cf4feb3c2209d04566e82fc4df3c",
+      "local_sha256": "5ca38a9ecdf2c93183069dae1d7d76ec12e9cf4feb3c2209d04566e82fc4df3c"
+    },
+    {
+      "name": "opentelemetry-gcp-resources-1.37.0-alpha.jar",
+      "production_sha256": "f7b6baddfbbe57f0e3e1e3cc08eb68bb61c29ef6c17898ce7ce35b1f3029d3e6",
+      "local_sha256": "f7b6baddfbbe57f0e3e1e3cc08eb68bb61c29ef6c17898ce7ce35b1f3029d3e6"
+    },
+    {
+      "name": "opentelemetry-grpc-1.6-2.1.0-alpha.jar",
+      "production_sha256": "7c033f0c8c8c8159c396b21922460ecfb7a5f004258f8fcdc4ce9979261e1ac9",
+      "local_sha256": "7c033f0c8c8c8159c396b21922460ecfb7a5f004258f8fcdc4ce9979261e1ac9"
+    },
+    {
+      "name": "opentelemetry-instrumentation-api-2.1.0.jar",
+      "production_sha256": "4f6ac1247c7372c103c23ef2594413418a496b114e13ef237031255a2d3ce361",
+      "local_sha256": "4f6ac1247c7372c103c23ef2594413418a496b114e13ef237031255a2d3ce361"
+    },
+    {
+      "name": "opentelemetry-instrumentation-api-incubator-2.1.0-alpha.jar",
+      "production_sha256": "4eae68272790153fabbfdc08741e7f3909af43adeb6ea4a30dd8a53d3bac4cd7",
+      "local_sha256": "4eae68272790153fabbfdc08741e7f3909af43adeb6ea4a30dd8a53d3bac4cd7"
+    },
+    {
+      "name": "opentelemetry-sdk-1.45.0.jar",
+      "production_sha256": "4e1f2e692e6bb7ed17ad45748b3d21f027be02c440cc991227fc79ea32522085",
+      "local_sha256": "4e1f2e692e6bb7ed17ad45748b3d21f027be02c440cc991227fc79ea32522085"
+    },
+    {
+      "name": "opentelemetry-sdk-common-1.45.0.jar",
+      "production_sha256": "cb58926cc8341a03e8bda7530de8b4516c5dfd6829271d2fe156d0c558800d77",
+      "local_sha256": "cb58926cc8341a03e8bda7530de8b4516c5dfd6829271d2fe156d0c558800d77"
+    },
+    {
+      "name": "opentelemetry-sdk-extension-autoconfigure-spi-1.45.0.jar",
+      "production_sha256": "d55d8e2e877d5b0424375c79a891c82e78d00eb1b1273295763e1b55b0374123",
+      "local_sha256": "d55d8e2e877d5b0424375c79a891c82e78d00eb1b1273295763e1b55b0374123"
+    },
+    {
+      "name": "opentelemetry-sdk-logs-1.45.0.jar",
+      "production_sha256": "8c9acc425c82055b1fd268e0873ae36c0b9d15a84d676512cff1987750049605",
+      "local_sha256": "8c9acc425c82055b1fd268e0873ae36c0b9d15a84d676512cff1987750049605"
+    },
+    {
+      "name": "opentelemetry-sdk-metrics-1.45.0.jar",
+      "production_sha256": "cf8711fc3d2b2c6af3fe039be1d355dfe4310e468f6761b080e1e42fe8617f5a",
+      "local_sha256": "cf8711fc3d2b2c6af3fe039be1d355dfe4310e468f6761b080e1e42fe8617f5a"
+    },
+    {
+      "name": "opentelemetry-sdk-trace-1.45.0.jar",
+      "production_sha256": "c7120a0bac3adedc81574093711bcf961fcee27023e88fa35f82187452a93580",
+      "local_sha256": "c7120a0bac3adedc81574093711bcf961fcee27023e88fa35f82187452a93580"
+    },
+    {
+      "name": "opentelemetry-semconv-1.27.0-alpha.jar",
+      "production_sha256": "9d63590c51a3455f440841e149b132bfd4d46eccbff9823d10211c1cec3e97f0",
+      "local_sha256": "9d63590c51a3455f440841e149b132bfd4d46eccbff9823d10211c1cec3e97f0"
+    },
+    {
+      "name": "perfmark-api-0.27.0.jar",
+      "production_sha256": "c7b478503ec524e55df19b424d46d27c8a68aeb801664fadd4f069b71f52d0f6",
+      "local_sha256": "c7b478503ec524e55df19b424d46d27c8a68aeb801664fadd4f069b71f52d0f6"
+    },
+    {
+      "name": "postgresql-42.7.5.jar",
+      "production_sha256": "69020b3bd20984543e817393f2e6c01a890ef2e37a77dd11d6d8508181d079ab",
+      "local_sha256": "69020b3bd20984543e817393f2e6c01a890ef2e37a77dd11d6d8508181d079ab"
+    },
+    {
+      "name": "protobuf-java-3.25.5.jar",
+      "production_sha256": "8540247fad9e06baefa8fb45eb313802d019f485f14300e0f9d6b556ed88e753",
+      "local_sha256": "8540247fad9e06baefa8fb45eb313802d019f485f14300e0f9d6b556ed88e753"
+    },
+    {
+      "name": "protobuf-java-util-3.25.5.jar",
+      "production_sha256": "dacc58b2c3d2fa8d4bddc1acb881e78d6cf7c137dd78bc1d67f6aca732436a8d",
+      "local_sha256": "dacc58b2c3d2fa8d4bddc1acb881e78d6cf7c137dd78bc1d67f6aca732436a8d"
+    },
+    {
+      "name": "proto-google-cloud-firestore-bundle-v1-3.30.2.jar",
+      "production_sha256": "aebac5515f7b748591988e75f15cdbc7703b69311456e46dab3ce25512d2b3df",
+      "local_sha256": "aebac5515f7b748591988e75f15cdbc7703b69311456e46dab3ce25512d2b3df"
+    },
+    {
+      "name": "proto-google-cloud-firestore-v1-3.30.2.jar",
+      "production_sha256": "c7eb7610ecb6e00ceeb6f916660d1e6846bae05f478133eeede249f44737417a",
+      "local_sha256": "c7eb7610ecb6e00ceeb6f916660d1e6846bae05f478133eeede249f44737417a"
+    },
+    {
+      "name": "proto-google-cloud-monitoring-v3-3.52.0.jar",
+      "production_sha256": "8238b3216aa59ffeed9a157833d7fcc844a7dc9f101b23d728f1cdec6c5c3ba2",
+      "local_sha256": "8238b3216aa59ffeed9a157833d7fcc844a7dc9f101b23d728f1cdec6c5c3ba2"
+    },
+    {
+      "name": "proto-google-cloud-storage-v2-2.46.0-beta.jar",
+      "production_sha256": "6ac54d7203f5c80b05323a1743fd63a4aef3bdc2c9e8a29d3401ef67912a901b",
+      "local_sha256": "6ac54d7203f5c80b05323a1743fd63a4aef3bdc2c9e8a29d3401ef67912a901b"
+    },
+    {
+      "name": "proto-google-common-protos-2.50.0.jar",
+      "production_sha256": "d209ac9c1d875e82b716ced2714b082ccc2149be412ef67384cd8a5c9eeb6dd0",
+      "local_sha256": "d209ac9c1d875e82b716ced2714b082ccc2149be412ef67384cd8a5c9eeb6dd0"
+    },
+    {
+      "name": "proto-google-iam-v1-1.45.0.jar",
+      "production_sha256": "52c6ba098c0c4ceb3a4615bb93687f4291b1a536f9a3be91f102c918944dbd89",
+      "local_sha256": "52c6ba098c0c4ceb3a4615bb93687f4291b1a536f9a3be91f102c918944dbd89"
+    },
+    {
+      "name": "re2j-1.7.jar",
+      "production_sha256": "4f657af51ab8bb0909bcc3eb40862d26125af8cbcf92aaaba595fed77f947bc0",
+      "local_sha256": "4f657af51ab8bb0909bcc3eb40862d26125af8cbcf92aaaba595fed77f947bc0"
+    },
+    {
+      "name": "shared-jvm.jar",
+      "production_sha256": "3cac70d4eec8ec2bd2c887ec8a1c8c3c273e5ee8f797f02b437d54f440f2f145",
+      "local_sha256": "77032b200092fe0efd0bff49b3b13bc083f0e26de11a5ae0d98d13039a540b0f"
+    },
+    {
+      "name": "shared-resourcemapping-0.33.0.jar",
+      "production_sha256": "eea9a3e11db783626cc15dd1835c1ed09f53b70a1fca8c58bf723ce813e9f843",
+      "local_sha256": "eea9a3e11db783626cc15dd1835c1ed09f53b70a1fca8c58bf723ce813e9f843"
+    },
+    {
+      "name": "slf4j-api-2.0.17.jar",
+      "production_sha256": "7b751d952061954d5abfed7181c1f645d336091b679891591d63329c622eb832",
+      "local_sha256": "7b751d952061954d5abfed7181c1f645d336091b679891591d63329c622eb832"
+    },
+    {
+      "name": "threetenbp-1.7.0.jar",
+      "production_sha256": "857917d2319a4e92dc1c5e3aeb75a0dac84445ed315e7ac3d82bb8d2b298977f",
+      "local_sha256": "857917d2319a4e92dc1c5e3aeb75a0dac84445ed315e7ac3d82bb8d2b298977f"
+    }
+  ],
+  "added_libraries": [
+    {
+      "name": "common-image-3.12.0.jar",
+      "sha256": "62a3821c724fadfda346c1e2d83b0c506a0c4074be269a52bf4e3192c7dd92bc"
+    },
+    {
+      "name": "common-io-3.12.0.jar",
+      "sha256": "bfacfeb02acac47dbfd1fab0002eaeca65547d04249498b654320c9e0fdf6647"
+    },
+    {
+      "name": "common-lang-3.12.0.jar",
+      "sha256": "5c65e504b5b64d80683e0fa70a1dd154dd83d4de7da37f21e950f5a9c03bc66d"
+    },
+    {
+      "name": "imageio-core-3.12.0.jar",
+      "sha256": "34c6f91bf3b217ed0115bce8283238fbd0264562aa682b4226a3960d0ede9815"
+    },
+    {
+      "name": "imageio-jpeg-3.12.0.jar",
+      "sha256": "fc62f5d7df04d1af27dc7e5b74ea5f93c23b1013064ddd4e74879d709a9d859e"
+    },
+    {
+      "name": "imageio-metadata-3.12.0.jar",
+      "sha256": "797d026b67d07e6d5eb00a1ab53a55acaab6f80a71c5ee325572093eb90c0caa"
+    },
+    {
+      "name": "imageio-webp-3.12.0.jar",
+      "sha256": "43dc447ccfe34c5c5c6f5d31190270e1f9bf65f60375d697ae2a8ff433468526"
+    },
+    {
+      "name": "metadata-extractor-2.19.0.jar",
+      "sha256": "e51bb454ed08ea2bfcc3ad147d088ad1aa73a999e0072563f8ae50021a2fcadb"
+    },
+    {
+      "name": "xmpcore-6.1.11.jar",
+      "sha256": "8f7033c579b99fa0d9d6ddcb9448875b5e4b577c350002278ce46997d678b737"
+    }
+  ],
+  "unchanged_third_party_count": 163
+}
