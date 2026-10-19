@@ -49,6 +49,9 @@ test('register through Firebase, save compressed avatar, reload, sign out and si
   await page.getByLabel('Contraseña', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
   await expect(page).toHaveURL(/#\/inicio/);
+  await page.goto('/#/ajustes');
+  await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('Persona QA Actualizada');
+  await expect(page.locator('#profile-form img').first()).toHaveJSProperty('src', saved.data.url);
 });
 
 test('real API rejects forged sessions, anonymous uploads and laboratory tokens', async ({ request }) => {

@@ -3,6 +3,10 @@ services:
   postgres:
     image: postgis/postgis:16-3.4
     platform: linux/amd64
+    entrypoint:
+      - /bin/bash
+      - -c
+      - cp /qa-init.sh /docker-entrypoint-initdb.d/01-qa-init.sh && chmod 644 /docker-entrypoint-initdb.d/01-qa-init.sh && exec /usr/local/bin/docker-entrypoint.sh postgres
     environment:
       POSTGRES_DB: onlygoodthings
       POSTGRES_USER: ogt
@@ -10,7 +14,8 @@ services:
     ports:
       - "127.0.0.1:19432:5432"
     volumes:
-      - ../database/migrations:/docker-entrypoint-initdb.d:ro
+      - ../database/migrations:/ogt-migrations:ro
+      - ./init-db.sh:/qa-init.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ogt -d onlygoodthings"]
       interval: 2s

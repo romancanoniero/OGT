@@ -53,7 +53,7 @@ OGT_FULL_E2E=1 npm test
 
 `npm test` sin `OGT_FULL_E2E=1` ejecuta la interfaz anónima y omite explícitamente
 el circuito completo. No equivale a una certificación E2E. Los casos completos
-utilizan Firebase emulado, API real y base de datos real; todavía requieren ejecución.
+utilizan Firebase emulado, API real y base de datos real; el circuito descrito pasó en ambos navegadores.
 Los navegadores bloquean destinos externos, incluidos producción, proveedores OAuth y SMS.
 Las pruebas completas generan usuarios sintéticos únicamente en el entorno de QA.
 
@@ -69,7 +69,8 @@ Para liberar el entorno aislado: detener los procesos de las terminales y ejecut
 | Backend: autenticación, imágenes y subida HTTP | 16 aprobadas |
 | Lógica de sesión web | 5 aprobadas |
 | Interfaz anónima Chromium/WebKit móvil | 4 aprobadas |
-| Registro → API → persistencia → avatar → nueva sesión | Pendiente; Docker bloqueado por espacio/IO |
+| Registro → API → persistencia → avatar → nueva sesión | Aprobado en Chromium y WebKit móvil |
+| API: sesiones falsas y subidas anónimas | Aprobado en ambos proyectos de navegador |
 | Android: compilación completa | Bloqueada por ausencia de `google-services.json` |
 | Android: compilación Kotlin omitiendo generación Firebase | Aprobada; no equivale a APK/configuración verificados |
 | Producción: consulta de configuración sin mutaciones | Laboratorio habilitado; ruta Firebase Admin ausente |
@@ -82,8 +83,23 @@ de la VPS se conserva localmente bajo `.recovery`; no se publica ni se suben bin
 Medición con imagen sintética texturada y EXIF: 6.135.720 → 1.905.840 bytes (68,9 % de reducción).
 Un WebP transparente de 44 bytes se conservó en 44 bytes. No es una estimación de ahorro de producción.
 
+Al recuperar espacio se restableció Docker y se ejecutaron los ocho casos Playwright
+con `OGT_FULL_E2E=1`: todos aprobados. Los 16 tests del backend también se repitieron
+correctamente. Para alojar navegadores en el disco externo, usar
+`PLAYWRIGHT_BROWSERS_PATH=/Volumes/DEV_MAC/OGT/.recovery/playwright` tanto al instalar
+como al ejecutar Playwright.
+
+La inicialización aislada excluye únicamente `14_elpidio_homenaje.sql`, una importación
+editorial que referencia una identidad existente de producción. Las migraciones originales
+se conservan. El script se copia dentro del contenedor para evitar permisos de ejecución
+del volumen macOS. Esto no certifica una instalación limpia de producción.
+
 ## Diferencias intencionales de esta rama
 
+- Firebase define el nombre al crear la cuenta; los siguientes inicios de sesión
+  conservan el nombre editado en OGT. Antes el nombre antiguo sobrescribía el cambio
+  al recargar. El E2E verifica nombre y foto después de guardar, recargar y volver a entrar.
+  Email, teléfono y reclamo de reconocimientos mantienen el comportamiento previo.
 - Producción falla al iniciar si permite tokens de laboratorio o emulación Firebase.
   Firebase Admin usa credenciales configuradas o Application Default Credentials;
   los tokens inválidos reciben 401. No se cambió la configuración de la VPS.
@@ -112,7 +128,8 @@ Un WebP transparente de 44 bytes se conservó en 44 bytes. No es una estimación
 
 ## Bloqueos y próximos controles
 
-1. Recuperar Docker/espacio local y ejecutar E2E completo con PostGIS y Redis reales.
+1. Ampliar la cobertura E2E: el circuito de autenticación/perfil y los rechazos de API
+   ya pasan con PostGIS y Redis reales; no equivalen a certificar todos los módulos.
 2. Reconciliar el código exacto de `SocialSqlRepository` con producción. La VPS no
    contiene `loadMatchedFriendNeeds`; no sustituir el backend hasta preservar y probar
    tanto el comportamiento desplegado como los cambios existentes en GitHub.

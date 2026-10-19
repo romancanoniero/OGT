@@ -29,16 +29,13 @@ class IdentityStore(private val db: Database) {
             }
         }
         if (existing != null) {
-            val incomingName = verified.displayName?.trim().orEmpty()
-            val keepName = incomingName.isBlank() || incomingName == verified.firebaseUid
-            val nextName = if (keepName) existing.displayName else incomingName
+            // Firebase seeds a new profile; subsequent logins must preserve edits made in OGT.
             connection.prepareStatement(
-                "UPDATE users SET email = COALESCE(?, email), phone_e164 = COALESCE(?, phone_e164), display_name = ? WHERE firebase_uid = ?",
+                "UPDATE users SET email = COALESCE(?, email), phone_e164 = COALESCE(?, phone_e164) WHERE firebase_uid = ?",
             ).use { stmt ->
                 stmt.setString(1, verified.email)
                 stmt.setString(2, verified.phone)
-                stmt.setString(3, nextName)
-                stmt.setString(4, verified.firebaseUid)
+                stmt.setString(3, verified.firebaseUid)
                 stmt.executeUpdate()
             }
             com.onlygoodthings.backend.social.claimHonorsMatchingContact(
@@ -47,7 +44,7 @@ class IdentityStore(private val db: Database) {
                 verified.email,
                 verified.phone,
             )
-            return@withConnection existing.copy(displayName = nextName)
+            return@withConnection existing
         }
 
         val id = UUID.randomUUID().toString()
