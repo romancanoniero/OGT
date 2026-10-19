@@ -1,0 +1,24 @@
+{
+  "base_commit": "22c21ff736bd72fa2347c9ec4248adb80c0767fb",
+  "production_modified": false,
+  "normalization": "ASM 9.8 SKIP_DEBUG; omit only kotlin.jvm.internal.SourceDebugExtension. Kotlin Metadata, bytecode, SQL constants, bootstrap handles, frames and exception tables retained.",
+  "classes": {
+    "backend.jar": {
+      "sha256": "5f78bef5ef37b55140db84b525cfd8a2e58c9433b78b42bb2bacad26f1b6ae17",
+      "total": 175,
+      "raw_identical": 174,
+      "normalized_identical": 175,
+      "missing": 0,
+      "extra": 0
+    },
+    "shared-jvm.jar": {
+      "sha256": "3cac70d4eec8ec2bd2c887ec8a1c8c3c273e5ee8f797f02b437d54f440f2f145",
+      "total": 429,
+      "raw_identical": 429,
+      "normalized_identical": 429,
+      "missing": 0,
+      "extra": 0
+    }
+  },
+  "scope": "Application classes only; not certification of third-party dependencies, database data, infrastructure or launch readiness."
+}

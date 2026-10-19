@@ -39,7 +39,7 @@ class ParkingSqlRepository(
             val now = Instant.now()
             val expires = now.plusSeconds(ttlMinutes.toLong() * 60)
             val interestCloses = if (leftoverNow) now else now.plusMillis(ParkingRules.INTEREST_WINDOW_MS)
-            val waitDeadline = if (leftoverNow) now else now.plusSeconds(ownerEtaSeconds.toLong() + ParkingRules.OWNER_WAIT_SECONDS)
+            val waitDeadline = if (leftoverNow) expires else now.plusSeconds(ownerEtaSeconds.toLong() + ParkingRules.OWNER_WAIT_SECONDS)
             val eta = if (leftoverNow) 1 else ownerEtaSeconds
             connection.prepareStatement(
                 """
@@ -352,7 +352,7 @@ class ParkingSqlRepository(
                             AND ST_Distance(owner_last_location::geography, claimant_last_location::geography) <= ?
                         )
                       )
-                RETURNING $SPOT_RETURNING,
+                RETURNING $SPOT_SELECT,
                           owner_user_id AS done_owner,
                           claimed_by_user_id AS done_claimant,
                           reward_points AS done_points,
@@ -655,6 +655,6 @@ class ParkingSqlRepository(
             EXTRACT(EPOCH FROM owner_wait_deadline_at) * 1000 AS wait_deadline_ms,
             ST_Y(location) AS lat, ST_X(location) AS lng
         """
-        const val SPOT_RETURNING = SPOT_SELECT
+        const val SPOT_RETURNING = "$SPOT_SELECT, distance_meters AS meters"
     }
 }

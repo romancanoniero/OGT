@@ -3,6 +3,12 @@
 Base de producción recuperada: `recovery/vps-baseline-20261019` (`3a726d6`).
 Trabajo de lanzamiento: `launch/readiness-20261019`. No desplegar esta rama todavía.
 
+Última regresión local (19/10/2026): **22/22 pruebas** en Chromium y WebKit con
+emulación móvil, con Firebase Auth emulado, PostGIS y Redis. Incluye reserva
+simultánea de estacionamiento (un solo ganador), permisos de terceros, liberación,
+cierre por proximidad y confirmación repetida sin duplicar puntos. Las 16 pruebas
+del backend también pasan. No sustituye pruebas de proveedores reales ni dispositivos.
+
 ## Entorno aislado
 
 Requisitos: JDK 17/21, SDK Android 36, Node 22, Docker con espacio disponible y el SDK
@@ -82,7 +88,8 @@ Para liberar el entorno aislado: detener los procesos de las terminales y ejecut
 | Android: compilación completa | Bloqueada por ausencia de `google-services.json` |
 | Android: compilación Kotlin omitiendo generación Firebase | Aprobada; no equivale a APK/configuración verificados |
 | Producción: consulta de configuración sin mutaciones | Laboratorio habilitado; ruta Firebase Admin ausente |
-| Clases backend de línea base frente a VPS | 174/175 idénticas; `SocialSqlRepository` diferente |
+| Reconstrucción backend de Contabo | 175/175 clases equivalentes sin depuración; 174 idénticas byte a byte |
+| Reconstrucción biblioteca compartida de Contabo | 429/429 clases idénticas byte a byte |
 
 Los informes se generan en `backend/build/reports/tests`, `shared/build/reports/tests`
 y `qa/playwright-report`. Capturas y trazas están en `qa/test-results`. La evidencia
@@ -154,6 +161,9 @@ del volumen macOS. Esto no certifica una instalación limpia de producción.
 - Las plazas locales publicadas en el mismo milisegundo reciben IDs distintos. Las
   plazas inmediatamente disponibles vencen por su TTL, no al instante de publicación.
   Una prueba usaba relojes incompatibles entre usuarios; ahora comparten el mismo reloj.
+- El backend SQL también conserva una plaza inmediatamente libre hasta su TTL.
+  Las respuestas de reserva, cancelación y liberación incluyen la columna de distancia
+  que esperaba el lector SQL; antes la reserva podía persistir y responder con error 500.
 - El script de despliegue verifica la configuración segura antes de copiar archivos.
 - Se recupera la prioridad `^~ /media/` ya presente en GitHub: las fotos y videos
   subidos deben llegar a la API en lugar de resolverse como archivos estáticos de Nginx.
@@ -165,9 +175,10 @@ del volumen macOS. Esto no certifica una instalación limpia de producción.
 
 1. Ampliar la cobertura E2E: el circuito de autenticación/perfil y los rechazos de API
    ya pasan con PostGIS y Redis reales; no equivalen a certificar todos los módulos.
-2. Reconciliar el código exacto de `SocialSqlRepository` con producción. La VPS no
-   contiene `loadMatchedFriendNeeds`; no sustituir el backend hasta preservar y probar
-   tanto el comportamiento desplegado como los cambios existentes en GitHub.
+2. La diferencia de clases con Contabo quedó identificada y reconstruida (ver evidencia
+   abajo). Antes de desplegar, verificar también dependencias externas, configuración,
+   compatibilidad de clientes y transición en staging. La rama conserva las mejoras
+   de matching de Trueque presentes en GitHub y sus regresiones verificadas.
 3. Configurar y validar Firebase Admin de producción, dominios y métodos habilitados.
    Ensayar la transición en staging antes de desactivar el acceso actual de laboratorio.
 4. Completar compresión de animaciones; comprobar todas las entradas de clientes,
@@ -183,3 +194,25 @@ del volumen macOS. Esto no certifica una instalación limpia de producción.
    defectos críticos/altos, versión desplegable identificada y recuperación ensayada.
 
 No hay despliegue automático ni certificación de lanzamiento en este conjunto de cambios.
+
+## Reconstrucción verificable de Contabo
+
+`baselines/contabo-20261019.json` registra hashes de los dos JAR originales y resultados.
+`baselines/contabo-20261019.patch` reconstruye el código desplegado desde el commit
+`22c21ff736bd72fa2347c9ec4248adb80c0767fb`. Aplicarlo **solo a una copia aislada** de ese
+commit, nunca a la rama de lanzamiento: retira exclusivamente el matching de habilidades
+en SocialRepository, SocialPost, FeedCandidate, ViewerContext y los motivos/orden del feed.
+La copia local usada está en `.recovery/reconcile-src`; los JAR están en la recuperación
+de VPS y no se versionan. Compilar allí `:backend:compileKotlin` con el SDK indicado arriba.
+
+La herramienta `baselines/CompareClasses.java` usa ASM 9.8 (`asm` y `asm-util` en el
+classpath). Compilarla con `javac -cp "$ASM_CP" -d /tmp/ogt-class-check qa/baselines/CompareClasses.java`.
+Ejecutar `java -cp "$ASM_CP:/tmp/ogt-class-check" CompareClasses ORIGINAL.jar DIRECTORIO_CLASSES`
+para cada JAR y su directorio compilado (`backend/build/classes/kotlin/main` y
+`shared/build/classes/kotlin/jvm/main`). Falla si falta, sobra o difiere alguna clase.
+Solo excluye información de depuración y `SourceDebugExtension`; conserva Kotlin Metadata,
+instrucciones, firmas, constantes SQL, bootstrap handles, frames y tablas de excepciones.
+Resultado: 175/175 clases backend normalizadas iguales (174 byte a byte), y 429/429 clases
+compartidas iguales byte a byte. No quedan diferencias ejecutables sin explicar en esas
+clases. Esto no implica que dependencias de terceros, datos, infraestructura o despliegue
+estén certificados. Contabo no fue modificado.

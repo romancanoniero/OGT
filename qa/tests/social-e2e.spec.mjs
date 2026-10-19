@@ -219,3 +219,47 @@ test('lost pet requires identifying details and coordinates, appears nearby and 
   expect((await owner('animals/get', { listingId: listing.listingId })).resolved).toBe(true);
   expect((await owner('animals/nearby', { latitude: draft.latitude, longitude: draft.longitude, radius: 500 })).some(row => row.id === listing.listingId || row.listingId === listing.listingId)).toBe(false);
 });
+
+test('parking leftover remains available and simultaneous claims have one winner', async ({ page, browser, request }) => {
+  const ownerToken = await signup(page, 'Vecina QA Parking');
+  const owner = api(request, ownerToken);
+  const location = { latitude: -34.6037, longitude: -58.3816 };
+  const spot = await owner('parking/publish', { ...location, leftoverNow: true, ttlMinutes: 15, notes: 'QA vacante inmediata' });
+  expect(spot.ownerWaitDeadlineAtEpochMs).toBeGreaterThan(Date.now());
+  expect((await owner('parking/nearby', { ...location, radius: 500 })).some(s => s.id === spot.id)).toBe(true);
+  const contexts = [];
+  try {
+    const tokens = [];
+    for (const name of ['Primer vecino QA', 'Segundo vecino QA']) {
+      const context = await browser.newContext(); contexts.push(context);
+      await context.route('**/*', route => ['localhost', '127.0.0.1'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
+      tokens.push(await signup(await context.newPage(), name));
+    }
+    const claims = await Promise.all(tokens.map(token => request.post('/api/v1/parking/claim', { headers: { Authorization: `Bearer ${token}` }, data: { ...location, spotId: spot.id, expectedVersion: spot.version } })));
+    expect(claims.map(r => r.status()).sort()).toEqual([200, 409]);
+    const winnerIndex = claims.findIndex(r => r.status() === 200);
+    const winner = api(request, tokens[winnerIndex]);
+    const loser = api(request, tokens[1 - winnerIndex]);
+    const taken = await owner('parking/get', { spotId: spot.id });
+    expect(taken.status).toBe('CLAIMED');
+    expect(taken.claimedByUserId).toBe((await winner('auth/me')).userId);
+    await loser('parking/complete', { ...location, spotId: spot.id }, false);
+    await loser('parking/cancel', { spotId: spot.id }, false);
+    await winner('parking/found-other', { spotId: spot.id });
+    expect((await owner('parking/get', { spotId: spot.id })).status).toBe('AVAILABLE');
+    await owner('parking/cancel', { spotId: spot.id });
+    expect((await owner('parking/nearby', { ...location, radius: 500 })).some(s => s.id === spot.id)).toBe(false);
+    const second = await owner('parking/publish', { ...location, leftoverNow: true, ttlMinutes: 15 });
+    await winner('parking/claim', { ...location, spotId: second.id, expectedVersion: second.version });
+    await winner('parking/complete', { latitude: 0, longitude: 0, spotId: second.id }, false);
+    const pointsBefore = (await owner('auth/me')).communityPoints;
+    const completed = await winner('parking/complete', { ...location, spotId: second.id });
+    expect(completed.spot.status).toBe('COMPLETED');
+    expect(completed.handoff.verified).toBe(true);
+    expect(completed.handoff.proximityMeters).toBeLessThan(1);
+    const pointsAfter = (await owner('auth/me')).communityPoints;
+    expect(pointsAfter - pointsBefore).toBe(completed.handoff.pointsAwarded);
+    await winner('parking/complete', { ...location, spotId: second.id }, false);
+    expect((await owner('auth/me')).communityPoints).toBe(pointsAfter);
+  } finally { await Promise.all(contexts.map(c => c.close())); }
+});

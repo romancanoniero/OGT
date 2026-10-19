@@ -1,0 +1,238 @@
+--- a/backend/src/main/kotlin/com/onlygoodthings/backend/social/SocialRepository.kt
++++ b/backend/src/main/kotlin/com/onlygoodthings/backend/social/SocialRepository.kt
+@@ -35,7 +35,7 @@
+     ): List<SocialPost> {
+         val offset = cursor?.toIntOrNull() ?: 0
+         val viewer = loadViewer(userId)
+-        val candidates = (loadCandidates() + loadMatchedFriendNeeds(viewer)).distinctBy { it.postId }
++        val candidates = loadCandidates()
+         val ranked = FeedRanker.rank(candidates, viewer, mode, System.currentTimeMillis(), offset, pageSize, family)
+         if (ranked.isEmpty()) return emptyList()
+         val hydrated = hydratePosts(ranked.map { it.postId }, userId).associateBy { it.id }
+@@ -834,15 +834,7 @@
+                 }
+             }
+         }
+-        val offered = connection.prepareStatement(
+-            "SELECT tag_id::text FROM user_skills WHERE user_id = ?::uuid AND offered",
+-        ).use { stmt ->
+-            stmt.setString(1, userId)
+-            stmt.executeQuery().use { rs ->
+-                buildSet { while (rs.next()) add(rs.getString(1)) }
+-            }
+-        }
+-        ViewerContext(userId, followed, events, lat, lng, offeredTagIds = offered)
++        ViewerContext(userId, followed, events, lat, lng)
+     }
+ 
+     private fun loadCandidates(): List<FeedCandidate> = db.withConnection { connection ->
+@@ -861,12 +853,10 @@
+                    (
+                        SELECT pp.user_id::text FROM post_people pp
+                        WHERE pp.post_id = p.id AND pp.role = 'PROTAGONIST' LIMIT 1
+-                   ) AS protagonist_id,
+-                   tn.tag_id::text AS need_tag_id
++                   ) AS protagonist_id
+             FROM social_posts p
+             LEFT JOIN users u ON u.id = p.author_user_id
+             LEFT JOIN animal_listings a ON a.id = p.listing_id
+-            LEFT JOIN timebank_needs tn ON tn.post_id = p.id AND tn.open
+             WHERE p.moderation_status = 'VISIBLE' AND p.is_story = FALSE
+             ORDER BY p.created_at DESC
+             LIMIT 200
+@@ -895,7 +885,6 @@
+                                 urgencyRank = rs.getInt("urgency_rank"),
+                                 placement = runCatching { PostPlacement.valueOf(rs.getString("placement")) }
+                                     .getOrDefault(PostPlacement.ORGANIC),
+-                                needTagId = rs.stringOrNull("need_tag_id"),
+                             ),
+                         )
+                     }
+@@ -905,73 +894,6 @@
+     }
+ 
+     /** Pedidos abiertos de gente que seguís y que vos podés cubrir. Entran al feed aunque no estén entre los 200 más nuevos. */
+-    private fun loadMatchedFriendNeeds(viewer: ViewerContext): List<FeedCandidate> {
+-        if (viewer.followedIds.isEmpty() || viewer.offeredTagIds.isEmpty()) return emptyList()
+-        val people = viewer.followedIds.joinToString(",") { "?::uuid" }
+-        val tags = viewer.offeredTagIds.joinToString(",") { "?::uuid" }
+-        return db.withConnection { connection ->
+-            connection.prepareStatement(
+-                """
+-                SELECT p.id, p.author_user_id, p.author_company_id, COALESCE(p.topic, '') AS topic,
+-                       p.impact_count, p.comment_count, p.source_url,
+-                       EXTRACT(EPOCH FROM p.created_at) * 1000 AS created_ms,
+-                       ST_Y(p.location) AS lat, ST_X(p.location) AS lng,
+-                       COALESCE(p.achieved_count, 0) AS achieved_count,
+-                       COALESCE(p.placement::text, 'ORGANIC') AS placement,
+-                       COALESCE(u.trust_score, 0) AS trust_score,
+-                       0 AS urgency_rank,
+-                       p.author_user_id::text AS protagonist_id,
+-                       n.tag_id::text AS need_tag_id
+-                FROM timebank_needs n
+-                JOIN social_posts p ON p.id = n.post_id
+-                LEFT JOIN users u ON u.id = p.author_user_id
+-                WHERE n.open
+-                  AND p.moderation_status = 'VISIBLE'
+-                  AND p.is_story = FALSE
+-                  AND n.user_id IN ($people)
+-                  AND n.tag_id IN ($tags)
+-                  AND n.user_id <> ?::uuid
+-                ORDER BY n.created_at DESC
+-                LIMIT 20
+-                """.trimIndent(),
+-            ).use { stmt ->
+-                var i = 1
+-                viewer.followedIds.forEach { stmt.setString(i++, it) }
+-                viewer.offeredTagIds.forEach { stmt.setString(i++, it) }
+-                stmt.setString(i, viewer.userId)
+-                stmt.executeQuery().use { rs ->
+-                    buildList {
+-                        while (rs.next()) {
+-                            val authorUser = rs.getString("author_user_id")
+-                            val companyId = rs.getString("author_company_id")
+-                            add(
+-                                FeedCandidate(
+-                                    postId = rs.getString("id"),
+-                                    authorKey = authorUser ?: "company:${companyId.orEmpty()}",
+-                                    authorUserId = authorUser,
+-                                    protagonistUserId = rs.getString("protagonist_id") ?: authorUser,
+-                                    topic = rs.getString("topic"),
+-                                    createdAtEpochMs = rs.getLong("created_ms"),
+-                                    impactCount = rs.getInt("impact_count"),
+-                                    commentCount = rs.getInt("comment_count"),
+-                                    latitude = rs.optDouble("lat"),
+-                                    longitude = rs.optDouble("lng"),
+-                                    sourceUrl = rs.stringOrNull("source_url"),
+-                                    achievedCount = rs.getInt("achieved_count"),
+-                                    trustScore = rs.getDouble("trust_score"),
+-                                    urgencyRank = rs.getInt("urgency_rank"),
+-                                    placement = runCatching { PostPlacement.valueOf(rs.getString("placement")) }
+-                                        .getOrDefault(PostPlacement.ORGANIC),
+-                                    needTagId = rs.stringOrNull("need_tag_id"),
+-                                ),
+-                            )
+-                        }
+-                    }
+-                }
+-            }
+-        }
+-    }
+-
+     private fun hydratePosts(ids: List<String>, viewerId: String): List<SocialPost> {
+         if (ids.isEmpty()) return emptyList()
+         val placeholders = ids.joinToString(",") { "?::uuid" }
+@@ -1011,10 +933,6 @@
+                            SELECT 1 FROM timebank_need_invites i
+                            WHERE i.need_id = tn.id AND i.invitee_id = ?::uuid
+                        ) AS viewer_invited,
+-                       EXISTS (
+-                           SELECT 1 FROM user_skills us
+-                           WHERE us.user_id = ?::uuid AND us.offered AND us.tag_id = tn.tag_id
+-                       ) AS matches_my_offer,
+                        COALESCE((
+                            SELECT array_agg(DISTINCT st.label ORDER BY st.label)
+                            FROM (
+@@ -1037,8 +955,7 @@
+                 stmt.setString(1, viewerId)
+                 stmt.setString(2, viewerId)
+                 stmt.setString(3, viewerId)
+-                stmt.setString(4, viewerId)
+-                ids.forEachIndexed { index, id -> stmt.setString(index + 5, id) }
++                ids.forEachIndexed { index, id -> stmt.setString(index + 4, id) }
+                 val posts = stmt.executeQuery().use { rs ->
+                     buildList { while (rs.next()) add(rs.toPost()) }
+                 }
+@@ -1383,7 +1300,6 @@
+             supportCount = runCatching { getInt("support_count") }.getOrDefault(0),
+             viewerSupported = runCatching { getBoolean("viewer_supported") }.getOrDefault(false),
+             viewerInvited = runCatching { getBoolean("viewer_invited") }.getOrDefault(false),
+-            matchesMyOffer = runCatching { getBoolean("matches_my_offer") }.getOrDefault(false),
+         )
+     }
+ 
+--- a/shared/src/commonMain/kotlin/com/onlygoodthings/shared/domain/Social.kt
++++ b/shared/src/commonMain/kotlin/com/onlygoodthings/shared/domain/Social.kt
+@@ -40,7 +40,6 @@
+     val supportCount: Int = 0,
+     val viewerSupported: Boolean = false,
+     val viewerInvited: Boolean = false,
+-    val matchesMyOffer: Boolean = false,
+ )
+ 
+ @Serializable
+--- a/shared/src/commonMain/kotlin/com/onlygoodthings/shared/domain/Feed.kt
++++ b/shared/src/commonMain/kotlin/com/onlygoodthings/shared/domain/Feed.kt
+@@ -150,7 +150,6 @@
+     EXPLORE,
+     FILTER,
+     PROMOTED,
+-    SKILL_MATCH,
+ }
+ 
+ /** Home rankeado vs tubo cronológico del grafo. */
+--- a/shared/src/commonMain/kotlin/com/onlygoodthings/shared/feed/FeedRanker.kt
++++ b/shared/src/commonMain/kotlin/com/onlygoodthings/shared/feed/FeedRanker.kt
+@@ -30,7 +30,6 @@
+     val trustScore: Double = 0.0,
+     val urgencyRank: Int = 0,
+     val placement: PostPlacement = PostPlacement.ORGANIC,
+-    val needTagId: String? = null,
+ ) {
+     fun family(): FeedTopicFamily = feedTopicFamily(topic, sourceUrl)
+ }
+@@ -48,7 +47,6 @@
+     val events: List<FeedEventSignal> = emptyList(),
+     val latitude: Double? = null,
+     val longitude: Double? = null,
+-    val offeredTagIds: Set<String> = emptySet(),
+ )
+ 
+ data class RankedFeedItem(
+@@ -128,22 +126,17 @@
+         }
+         return visible
+             .sortedWith(
+-                compareByDescending<FeedCandidate> { skillMatch(it, viewer) && inGraph(it, viewer) }
+-                    .thenByDescending { it.createdAtEpochMs }
+-                    .thenBy { it.postId },
++                compareByDescending<FeedCandidate> { it.createdAtEpochMs }.thenBy { it.postId },
+             )
+             .drop(offset.coerceAtLeast(0))
+             .take(limit.coerceAtLeast(0))
+             .map { post ->
+                 val fromGraph = inGraph(post, viewer)
+-                val canHelp = skillMatch(post, viewer) && fromGraph
+                 RankedFeedItem(
+                     postId = post.postId,
+                     score = post.createdAtEpochMs.toDouble(),
+                     discovery = query.mode == FeedMode.HOME && !fromGraph,
+-                    reason = if (canHelp) {
+-                        FeedShowReason.SKILL_MATCH
+-                    } else if (query.mode == FeedMode.FOLLOWING) {
++                    reason = if (query.mode == FeedMode.FOLLOWING) {
+                         if (query.family != null) FeedShowReason.FILTER else FeedShowReason.GRAPH
+                     } else {
+                         reasonFor(query, profile, post, fromGraph)
+@@ -199,11 +192,6 @@
+             hide
+     }
+ 
+-    private fun skillMatch(post: FeedCandidate, viewer: ViewerContext): Boolean {
+-        val tag = post.needTagId ?: return false
+-        return tag in viewer.offeredTagIds
+-    }
+-
+     private fun inGraph(post: FeedCandidate, viewer: ViewerContext): Boolean {
+         val mine = setOfNotNull(post.authorUserId, post.protagonistUserId)
+         return viewer.userId in mine || mine.any { it in viewer.followedIds }
+--- a/shared/src/commonMain/kotlin/com/onlygoodthings/shared/feed/FeedTopic.kt
++++ b/shared/src/commonMain/kotlin/com/onlygoodthings/shared/feed/FeedTopic.kt
+@@ -75,7 +75,6 @@
+     FeedShowReason.EXPLORE -> "Para que explores"
+     FeedShowReason.FILTER -> "Filtro"
+     FeedShowReason.PROMOTED -> "Promocionado"
+-    FeedShowReason.SKILL_MATCH -> "Podés dar lo que pide"
+ }
+ 
+ private val PET_TAGS = setOf(
