@@ -244,3 +244,23 @@ Chromium y WebKit móvil emulado, 5/5 controles de sesión, sintaxis JavaScript 
 Swift correctas, compilación Kotlin Android aprobada excluyendo
 `:composeApp:processDebugGoogleServices` por faltar `google-services.json`.
 No equivale a compilación iOS completa ni validación OAuth real. No se desplegó.
+
+## Despliegue parcial autorizado (19/10/2026)
+
+Se publicó la retirada de Facebook sobre la versión vigente de Contabo, sin
+publicar aún el resto de la rama de lanzamiento. Archivos públicos `app.js`,
+`auth.js` e `index.html` verificados byte a byte contra el candidato; referencias
+JS versionadas para renovar caché. Evidencia y parche reproducible en
+`baselines/facebook-deployment-20261019.{json,patch}`. Respaldo remoto:
+`/home/iankmp/ogt-backups/facebook-20261019T184217Z`.
+
+La comprobación posterior detectó un 502: `api` resolvía a 172.20.0.3 en la red
+compartida, mientras OGT estaba en 172.31.0.4. Se reemplazaron los cinco destinos
+por `ogt-api:8080`, se validó Nginx y se recargó sin reiniciar API ni bases. La
+configuración local recoge la misma corrección. `/health` público volvió a
+responder con `ogt-backend` y `up`. No se modificaron credenciales ni datos.
+
+Regresión local completa posterior: **24/24 pruebas aprobadas** en Chromium y
+WebKit móvil emulado. El control aislado del proxy también pasa. Estos resultados
+no equivalen a E2E autenticado de producción: Firebase Admin y OAuth/SMS reales
+siguen pendientes; la herramienta de navegador continúa bloqueada por su política.

@@ -1,0 +1,19 @@
+{
+  "scope": "Production-only Facebook removal applied to recovered live web, not full launch branch",
+  "backup": "/home/iankmp/ogt-backups/facebook-20261019T184217Z",
+  "files": {
+    "app.js": {
+      "before": "fe73c4f46a4c39f289731f52812442a9252435a55ae2f7258a8f76a4485c839f",
+      "after": "8b086b44ccd1a9f3b86587677102bc7042a1f8997d30c2545a60e2ac71cf09fe"
+    },
+    "auth.js": {
+      "before": "8fbe1a04e9c9797f6dd7aee38a1c1b27f6fda66cd79e9573444bcceea1a8b5cd",
+      "after": "7e55deb7252a148de04647e80f6b76b63f0cb25f4535b519c4981357de8e8a22"
+    },
+    "index.html": {
+      "before": "b368752323fbf2b3e98667c4f5bcaac7224918c814c9004c50199b9956df93b0",
+      "after": "9d4f45c0229b16602d86b973def91a1cc2d5aa7155f635f5eb0fb3e05bc036d1"
+    }
+  },
+  "proxy_change": "Five upstreams changed from api:8080 to ogt-api:8080 after wrong-network DNS resolution caused 502; nginx config validated then reloaded."
+}

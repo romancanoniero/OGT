@@ -2,7 +2,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 # Isolated upstream: no published ports, mounts, production data or network calls.
-docker run --rm -i --add-host api:127.0.0.1 nginx:alpine sh -ec '
+docker run --rm -i --add-host ogt-api:127.0.0.1 nginx:alpine sh -ec '
   cat > /etc/nginx/conf.d/default.conf
   printf "server { listen 8080; return 200 \"qa-upstream\"; }\n" > /etc/nginx/conf.d/qa-upstream.conf
   nginx -t
