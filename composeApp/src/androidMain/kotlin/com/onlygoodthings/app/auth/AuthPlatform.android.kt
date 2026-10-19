@@ -139,7 +139,6 @@ actual class AuthPlatform actual constructor() {
         throw AuthException("La cuenta de Google no devolvió un token válido")
     }
 
-    actual suspend fun signInFacebook(): AuthUser = signInOAuth("facebook.com", listOf("email", "public_profile"))
 
     actual suspend fun unlockBiometric(): Boolean {
         val activity = AndroidAuthHost.requireActivity()

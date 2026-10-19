@@ -121,7 +121,6 @@ class AuthController(
     suspend fun signInProvider(provider: String): Boolean = wrap {
         val user = when (provider) {
             "google" -> platform.signInGoogle()
-            "facebook" -> platform.signInFacebook()
             else -> error("Proveedor no soportado")
         }
         finishSession(user, keep = true)

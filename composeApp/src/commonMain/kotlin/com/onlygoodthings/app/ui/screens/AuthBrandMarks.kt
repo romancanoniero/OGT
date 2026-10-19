@@ -5,13 +5,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,12 +25,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.onlygoodthings.app.theme.OgtColors
 
-/** Fila de proveedores. Google y Facebook; el mismo par que en la web. */
+/** Fila de proveedores. Google; el mismo proveedor que en la web. */
 @Composable
 fun AuthProviderRow(onPick: (String) -> Unit = {}) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         AuthProviderChip("Google", Modifier.weight(1f), onClick = { onPick("google") }) { GoogleMark() }
-        AuthProviderChip("Facebook", Modifier.weight(1f), onClick = { onPick("facebook") }) { FacebookMark() }
     }
 }
 
@@ -75,15 +72,5 @@ private fun GoogleMark() {
             topLeft = Offset(s * 0.50f, s * 0.44f),
             size = Size(s * 0.42f, stroke),
         )
-    }
-}
-
-@Composable
-private fun FacebookMark() {
-    Box(
-        Modifier.size(20.dp).clip(RoundedCornerShape(5.dp)).background(Color(0xFF1877F2)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text("f", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
     }
 }

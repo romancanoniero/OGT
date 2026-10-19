@@ -157,14 +157,6 @@
         await openSession(cred.user);
       });
     },
-    async signInFacebook() {
-      return wrap(async () => {
-        const provider = new firebase.auth.FacebookAuthProvider();
-        provider.addScope("email");
-        const cred = await auth().signInWithPopup(provider);
-        await openSession(cred.user);
-      });
-    },
     async startPhone(e164) {
       return wrap(async () => {
         pendingPhone = await auth().signInWithPhoneNumber(e164, ensureRecaptcha());

@@ -230,3 +230,17 @@ byte a byte; solo cambian `backend.jar` y `shared-jvm.jar`, como corresponde a l
 correcciones preparadas. Se agregan nueve bibliotecas de procesamiento de imágenes,
 también registradas con su huella. Esta comparación verifica contenido, no ausencia
 de vulnerabilidades ni comportamiento en producción.
+
+## Retiro de Facebook (19/10/2026)
+
+Por pedido del usuario se eliminó Facebook de los botones y adaptadores de acceso
+web, Android y iOS. Google, correo y teléfono conservan sus recorridos; en Compose
+el botón Google ocupa el ancho disponible. Se actualizó la regla de diseño para
+no reintroducir Facebook. La captura de Firebase aportada por el usuario no
+mostraba ese proveedor habilitado, por lo que no se cambió la consola.
+
+Verificación: 10/10 pruebas existentes de autenticación/perfil/recuperación en
+Chromium y WebKit móvil emulado, 5/5 controles de sesión, sintaxis JavaScript y
+Swift correctas, compilación Kotlin Android aprobada excluyendo
+`:composeApp:processDebugGoogleServices` por faltar `google-services.json`.
+No equivale a compilación iOS completa ni validación OAuth real. No se desplegó.

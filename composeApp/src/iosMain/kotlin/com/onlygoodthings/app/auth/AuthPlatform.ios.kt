@@ -52,7 +52,6 @@ actual class AuthPlatform actual constructor() {
 
     actual suspend fun signInGoogle(): AuthUser = awaitUser { host().signInGoogle(it) }
 
-    actual suspend fun signInFacebook(): AuthUser = awaitUser { host().signInFacebook(it) }
 
     actual suspend fun unlockBiometric(): Boolean = suspendCancellableCoroutine { cont ->
         host().unlockBiometric { cont.resume(it) }

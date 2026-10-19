@@ -327,29 +327,6 @@ final class OgtFirebaseHost: NSObject, IosAuthHost {
         }
     }
 
-    func signInFacebook(onResult: @escaping (AuthUser?, String?) -> Void) {
-        guard let presenter = Self.topController() else {
-            onResult(nil, "No hay una ventana para Facebook")
-            return
-        }
-        let provider = OAuthProvider(providerID: "facebook.com")
-        provider.scopes = ["email", "public_profile"]
-        provider.getCredentialWith(nil) { credential, error in
-            if let error {
-                onResult(nil, Self.mensaje(error))
-                return
-            }
-            guard let credential else {
-                onResult(nil, "Facebook no devolvió credencial")
-                return
-            }
-            Auth.auth().signIn(with: credential) { result, authError in
-                Self.finish(result?.user, authError, onResult)
-            }
-        }
-        _ = presenter
-    }
-
     func unlockBiometric(onResult: @escaping (KotlinBoolean) -> Void) {
         let context = LAContext()
         var error: NSError?

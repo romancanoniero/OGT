@@ -10,7 +10,6 @@ expect class AuthPlatform() {
     suspend fun startPhoneAuth(phoneE164: String): PendingPhoneAuth
     suspend fun confirmPhone(pending: PendingPhoneAuth, code: String): AuthUser
     suspend fun signInGoogle(): AuthUser
-    suspend fun signInFacebook(): AuthUser
     suspend fun unlockBiometric(): Boolean
     suspend fun canUseBiometric(): Boolean
     suspend fun signOut()

@@ -1,7 +1,7 @@
 package com.onlygoodthings.app.auth
 
 /**
- * Host que implementa Swift (FirebaseAuth + Google + Facebook + biometría)
+ * Host que implementa Swift (FirebaseAuth + Google + biometría)
  * y que Kotlin consume desde [AuthPlatform].
  */
 interface IosAuthHost {
@@ -13,7 +13,6 @@ interface IosAuthHost {
     fun startPhoneAuth(phoneE164: String, onResult: (String?, String?) -> Unit)
     fun confirmPhone(verificationId: String, code: String, onResult: (AuthUser?, String?) -> Unit)
     fun signInGoogle(onResult: (AuthUser?, String?) -> Unit)
-    fun signInFacebook(onResult: (AuthUser?, String?) -> Unit)
     fun unlockBiometric(onResult: (Boolean) -> Unit)
     fun canUseBiometric(): Boolean
     fun signOut()
