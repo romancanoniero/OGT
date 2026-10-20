@@ -72,7 +72,7 @@ fun Application.module() {
     val redisUrl = env("OGT_REDIS_URL", "redis://127.0.0.1:6379")
     val firebaseProject = env("OGT_FIREBASE_PROJECT_ID", "goodthings-55612")
     val credentials = env("OGT_FIREBASE_CREDENTIALS", "")
-    val allowDev = env("OGT_ALLOW_DEV_TOKENS", "true").toBoolean()
+    val allowDev = env("OGT_ALLOW_DEV_TOKENS", "false").toBoolean()
     val parkingProximity = env("OGT_PARKING_PROXIMITY_METERS", "40").toDoubleOrNull()
         ?: com.onlygoodthings.shared.domain.ParkingRules.PROXIMITY_METERS
     val mediaStore = MediaStore(
