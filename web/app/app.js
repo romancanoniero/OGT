@@ -769,12 +769,16 @@ function ago(ms) {
 
 function mediaUrl(url) {
   if (!url) return "";
+  const raw = String(url).trim();
+  // Atributos HTML: sin comillas, ángulos ni controles. Solo http(s) o /media.
+  if (/[\u0000-\u001f"'<>\\]/.test(raw)) return "";
   try {
-    const u = new URL(url, location.origin);
+    const u = new URL(raw, location.origin);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return "";
     if (u.pathname.startsWith("/media")) return u.pathname + u.search;
+    if (/^https?:\/\//i.test(raw)) return raw;
   } catch (_) { /* ignore */ }
-  if (url.startsWith("http")) return url;
-  return url.startsWith("/") ? url : `/${url}`;
+  return "";
 }
 
 function httpSource(url) {
@@ -1489,7 +1493,7 @@ function storiesBlock(post, { preview = false, compose = false } = {}) {
 
 function postCard(post, { openable = true, previewStories = true, compose = false } = {}) {
   const photo = post.media?.[0]?.url || post.mediaUrls?.[0];
-  const img = photo ? `<img class="media" src="${mediaUrl(photo)}" alt="">` : "";
+  const img = photo ? `<img class="media" src="${escapeHtml(mediaUrl(photo))}" alt="">` : "";
   const share = isAnecdoteShare(post);
   const homage = isHomenaje(post);
   const honoree = post.honoreeName;
@@ -2364,7 +2368,7 @@ function bindAnimalForm(kind, editing) {
     const thumbs = form.querySelector("[data-thumbs]");
     if (thumbs) {
       thumbs.innerHTML = existingMedia.map((row) =>
-        `<img src="${mediaUrl(row.url)}" alt="">`).join("");
+        `<img src="${escapeHtml(mediaUrl(row.url))}" alt="">`).join("");
     }
   }
   bindChipGroup(form, "species", (code) => { species = code; });
@@ -2831,7 +2835,7 @@ function listingRow(row) {
   const photo = row.media?.[0]?.url;
   const place = row.lastSeenPlace || row.place || "";
   return `<a class="listing" href="#/p/${escapeHtml(row.postId)}">
-    ${photo ? `<img src="${mediaUrl(photo)}" alt="">` : `<span class="avatar">${icon(lost ? "qs-paw" : "qs-pets")}</span>`}
+    ${photo ? `<img src="${escapeHtml(mediaUrl(photo))}" alt="">` : `<span class="avatar">${icon(lost ? "qs-paw" : "qs-pets")}</span>`}
     <span class="copy">
       <span class="stories-head">${icon(lost ? "qs-paw" : "qs-pets")}<span class="pill">${lost ? "Mascota perdida" : "Adopción"}</span></span>
       <strong>${escapeHtml(row.petName || row.title || "Mascota")}</strong>
@@ -3536,7 +3540,7 @@ async function renderAvisos() {
   function paint() {
     const shown = rows.filter((r) => !kind || r.kind === kind);
     box.innerHTML = shown.length
-      ? shown.map((item) => `<a class="notice${item.read ? "" : " unread"}" href="${hrefOf(item)}" data-notice="${escapeHtml(item.id)}">
+      ? shown.map((item) => `<a class="notice${item.read ? "" : " unread"}" href="${escapeHtml(hrefOf(item))}" data-notice="${escapeHtml(item.id)}">
           <span class="pill">${escapeHtml({ ALERT: "Alerta", KARMA: "Puntos", MATCH: "Trueque", MENTION: "Mención" }[item.kind] || item.kind)}</span>
           <strong>${escapeHtml(item.title)}</strong>
           <span>${escapeHtml(item.body || "")}</span>
