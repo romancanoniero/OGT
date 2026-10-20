@@ -34,7 +34,8 @@ class OgtWebRealtime {
 
     fun start(token: String, endpoint: String? = null) {
         val url = endpoint?.takeIf { it.isNotBlank() } ?: defaultGateway()
-        OgtSdk.start(url, tokenProvider = { token })
+        val provider: suspend () -> String? = { token }
+        OgtSdk.start(url, tokenProvider = provider)
     }
 
     fun observeSocialPosts(onLive: (String) -> Unit): () -> Unit {
