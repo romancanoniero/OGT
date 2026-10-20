@@ -7,12 +7,32 @@ import com.iyr.db.database.DbDatabase
 /**
  * Boot del cliente de sockets propio (db-kmp-sdk).
  * La UI solo necesita llamar [start] con el JWT de Firebase.
+ *
+ * El SDK en SHA 0a881b7 expone `tokenProvider: suspend () -> String?` y
+ * `persistenceEnabled`. No hay `persistenceDir` ni `forceReconnect`.
  */
 object OgtSdk {
     fun start(
         gatewayEndpoint: String,
         tokenProvider: suspend (forceRefresh: Boolean) -> String?,
         persistenceDir: String? = null,
+    ): DbDatabase = startZeroArg(
+        gatewayEndpoint = gatewayEndpoint,
+        tokenProvider = { tokenProvider(false) },
+        persistenceDir = persistenceDir,
+    )
+
+    /** Proveedor sin bandera de refresh. Lo usa la fachada JS (`{ token }`). */
+    fun start(
+        gatewayEndpoint: String,
+        tokenProvider: suspend () -> String?,
+        persistenceDir: String? = null,
+    ): DbDatabase = startZeroArg(gatewayEndpoint, tokenProvider, persistenceDir)
+
+    private fun startZeroArg(
+        gatewayEndpoint: String,
+        tokenProvider: suspend () -> String?,
+        persistenceDir: String?,
     ): DbDatabase {
         if (!DbApp.isInitialized()) {
             DbApp.initialize(
@@ -20,7 +40,6 @@ object OgtSdk {
                     endpoint = gatewayEndpoint,
                     tokenProvider = tokenProvider,
                     persistenceEnabled = persistenceDir != null,
-                    persistenceDir = persistenceDir,
                 ),
             )
         }
@@ -31,9 +50,10 @@ object OgtSdk {
 
     fun isStarted(): Boolean = runCatching { DbApp.isInitialized() }.getOrDefault(false)
 
-        fun reconnect() {
+    /** El SDK actual no tiene forceReconnect; goOnline reabre el socket si está caído. */
+    fun reconnect() {
         if (DbApp.isInitialized()) {
-            DbDatabase.getInstance().forceReconnect()
+            DbDatabase.getInstance().goOnline()
         }
     }
 

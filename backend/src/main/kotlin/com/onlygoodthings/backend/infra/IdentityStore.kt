@@ -1,8 +1,11 @@
 package com.onlygoodthings.backend.infra
 
+import com.onlygoodthings.backend.auth.AccountExport
+import com.onlygoodthings.backend.auth.AccountTextRow
 import com.onlygoodthings.backend.auth.VerifiedFirebaseUser
 import com.onlygoodthings.shared.domain.UserProfile
 import com.onlygoodthings.shared.domain.UserRole
+import java.sql.Connection
 import java.util.UUID
 
 class IdentityStore(private val db: Database) {
@@ -125,4 +128,90 @@ class IdentityStore(private val db: Database) {
             }
         }
     }
+
+    /** Datos personales del propio usuario. No incluye filas de otras cuentas. */
+    fun exportAccount(userId: String): AccountExport? = db.withConnection { connection ->
+        val profile = connection.prepareStatement(
+            """
+            SELECT id::text, email::text, phone_e164, display_name, community_points
+            FROM users WHERE id = ?::uuid
+            """.trimIndent(),
+        ).use { stmt ->
+            stmt.setString(1, userId)
+            stmt.executeQuery().use { rs ->
+                if (!rs.next()) return@withConnection null
+                AccountExport(
+                    userId = rs.getString("id"),
+                    email = rs.stringOrNull("email"),
+                    phone = rs.stringOrNull("phone_e164"),
+                    displayName = rs.getString("display_name"),
+                    communityPoints = rs.getInt("community_points"),
+                    posts = emptyList(),
+                    comments = emptyList(),
+                    messagesSent = emptyList(),
+                )
+            }
+        }
+        profile.copy(
+            posts = textRows(connection, "SELECT id::text, body, created_at::text FROM social_posts WHERE author_user_id = ?::uuid ORDER BY created_at", userId),
+            comments = textRows(connection, "SELECT id::text, body, created_at::text FROM post_comments WHERE author_user_id = ?::uuid ORDER BY created_at", userId),
+            messagesSent = textRows(connection, "SELECT id::text, body, created_at::text FROM timebank_messages WHERE sender_id = ?::uuid ORDER BY created_at", userId),
+        )
+    }
+
+    /**
+     * Baja de la propia cuenta. Borra el contenido cuyo autor es el usuario
+     * (los posts no pueden quedar con autor nulo) y las entregas de estacionamiento
+     * que no tienen ON DELETE. El resto cae por cascada o queda anonimizado.
+     */
+    fun eraseAccount(userId: String) {
+        db.withConnection { connection ->
+            val previous = connection.autoCommit
+            connection.autoCommit = false
+            try {
+                connection.prepareStatement(
+                    "DELETE FROM parking_handoffs WHERE owner_user_id = ?::uuid OR claimant_user_id = ?::uuid",
+                ).use { stmt ->
+                    stmt.setString(1, userId)
+                    stmt.setString(2, userId)
+                    stmt.executeUpdate()
+                }
+                connection.prepareStatement(
+                    "DELETE FROM social_posts WHERE author_user_id = ?::uuid",
+                ).use { stmt ->
+                    stmt.setString(1, userId)
+                    stmt.executeUpdate()
+                }
+                val deleted = connection.prepareStatement(
+                    "DELETE FROM users WHERE id = ?::uuid",
+                ).use { stmt ->
+                    stmt.setString(1, userId)
+                    stmt.executeUpdate()
+                }
+                if (deleted != 1) error("No se pudo dar de baja la cuenta")
+                connection.commit()
+            } catch (failure: Exception) {
+                connection.rollback()
+                throw failure
+            } finally {
+                connection.autoCommit = previous
+            }
+        }
+    }
+
+    private fun textRows(connection: Connection, sql: String, userId: String): List<AccountTextRow> =
+        connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, userId)
+            stmt.executeQuery().use { rs ->
+                val rows = ArrayList<AccountTextRow>()
+                while (rs.next()) {
+                    rows += AccountTextRow(
+                        id = rs.getString(1),
+                        body = rs.getString(2),
+                        createdAt = rs.getString(3),
+                    )
+                }
+                rows
+            }
+        }
 }

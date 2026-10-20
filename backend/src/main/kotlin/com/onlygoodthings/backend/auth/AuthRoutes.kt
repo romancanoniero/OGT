@@ -2,6 +2,7 @@ package com.onlygoodthings.backend.auth
 
 import com.onlygoodthings.backend.http.JsonBody
 import com.onlygoodthings.backend.http.optDouble
+import com.onlygoodthings.backend.http.optString
 import com.onlygoodthings.backend.http.reqDouble
 import com.onlygoodthings.backend.http.reqString
 import com.onlygoodthings.backend.infra.IdentityStore
@@ -80,5 +81,34 @@ fun Route.protectedAuthRoutes(identity: IdentityStore) {
                 "Ubicación actualizada",
             ),
         )
+    }
+
+    post("/api/v1/account/export") {
+        val principal = call.principal<AuthPrincipal>() ?: return@post call.respond(
+            HttpStatusCode.Unauthorized,
+            ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
+        )
+        call.receiveText()
+        val exported = identity.exportAccount(principal.userId) ?: return@post call.respond(
+            HttpStatusCode.NotFound,
+            ApiResponse.fail<Unit>("Cuenta no encontrada", "NOT_FOUND"),
+        )
+        call.respond(ApiResponse.ok(exported, "Exportación lista"))
+    }
+
+    post("/api/v1/account/delete") {
+        val principal = call.principal<AuthPrincipal>() ?: return@post call.respond(
+            HttpStatusCode.Unauthorized,
+            ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
+        )
+        val dataMap = JsonBody.parse(call.receiveText())
+        if (dataMap.optString("confirm") != "BAJA") {
+            return@post call.respond(
+                HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Confirmación requerida", "CONFIRM_REQUIRED"),
+            )
+        }
+        identity.eraseAccount(principal.userId)
+        call.respond(ApiResponse.ok(mapOf("deleted" to true), "Cuenta dada de baja"))
     }
 }

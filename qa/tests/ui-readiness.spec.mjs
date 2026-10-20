@@ -29,7 +29,9 @@ test('authenticated screens meet accessibility and layout release checks', async
     const audit = await new AxeBuilder({ page }).analyze();
     const layout = await page.evaluate(() => ({ viewport: innerWidth, width: document.documentElement.scrollWidth }));
     results.push({ route, layout, violations: audit.violations.map(v => ({ id: v.id, impact: v.impact, description: v.description, nodes: v.nodes.map(n => ({ target: n.target, summary: n.failureSummary })) })) });
-    await page.screenshot({ path: testInfo.outputPath(`${route.replaceAll('/', '-')}.png`), fullPage: true });
+    // WebKit rechaza fullPage por encima de 32767 px. El feed de inicio lo supera en el iPhone.
+    const fullPage = await page.evaluate(() => document.documentElement.scrollHeight <= 16000);
+    await page.screenshot({ path: testInfo.outputPath(`${route.replaceAll('/', '-')}.png`), fullPage });
   }
   await testInfo.attach('ui-readiness', { body: JSON.stringify({ results, errors }, null, 2), contentType: 'application/json' });
   expect(errors, 'Uncaught UI errors').toEqual([]);

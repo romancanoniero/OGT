@@ -35,6 +35,7 @@ fun Route.dbGatewayRoutes(
 ) {
     webSocket("/db") {
         var authed = false
+        var viewerId: String? = null
         val listens = mutableMapOf<Long, String>()
         val mutex = Mutex()
         val sendLock = Mutex()
@@ -74,8 +75,9 @@ fun Route.dbGatewayRoutes(
                         val token = obj["token"]?.jsonPrimitive?.contentOrNull.orEmpty()
                         runCatching {
                             identity.upsertFromFirebase(verifier.verify(token))
-                        }.onSuccess {
+                        }.onSuccess { profile ->
                             authed = true
+                            viewerId = profile.id
                             emit(ackAuth())
                         }.onFailure { err ->
                             emit(errorMsg(code = "UNAUTHENTICATED", message = err.message ?: "Token inválido"))
@@ -84,12 +86,17 @@ fun Route.dbGatewayRoutes(
                         }
                     }
                     "listen" -> {
-                        if (!authed) {
+                        val ownerId = viewerId
+                        if (!authed || ownerId.isNullOrBlank()) {
                             emit(errorMsg(id = obj["id"]?.jsonPrimitive?.longOrNull, code = "UNAUTHENTICATED", message = "Auth requerido"))
                             continue
                         }
                         val id = obj["id"]?.jsonPrimitive?.longOrNull ?: continue
                         val path = obj["path"]?.jsonPrimitive?.contentOrNull?.trim('/').orEmpty()
+                        if (!dbListenAllowed(path, ownerId)) {
+                            emit(errorMsg(id = id, code = "PERMISSION_DENIED", message = "Path no autorizado"))
+                            continue
+                        }
                         mutex.withLock { listens[id] = path }
                         emit(listenAck(id))
                         if (path == OgtDbPaths.SOCIAL_FEED) {
