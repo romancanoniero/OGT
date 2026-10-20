@@ -45,16 +45,9 @@
 
   async function openSession(user) {
     const jwt = await user.getIdToken(true);
-    try {
-      await postJson("/api/v1/auth/session", { token: jwt }, jwt);
-      persist(jwt);
-      return jwt;
-    } catch (_) {
-      const lab = `dev.${user.uid}.USER`;
-      await postJson("/api/v1/auth/session", { token: lab }, lab);
-      persist(lab);
-      return lab;
-    }
+    await postJson("/api/v1/auth/session", { token: jwt }, jwt);
+    persist(jwt);
+    return jwt;
   }
 
   function mapAuthError(err) {
@@ -153,11 +146,6 @@
     },
     async methodsFor(email) {
       return wrap(async () => auth().fetchSignInMethodsForEmail(email));
-    },
-    async signInLab(uid, role) {
-      const lab = `dev.${uid}.${role || "USER"}`;
-      await postJson("/api/v1/auth/session", { token: lab }, lab);
-      persist(lab);
     },
     async signOut() {
       try { await auth().signOut(); } catch (_) { /* sin Firebase */ }
