@@ -885,7 +885,9 @@ function escapeHtml(s) {
   return String(s)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 /**
@@ -4254,10 +4256,7 @@ function renderAuth(page, err) {
         <a href="#/registro">Crear cuenta</a>
         <a href="#/telefono">Entrar con teléfono</a>
       </p>
-      <p class="auth-lab">Laboratorio
-        <button type="button" data-lab="vecino">vecino</button>
-        <button type="button" data-lab="empresa">empresa</button>
-      </p>`;
+      `;
   }
   const stillTitle = key === "entrar" ? "Las buenas acciones se encuentran." : "";
   const stillSub = key === "registro"
@@ -4375,16 +4374,6 @@ function bindAuth(page) {
         setAuthBusy(true, "Ingresando…");
         if (btn.dataset.prov === "google") await auth.signInGoogle();
         else await auth.signInFacebook();
-        await enterAfterAuth();
-      } catch (e) { fail(e); }
-    });
-  });
-  document.querySelectorAll("[data-lab]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      try {
-        setAuthBusy(true, "Ingresando…");
-        if (btn.dataset.lab === "empresa") await auth.signInLab("dev-admin-diego", "COMPANY_ADMIN");
-        else await auth.signInLab("dev-user-ana", "USER");
         await enterAfterAuth();
       } catch (e) { fail(e); }
     });
