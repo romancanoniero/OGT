@@ -1,5 +1,6 @@
 package com.onlygoodthings.backend
 
+import com.onlygoodthings.backend.crm.crmRoutes
 import com.onlygoodthings.backend.auth.AuthPrincipal
 import com.onlygoodthings.backend.auth.AuthSettings
 import com.onlygoodthings.backend.auth.CompositeTokenVerifier
@@ -155,6 +156,7 @@ fun Application.module() {
         dbGatewayRoutes(verifier, identity, hub)
         authenticate("firebase") {
             protectedAuthRoutes(identity)
+            crmRoutes(db, verifier)
             parkingRoutes(ParkingSqlRepository(db), redis, hub, FootRoutingService.fromEnv(), parkingProximity)
             socialRoutes(SocialSqlRepository(db), hub)
             mediaRoutes(mediaStore)
