@@ -1,122 +1,152 @@
-name: CRM staging deployment - manual approval
-run-name: CRM staging - interfaces 8ed33289
+name: OGT CRM staging
+run-name: OGT CRM staging - ${{ github.event_name }}
 on:
+  push:
+    branches: [main]
+    paths: ['.github/crm-staging-request.json']
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Selecciona DEPLOY-STAGING para publicar solo las interfaces de prueba'
+        description: 'Publicar la version solicitada, solo en staging'
         required: true
         type: choice
         default: CANCELAR
-        options:
-          - CANCELAR
-          - DEPLOY-STAGING
+        options: [CANCELAR, DEPLOY-STAGING]
 permissions:
   contents: read
 concurrency:
   group: ogt-crm-staging
   cancel-in-progress: false
-# The workflow lives on main; the CRM implementation is not merged there yet.
-# Both jobs must use this exact reviewed source, never the dispatch branch.
-# Update this pin explicitly after reviewing a newer CRM revision.
-env:
-  CRM_SOURCE_SHA: '8ed33289e35b9a6c05d52bbed0c8dfeb5e268160'
 jobs:
+  request:
+    if: github.repository == 'romancanoniero/OGT' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      source_sha: ${{ steps.request.outputs.source_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate committed staging request
+        id: request
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CONFIRM: ${{ inputs.confirm }}
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          function fail(message) { console.error(`::error::${message}`); process.exit(1); }
+          if (process.env.EVENT_NAME === 'workflow_dispatch' && process.env.CONFIRM !== 'DEPLOY-STAGING') fail('Selecciona DEPLOY-STAGING.');
+          const request = JSON.parse(fs.readFileSync('.github/crm-staging-request.json', 'utf8'));
+          if (request.repository !== 'romancanoniero/OGT' || request.environment !== 'ogt-crm-staging' || request.scope !== 'static-ui-only' || request.confirm !== 'DEPLOY-STAGING' || !/^[0-9a-f]{40}$/.test(request.sourceSha)) fail('Solicitud invalida. No se publica nada.');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `source_sha=${request.sourceSha}\n`);
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## Solicitud de staging\nCommit: \`${request.sourceSha}\`\n\nSolo interfaces web. No habilita operaciones sin backend y permisos.\n`);
+          NODE
   preflight:
-    if: github.repository == 'romancanoniero/OGT'
+    needs: request
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Require intentional staging deploy
-        env:
-          CONFIRM: ${{ inputs.confirm }}
-        run: |
-          if [ "$CONFIRM" != DEPLOY-STAGING ]; then
-            echo '::error::Publicacion no autorizada. Selecciona DEPLOY-STAGING al iniciar una nueva ejecucion.'
-            exit 1
-          fi
-      - name: Checkout pinned CRM implementation
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           repository: romancanoniero/OGT
-          ref: ${{ env.CRM_SOURCE_SHA }}
+          ref: ${{ needs.request.outputs.source_sha }}
           persist-credentials: false
-      - name: Verify source commit and required files
-        run: |
-          test "$(git rev-parse HEAD)" = "$CRM_SOURCE_SHA"
-          for path in web/app/crm/crm.js web/app/crm/control/index.html web/app/crm/empresas/index.html web/app/app.js web/app/auth.js qa/auth-unit.test.mjs; do
-            if [ ! -s "$path" ]; then
-              echo "::error::Falta el archivo requerido: $path"
-              exit 1
-            fi
-          done
-          printf 'Codigo CRM seleccionado: %s\n' "$CRM_SOURCE_SHA"
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: JavaScript syntax and authentication unit tests
+      - name: Check pinned source, syntax and tests
+        env:
+          SOURCE_SHA: ${{ needs.request.outputs.source_sha }}
+        shell: bash
         run: |
-          node --check web/app/crm/crm.js
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          for path in web/app/crm/crm.js web/app/crm/control/index.html web/app/crm/empresas/index.html web/app/app.js web/app/auth.js qa/auth-unit.test.mjs; do
+            test -s "$path" || { echo "::error::Falta $path"; exit 1; }
+          done
           node --check web/app/app.js
           node --check web/app/auth.js
+          find web/app/crm -type f -name '*.js' -print0 | xargs -0 -r -n 1 node --check
           node --test qa/auth-unit.test.mjs
+          if compgen -G 'qa/crm-*.test.mjs' >/dev/null; then node --test qa/crm-*.test.mjs; fi
   publish:
-    needs: preflight
+    needs: [request, preflight]
     runs-on: ubuntu-latest
     environment: ogt-crm-staging
     timeout-minutes: 10
     steps:
-      - name: Checkout the same tested CRM commit
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           repository: romancanoniero/OGT
-          ref: ${{ env.CRM_SOURCE_SHA }}
+          ref: ${{ needs.request.outputs.source_sha }}
           persist-credentials: false
-      - name: Check deploy configuration without printing secrets
+      - name: Validate staging connection without exposing credentials
         env:
           OGT_STAGING_HOST: ${{ secrets.OGT_STAGING_HOST }}
           OGT_STAGING_USER: ${{ secrets.OGT_STAGING_USER }}
           OGT_STAGING_SSH_KEY: ${{ secrets.OGT_STAGING_SSH_KEY }}
           OGT_STAGING_KNOWN_HOSTS: ${{ secrets.OGT_STAGING_KNOWN_HOSTS }}
+          OGT_STAGING_BASE_URL: ${{ vars.OGT_STAGING_BASE_URL }}
+        shell: bash
         run: |
-          test "$(git rev-parse HEAD)" = "$CRM_SOURCE_SHA"
+          set -euo pipefail
           missing=0
-          for name in OGT_STAGING_HOST OGT_STAGING_USER OGT_STAGING_SSH_KEY OGT_STAGING_KNOWN_HOSTS; do
+          for name in OGT_STAGING_HOST OGT_STAGING_USER OGT_STAGING_SSH_KEY OGT_STAGING_KNOWN_HOSTS OGT_STAGING_BASE_URL; do
             if [ -z "${!name}" ]; then
-              echo "::error::Falta configurar $name para el entorno ogt-crm-staging. No compartas su valor en los logs."
+              echo "::error::Falta configurar $name en ogt-crm-staging. No se intento conectar ni publicar."
+              printf -- '- Falta `%s`\n' "$name" >> "$GITHUB_STEP_SUMMARY"
               missing=1
             fi
           done
-          if [ "$missing" -ne 0 ]; then exit 1; fi
-          test -s web/app/crm/control/index.html
-          test -s web/app/crm/empresas/index.html
-      - name: Install restricted SSH deploy identity
+          test "$missing" -eq 0
+          [[ "$OGT_STAGING_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]] || { echo '::error::Host SSH invalido'; exit 1; }
+          [[ "$OGT_STAGING_USER" =~ ^[a-zA-Z0-9_][a-zA-Z0-9_-]*$ ]] || { echo '::error::Usuario SSH invalido'; exit 1; }
+          node -e 'const u=new URL(process.env.OGT_STAGING_BASE_URL);if(u.protocol!=="https:"||u.username||u.password||u.search||u.hash)process.exit(1)'
+      - name: Install staging-only SSH identity
         env:
           SSH_KEY: ${{ secrets.OGT_STAGING_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.OGT_STAGING_KNOWN_HOSTS }}
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-      - name: Publish static CRM shell only to isolated staging directory
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+      - name: Publish only tested web files to the isolated staging directory
         env:
           HOST: ${{ secrets.OGT_STAGING_HOST }}
           USER: ${{ secrets.OGT_STAGING_USER }}
+          SOURCE_SHA: ${{ needs.request.outputs.source_sha }}
         run: |
-          # SSH account must be restricted to this dedicated staging directory.
-          # Never deploy the backend, production data or migrations in this job.
-          rsync -az --delete -e 'ssh -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=15' \
+          set -eu
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          printf '{"sourceSha":"%s","scope":"static-ui-only"}\n' "$SOURCE_SHA" > web/app/crm/release.json
+          # The server account must be restricted to this staging directory.
+          # Never sync to the production web root or alter the database here.
+          rsync -az --delay-updates --delete-delay -e 'ssh -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=15' \
             web/app/crm/ "$USER@$HOST:ogt-crm-staging/"
-      - name: Record exactly what was published
+      - name: Verify HTTPS pages and exact release
+        env:
+          BASE_URL: ${{ vars.OGT_STAGING_BASE_URL }}
+          SOURCE_SHA: ${{ needs.request.outputs.source_sha }}
         run: |
+          set -eu
+          base="${BASE_URL%/}"
+          for page in control empresas; do
+            curl --proto '=https' --fail --silent --show-error --max-time 30 "$base/$page/?release=$SOURCE_SHA" -o "$RUNNER_TEMP/$page.html"
+            grep -q 'id="crm-root"' "$RUNNER_TEMP/$page.html"
+          done
+          curl --proto '=https' --fail --silent --show-error --max-time 30 "$base/release.json?release=$SOURCE_SHA" -o "$RUNNER_TEMP/crm-release.json"
+          node -e 'const fs=require("node:fs"); const r=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/crm-release.json")); if(r.sourceSha!==process.env.SOURCE_SHA||r.scope!=="static-ui-only") process.exit(1)'
           {
-            printf '## OGT CRM: interfaces de staging\n\n'
-            printf 'Commit del codigo publicado: `%s`\n\n' "$CRM_SOURCE_SHA"
-            printf 'Solo archivos web. Este flujo no instala el backend ni ejecuta migraciones.\n'
-            printf 'La URL publica y el acceso funcional deben verificarse por separado.\n'
+            printf '## Interfaces publicadas y verificadas\n\n'
+            printf 'Codigo: `%s`\n\n' "$SOURCE_SHA"
+            printf 'OGT Control: %s/control/\n\n' "$base"
+            printf 'OGT Empresas: %s/empresas/\n\n' "$base"
+            printf 'Pendiente separado: backend, migraciones, MFA real y autorizacion de cuentas.\n'
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Remove temporary SSH material
+      - name: Remove temporary SSH credentials
         if: always()
         run: rm -f ~/.ssh/id_ed25519 ~/.ssh/known_hosts
