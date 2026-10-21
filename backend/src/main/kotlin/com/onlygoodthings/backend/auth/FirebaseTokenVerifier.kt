@@ -14,6 +14,9 @@ data class VerifiedFirebaseUser(
     val phone: String?,
     val displayName: String?,
     val role: UserRole,
+    val emailVerified: Boolean = false,
+    val secondFactor: Boolean = false,
+    val authTimeEpochSeconds: Long? = null,
 )
 
 interface FirebaseTokenVerifier {
@@ -43,12 +46,17 @@ class FirebaseAdminTokenVerifier(
     override fun verify(idToken: String): VerifiedFirebaseUser {
         val decoded = FirebaseAuth.getInstance().verifyIdToken(idToken)
         val roleClaim = decoded.claims["role"]?.toString() ?: UserRole.USER.name
+        val firebaseClaims = decoded.claims["firebase"] as? Map<*, *>
+        val secondFactor = !firebaseClaims?.get("sign_in_second_factor")?.toString().isNullOrBlank()
         return VerifiedFirebaseUser(
             firebaseUid = decoded.uid,
             email = decoded.email,
             phone = decoded.claims["phone_number"]?.toString(),
             displayName = decoded.name,
             role = runCatching { UserRole.valueOf(roleClaim) }.getOrDefault(UserRole.USER),
+            emailVerified = decoded.claims["email_verified"] == true,
+            secondFactor = secondFactor,
+            authTimeEpochSeconds = (decoded.claims["auth_time"] as? Number)?.toLong(),
         )
     }
 }
