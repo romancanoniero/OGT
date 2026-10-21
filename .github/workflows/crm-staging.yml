@@ -1,34 +1,64 @@
 name: CRM staging deployment - manual approval
+run-name: CRM staging - interfaces 8ed33289
 on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type DEPLOY-STAGING after reviewing the PR, MFA and test results'
+        description: 'Selecciona DEPLOY-STAGING para publicar solo las interfaces de prueba'
         required: true
-        type: string
+        type: choice
+        default: CANCELAR
+        options:
+          - CANCELAR
+          - DEPLOY-STAGING
 permissions:
   contents: read
 concurrency:
   group: ogt-crm-staging
   cancel-in-progress: false
+# The workflow lives on main; the CRM implementation is not merged there yet.
+# Both jobs must use this exact reviewed source, never the dispatch branch.
+# Update this pin explicitly after reviewing a newer CRM revision.
+env:
+  CRM_SOURCE_SHA: '8ed33289e35b9a6c05d52bbed0c8dfeb5e268160'
 jobs:
   preflight:
+    if: github.repository == 'romancanoniero/OGT'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
       - name: Require intentional staging deploy
         env:
           CONFIRM: ${{ inputs.confirm }}
-        run: test "$CONFIRM" = DEPLOY-STAGING
+        run: |
+          if [ "$CONFIRM" != DEPLOY-STAGING ]; then
+            echo '::error::Publicacion no autorizada. Selecciona DEPLOY-STAGING al iniciar una nueva ejecucion.'
+            exit 1
+          fi
+      - name: Checkout pinned CRM implementation
+        uses: actions/checkout@v4
+        with:
+          repository: romancanoniero/OGT
+          ref: ${{ env.CRM_SOURCE_SHA }}
+          persist-credentials: false
+      - name: Verify source commit and required files
+        run: |
+          test "$(git rev-parse HEAD)" = "$CRM_SOURCE_SHA"
+          for path in web/app/crm/crm.js web/app/crm/control/index.html web/app/crm/empresas/index.html web/app/app.js web/app/auth.js qa/auth-unit.test.mjs; do
+            if [ ! -s "$path" ]; then
+              echo "::error::Falta el archivo requerido: $path"
+              exit 1
+            fi
+          done
+          printf 'Codigo CRM seleccionado: %s\n' "$CRM_SOURCE_SHA"
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: |
+      - name: JavaScript syntax and authentication unit tests
+        run: |
           node --check web/app/crm/crm.js
           node --check web/app/app.js
+          node --check web/app/auth.js
           node --test qa/auth-unit.test.mjs
   publish:
     needs: preflight
@@ -36,24 +66,35 @@ jobs:
     environment: ogt-crm-staging
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout the same tested CRM commit
+        uses: actions/checkout@v4
         with:
+          repository: romancanoniero/OGT
+          ref: ${{ env.CRM_SOURCE_SHA }}
           persist-credentials: false
       - name: Check deploy configuration without printing secrets
         env:
-          HOST: ${{ secrets.OGT_STAGING_HOST }}
-          USER: ${{ secrets.OGT_STAGING_USER }}
-          KEY: ${{ secrets.OGT_STAGING_SSH_KEY }}
+          OGT_STAGING_HOST: ${{ secrets.OGT_STAGING_HOST }}
+          OGT_STAGING_USER: ${{ secrets.OGT_STAGING_USER }}
+          OGT_STAGING_SSH_KEY: ${{ secrets.OGT_STAGING_SSH_KEY }}
+          OGT_STAGING_KNOWN_HOSTS: ${{ secrets.OGT_STAGING_KNOWN_HOSTS }}
         run: |
-          test -n "$HOST" && test -n "$USER" && test -n "$KEY"
-          test -d web/app/crm/control
-          test -d web/app/crm/empresas
+          test "$(git rev-parse HEAD)" = "$CRM_SOURCE_SHA"
+          missing=0
+          for name in OGT_STAGING_HOST OGT_STAGING_USER OGT_STAGING_SSH_KEY OGT_STAGING_KNOWN_HOSTS; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Falta configurar $name para el entorno ogt-crm-staging. No compartas su valor en los logs."
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then exit 1; fi
+          test -s web/app/crm/control/index.html
+          test -s web/app/crm/empresas/index.html
       - name: Install restricted SSH deploy identity
         env:
           SSH_KEY: ${{ secrets.OGT_STAGING_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.OGT_STAGING_KNOWN_HOSTS }}
         run: |
-          test -n "$KNOWN_HOSTS"
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
@@ -66,5 +107,16 @@ jobs:
         run: |
           # SSH account must be restricted to this dedicated staging directory.
           # Never deploy the backend, production data or migrations in this job.
-          rsync -az --delete -e 'ssh -o StrictHostKeyChecking=yes' \
+          rsync -az --delete -e 'ssh -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=15' \
             web/app/crm/ "$USER@$HOST:ogt-crm-staging/"
+      - name: Record exactly what was published
+        run: |
+          {
+            printf '## OGT CRM: interfaces de staging\n\n'
+            printf 'Commit del codigo publicado: `%s`\n\n' "$CRM_SOURCE_SHA"
+            printf 'Solo archivos web. Este flujo no instala el backend ni ejecuta migraciones.\n'
+            printf 'La URL publica y el acceso funcional deben verificarse por separado.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove temporary SSH material
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519 ~/.ssh/known_hosts
