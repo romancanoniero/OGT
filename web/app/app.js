@@ -4204,6 +4204,7 @@ function renderAcceso() {
   const main = document.getElementById("main");
   main.innerHTML = `<h1>Acceso privado</h1>
     <div class="page proyectos">
+      <img class="proyecto-shot" src="media/modulos/portada-dispositivos.jpg" alt="Only Good Things en la laptop, el iPhone, Android y el iPad.">
       ${PROYECTOS_ACCESO.map((proyecto) => `<article class="proyecto">
         <h2>${escapeHtml(proyecto.title)}</h2>
         <p class="hint">${escapeHtml(proyecto.lead)}</p>
