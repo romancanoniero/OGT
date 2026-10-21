@@ -1,7 +1,7 @@
 # Publica OGT en la VPS Contabo. Solo a mano.
 name: Deploy OGT VPS
 
-on:
+"on":
   workflow_dispatch:
 
 permissions:
@@ -57,13 +57,14 @@ jobs:
           chmod 700 ~/.ssh
           printf '%s\n' "$OGT_VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
-          cat > ~/.ssh/config <<'EOF'
-Host iankmp-vps
-  HostName 217.216.82.209
-  User iankmp
-  IdentitiesOnly yes
-  BatchMode yes
-EOF
+          # Sin heredoc en columna 0: eso corta el bloque YAML del step.
+          {
+            echo 'Host iankmp-vps'
+            echo '  HostName 217.216.82.209'
+            echo '  User iankmp'
+            echo '  IdentitiesOnly yes'
+            echo '  BatchMode yes'
+          } > ~/.ssh/config
           chmod 600 ~/.ssh/config
           # Comprueba el acceso sin imprimir material sensible.
           ssh -o BatchMode=yes -o ConnectTimeout=20 iankmp-vps true
