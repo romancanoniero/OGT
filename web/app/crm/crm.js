@@ -6,7 +6,16 @@ const status=document.getElementById("crm-status");
 const login=document.getElementById("crm-login");
 const userEmail=document.getElementById("email");
 const password=document.getElementById("password");
+const refreshButton=document.getElementById("crm-refresh");
+const logoutButton=document.createElement("button");
+logoutButton.type="button";logoutButton.textContent="Cerrar sesión";logoutButton.hidden=true;
+logoutButton.setAttribute("aria-label","Cerrar sesión de OGT CRM");
+refreshButton.insertAdjacentElement("afterend",logoutButton);
 const setStatus=(s)=>{status.textContent=s;};
+const humanError=(err)=>{
+ if(err?.message?.includes("STEP_UP_REQUIRED")||err?.message?.includes("segundo factor"))return "Para acceder al CRM necesitás verificar el correo e iniciar sesión nuevamente con un segundo factor en una sesión reciente. Actualizar la página o renovar el token no reemplaza ese requisito.";
+ return err?.message||"No se pudo completar la operación.";
+};
 const label=(name,val)=>{const p=document.createElement("p"),b=document.createElement("strong");b.textContent=name+": ";p.append(b,document.createTextNode(String(val)));return p;};
 function api(path,token,body={}){
 return fetch(path,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+token},body:JSON.stringify(body),cache:"no-store",credentials:"omit"}).then(async r=>{const data=await r.json();if(!r.ok||!data.success)throw new Error(data.message||"Acceso no autorizado");return data.data;});
@@ -19,7 +28,8 @@ return firebase.auth();
 async function checkAccess(){
 root.replaceChildren();setStatus("Verificando identidad, segundo factor y permisos…");
 const auth=useFirebase(),user=auth.currentUser;
-if(!user){login.hidden=false;setStatus("Iniciá sesión para acceder al CRM.");return;}
+if(!user){login.hidden=false;logoutButton.hidden=true;setStatus("Iniciá sesión para acceder al CRM.");return;}
+logoutButton.hidden=false;
 const token=await user.getIdToken(true);
 const access=await api("/api/v1/crm/access",token);
 if(mode==="control"&&!access.platformRole)throw new Error("Tu cuenta no está autorizada para la administración central.");
@@ -39,7 +49,8 @@ choose.addEventListener("change",()=>refresh().catch(err=>setStatus(err.message)
 }
 setStatus("Acceso autorizado. Información obtenida directamente del servidor.");
 }
-document.getElementById("crm-login").addEventListener("submit",async ev=>{ev.preventDefault();setStatus("Iniciando sesión…");try{await useFirebase().signInWithEmailAndPassword(userEmail.value,password.value);password.value="";await checkAccess();}catch(err){setStatus(err.code==="auth/multi-factor-auth-required"?"Tu cuenta requiere completar la autenticación multifactor en la aplicación principal. No se omitirá ese control.":err.message);}});
-document.getElementById("crm-refresh").addEventListener("click",()=>checkAccess().catch(err=>setStatus(err.message)));
-useFirebase().onAuthStateChanged(()=>checkAccess().catch(err=>{root.replaceChildren();setStatus(err.message);login.hidden=false;}));
+document.getElementById("crm-login").addEventListener("submit",async ev=>{ev.preventDefault();setStatus("Iniciando sesión…");try{await useFirebase().signInWithEmailAndPassword(userEmail.value,password.value);password.value="";await checkAccess();}catch(err){setStatus(err.code==="auth/multi-factor-auth-required"?"Tu cuenta requiere completar la autenticación multifactor en la aplicación principal. No se omitirá ese control.":humanError(err));}});
+refreshButton.addEventListener("click",()=>checkAccess().catch(err=>setStatus(humanError(err))));
+logoutButton.addEventListener("click",async()=>{try{await useFirebase().signOut();root.replaceChildren();login.hidden=false;logoutButton.hidden=true;password.value="";setStatus("Sesión cerrada.");}catch(err){setStatus(humanError(err));}});
+useFirebase().onAuthStateChanged(()=>checkAccess().catch(err=>{root.replaceChildren();setStatus(humanError(err));login.hidden=false;}));
 })();
