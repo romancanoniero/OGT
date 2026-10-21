@@ -12,7 +12,6 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
 import java.time.Instant
-import java.util.UUID
 
 /**
  * An independent privileged gate; ordinary Firebase auth or COMPANY_ADMIN is insufficient.
@@ -30,8 +29,7 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier) {
             ?: return@post call.respond(HttpStatusCode.Unauthorized, ApiResponse.fail<Unit>("Token inválido", "UNAUTHENTICATED"))
         val now = Instant.now().epochSecond
         // Sensitive administrative sessions need email verification, MFA and a recent login.
-        val recent = verified.authTimeEpochSeconds?.let { it in (now - 900)..(now + 60) } == true
-        if (!verified.emailVerified || !verified.secondFactor || !recent) {
+        if (!crmStepUpAllowed(verified.emailVerified, verified.secondFactor, verified.authTimeEpochSeconds, now)) {
             return@post call.respond(HttpStatusCode.Forbidden,
                 ApiResponse.fail<Unit>("Se requiere correo verificado, segundo factor y autenticación reciente", "STEP_UP_REQUIRED"))
         }
@@ -70,3 +68,12 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier) {
         )))
     }
 }
+
+/** Pure security predicate: no privilege is granted for missing/old/future claims. */
+internal fun crmStepUpAllowed(
+    verifiedEmail: Boolean,
+    secondFactor: Boolean,
+    authTimeSeconds: Long?,
+    nowSeconds: Long,
+): Boolean = verifiedEmail && secondFactor &&
+    authTimeSeconds != null && authTimeSeconds in (nowSeconds - 900)..(nowSeconds + 60)
