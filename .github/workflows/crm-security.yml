@@ -1,0 +1,35 @@
+name: OGT CRM security gate
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: crm-security-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript syntax
+        run: |
+          node --check web/app/app.js
+          node --check web/app/auth.js
+      - name: Authentication unit tests
+        run: node --test qa/auth-unit.test.mjs
+      - name: Check privileged CRM implementation markers
+        run: |
+          grep -q 'crmRoutes(db, verifier)' backend/src/main/kotlin/com/onlygoodthings/backend/Application.kt
+          grep -q 'verified.secondFactor' backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmRoutes.kt
+          grep -q 'crm_platform_staff' database/migrations/23_crm_foundations.sql
+          grep -q 'JOIN company_admins' backend/src/main/kotlin/com/onlygoodthings/backend/modules/CommunityRoutes.kt
+  # Build and full E2E require the private composite db-kmp-sdk.
+  # They must run via an approved trusted runner before production approval.
