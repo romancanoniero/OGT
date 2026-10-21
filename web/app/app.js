@@ -646,7 +646,7 @@ function paintPublishFab() {
   const fab = document.getElementById("publish-fab");
   if (!layer || !fab || !document.getElementById("center-col")) return;
   const { page, id } = route();
-  const hide = !hasSession() || isCompany() || page === "publicar" || (page === "mensajes" && Boolean(id));
+  const hide = !hasSession() || isCompany() || page === "publicar" || page === "acceso" || (page === "mensajes" && Boolean(id));
   layer.hidden = hide;
   if (hide) return;
   fab.innerHTML = icon("qs-plus");
@@ -3767,6 +3767,7 @@ async function renderAjustes() {
   const settings = { ...defaultSettings(), ...(me.settings || {}) };
   const main = document.getElementById("main");
   main.innerHTML = `<div class="chrome"><a href="#/perfil">Perfil</a><h1>Configuración</h1></div>
+    <p class="hint"><a href="#/acceso">Acceso privado</a></p>
     <form class="profile-edit" id="profile-form">
       <div class="avatar-edit">
         ${avatarHtml(me.userId, me.displayName, "lg", me.photoUrl)}
@@ -4129,6 +4130,89 @@ function renderIntro() {
   root.querySelector(".intro-skip")?.addEventListener("click", leaveIntro);
 }
 
+const MODULOS_PUBLICOS = [
+  ["#/inicio", "Inicio"],
+  ["#/buscar", "Buscar"],
+  ["#/mascotas", "Mascotas"],
+  ["#/ayuda", "Trueque"],
+  ["#/mensajes", "Mensajes"],
+  ["#/avisos", "Avisos"],
+  ["#/publicar", "Publicar"],
+  ["#/billetera", "Billetera"],
+  ["#/perfil", "Perfil"],
+];
+
+const PROYECTOS_ACCESO = [
+  {
+    title: "Escritorio público",
+    lead: "El navegador de la comunidad.",
+    image: "media/modulos/escritorio-publico.jpg",
+    alt: "Escritorio público con inicio, buscar, mascotas, trueque y billetera.",
+    modules: MODULOS_PUBLICOS,
+  },
+  {
+    title: "CRM de empresas",
+    lead: "Panel, campañas y la comunidad en solo lectura.",
+    image: "media/modulos/crm-empresas.jpg",
+    alt: "CRM de empresas: panel, campañas y comunidad.",
+    modules: [
+      ["#/empresa", "Panel"],
+      ["#/empresa/campanas", "Campañas"],
+      ["#/empresa/comunidad", "Comunidad"],
+    ],
+  },
+  {
+    title: "Apps nativas",
+    lead: "iOS y Android. El estacionamiento se abre en la app.",
+    image: "media/modulos/apps-nativas.jpg",
+    alt: "Apps iOS y Android con inicio, estacionamiento, mascotas, trueque y perfil.",
+    modules: [
+      ["#/inicio", "Inicio"],
+      ["https://apps.apple.com/search?term=Only%20Good%20Things", "Estacionamiento · iOS", true],
+      ["https://play.google.com/store/apps/details?id=com.onlygoodthings.app", "Estacionamiento · Android", true],
+      ["#/mascotas", "Mascotas"],
+      ["#/ayuda", "Trueque"],
+      ["#/billetera", "Billetera"],
+      ["#/perfil", "Perfil"],
+    ],
+  },
+];
+
+function moduloLinks(items) {
+  return `<ul class="modulo-links">${items.map(([href, label, external]) => {
+    const extra = external ? ` target="_blank" rel="noopener noreferrer"` : "";
+    return `<li><a href="${href}"${extra}>${escapeHtml(label)}</a></li>`;
+  }).join("")}</ul>`;
+}
+
+function publicProductsHtml() {
+  return `<section class="productos" aria-labelledby="productos-title">
+    <div class="productos-inner">
+      <p class="auth-kicker">Nuestros productos</p>
+      <h2 id="productos-title">Lo que ve la comunidad</h2>
+      <p class="hint">Inicio, buscar, mascotas, trueque, mensajes, avisos, publicar, billetera y perfil.</p>
+      <img class="proyecto-shot" src="media/modulos/productos-publicos.jpg" alt="Módulos públicos: Inicio, Buscar, Mascotas, Trueque, Mensajes, Avisos, Publicar, Billetera y Perfil.">
+      ${moduloLinks(MODULOS_PUBLICOS)}
+    </div>
+  </section>`;
+}
+
+function renderAcceso() {
+  setShell(true);
+  document.body.classList.remove("desk");
+  document.body.classList.toggle("desk", isCompany());
+  const main = document.getElementById("main");
+  main.innerHTML = `<h1>Acceso privado</h1>
+    <div class="page proyectos">
+      ${PROYECTOS_ACCESO.map((proyecto) => `<article class="proyecto">
+        <h2>${escapeHtml(proyecto.title)}</h2>
+        <p class="hint">${escapeHtml(proyecto.lead)}</p>
+        <img class="proyecto-shot" src="${proyecto.image}" alt="${escapeHtml(proyecto.alt)}">
+        ${moduloLinks(proyecto.modules)}
+      </article>`).join("")}
+    </div>`;
+}
+
 function ogtMark(kind) {
   return `<img class="ogt-mark ogt-mark--${kind}" src="${OGT_LOGO}" alt="">`;
 }
@@ -4181,7 +4265,8 @@ function paintAuth(key, still, panel, card) {
         <section class="auth-panel${card ? " is-card" : ""}">${panel}</section>
       </div>
       ${authFoot()}
-    </div>`;
+    </div>
+    ${key === "portal" || key === "entrar" ? publicProductsHtml() : ""}`;
 }
 
 function normalizePhone(raw) {
@@ -4480,7 +4565,8 @@ async function renderEmpresaPanel() {
       ${moneyCards(company)}
       <p class="hint section">Campañas</p>
       ${campaignRows(Array.isArray(campaigns) ? campaigns : [])}
-      <p class="hint">Acá operás saldo, metas y cupones. El feed de vecinos está en Comunidad.</p>`;
+      <p class="hint">Acá operás saldo, metas y cupones. El feed de vecinos está en Comunidad.</p>
+      <p class="hint"><a href="#/acceso">Acceso privado</a></p>`;
   } catch (e) {
     document.querySelector(".page").innerHTML = `<p class="err">${escapeHtml(e.message)}</p>`;
   }
@@ -4599,7 +4685,7 @@ async function show() {
     location.hash = home;
     return;
   }
-  if (isCompany() && page !== "empresa" && page !== "p") {
+  if (isCompany() && page !== "empresa" && page !== "p" && page !== "acceso") {
     location.hash = "#/empresa";
     return;
   }
@@ -4616,6 +4702,7 @@ async function show() {
   if (page === "empresa" && id === "campanas") return withSectionTools(renderEmpresaCampanas());
   if (page === "empresa" && id === "comunidad") return withSectionTools(renderEmpresaComunidad());
   if (page === "empresa") return withSectionTools(renderEmpresaPanel());
+  if (page === "acceso") return withSectionTools(renderAcceso());
   if (page === "inicio") return withSectionTools(renderInicio());
   if (page === "p" && id) return withSectionTools(renderPost(id));
   if (page === "publicar") return withSectionTools(renderPublicar(id));

@@ -7,7 +7,7 @@
   <link rel="icon" href="ogt-logo.png" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=trueque-invite">
+  <link rel="stylesheet" href="styles.css?v=modulos">
 </head>
 <body>
   <div id="auth-root" hidden></div>
@@ -43,6 +43,7 @@
         <div class="rail-kicker"><span>Regla de la casa</span></div>
         <p class="rail-rule">Quien entra, entra a sumar. Se cuenta lo que se hizo, no lo que hay que creer.</p>
         <a class="rail-link" href="#/reglas">Leer manifiesto</a>
+        <a class="rail-link" href="#/acceso">Acceso privado</a>
       </section>
     </aside>
     <div class="fab-layer" id="fab-layer" role="region" aria-label="Crear publicación" hidden>
@@ -76,7 +77,7 @@
       db.src = "ogt-sdk.js?v=chat-live";
       db.onload = function () {
         const s = document.createElement("script");
-        s.src = "app.js?v=nombre-ogt";
+        s.src = "app.js?v=modulos";
         document.body.appendChild(s);
       };
       document.body.appendChild(db);
