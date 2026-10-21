@@ -68,16 +68,15 @@ fun OnboardingScreen(onDone: () -> Unit, onLogin: () -> Unit) {
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .aspectRatio(1.05f)
+                        .aspectRatio(4f / 3f)
                         .clip(RoundedCornerShape(28.dp))
                         .background(OgtColors.surface),
-                    contentAlignment = Alignment.Center,
                 ) {
                     Image(
                         painter = painterResource(page.image),
                         contentDescription = page.title,
-                        modifier = Modifier.fillMaxSize().padding(20.dp),
-                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
                     )
                 }
                 Spacer(Modifier.height(20.dp))

@@ -9,10 +9,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -59,21 +59,21 @@ internal fun AuthFeatureReel(modifier: Modifier = Modifier) {
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(168.dp)
+                .aspectRatio(4f / 3f)
                 .clip(RoundedCornerShape(OgtDimens.cardRadius))
                 .background(OgtColors.sand),
-            contentAlignment = Alignment.Center,
         ) {
             AnimatedContent(
                 targetState = page,
+                modifier = Modifier.fillMaxSize(),
                 transitionSpec = { OgtMotion.enterUp togetherWith OgtMotion.exitDown },
                 label = "auth-reel",
             ) { scene ->
                 Image(
                     painter = painterResource(scene.image),
                     contentDescription = scene.title,
-                    modifier = Modifier.fillMaxSize().padding(16.dp),
-                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
                 )
             }
         }
