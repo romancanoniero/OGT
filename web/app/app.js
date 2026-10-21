@@ -4143,7 +4143,7 @@ function authBar(backHref, backLabel) {
 function authFoot() {
   return `<footer class="auth-foot">
     <p class="auth-foot-brand">${ogtMark("foot")}OGT · 2025 · Plataforma de confianza cívica</p>
-    <p><a href="privacy.html">Privacidad</a> · Términos · Centro de ayuda</p>
+    <p><a href="privacy.html">Privacidad</a> · <a href="terms.html">Términos</a> · Centro de ayuda</p>
   </footer>`;
 }
 
