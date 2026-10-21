@@ -27,7 +27,7 @@ fun IdentityScreen(onContinue: () -> Unit) {
     Column(Modifier.fillMaxSize().background(OgtColors.canvas).verticalScroll(rememberScrollState())) {
         OgtTopBar(title = "Verificación")
         ScreenColumn {
-            OgtCaption("OnlyGoodThings es una red de personas reales. Verificar el perfil abre alertas, trueques y voto comunitario.")
+            OgtCaption("Only Good Things (OGT) es una red de personas reales. Verificar el perfil abre alertas, trueques y voto comunitario.")
             PrefCategory("Beneficios")
             PrefGroup {
                 PrefLine(

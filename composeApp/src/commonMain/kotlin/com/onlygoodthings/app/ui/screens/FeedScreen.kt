@@ -307,7 +307,7 @@ fun FeedScreen(
     var reportPostId by remember { mutableStateOf<String?>(null) }
     val seenStoryIds = remember { mutableStateListOf<String>() }
     OgtTopBar(
-        title = "OnlyGoodThings",
+        title = "Only Good Things (OGT)",
         onNotifications = onNotifications,
         onProfile = onProfile,
         onMessages = onMessages,

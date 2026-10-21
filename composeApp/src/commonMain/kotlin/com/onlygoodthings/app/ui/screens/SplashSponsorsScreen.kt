@@ -35,7 +35,7 @@ fun SplashSponsorsScreen(onContinue: () -> Unit, onBack: (() -> Unit)? = null) {
         ) {
         OgtLogo(size = 96.dp)
         Spacer(Modifier.height(12.dp))
-        Text("OnlyGoodThings", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = OgtColors.ink)
+        Text("Only Good Things (OGT)", fontWeight = FontWeight.Bold, fontSize = 22.sp, color = OgtColors.ink)
         OgtCaption("La red donde hacer el bien transforma tu comunidad.")
         PrefCategory("Sponsors regionales")
         PrefGroup {

@@ -39,10 +39,10 @@ fun InviteScreen(onBack: () -> Unit = {}) {
             OgtCaption("+700 pts · Código ${me.inviteCode}")
             OgtCaption(link.removePrefix("https://"))
             OgtPrimaryButton("Copiar enlace") {
-                sharePlainText("Sumate a Only Good Things con ${me.displayName}: $link")
+                sharePlainText("Sumate a Only Good Things (OGT) con ${me.displayName}: $link")
             }
             OgtPrimaryButton("Compartir por WhatsApp") {
-                sharePlainText("Sumate a Only Good Things con ${me.displayName}: $link")
+                sharePlainText("Sumate a Only Good Things (OGT) con ${me.displayName}: $link")
             }
             PrefCategory("Contactos de confianza")
             PrefGroup {

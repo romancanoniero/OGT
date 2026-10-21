@@ -15,7 +15,7 @@ object CommunityRules {
     const val kicker = "Cómo se publica acá"
 
     const val preamble =
-        "Only Good Things nació para que se vea lo que alguien hizo por otra persona: " +
+        "Only Good Things (OGT) nació para que se vea lo que alguien hizo por otra persona: " +
             "ceder un lugar, encontrar un animal, dar una mano, honrar a alguien, contar que algo salió bien. " +
             "No es un púlpito ni una campaña. Quien entra, entra a sumar. No a convertir a nadie."
 

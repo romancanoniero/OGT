@@ -864,7 +864,7 @@ function publicLink(post) {
 function shareText(post) {
   const headline = isAnecdoteShare(post) && post.honoreeName
     ? `Anécdota del homenaje a ${post.honoreeName}`
-    : (post.honoreeName || post.topic || "Only Good Things");
+    : (post.honoreeName || post.topic || "Only Good Things (OGT)");
   return [headline, post.body, publicLink(post)].filter(Boolean).join("\n\n");
 }
 
@@ -3875,7 +3875,7 @@ async function renderAjustes() {
 const COMMUNITY_RULES = {
   title: "Reglas de la comunidad",
   kicker: "Cómo se publica acá",
-  preamble: "Only Good Things nació para que se vea lo que alguien hizo por otra persona: ceder un lugar, encontrar un animal, dar una mano, honrar a alguien, contar que algo salió bien. No es un púlpito ni una campaña. Quien entra, entra a sumar. No a convertir a nadie.",
+  preamble: "Only Good Things (OGT) nació para que se vea lo que alguien hizo por otra persona: ceder un lugar, encontrar un animal, dar una mano, honrar a alguien, contar que algo salió bien. No es un púlpito ni una campaña. Quien entra, entra a sumar. No a convertir a nadie.",
   sections: [
     ["Se cuenta lo que se hizo, no lo que hay que creer", "Hechos e invitaciones concretas. No doctrinas."],
     ["El aplauso no prueba el bien", "La reputación sale de lo que se logró, no de lo que se pagó ni de cuántos aplauden."],
@@ -4110,8 +4110,8 @@ function renderIntro() {
   const root = document.getElementById("auth-root");
   root.innerHTML = `
     <div class="intro-stage">
-      <img class="ogt-mark ogt-mark--intro" src="${OGT_LOGO}" alt="Only Good Things">
-      <p class="intro-kicker">ONLY GOOD THINGS</p>
+      <img class="ogt-mark ogt-mark--intro" src="${OGT_LOGO}" alt="Only Good Things (OGT)">
+      <p class="intro-kicker">Only Good Things (OGT)</p>
       <div class="intro-frame">
         <div class="intro-loader" aria-hidden="true"></div>
         <video src="${INTRO_VIDEO}" playsinline disablepictureinpicture controlslist="nodownload nofullscreen noremoteplayback" preload="auto"></video>
@@ -4135,14 +4135,14 @@ function ogtMark(kind) {
 
 function authBar(backHref, backLabel) {
   return `<header class="auth-bar">
-    <a class="auth-brand" href="#/portal">${ogtMark("bar")}ONLY GOOD THINGS</a>
+    <a class="auth-brand" href="#/portal">${ogtMark("bar")}Only Good Things (OGT)</a>
     ${backHref ? `<a class="auth-back" href="${backHref}">${backLabel}</a>` : `<span></span>`}
   </header>`;
 }
 
 function authFoot() {
   return `<footer class="auth-foot">
-    <p class="auth-foot-brand">${ogtMark("foot")}OGT · 2025 · Plataforma de confianza cívica</p>
+    <p class="auth-foot-brand">${ogtMark("foot")}Only Good Things (OGT) · 2025 · Plataforma de confianza cívica</p>
     <p><a href="privacy.html">Privacidad</a> · <a href="terms.html">Términos</a> · Centro de ayuda</p>
   </footer>`;
 }
@@ -4628,7 +4628,7 @@ async function show() {
   if (page === "perfil") return withSectionTools(renderPerfil(id));
   if (page === "ajustes") return withSectionTools(renderAjustes());
   if (page === "reglas") return withSectionTools(renderReglas());
-  soon("Only Good Things", "");
+  soon("Only Good Things (OGT)", "");
   ensureSectionHead();
   paintPublishFab();
 }

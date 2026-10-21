@@ -566,12 +566,12 @@ object OgtMockSeed {
         db.inviteContacts += listOf(
             LocalInviteContact("Carolina Rossi", "+54 9 11 4455-8899"),
             LocalInviteContact("Agustín Pereyra", "agustin.p@correo.com"),
-            LocalInviteContact("Valeria Gómez", "Vecina activa • Huertas · En OnlyGoodThings"),
+            LocalInviteContact("Valeria Gómez", "Vecina activa • Huertas · En Only Good Things (OGT)"),
         )
 
         db.sponsors += listOf(
             LocalSponsor("s1", "Promocionado con Causa", "Banco Santander Río", "Tasa Cero Movilidad y Solar", "Alcanzaste 1.450 puntos: tasa preferencial 0% para paneles solares y bicicletas eléctricas. Por cada acción, Santander planta 1 árbol nativo en tu municipio.", "Simular Beneficio Verde"),
-            LocalSponsor("s2", "A 400m de vos", "Almacén Orgánico Raíces Libres", null, "25% OFF en compras a granel presentando tu perfil OGT. Apoyando huertas agroecológicas de la zona.", null),
+            LocalSponsor("s2", "A 400m de vos", "Almacén Orgánico Raíces Libres", null, "25% OFF en compras a granel presentando tu perfil de Only Good Things (OGT). Apoyando huertas agroecológicas de la zona.", null),
             LocalSponsor("s3", null, "Cablevisión Flow", "3 Meses Bonificados", "Tus horas de voluntariado te otorgan 3 meses de suscripción + Flow conecta el merendero Los Aromos sin costo. Requisito: 8 horas de acción social.", "Activar Beneficio Flow"),
         )
 

@@ -64,7 +64,7 @@ fun SplashScreen(onContinue: () -> Unit) {
         OgtLogo(size = 168.dp, animated = true)
         Spacer(Modifier.height(20.dp))
         Text("RED SOLIDARIA DE COMUNIDAD", color = OgtColors.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
-        Text("OnlyGoodThings", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = OgtColors.ink)
+        Text("Only Good Things (OGT)", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = OgtColors.ink)
         OgtCaption("Las buenas noticias, la ayuda mutua y los actos solidarios de tu comunidad.")
         Spacer(Modifier.height(16.dp))
         AuthFeatureReel()

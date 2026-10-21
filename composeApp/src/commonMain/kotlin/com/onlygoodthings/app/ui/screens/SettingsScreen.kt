@@ -241,7 +241,7 @@ fun SettingsScreen(onLogout: () -> Unit = {}, onBack: () -> Unit = {}, onOpen: (
                     .clickable(onClick = onLogout)
                     .padding(vertical = 16.dp),
             )
-            OgtCaption("OnlyGoodThings v2.8.4")
+            OgtCaption("Only Good Things (OGT) v2.8.4")
             Spacer(Modifier.height(80.dp))
         }
     }

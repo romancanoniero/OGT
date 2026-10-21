@@ -678,7 +678,7 @@ fun ParkingScreen(
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OgtPill("+${spot.rewardPoints} Pts OnlyGoodThings")
+                        OgtPill("+${spot.rewardPoints} Pts Only Good Things (OGT)")
                         val etaMin = ((spot.etaSeconds ?: 180) / 60).coerceAtLeast(1)
                         val meters = spot.distanceMeters?.toInt() ?: 0
                         OgtPill("ETA $etaMin min · $meters m", OgtColors.sunset, OgtColors.sunsetText)

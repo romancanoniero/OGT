@@ -40,7 +40,7 @@
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:label="Only Good Things"
+        android:label="Only Good Things (OGT)"
         android:supportsRtl="true"
         android:theme="@style/Theme.Ogt"
         android:usesCleartextTraffic="true">

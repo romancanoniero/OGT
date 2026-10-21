@@ -24,7 +24,7 @@ fun OgtLogo(
 ) {
     Image(
         painter = painterResource(Res.drawable.ogt_logo),
-        contentDescription = "OnlyGoodThings",
+        contentDescription = "Only Good Things (OGT)",
         modifier = modifier.size(size),
         contentScale = ContentScale.Fit,
     )

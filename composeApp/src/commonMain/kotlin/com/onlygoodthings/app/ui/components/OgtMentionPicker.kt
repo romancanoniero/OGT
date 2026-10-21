@@ -181,7 +181,7 @@ fun OgtMentionPicker(
                             if (allowNameOnly) {
                                 "Opcional. WhatsApp, SMS o mail si alguien puede reivindicar el crédito."
                             } else {
-                                "Aún no está en Only Good Things · WhatsApp, SMS o mail"
+                                "Aún no está en Only Good Things (OGT) · WhatsApp, SMS o mail"
                             },
                             color = OgtColors.muted,
                             fontSize = 12.sp,
