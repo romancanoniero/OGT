@@ -1,5 +1,6 @@
 package com.onlygoodthings.app.ui.screens
 
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,7 +18,11 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -53,6 +58,7 @@ internal fun AuthField(
     hint: String,
     value: String,
     secret: Boolean = false,
+    otp: Boolean = false,
     onChange: (String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -60,9 +66,12 @@ internal fun AuthField(
         OutlinedTextField(
             value = value,
             onValueChange = onChange,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().then(
+                if (otp) Modifier.semantics { contentType = ContentType.SmsOtpCode } else Modifier,
+            ),
             placeholder = { Text(hint) },
             visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
+            keyboardOptions = if (otp) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
             singleLine = true,
             maxLines = 1,
             shape = AuthCorner,

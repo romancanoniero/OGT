@@ -18,6 +18,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalClipboardManager
+import com.onlygoodthings.app.auth.OtpArrivalEffect
+import com.onlygoodthings.app.auth.otpDigits
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,12 +40,18 @@ fun OtpScreen(onConfirm: () -> Unit, onBack: () -> Unit) {
     val auth = LocalAuth.current
     val scope = rememberCoroutineScope()
     var code by remember { mutableStateOf("") }
+    var pasteNote by remember { mutableStateOf<String?>(null) }
+    val clipboard = LocalClipboardManager.current
     val phone = auth.pendingPhone?.phoneE164 ?: "tu número"
+    OtpArrivalEffect { received ->
+        code = received
+        pasteNote = null
+    }
     AuthScaffold(onBack = onBack) {
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             OgtLogo(size = 80.dp)
             OgtSectionTitle("Verifica tu número")
-            OgtCaption("Enviamos un código de 6 dígitos por SMS a $phone")
+            OgtCaption("Enviamos un código de 6 dígitos a $phone. Si llega por SMS o por correo, el teclado te lo ofrece para pegarlo. En Android, el SMS también puede completarse al aceptarlo.")
             GhostLink("¿Número incorrecto? Editar") { onBack() }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
@@ -58,7 +67,19 @@ fun OtpScreen(onConfirm: () -> Unit, onBack: () -> Unit) {
                 }
             }
         }
-        AuthField("Código", "Emulador: ${AuthLab.TEST_OTP}", code) { if (it.length <= 6) code = it.filter { c -> c.isDigit() } }
+        AuthField("Código", "Emulador: ${AuthLab.TEST_OTP}", code, otp = true) {
+            if (it.length <= 6) code = it.filter { c -> c.isDigit() }
+        }
+        GhostLink("Pegar código") {
+            val digits = otpDigits(clipboard.getText()?.text.orEmpty())
+            if (digits == null) {
+                pasteNote = "No hay un código de 6 dígitos para pegar."
+            } else {
+                code = digits
+                pasteNote = null
+            }
+        }
+        if (pasteNote != null) OgtCaption(pasteNote!!)
         GhostLink("Reenviar código") { scope.launch { auth.resendOtp() } }
         AuthError(auth.error)
         OgtPrimaryButton(

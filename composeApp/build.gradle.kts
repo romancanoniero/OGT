@@ -60,6 +60,7 @@ kotlin {
             implementation(libs.androidx.biometric)
             implementation(libs.kotlinx.coroutines.play)
             implementation(libs.play.services.location)
+            implementation("com.google.android.gms:play-services-auth-api-phone:18.1.0")
             implementation("com.android.installreferrer:installreferrer:2.2")
         }
     }
