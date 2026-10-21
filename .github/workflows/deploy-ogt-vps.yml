@@ -52,18 +52,24 @@ jobs:
       - name: Trust the VPS host and map iankmp-vps
         env:
           OGT_VPS_KNOWN_HOSTS: ${{ secrets.OGT_VPS_KNOWN_HOSTS }}
+          OGT_VPS_SSH_KEY: ${{ secrets.OGT_VPS_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           printf '%s\n' "$OGT_VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
-          # Sin heredoc en columna 0: eso corta el bloque YAML del step.
+          # El secreto a veces llega sin newline final; OpenSSH lo rechaza.
+          printf '%s\n' "$OGT_VPS_SSH_KEY" > ~/.ssh/ogt_vps_actions
+          chmod 600 ~/.ssh/ogt_vps_actions
+          ssh-keygen -y -f ~/.ssh/ogt_vps_actions >/dev/null
           {
             echo 'Host iankmp-vps'
             echo '  HostName 217.216.82.209'
             echo '  User iankmp'
+            echo '  IdentityFile ~/.ssh/ogt_vps_actions'
             echo '  IdentitiesOnly yes'
             echo '  BatchMode yes'
+            echo '  PreferredAuthentications publickey'
           } > ~/.ssh/config
           chmod 600 ~/.ssh/config
           # Comprueba el acceso sin imprimir material sensible.
