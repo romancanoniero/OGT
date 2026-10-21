@@ -1,0 +1,70 @@
+name: CRM staging deployment - manual approval
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DEPLOY-STAGING after reviewing the PR, MFA and test results'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: ogt-crm-staging
+  cancel-in-progress: false
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require intentional staging deploy
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: test "$CONFIRM" = DEPLOY-STAGING
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          node --check web/app/crm/crm.js
+          node --check web/app/app.js
+          node --test qa/auth-unit.test.mjs
+  publish:
+    needs: preflight
+    runs-on: ubuntu-latest
+    environment: ogt-crm-staging
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check deploy configuration without printing secrets
+        env:
+          HOST: ${{ secrets.OGT_STAGING_HOST }}
+          USER: ${{ secrets.OGT_STAGING_USER }}
+          KEY: ${{ secrets.OGT_STAGING_SSH_KEY }}
+        run: |
+          test -n "$HOST" && test -n "$USER" && test -n "$KEY"
+          test -d web/app/crm/control
+          test -d web/app/crm/empresas
+      - name: Install restricted SSH deploy identity
+        env:
+          SSH_KEY: ${{ secrets.OGT_STAGING_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.OGT_STAGING_KNOWN_HOSTS }}
+        run: |
+          test -n "$KNOWN_HOSTS"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Publish static CRM shell only to isolated staging directory
+        env:
+          HOST: ${{ secrets.OGT_STAGING_HOST }}
+          USER: ${{ secrets.OGT_STAGING_USER }}
+        run: |
+          # SSH account must be restricted to this dedicated staging directory.
+          # Never deploy the backend, production data or migrations in this job.
+          rsync -az --delete -e 'ssh -o StrictHostKeyChecking=yes' \
+            web/app/crm/ "$USER@$HOST:ogt-crm-staging/"
