@@ -1,0 +1,9 @@
+{
+  "repository": "romancanoniero/OGT",
+  "environment": "ogt-crm-staging",
+  "scope": "static-ui-only",
+  "confirm": "DEPLOY-STAGING",
+  "sourceSha": "8ed33289e35b9a6c05d52bbed0c8dfeb5e268160",
+  "requestId": "crm-staging-20261021-automated-01",
+  "reason": "User requested end-to-end staging publication without repeated manual workflow starts. Production data and backend deployment remain outside this static release."
+}
