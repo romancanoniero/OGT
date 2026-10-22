@@ -15,7 +15,7 @@ export async function start() {
   const googleLogin = make('button', 'Ingresar con Google');
   googleLogin.id = 'crm-google-login'; googleLogin.type = 'button';
   login.insertAdjacentElement('afterend', googleLogin);
-  const signupToggle = make('button', 'Crear cuenta de Control');
+  const signupToggle = make('button', mode === 'control' ? 'Crear cuenta de Control' : 'Crear cuenta de Empresas');
   signupToggle.id = 'crm-signup-toggle'; signupToggle.type = 'button';
   googleLogin.insertAdjacentElement('afterend', signupToggle);
   const onboarding = make('section'); onboarding.id = 'crm-onboarding'; onboarding.hidden = true;
@@ -33,7 +33,7 @@ export async function start() {
   const addGoogle = make('button', 'Vincular Google a esta cuenta'); addGoogle.type = 'button'; addGoogle.hidden = true;
   const addPassword = make('button', 'Activar contraseña en esta cuenta'); addPassword.type = 'button'; addPassword.hidden = true;
   const linkedPassword = make('input'); linkedPassword.type = 'password'; linkedPassword.autocomplete = 'new-password';
-  linkedPassword.setAttribute('aria-label', 'Nueva contraseña para OGT Control');
+  linkedPassword.setAttribute('aria-label', 'Nueva contraseña para OGT');
   linkedPassword.placeholder = 'Nueva contraseña (mínimo 12 caracteres)'; linkedPassword.hidden = true;
   logout.insertAdjacentElement('afterend', addGoogle);
   addGoogle.insertAdjacentElement('afterend', linkedPassword);
@@ -77,8 +77,8 @@ export async function start() {
     onboardingText.textContent = !verified
       ? 'Verificá tu correo electrónico antes de configurar el segundo factor.'
       : !hasFactor
-        ? 'Para activar Control necesitás un segundo factor. Configurá una aplicación autenticadora.'
-        : 'Ya tenés un segundo factor. Cerrá sesión y volvé a ingresar con Google o contraseña para completar la verificación.';
+        ? 'Para acceder a este CRM necesitás un segundo factor. Configurá una aplicación autenticadora.'
+        : 'El segundo factor está registrado. Cerrá sesión y volvé a ingresar con Google o contraseña para renovar la autenticación.';
   }
   function fail(error) {
     clearData();
@@ -117,7 +117,7 @@ export async function start() {
     if (!identity.currentUser()) {
       login.hidden = false; googleLogin.hidden = false; signupToggle.hidden = false;
       onboarding.hidden = true; addGoogle.hidden = true; addPassword.hidden = true; linkedPassword.hidden = true;
-      message('Iniciá sesión o creá tu cuenta para acceder al CRM.'); return;
+      message('El acceso requiere correo verificado, segundo factor y permisos expresos. Iniciá sesión o creá tu cuenta.'); return;
     }
     message('Verificando identidad, segundo factor y permisos...');
     try {
@@ -163,7 +163,7 @@ export async function start() {
       if (signupMode) {
         try { await identity.sendVerification(); } catch (_) { /* the user can retry */ }
         signupMode = false;
-        signupToggle.textContent = 'Crear cuenta de Control';
+        signupToggle.textContent = mode === 'control' ? 'Crear cuenta de Control' : 'Crear cuenta de Empresas';
         login.querySelector('button').textContent = 'Ingresar';
       }
       if (result.factors) {
@@ -178,9 +178,9 @@ export async function start() {
   });
   signupToggle.addEventListener('click', () => {
     signupMode = !signupMode;
-    signupToggle.textContent = signupMode ? 'Ya tengo una cuenta' : 'Crear cuenta de Control';
+    signupToggle.textContent = signupMode ? 'Ya tengo una cuenta' : (mode === 'control' ? 'Crear cuenta de Control' : 'Crear cuenta de Empresas');
     login.querySelector('button').textContent = signupMode ? 'Registrarme' : 'Ingresar';
-    message(signupMode ? 'Creá tu cuenta. El primer administrador solo se autoriza desde el servidor.' : 'Ingresá con tu cuenta existente.');
+    message(signupMode ? (mode === 'control' ? 'Creá tu cuenta. El primer administrador solo se autoriza desde el servidor.' : 'Creá una cuenta. Para ver datos de empresas necesitás una invitación y permisos de la organización.') : 'Ingresá con tu cuenta existente.');
   });
   googleLogin.addEventListener('click', async () => {
     if (identityBusy) return;
@@ -229,7 +229,7 @@ export async function start() {
       await identity.signOut();
       onboarding.hidden = true; login.hidden = false; googleLogin.hidden = false;
       signupToggle.hidden = false; logout.hidden = true;
-      message('Segundo factor configurado. Ingresá nuevamente para activar los permisos.');
+      message('Segundo factor configurado. Volvé a ingresar y verificá el código del autenticador para acceder.');
     } catch (error) { message(friendlyError(error)); }
     finally { setBusy(false); }
   });
