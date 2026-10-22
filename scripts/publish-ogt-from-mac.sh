@@ -68,7 +68,17 @@ test "$ACTUAL_SERVER" = "$EXPECTED_SERVER" || {
   echo 'El dominio resuelto por la Mac no apunta al mismo destino que la sesion SSH. No se publica.' >&2
   exit 1
 }
-"${SSH[@]}" "$OGT_VPS_HOST" "python3 - --apply --expected-server '$EXPECTED_SERVER'" < scripts/prepare-ogt-review.py
+# The initial OWNER email is opt-in, exact, and stored ONLY in the VPS .env.
+# It is never bundled into public web assets or inferred from the first visitor.
+BOOTSTRAP_EMAIL="${OGT_CONTROL_BOOTSTRAP_EMAIL:-}"
+if [ -n "$BOOTSTRAP_EMAIL" ]; then
+  [[ "$BOOTSTRAP_EMAIL" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]] || {
+    echo 'OGT_CONTROL_BOOTSTRAP_EMAIL no es un correo valido.' >&2; exit 1;
+  }
+  "${SSH[@]}" "$OGT_VPS_HOST" "python3 - --apply --expected-server '$EXPECTED_SERVER' --bootstrap-email '$BOOTSTRAP_EMAIL'" < scripts/prepare-ogt-review.py
+else
+  "${SSH[@]}" "$OGT_VPS_HOST" "python3 - --apply --expected-server '$EXPECTED_SERVER'" < scripts/prepare-ogt-review.py
+fi
 echo '[3/4] Compilando y publicando app, backend y CRM con respaldo previo.'
 bash scripts/deploy-ogt-vps.sh --deploy
 echo '[4/4] Verificando las paginas por HTTPS desde esta Mac.'
