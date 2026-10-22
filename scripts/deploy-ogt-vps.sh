@@ -33,9 +33,23 @@ SSH=(ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15)
 # Check server prerequisites BEFORE spending time on the build. These reads do not deploy.
 "${SSH[@]}" "$HOST" 'test -f "$HOME/ogt/.env" && test -f "$HOME/ogt/docker-compose.yml"'
 "${SSH[@]}" "$HOST" 'python3 - env "$HOME/ogt/.env"' < scripts/release_guard.py
+# Gradle may be configured globally to cache on an unavailable external disk.
+# Keep release dependencies in a persistent, private, writable LOCAL user cache.
+# This does not remove, reset or migrate the original Gradle cache.
+if [ "$(uname -s)" = Darwin ]; then
+  DEFAULT_GRADLE_CACHE="$HOME/Library/Caches/OGT/gradle"
+else
+  DEFAULT_GRADLE_CACHE="$HOME/.cache/ogt-release-gradle"
+fi
+export GRADLE_USER_HOME="${OGT_RELEASE_GRADLE_HOME:-$DEFAULT_GRADLE_CACHE}"
+mkdir -p "$GRADLE_USER_HOME" || { echo "No se puede crear la cache de Gradle de OGT: $GRADLE_USER_HOME" >&2; exit 1; }
+test -d "$GRADLE_USER_HOME" && test -w "$GRADLE_USER_HOME" || { echo "La cache de Gradle de OGT no es escribible: $GRADLE_USER_HOME" >&2; exit 1; }
+PROBE="$(mktemp "$GRADLE_USER_HOME/.ogt-write-test.XXXXXX")" || { echo "No se puede escribir en la cache de Gradle de OGT: $GRADLE_USER_HOME" >&2; exit 1; }
+rm -f "$PROBE"
+echo "Gradle OGT usa cache local: $GRADLE_USER_HOME"
 # Compile fresh outputs OUTSIDE tracked web/app. syncWebSdk writes to tracked files
 # and would make the subsequent source-integrity check reject a legitimate build.
-./gradlew "-Pogt.dbKmpSdkPath=$SDK" :backend:clean :shared:clean :backend:test :shared:jvmTest :backend:installDist :shared:jsBrowserProductionWebpack --no-daemon
+./gradlew --gradle-user-home "$GRADLE_USER_HOME" "-Pogt.dbKmpSdkPath=$SDK" :backend:clean :shared:clean :backend:test :shared:jvmTest :backend:installDist :shared:jsBrowserProductionWebpack --no-daemon
 # Building may create ignored output, but must not alter application or SDK source.
 git diff --exit-code --quiet
 git diff --cached --exit-code --quiet
