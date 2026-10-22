@@ -62,7 +62,7 @@ if not address.is_global:
 print(address)
 PY
 )"
-ACTUAL_SERVER="$("${SSH[@]}" "$OGT_VPS_HOST" 'python3 -c "import os; p=os.environ.get('''SSH_CONNECTION''','''''').split(); print(p[2] if len(p)==4 else '''''')"' )"
+ACTUAL_SERVER="$("${SSH[@]}" "$OGT_VPS_HOST" 'set -- $SSH_CONNECTION; if [ "$#" -eq 4 ]; then printf "%s\\n" "$3"; fi')"
 test -n "$ACTUAL_SERVER" || { echo 'No se pudo obtener la direccion de destino de la sesion SSH.' >&2; exit 1; }
 test "$ACTUAL_SERVER" = "$EXPECTED_SERVER" || {
   echo 'El dominio resuelto por la Mac no apunta al mismo destino que la sesion SSH. No se publica.' >&2
