@@ -153,4 +153,7 @@ test('unknown Firebase error code is safely shown for troubleshooting without ex
   assert.match(result, /auth\/internal-error/);
   assert.doesNotMatch(result, /PRIVATE_SDK_MESSAGE/);
   assert.equal(friendlyError({ code: 'auth/<script>', message: 'SECRET' }), 'No se pudo completar la operación. Probá nuevamente.');
+  const leaked = friendlyError({ code: 'TOTP_CONFIGURATION', message: 'Continuar en project-521063054927' });
+  assert.match(leaked, /Only Good Things/);
+  assert.doesNotMatch(leaked, /521063054927|goodthings-55612|project-/);
 });

@@ -61,7 +61,7 @@ export function createApi(fetcher, timeoutMs = 15000) {
 export function friendlyError(error) {
   const code = String(error?.code || '');
   if (/email-already-in-use/.test(code)) return 'Ya existe una cuenta con ese correo. Ingresá con Google o con tu contraseña; no crees otra cuenta de administrador.';
-  if (/operation-not-allowed/.test(code)) return 'El método elegido no está habilitado en Firebase Authentication de OGT. Revisá Google o correo y contraseña en Sign-in method.';
+  if (/operation-not-allowed/.test(code)) return 'El método elegido no está habilitado en Firebase Authentication de Only Good Things. Revisá Google o correo y contraseña en Sign-in method.';
   if (/weak-password|password-does-not-meet-requirements/.test(code)) return 'La contraseña no cumple los requisitos de seguridad de Firebase. Elegí una clave más larga y segura.';
   if (/invalid-email/.test(code)) return 'El correo electrónico ingresado no es válido.';
   if (/requires-recent-login|user-token-expired/.test(code)) return 'Tu identificación ya no es reciente. Cerrá sesión y volvé a ingresar antes de configurar el segundo factor.';
@@ -69,7 +69,7 @@ export function friendlyError(error) {
   if (/unsupported-first-factor/.test(code)) return 'Ese método de ingreso no admite un segundo factor en Firebase. Ingresá con Google o correo y contraseña.';
   if (/second-factor-already-in-use|maximum-second-factor-count-exceeded/.test(code)) return 'Ya hay factores de seguridad configurados. Volvé a ingresar para verificar el existente.';
   if (/invalid-multi-factor-session|missing-multi-factor-session/.test(code)) return 'La sesión de verificación venció. Cerrá sesión y volvé a iniciar el ingreso.';
-  if (code === 'TOTP_NOT_ENABLED' || code === 'TOTP_CONFIGURATION') return error.message;
+  if (code === 'TOTP_NOT_ENABLED' || code === 'TOTP_CONFIGURATION') return sinIdDeProyecto(error.message);
 
   if (/account-exists-with-different-credential|credential-already-in-use/.test(code)) return 'La cuenta ya tiene otro método de ingreso. Accedé con el método original y después vinculá Google o la contraseña.';
   if (/popup-blocked|popup-closed-by-user|cancelled-popup-request/.test(code)) return 'No se pudo completar la ventana de Google. Permití ventanas emergentes y volvé a intentarlo.';
@@ -82,6 +82,12 @@ export function friendlyError(error) {
   if (/code-expired|multi-factor-session/.test(code)) return 'La verificaci\u00f3n venci\u00f3. Inici\u00e1 sesi\u00f3n nuevamente.';
   if (/unauthorized-domain/.test(code)) return 'Este dominio no est\u00e1 autorizado en Firebase.';
   if (/^auth\/[a-z0-9-]{1,80}$/.test(code)) return 'Firebase rechazó la operación (' + code + '). Revisá el método de acceso e intentá nuevamente.';
-  if (error instanceof CrmError) return error.message;
+  if (error instanceof CrmError) return sinIdDeProyecto(error.message);
   return 'No se pudo completar la operaci\u00f3n. Prob\u00e1 nuevamente.';
+}
+// El id del proyecto de Firebase no se muestra. Si un mensaje lo trae, se reemplaza el nombre.
+function sinIdDeProyecto(message) {
+  const text = String(message || '');
+  if (/521063054927|goodthings-55612|project-\d/i.test(text)) return 'No se pudo completar el ingreso a Only Good Things.';
+  return text;
 }

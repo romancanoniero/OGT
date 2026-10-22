@@ -222,6 +222,15 @@ private fun mapGoogleOpen(error: Throwable): AuthException = when (error) {
     )
 }
 
+// El id del proyecto de Firebase no se muestra. El nombre visible es Only Good Things.
+private fun sinIdDeProyecto(message: String?): String {
+    val text = message.orEmpty()
+    if (text.contains("521063054927") || text.contains("goodthings-55612") || text.contains("project-")) {
+        return "No se pudo completar el ingreso a Only Good Things."
+    }
+    return text.ifBlank { "No se pudo autenticar" }
+}
+
 private fun mapFirebase(error: Throwable?): AuthException {
     val code = (error as? com.google.firebase.auth.FirebaseAuthException)?.errorCode
     val message = when (code) {
@@ -235,7 +244,7 @@ private fun mapFirebase(error: Throwable?): AuthException {
         "ERROR_SESSION_EXPIRED" -> "El código SMS venció. Pedí uno nuevo"
         "ERROR_QUOTA_EXCEEDED" -> "Se agotó la cuota de SMS de Firebase"
         "ERROR_OPERATION_NOT_ALLOWED" -> "Este método de ingreso no está habilitado en Firebase"
-        else -> error?.message ?: "No se pudo autenticar"
+        else -> sinIdDeProyecto(error?.message)
     }
     return AuthException(message, error)
 }

@@ -76,7 +76,7 @@ export function createIdentity(sdk, auth, makeRecaptcha) {
         enrollmentSecret = await sdk.TotpMultiFactorGenerator.generateSecret(session);
       } catch (error) {
         if (error?.code === 'auth/operation-not-allowed' || error?.code === 'auth/feature-not-enabled') {
-          throw new CrmError('TOTP no está habilitado en Firebase Authentication con Identity Platform del proyecto OGT. Un administrador debe habilitarlo allí antes de continuar.', 'TOTP_NOT_ENABLED');
+          throw new CrmError('TOTP no está habilitado en Firebase Authentication con Identity Platform de Only Good Things. Un administrador debe habilitarlo allí antes de continuar.', 'TOTP_NOT_ENABLED');
         }
         throw error;
       }
