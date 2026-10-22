@@ -44,6 +44,10 @@ with sync_playwright() as pw:
             if 'gstatic.com' in url:
                 content='' if '-compat.js' in url else APP if 'firebase-app.js' in url else AUTH
                 route.fulfill(status=200,content_type='text/javascript',headers={'Access-Control-Allow-Origin':'*'},body=content);return
+            if urlsplit(url).path == '/google-logo.svg':
+                logo = (ROOT / 'web/app/google-logo.svg').read_text()
+                route.fulfill(status=200,content_type='image/svg+xml',body=logo)
+                return
             if '/api/v1/crm/' in url:
                 body=route.request.post_data_json or {}
                 state['requests'].append((url,body))
@@ -129,5 +133,23 @@ with sync_playwright() as pw:
         assert not errors,errors
         context.close()
         results.append(mode+' Google sign-in also requires Firebase second factor')
+    for mode in ['control','empresas']:
+        context,page,state,errors=session(mode)
+        google=page.locator('#crm-google-login')
+        expect(google).to_be_visible()
+        expect(google.locator('img.crm-google-mark')).to_be_visible()
+        assert google.locator('img').get_attribute('src')=='/google-logo.svg'
+        password=page.locator('#password')
+        expect(password).to_have_attribute('type','password')
+        eye=page.locator('#crm-login .crm-password-eye')
+        expect(eye).to_be_visible()
+        eye.click()
+        expect(password).to_have_attribute('type','text')
+        expect(eye).to_have_attribute('aria-label','Ocultar contraseña')
+        eye.click()
+        expect(password).to_have_attribute('type','password')
+        assert not errors,errors
+        context.close()
+        results.append(mode+' Google logo and accessible eye toggle')
     browser.close()
 print(json.dumps({'passed':len(results),'scenarios':results,'identityAndApi':'mocked; not real Firebase or Contabo'},ensure_ascii=True,indent=2))
