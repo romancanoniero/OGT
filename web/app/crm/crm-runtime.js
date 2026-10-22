@@ -1,5 +1,20 @@
 import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError } from './crm-core.js';
 import { createIdentity } from './crm-auth.js';
+
+const controlSections = [
+  { id: 'resumen', label: 'Resumen', icon: 'qs_feed.svg', keys: null },
+  { id: 'usuarios', label: 'Usuarios', icon: 'qs_skills.svg', keys: ['Usuarios activos'] },
+  { id: 'empresas', label: 'Empresas', icon: 'qs_form.svg', keys: ['Empresas', 'Empresas por verificar'] },
+  { id: 'denuncias', label: 'Denuncias', icon: 'qs_notifications.svg', keys: ['Denuncias pendientes'] },
+  { id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote.svg', keys: ['Publicaciones visibles'] },
+];
+const empresaSections = [
+  { id: 'resumen', label: 'Resumen', icon: 'qs_feed.svg', keys: null },
+  { id: 'campanas', label: 'Campañas', icon: 'qs_invite.svg', keys: ['Campañas', 'Campañas activas'] },
+  { id: 'cupones', label: 'Cupones', icon: 'qs_wallet.svg', keys: ['Cupones emitidos'] },
+  { id: 'impacto', label: 'Impacto', icon: 'qs_clap.svg', keys: ['Saldo en centavos', 'Puntaje de impacto'] },
+];
+
 export async function start() {
   const $ = id => document.getElementById(id);
   const root = $('crm-root'), status = $('crm-status'), login = $('crm-login');
@@ -7,14 +22,18 @@ export async function start() {
   const api = createApi(window.fetch.bind(window));
   let expiry = null, access = null, chosen = '', identityBusy = false;
   const make = (tag, text) => { const node = document.createElement(tag); if (text !== undefined) node.textContent = String(text); return node; };
-  const message = text => {
+  const message = (text, tone = 'info') => {
     status.replaceChildren();
+    status.dataset.tone = tone;
+    // La marca de Google acompaña los textos que la nombran. No es un icono de producto.
     if (/Google/i.test(String(text))) status.append(googleIcon());
     status.append(document.createTextNode(String(text)));
   };
+  const showAuth = () => { document.body.dataset.crmView = 'auth'; };
+  const showApp = () => { document.body.dataset.crmView = 'app'; };
   const refresh = $('crm-refresh');
-  refresh.hidden = true; // Only meaningful after Firebase has an authenticated user.
-  const logout = make('button', 'Cerrar sesi\u00f3n'); logout.type = 'button'; logout.hidden = true;
+  refresh.hidden = true; // Solo aporta cuando Firebase ya tiene un usuario autenticado.
+  const logout = make('button', 'Cerrar sesión'); logout.type = 'button'; logout.className = 'crm-btn crm-btn-ghost'; logout.hidden = true;
   refresh.insertAdjacentElement('afterend', logout);
   let signupMode = false;
   const googleIcon = () => {
@@ -28,33 +47,41 @@ export async function start() {
   };
   const googleLogin = make('button', 'Ingresar con Google');
   googleLogin.id = 'crm-google-login'; googleLogin.type = 'button';
-  googleLogin.className = 'crm-google-button'; googleLogin.prepend(googleIcon());
+  googleLogin.className = 'crm-google-button crm-btn crm-btn-google';
+  googleLogin.prepend(googleIcon());
   login.insertAdjacentElement('afterend', googleLogin);
   const signupToggle = make('button', mode === 'control' ? 'Crear cuenta de Control' : 'Crear cuenta de Empresas');
-  signupToggle.id = 'crm-signup-toggle'; signupToggle.type = 'button';
+  signupToggle.id = 'crm-signup-toggle'; signupToggle.type = 'button'; signupToggle.className = 'crm-btn crm-btn-ghost';
   googleLogin.insertAdjacentElement('afterend', signupToggle);
   const onboarding = make('section'); onboarding.id = 'crm-onboarding'; onboarding.hidden = true;
-  const onboardingText = make('p');
-  const sendVerification = make('button', 'Enviar correo de verificación'); sendVerification.type = 'button';
-  const reloadVerification = make('button', 'Ya verifiqué mi correo'); reloadVerification.type = 'button';
-  const beginTotp = make('button', 'Configurar aplicación autenticadora'); beginTotp.type = 'button';
-  const totpSecret = make('p');
-  const totpCode = make('input'); totpCode.setAttribute('aria-label', 'Código del autenticador');
+  const onboardingText = make('p'); onboardingText.className = 'crm-note';
+  const sendVerification = make('button', 'Enviar correo de verificación'); sendVerification.type = 'button'; sendVerification.className = 'crm-btn crm-btn-primary';
+  const reloadVerification = make('button', 'Ya verifiqué mi correo'); reloadVerification.type = 'button'; reloadVerification.className = 'crm-btn crm-btn-secondary';
+  const beginTotp = make('button', 'Configurar aplicación autenticadora'); beginTotp.type = 'button'; beginTotp.className = 'crm-btn crm-btn-primary';
+  const totpSecret = make('p'); totpSecret.className = 'crm-note';
+  const totpCode = make('input'); totpCode.className = 'crm-input'; totpCode.setAttribute('aria-label', 'Código del autenticador');
   totpCode.inputMode = 'numeric'; totpCode.maxLength = 6; totpCode.autocomplete = 'one-time-code';
   totpCode.placeholder = 'Código de seis dígitos'; totpCode.hidden = true;
-  const confirmTotp = make('button', 'Confirmar segundo factor'); confirmTotp.type = 'button'; confirmTotp.hidden = true;
+  const confirmTotp = make('button', 'Confirmar segundo factor'); confirmTotp.type = 'button'; confirmTotp.className = 'crm-btn crm-btn-primary'; confirmTotp.hidden = true;
   onboarding.append(onboardingText, sendVerification, reloadVerification, beginTotp, totpSecret, totpCode, confirmTotp);
   signupToggle.insertAdjacentElement('afterend', onboarding);
   const addGoogle = make('button', 'Vincular Google a esta cuenta'); addGoogle.type = 'button'; addGoogle.hidden = true;
-  addGoogle.className = 'crm-google-button'; addGoogle.prepend(googleIcon());
-  const addPassword = make('button', 'Activar contraseña en esta cuenta'); addPassword.type = 'button'; addPassword.hidden = true;
+  addGoogle.className = 'crm-google-button crm-btn crm-btn-google';
+  addGoogle.prepend(googleIcon());
+  const addPassword = make('button', 'Activar contraseña en esta cuenta'); addPassword.type = 'button'; addPassword.className = 'crm-btn crm-btn-secondary'; addPassword.hidden = true;
   function eyeToggle(input) {
     const button = make('button');
     button.type = 'button';
     button.className = 'crm-password-eye';
     button.setAttribute('aria-label', 'Mostrar contraseña');
     button.setAttribute('aria-pressed', 'false');
-    button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="crm-eye-slash" d="M3 3 21 21"/></svg>';
+    // qs_eye es el único ojo del sistema. No hay asset de ojo tachado: el estado lo marca aria-pressed.
+    const eye = make('img');
+    eye.src = '../icons/qs_eye.svg';
+    eye.alt = '';
+    eye.draggable = false;
+    eye.className = 'crm-eye';
+    button.append(eye);
     button.addEventListener('click', () => {
       const visible = input.type === 'password';
       input.type = visible ? 'text' : 'password';
@@ -64,6 +91,7 @@ export async function start() {
     return button;
   }
   function passwordWrap(input) {
+    input.classList.add('crm-input');
     const wrapper = make('span'); wrapper.className = 'crm-password-wrap';
     wrapper.append(input, eyeToggle(input));
     return wrapper;
@@ -80,19 +108,25 @@ export async function start() {
   logout.insertAdjacentElement('afterend', addGoogle);
   addGoogle.insertAdjacentElement('afterend', linkedPasswordWrap);
   linkedPasswordWrap.insertAdjacentElement('afterend', addPassword);
-  const challenge = make('form'); challenge.hidden = true; challenge.id = 'crm-mfa';
-  const fields = make('fieldset'), legend = make('legend', 'Verificaci\u00f3n en dos pasos');
+  const challenge = make('form'); challenge.hidden = true; challenge.id = 'crm-mfa'; challenge.className = 'crm-stack'; challenge.noValidate = true;
+  const fields = make('fieldset'); fields.className = 'crm-fieldset';
+  const legend = make('legend', 'Verificación en dos pasos'); legend.className = 'crm-legend';
   fields.append(legend);
-  const factorLabel = make('label', 'Segundo factor '), factor = make('select');
-  factor.id = 'crm-factor'; factorLabel.htmlFor = factor.id;
-  const begin = make('button', 'Usar este factor'); begin.type = 'button';
-  const codeLabel = make('label', 'C\u00f3digo de seis d\u00edgitos '), code = make('input');
-  code.id = 'crm-code'; codeLabel.htmlFor = code.id; code.type = 'text'; code.inputMode = 'numeric';
+  const factorLabel = make('label'); factorLabel.className = 'crm-field';
+  const factorCaption = make('span', 'Segundo factor'); factorCaption.className = 'crm-field-label';
+  const factor = make('select'); factor.id = 'crm-factor'; factor.className = 'crm-input crm-select';
+  factorLabel.htmlFor = factor.id; factorLabel.append(factorCaption, factor);
+  const begin = make('button', 'Usar este factor'); begin.type = 'button'; begin.className = 'crm-btn crm-btn-secondary';
+  const codeLabel = make('label'); codeLabel.className = 'crm-field';
+  const codeCaption = make('span', 'Código de seis dígitos'); codeCaption.className = 'crm-field-label';
+  const code = make('input'); code.id = 'crm-code'; code.className = 'crm-input';
+  codeLabel.htmlFor = code.id; codeLabel.append(codeCaption, code);
+  code.type = 'text'; code.inputMode = 'numeric';
   code.autocomplete = 'one-time-code'; code.pattern = '[0-9]{6}'; code.maxLength = 6; code.required = true;
   const recaptcha = make('div'); recaptcha.id = 'crm-recaptcha';
-  const verify = make('button', 'Verificar e ingresar'); verify.type = 'submit'; verify.disabled = true;
-  const cancel = make('button', 'Volver al ingreso'); cancel.type = 'button';
-  fields.append(factorLabel, factor, begin, recaptcha, codeLabel, code, verify, cancel);
+  const verify = make('button', 'Verificar e ingresar'); verify.type = 'submit'; verify.className = 'crm-btn crm-btn-primary'; verify.disabled = true;
+  const cancel = make('button', 'Volver al ingreso'); cancel.type = 'button'; cancel.className = 'crm-btn crm-btn-ghost';
+  fields.append(factorLabel, begin, recaptcha, codeLabel, verify, cancel);
   challenge.append(fields); login.insertAdjacentElement('afterend', challenge);
   const [appSdk, sdk] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
@@ -104,16 +138,32 @@ export async function start() {
   await sdk.setPersistence(auth, sdk.browserSessionPersistence);
   const identity = createIdentity(sdk, auth, () => new sdk.RecaptchaVerifier(auth, 'crm-recaptcha', { size: 'normal' }));
   function clearData() { gate.reset(); clearTimeout(expiry); expiry = null; root.replaceChildren(); access = null; }
-  function hideChallenge() { challenge.hidden = true; code.value = ''; verify.disabled = true; identity.cancel(); }
+  function hideChallenge() { challenge.hidden = true; code.value = ''; code.removeAttribute('aria-invalid'); verify.disabled = true; identity.cancel(); }
   function setSignupMode(enabled) {
     signupMode = enabled;
     signupToggle.textContent = enabled ? 'Ya tengo una cuenta' : (mode === 'control' ? 'Crear cuenta de Control' : 'Crear cuenta de Empresas');
     login.querySelector('button[type="submit"]').textContent = enabled ? 'Registrarme' : 'Ingresar';
     $('password').autocomplete = enabled ? 'new-password' : 'current-password';
   }
+  function showEntry() {
+    showAuth();
+    refresh.hidden = true;
+    login.hidden = false;
+    googleLogin.hidden = false;
+    signupToggle.hidden = false;
+  }
+  function showFactors(factors, prompt) {
+    factor.replaceChildren();
+    for (const hint of factors) { const option = make('option', hint.label); option.value = hint.index; factor.append(option); }
+    code.value = ''; code.removeAttribute('aria-invalid'); verify.disabled = true;
+    login.hidden = true; googleLogin.hidden = true; signupToggle.hidden = true; refresh.hidden = true;
+    challenge.hidden = false; showAuth();
+    message(prompt);
+  }
   function showEnrollment() {
     const user = identity.currentUser();
     if (!user) return;
+    showAuth();
     onboarding.hidden = false;
     login.hidden = true; googleLogin.hidden = true; signupToggle.hidden = true;
     addGoogle.hidden = true; addPassword.hidden = true; linkedPasswordWrap.hidden = true;
@@ -130,10 +180,11 @@ export async function start() {
   }
   function fail(error) {
     clearData();
+    showAuth();
     refresh.hidden = !identity.currentUser();
     if (error.code === 'auth/email-already-in-use' && signupMode) {
-      // Registering an existing Firebase identity is not a recoverable signup.
-      // Return to sign-in without losing the entered email or granting access.
+      // Registrar una identidad de Firebase que ya existe no es un alta recuperable.
+      // Se vuelve al ingreso sin perder el correo ni conceder acceso.
       setSignupMode(false);
       $('password').value = '';
       login.hidden = false; googleLogin.hidden = false; signupToggle.hidden = false;
@@ -142,12 +193,12 @@ export async function start() {
       return;
     }
     if (error.code === 'STEP_UP_REQUIRED' && identity.currentUser()) {
-      showEnrollment(); message(friendlyError(error)); return;
+      showEnrollment(); message(friendlyError(error), 'error'); return;
     }
     onboarding.hidden = true; login.hidden = false; googleLogin.hidden = false; signupToggle.hidden = false;
     if (error.code === 'FORBIDDEN' && mode === 'control' && identity.currentUser()) {
-      message('El ingreso fue reconocido, pero faltan permisos de OGT Control. Revisá la autorización inicial del correo OWNER en la configuración privada de Contabo; no se asignan privilegios desde esta pantalla.');
-    } else if (error.code !== 'ABORTED') message(friendlyError(error));
+      message('El ingreso fue reconocido, pero faltan permisos de OGT Control. Revisá la autorización inicial del correo OWNER en la configuración privada de Contabo; no se asignan privilegios desde esta pantalla.', 'error');
+    } else if (error.code !== 'ABORTED') message(friendlyError(error), 'error');
   }
   function showLinkMethods() {
     const user = identity.currentUser();
@@ -163,24 +214,21 @@ export async function start() {
     confirmTotp.disabled = busy; addGoogle.disabled = busy; addPassword.disabled = busy;
     for (const element of login.elements) element.disabled = busy;
   }
-  function row(label, value) {
-    const p = make('p'), strong = make('strong', label + ': ');
-    p.append(strong, document.createTextNode(String(value ?? 'No informado'))); return p;
-  }
   function summaryRows(summary) {
     return mode === 'control'
       ? [['Usuarios activos', summary.users], ['Empresas', summary.companies], ['Empresas por verificar', summary.pendingCompanies], ['Denuncias pendientes', summary.openReports], ['Publicaciones visibles', summary.visiblePosts]]
-      : [['Empresa', summary.tradeName || summary.legalName], ['Estado', summary.verificationStatus], ['Campa\u00f1as', summary.campaigns], ['Campa\u00f1as activas', summary.activeCampaigns], ['Cupones emitidos', summary.issuedCoupons], ['Saldo en centavos', summary.balanceCents], ['Puntaje de impacto', summary.impactScore]];
+      : [['Empresa', summary.tradeName || summary.legalName], ['Estado', summary.verificationStatus], ['Campañas', summary.campaigns], ['Campañas activas', summary.activeCampaigns], ['Cupones emitidos', summary.issuedCoupons], ['Saldo en centavos', summary.balanceCents], ['Puntaje de impacto', summary.impactScore]];
   }
   async function checkAccess() {
     clearData(); const task = gate.next();
     logout.hidden = !identity.currentUser();
     refresh.hidden = !identity.currentUser();
     if (!identity.currentUser()) {
-      login.hidden = false; googleLogin.hidden = false; signupToggle.hidden = false;
+      showEntry();
       onboarding.hidden = true; addGoogle.hidden = true; addPassword.hidden = true; linkedPasswordWrap.hidden = true;
       message('El acceso requiere correo verificado, segundo factor y permisos expresos. Iniciá sesión o creá tu cuenta.'); return;
     }
+    showApp();
     message('Verificando identidad, segundo factor y permisos...');
     try {
       const token = await identity.token(); if (!task.current()) return;
@@ -188,36 +236,49 @@ export async function start() {
       if (!task.current()) return;
       access = permission;
       clearTimeout(expiry);
-      expiry = setTimeout(() => { hideChallenge(); fail(new CrmError('Sesi\u00f3n vencida.', 'STEP_UP_REQUIRED', 403)); }, Math.max(0, permission.stepUpValidUntilEpochSeconds * 1000 - Date.now()));
+      expiry = setTimeout(() => { hideChallenge(); fail(new CrmError('Sesión vencida.', 'STEP_UP_REQUIRED', 403)); }, Math.max(0, permission.stepUpValidUntilEpochSeconds * 1000 - Date.now()));
       let body = {}, route = 'platform/summary';
       if (mode === 'empresa') {
         if (!permission.companies.some(item => item.companyId === chosen)) chosen = permission.companies[0].companyId;
         body = { companyId: requireCompany(permission, chosen) }; route = 'company/summary';
       }
       const summary = await api(route, token, body, task.signal); if (!task.current()) return;
-      if (mode === 'empresa' && summary.companyId !== chosen) throw new CrmError('El servidor devolvi\u00f3 otra empresa. No se muestran sus datos.', 'TENANT_MISMATCH');
-      if (Date.now() / 1000 >= permission.stepUpValidUntilEpochSeconds) throw new CrmError('Sesi\u00f3n vencida.', 'STEP_UP_REQUIRED', 403);
+      if (mode === 'empresa' && summary.companyId !== chosen) throw new CrmError('El servidor devolvió otra empresa. No se muestran sus datos.', 'TENANT_MISMATCH');
+      if (Date.now() / 1000 >= permission.stepUpValidUntilEpochSeconds) throw new CrmError('Sesión vencida.', 'STEP_UP_REQUIRED', 403);
       login.hidden = true; challenge.hidden = true; googleLogin.hidden = true;
-      signupToggle.hidden = true; onboarding.hidden = true;
+      signupToggle.hidden = true; onboarding.hidden = true; refresh.hidden = false;
       showLinkMethods();
-      root.append(make('h2', mode === 'control' ? 'Resumen operativo' : 'Empresa autorizada'));
+      showApp();
+      let extra = null;
       if (mode === 'empresa') {
-        const select = make('select'); select.setAttribute('aria-label', 'Seleccionar empresa');
+        extra = make('div'); extra.className = 'crm-field crm-field-inline';
+        const caption = make('span', 'Empresa'); caption.className = 'crm-field-label';
+        const select = make('select'); select.className = 'crm-input crm-select'; select.setAttribute('aria-label', 'Seleccionar empresa');
         for (const grant of permission.companies) {
           const option = make('option', grant.companyId === chosen ? (summary.tradeName || summary.legalName) : grant.companyId + ' (' + grant.role + ')');
           option.value = grant.companyId; select.append(option);
         }
         select.value = chosen;
         select.addEventListener('change', () => { chosen = select.value; void checkAccess(); });
-        root.append(select);
+        extra.append(caption, select);
       }
-      for (const [name, value] of summaryRows(summary)) root.append(row(name, value));
-      message('Acceso autorizado. Datos obtenidos del servidor; sesi\u00f3n de administraci\u00f3n limitada a 15 minutos.');
+      const brand = document.querySelector('#crm-auth h1')?.textContent || '';
+      const lede = document.querySelector('#crm-auth .crm-lede')?.textContent || '';
+      // El shell no hace falta para pintar el ingreso: se pide recién con el resumen.
+      const { mountWorkspace } = await import('./crm-ui.js');
+      mountWorkspace(root, {
+        title: mode === 'control' ? 'Resumen operativo' : 'Empresa autorizada',
+        brand, lede,
+        rows: summaryRows(summary).map(([label, value]) => ({ label, value })),
+        sections: mode === 'control' ? controlSections : empresaSections,
+        extra,
+      });
+      message('Acceso autorizado. Datos obtenidos del servidor; sesión de administración limitada a 15 minutos.', 'ok');
     } catch (error) { if (task.current()) fail(error); }
   }
   login.addEventListener('submit', async event => {
     event.preventDefault(); if (identityBusy) return;
-    clearData(); hideChallenge(); setBusy(true); message('Iniciando sesi\u00f3n...');
+    clearData(); hideChallenge(); setBusy(true); message('Iniciando sesión...');
     const email = $('email').value.trim(), password = $('password').value; $('password').value = '';
     let complete = false;
     try {
@@ -226,12 +287,8 @@ export async function start() {
         try { await identity.sendVerification(); } catch (_) { /* the user can retry */ }
         setSignupMode(false);
       }
-      if (result.factors) {
-        factor.replaceChildren();
-        for (const hint of result.factors) { const option = make('option', hint.label); option.value = hint.index; factor.append(option); }
-        login.hidden = true; challenge.hidden = false;
-        message('Seleccion\u00e1 tu segundo factor y presion\u00e1 Usar este factor.');
-      } else complete = true;
+      if (result.factors) showFactors(result.factors, 'Seleccioná tu segundo factor y presioná Usar este factor.');
+      else complete = true;
     } catch (error) { fail(error); }
     finally { setBusy(false); }
     if (complete) await checkAccess(); else if (!challenge.hidden) factor.focus();
@@ -242,20 +299,13 @@ export async function start() {
   });
   googleLogin.addEventListener('click', async () => {
     if (identityBusy) return;
-    setSignupMode(false); // Google is always an existing-account sign-in, not a second registration.
+    setSignupMode(false); // Google es un ingreso de cuenta existente, no un segundo registro.
     clearData(); hideChallenge(); setBusy(true); message('Ingresando con Google...');
     let complete = false;
     try {
       const result = await identity.signInGoogle();
-      if (result.factors) {
-        factor.replaceChildren();
-        for (const hint of result.factors) {
-          const option = make('option', hint.label); option.value = hint.index; factor.append(option);
-        }
-        login.hidden = true; googleLogin.hidden = true; signupToggle.hidden = true;
-        challenge.hidden = false;
-        message('Seleccioná el segundo factor de tu cuenta Google.');
-      } else complete = true;
+      if (result.factors) showFactors(result.factors, 'Seleccioná el segundo factor de tu cuenta Google.');
+      else complete = true;
     } catch (error) { fail(error); }
     finally { setBusy(false); }
     if (complete) await checkAccess();
@@ -264,11 +314,11 @@ export async function start() {
     try {
       await identity.sendVerification();
       message('Enviamos el correo de verificación. Abrilo y después pulsá Ya verifiqué mi correo.');
-    } catch (error) { message(friendlyError(error)); }
+    } catch (error) { message(friendlyError(error), 'error'); }
   });
   reloadVerification.addEventListener('click', async () => {
     try { await identity.reloadCurrentUser(); void checkAccess(); }
-    catch (error) { message(friendlyError(error)); }
+    catch (error) { message(friendlyError(error), 'error'); }
   });
   beginTotp.addEventListener('click', async () => {
     try {
@@ -290,7 +340,7 @@ export async function start() {
       }
       totpCode.hidden = false; confirmTotp.hidden = false; beginTotp.hidden = true;
       message('2. Ingresá el código de seis dígitos que genera tu aplicación y pulsá Confirmar segundo factor.');
-    } catch (error) { message(friendlyError(error)); }
+    } catch (error) { message(friendlyError(error), 'error'); }
   });
   confirmTotp.addEventListener('click', async () => {
     if (identityBusy) return;
@@ -300,10 +350,9 @@ export async function start() {
       totpSecret.replaceChildren(); totpCode.value = ''; totpCode.hidden = true;
       confirmTotp.hidden = true;
       await identity.signOut();
-      onboarding.hidden = true; login.hidden = false; googleLogin.hidden = false;
-      signupToggle.hidden = false; logout.hidden = true;
+      onboarding.hidden = true; showEntry(); logout.hidden = true;
       message('Segundo factor configurado. Volvé a ingresar y verificá el código del autenticador para acceder.');
-    } catch (error) { message(friendlyError(error)); }
+    } catch (error) { message(friendlyError(error), 'error'); }
     finally { setBusy(false); }
   });
   addGoogle.addEventListener('click', async () => {
@@ -311,51 +360,59 @@ export async function start() {
     setBusy(true);
     try {
       await identity.linkGoogle(); showLinkMethods();
-      message('Google vinculado a esta misma cuenta. Tus permisos se conservaron.');
-    } catch (error) { message(friendlyError(error)); }
+      message('Google vinculado a esta misma cuenta. Tus permisos se conservaron.', 'ok');
+    } catch (error) { message(friendlyError(error), 'error'); }
     finally { setBusy(false); }
   });
   addPassword.addEventListener('click', async () => {
     if (identityBusy) return;
-    if (linkedPassword.value.length < 12) { message('Elegí una contraseña de al menos 12 caracteres.'); return; }
+    if (linkedPassword.value.length < 12) { message('Elegí una contraseña de al menos 12 caracteres.', 'error'); return; }
     const value = linkedPassword.value; linkedPassword.value = '';
     setBusy(true);
     try {
       await identity.linkPassword(value); showLinkMethods();
-      message('Contraseña activada en esta misma cuenta. Tus permisos se conservaron.');
-    } catch (error) { message(friendlyError(error)); }
+      message('Contraseña activada en esta misma cuenta. Tus permisos se conservaron.', 'ok');
+    } catch (error) { message(friendlyError(error), 'error'); }
     finally { setBusy(false); }
   });
-  factor.addEventListener('change', () => { code.value = ''; verify.disabled = true; message('Presion\u00e1 Usar este factor para confirmar la selecci\u00f3n.'); });
+  factor.addEventListener('change', () => { code.value = ''; code.removeAttribute('aria-invalid'); verify.disabled = true; message('Presioná Usar este factor para confirmar la selección.'); });
   begin.addEventListener('click', async () => {
-    if (identityBusy) return; code.value = ''; verify.disabled = true; setBusy(true);
+    if (identityBusy) return; code.value = ''; code.removeAttribute('aria-invalid'); verify.disabled = true; setBusy(true);
     try {
       const kind = await identity.beginFactor(Number(factor.value));
       verify.disabled = false;
-      message(kind === 'phone' ? 'SMS enviado. Ingres\u00e1 el c\u00f3digo recibido.' : 'Ingres\u00e1 el c\u00f3digo de tu aplicaci\u00f3n autenticadora.');
-    } catch (error) { message(friendlyError(error)); }
+      message(kind === 'phone' ? 'SMS enviado. Ingresá el código recibido.' : 'Ingresá el código de tu aplicación autenticadora.');
+    } catch (error) { message(friendlyError(error), 'error'); }
     finally { setBusy(false); if (!verify.disabled) code.focus(); }
   });
+  code.addEventListener('input', () => code.removeAttribute('aria-invalid'));
   challenge.addEventListener('submit', async event => {
     event.preventDefault(); if (identityBusy || verify.disabled) return; setBusy(true);
     const value = code.value.trim(); code.value = ''; let complete = false;
     try { await identity.verify(value); challenge.hidden = true; complete = true; }
-    catch (error) { message(friendlyError(error)); }
+    catch (error) {
+      code.setAttribute('aria-invalid', 'true');
+      message(friendlyError(error), 'error');
+    }
     finally { setBusy(false); }
     if (complete) await checkAccess();
   });
-  cancel.addEventListener('click', () => { if (identityBusy) return; clearData(); hideChallenge(); login.hidden = false; message('Ingres\u00e1 nuevamente.'); $('email').focus(); });
+  cancel.addEventListener('click', () => {
+    if (identityBusy) return;
+    clearData(); hideChallenge(); showEntry();
+    message('Ingresá nuevamente.'); $('email').focus();
+  });
   refresh.addEventListener('click', () => { if (!identityBusy) { hideChallenge(); void checkAccess(); } });
   logout.addEventListener('click', async () => {
     if (identityBusy) return; clearData(); hideChallenge(); setBusy(true);
     try {
       await identity.signOut();
-      logout.hidden = true; login.hidden = false; googleLogin.hidden = false; signupToggle.hidden = false;
+      logout.hidden = true; showEntry();
       refresh.hidden = true; setSignupMode(false);
       onboarding.hidden = true; addGoogle.hidden = true; addPassword.hidden = true; linkedPasswordWrap.hidden = true;
       message('Sesión cerrada.');
     }
-    catch (error) { login.hidden = false; message('Los datos se ocultaron, pero no se pudo cerrar la sesi\u00f3n. Prob\u00e1 nuevamente.'); }
+    catch (error) { showEntry(); message('Los datos se ocultaron, pero no se pudo cerrar la sesión. Probá nuevamente.', 'error'); }
     finally { setBusy(false); }
   });
   identity.subscribe(() => { if (!identityBusy) { hideChallenge(); void checkAccess(); } });

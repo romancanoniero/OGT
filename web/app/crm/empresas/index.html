@@ -1,1 +1,39 @@
-<!doctype html><html lang="es" data-crm="empresa"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>OGT Empresas — Acceso protegido</title><style>body{font:16px system-ui;margin:0;background:#fff;color:#111213}main{max-width:960px;margin:8vh auto;padding:32px;border:1px solid #e5e7eb;border-radius:18px}h1{margin:0 0 10px}p{line-height:1.5}input,button,select{padding:12px;border-radius:8px;border:1px solid #ccd1d5;font:inherit}button{background:#0d3d4d;color:#fff;cursor:pointer}form{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}#crm-root p{padding:8px;border-bottom:1px solid #eee}#crm-status{color:#405660}[hidden]{display:none!important}.crm-google-button{display:inline-flex;align-items:center;justify-content:center;gap:9px;vertical-align:middle}.crm-google-mark{width:20px;height:20px;flex:none;vertical-align:middle;margin-right:5px}.crm-google-button>.crm-google-mark{margin:0}.crm-password-wrap{position:relative;display:inline-flex;align-items:center;min-width:200px}.crm-password-wrap>input{min-width:0;width:100%;padding-right:48px}.crm-password-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:transparent;color:#354b59;border:0}.crm-password-eye svg{width:21px;height:21px;pointer-events:none}.crm-eye-slash{display:none}.crm-password-eye[aria-pressed=true] .crm-eye-slash{display:block}</style></head><body><main><h1>Only Good Things · Empresas</h1><p>Gestión empresarial con permisos por organización</p><p id="crm-status" role="status"></p><form id="crm-login" hidden><input id="email" type="email" placeholder="Correo" aria-label="Correo" required autocomplete="username"><input id="password" type="password" placeholder="Contraseña" aria-label="Contraseña" required autocomplete="current-password"><button type="submit">Ingresar</button></form><button id="crm-refresh">Verificar nuevamente</button><section id="crm-root"></section><p>Acceso obligatorio con correo verificado, verificación de dos pasos y permisos de la empresa. Podés iniciar sesión con <img src="/google-logo.svg" width="17" height="17" class="crm-google-mark" alt="">Google o contraseña vinculados a la misma cuenta.</p></main><script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script><script src="../crm.js"></script></body></html>
+<!doctype html>
+<html lang="es" data-crm="empresa">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>OGT Empresas — Acceso protegido</title>
+  <link rel="stylesheet" href="../crm.css">
+</head>
+<body data-crm-view="auth">
+  <div id="crm-auth" class="crm-auth">
+    <main class="crm-card crm-auth-card">
+      <header class="crm-auth-head">
+        <img class="crm-logo" src="../icons/ogt-logo.png" alt="" width="48" height="48">
+        <div>
+          <h1>Only Good Things · Empresas</h1>
+          <p class="crm-lede">Gestión empresarial con permisos por organización</p>
+        </div>
+      </header>
+      <p id="crm-status" class="crm-status" role="status"></p>
+      <form id="crm-login" class="crm-stack">
+        <label class="crm-field" for="email">
+          <span class="crm-field-label">Correo</span>
+          <input id="email" class="crm-input" type="email" placeholder="Correo" aria-label="Correo" required autocomplete="username">
+        </label>
+        <label class="crm-field" for="password">
+          <span class="crm-field-label">Contraseña</span>
+          <input id="password" class="crm-input" type="password" placeholder="Contraseña" aria-label="Contraseña" required autocomplete="current-password">
+        </label>
+        <button class="crm-btn crm-btn-primary" type="submit">Ingresar</button>
+      </form>
+      <button id="crm-refresh" class="crm-btn crm-btn-ghost" type="button">Verificar nuevamente</button>
+      <p class="crm-footnote">Acceso obligatorio con correo verificado, verificación de dos pasos y permisos de la empresa. Podés iniciar sesión con <img src="/google-logo.svg" width="17" height="17" class="crm-google-mark" alt="">Google o contraseña vinculados a la misma cuenta.</p>
+    </main>
+  </div>
+  <section id="crm-root"></section>
+  <script type="module" src="../crm.js"></script>
+</body>
+</html>
