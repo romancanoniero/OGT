@@ -64,6 +64,13 @@ export function friendlyError(error) {
   if (/operation-not-allowed/.test(code)) return 'El método elegido no está habilitado en Firebase Authentication de OGT. Revisá Google o correo y contraseña en Sign-in method.';
   if (/weak-password|password-does-not-meet-requirements/.test(code)) return 'La contraseña no cumple los requisitos de seguridad de Firebase. Elegí una clave más larga y segura.';
   if (/invalid-email/.test(code)) return 'El correo electrónico ingresado no es válido.';
+  if (/requires-recent-login|user-token-expired/.test(code)) return 'Tu identificación ya no es reciente. Cerrá sesión y volvé a ingresar antes de configurar el segundo factor.';
+  if (/unverified-email/.test(code) || code === 'EMAIL_NOT_VERIFIED') return 'Primero verificá tu dirección de correo con el enlace de Firebase y pulsá Ya verifiqué mi correo.';
+  if (/unsupported-first-factor/.test(code)) return 'Ese método de ingreso no admite un segundo factor en Firebase. Ingresá con Google o correo y contraseña.';
+  if (/second-factor-already-in-use|maximum-second-factor-count-exceeded/.test(code)) return 'Ya hay factores de seguridad configurados. Volvé a ingresar para verificar el existente.';
+  if (/invalid-multi-factor-session|missing-multi-factor-session/.test(code)) return 'La sesión de verificación venció. Cerrá sesión y volvé a iniciar el ingreso.';
+  if (code === 'TOTP_NOT_ENABLED' || code === 'TOTP_CONFIGURATION') return error.message;
+
   if (/account-exists-with-different-credential|credential-already-in-use/.test(code)) return 'La cuenta ya tiene otro método de ingreso. Accedé con el método original y después vinculá Google o la contraseña.';
   if (/popup-blocked|popup-closed-by-user|cancelled-popup-request/.test(code)) return 'No se pudo completar la ventana de Google. Permití ventanas emergentes y volvé a intentarlo.';
   if (/network-request-failed/.test(code)) return 'Firebase no respondió. Comprobá la conexión e intentá nuevamente.';
