@@ -254,7 +254,8 @@ export async function start() {
   });
   beginTotp.addEventListener('click', async () => {
     try {
-      const setup = await identity.startTotpEnrollment();
+      const generated = await identity.startTotpEnrollment();
+      const setup = typeof generated === 'string' ? {secretKey: generated} : generated;
       // The otpauth URI stays in the user's browser; never request QR images
       // from external servers with the private TOTP enrollment secret.
       totpSecret.replaceChildren();
