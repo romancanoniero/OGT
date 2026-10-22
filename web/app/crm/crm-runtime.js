@@ -205,7 +205,7 @@ export async function start() {
         try { await identity.sendVerification(); } catch (_) { /* the user can retry */ }
         signupMode = false;
         signupToggle.textContent = mode === 'control' ? 'Crear cuenta de Control' : 'Crear cuenta de Empresas';
-        login.querySelector('button').textContent = 'Ingresar';
+        login.querySelector('button[type="submit"]').textContent = 'Ingresar';
       }
       if (result.factors) {
         factor.replaceChildren();
@@ -220,7 +220,7 @@ export async function start() {
   signupToggle.addEventListener('click', () => {
     signupMode = !signupMode;
     signupToggle.textContent = signupMode ? 'Ya tengo una cuenta' : (mode === 'control' ? 'Crear cuenta de Control' : 'Crear cuenta de Empresas');
-    login.querySelector('button').textContent = signupMode ? 'Registrarme' : 'Ingresar';
+    login.querySelector('button[type="submit"]').textContent = signupMode ? 'Registrarme' : 'Ingresar';
     message(signupMode ? (mode === 'control' ? 'Creá tu cuenta. El primer administrador solo se autoriza desde el servidor.' : 'Creá una cuenta. Para ver datos de empresas necesitás una invitación y permisos de la organización.') : 'Ingresá con tu cuenta existente.');
   });
   googleLogin.addEventListener('click', async () => {
