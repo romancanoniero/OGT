@@ -139,6 +139,33 @@ class DeploymentSourceTests(unittest.TestCase):
     def test_server_validation_precedes_gradle(self):
         self.assertLess(self.deploy.index('python3 - env'), self.deploy.index('./gradlew'))
 
+    def test_gradle_release_ignores_inaccessible_global_external_cache(self):
+        # Execute the actual cache setup in a Linux test shell with an
+        # inherited Gradle cache path that must not be reused.
+        start = self.deploy.index('# Gradle may be configured globally')
+        end = self.deploy.index('# Compile fresh outputs OUTSIDE tracked', start)
+        setup = self.deploy[start:end]
+        with tempfile.TemporaryDirectory() as folder:
+            env = dict(os.environ)
+            env.update(HOME=folder, GRADLE_USER_HOME='/Volumes/DEV_MAC/IAN/caches/gradle')
+            env.pop('OGT_RELEASE_GRADLE_HOME', None)
+            result = subprocess.run(
+                ['bash', '-euo', 'pipefail', '-c',
+                 setup + '\\n' + 'printf "CHOSEN=%s\\n" "$GRADLE_USER_HOME"'],
+                env=env, text=True, capture_output=True, check=True,
+            )
+            expected = str(Path(folder) / '.cache' / 'ogt-release-gradle')
+            self.assertIn('CHOSEN=' + expected, result.stdout)
+            self.assertTrue(Path(expected).is_dir())
+            self.assertEqual(stat.S_IMODE(Path(expected).stat().st_mode), 0o700)
+            self.assertNotIn('/Volumes/DEV_MAC', result.stdout)
+
+    def test_gradle_release_cache_writable_probe_and_explicit_home(self):
+        self.assertIn('export GRADLE_USER_HOME=', self.deploy)
+        self.assertIn('mktemp "$GRADLE_USER_HOME/.ogt-write-test.XXXXXX"', self.deploy)
+        self.assertIn('./gradlew --gradle-user-home "$GRADLE_USER_HOME"', self.deploy)
+        self.assertNotIn('rm -rf "$GRADLE_USER_HOME"', self.deploy)
+
     def test_no_static_only_publish_in_wrapper(self):
         self.assertIn('bash scripts/deploy-ogt-vps.sh --deploy', self.mac)
         self.assertNotIn('rsync -', self.mac)
