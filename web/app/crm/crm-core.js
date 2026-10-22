@@ -60,6 +60,14 @@ export function createApi(fetcher, timeoutMs = 15000) {
 }
 export function friendlyError(error) {
   const code = String(error?.code || '');
+  if (/email-already-in-use/.test(code)) return 'Ya existe una cuenta con ese correo. Ingresá con Google o con tu contraseña; no crees otra cuenta de administrador.';
+  if (/operation-not-allowed/.test(code)) return 'El registro con correo y contraseña no está habilitado en Firebase Authentication de OGT. Usá Ingresar con Google o habilitá ese método en Firebase.';
+  if (/weak-password|password-does-not-meet-requirements/.test(code)) return 'La contraseña no cumple los requisitos de seguridad de Firebase. Elegí una clave más larga y segura.';
+  if (/invalid-email/.test(code)) return 'El correo electrónico ingresado no es válido.';
+  if (/account-exists-with-different-credential|credential-already-in-use/.test(code)) return 'La cuenta ya tiene otro método de ingreso. Accedé con el método original y después vinculá Google o la contraseña.';
+  if (/popup-blocked|popup-closed-by-user|cancelled-popup-request/.test(code)) return 'No se pudo completar la ventana de Google. Permití ventanas emergentes y volvé a intentarlo.';
+  if (/network-request-failed/.test(code)) return 'Firebase no respondió. Comprobá la conexión e intentá nuevamente.';
+  if (/user-disabled/.test(code)) return 'La cuenta está deshabilitada. Contactá a la administración.';
   if (code === 'STEP_UP_REQUIRED' || /segundo factor/i.test(error?.message || '')) return 'Necesit\u00e1s correo verificado y un nuevo ingreso con segundo factor. Renovar el token no renueva la autenticaci\u00f3n.';
   if (/invalid-credential|wrong-password|user-not-found/.test(code)) return 'Correo o contrase\u00f1a incorrectos.';
   if (/invalid-verification-code|invalid-totp-code/.test(code)) return 'El c\u00f3digo no es v\u00e1lido. Prob\u00e1 nuevamente.';
