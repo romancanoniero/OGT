@@ -11,6 +11,33 @@ export async function start() {
   const refresh = $('crm-refresh');
   const logout = make('button', 'Cerrar sesi\u00f3n'); logout.type = 'button'; logout.hidden = true;
   refresh.insertAdjacentElement('afterend', logout);
+  let signupMode = false;
+  const googleLogin = make('button', 'Ingresar con Google');
+  googleLogin.id = 'crm-google-login'; googleLogin.type = 'button';
+  login.insertAdjacentElement('afterend', googleLogin);
+  const signupToggle = make('button', 'Crear cuenta de Control');
+  signupToggle.id = 'crm-signup-toggle'; signupToggle.type = 'button';
+  googleLogin.insertAdjacentElement('afterend', signupToggle);
+  const onboarding = make('section'); onboarding.id = 'crm-onboarding'; onboarding.hidden = true;
+  const onboardingText = make('p');
+  const sendVerification = make('button', 'Enviar correo de verificación'); sendVerification.type = 'button';
+  const reloadVerification = make('button', 'Ya verifiqué mi correo'); reloadVerification.type = 'button';
+  const beginTotp = make('button', 'Configurar aplicación autenticadora'); beginTotp.type = 'button';
+  const totpSecret = make('p');
+  const totpCode = make('input'); totpCode.setAttribute('aria-label', 'Código del autenticador');
+  totpCode.inputMode = 'numeric'; totpCode.maxLength = 6; totpCode.autocomplete = 'one-time-code';
+  totpCode.placeholder = 'Código de seis dígitos'; totpCode.hidden = true;
+  const confirmTotp = make('button', 'Confirmar segundo factor'); confirmTotp.type = 'button'; confirmTotp.hidden = true;
+  onboarding.append(onboardingText, sendVerification, reloadVerification, beginTotp, totpSecret, totpCode, confirmTotp);
+  signupToggle.insertAdjacentElement('afterend', onboarding);
+  const addGoogle = make('button', 'Vincular Google a esta cuenta'); addGoogle.type = 'button'; addGoogle.hidden = true;
+  const addPassword = make('button', 'Activar contraseña en esta cuenta'); addPassword.type = 'button'; addPassword.hidden = true;
+  const linkedPassword = make('input'); linkedPassword.type = 'password'; linkedPassword.autocomplete = 'new-password';
+  linkedPassword.setAttribute('aria-label', 'Nueva contraseña para OGT Control');
+  linkedPassword.placeholder = 'Nueva contraseña (mínimo 12 caracteres)'; linkedPassword.hidden = true;
+  logout.insertAdjacentElement('afterend', addGoogle);
+  addGoogle.insertAdjacentElement('afterend', linkedPassword);
+  linkedPassword.insertAdjacentElement('afterend', addPassword);
   const challenge = make('form'); challenge.hidden = true; challenge.id = 'crm-mfa';
   const fields = make('fieldset'), legend = make('legend', 'Verificaci\u00f3n en dos pasos');
   fields.append(legend);
@@ -36,9 +63,43 @@ export async function start() {
   const identity = createIdentity(sdk, auth, () => new sdk.RecaptchaVerifier(auth, 'crm-recaptcha', { size: 'normal' }));
   function clearData() { gate.reset(); clearTimeout(expiry); expiry = null; root.replaceChildren(); access = null; }
   function hideChallenge() { challenge.hidden = true; code.value = ''; verify.disabled = true; identity.cancel(); }
-  function fail(error) { clearData(); login.hidden = false; if (error.code !== 'ABORTED') message(friendlyError(error)); }
+  function showEnrollment() {
+    const user = identity.currentUser();
+    if (!user) return;
+    onboarding.hidden = false;
+    login.hidden = true; googleLogin.hidden = true; signupToggle.hidden = true;
+    addGoogle.hidden = true; addPassword.hidden = true; linkedPassword.hidden = true;
+    logout.hidden = false;
+    const verified = !!user.emailVerified, hasFactor = identity.hasSecondFactor();
+    sendVerification.hidden = verified; reloadVerification.hidden = verified;
+    beginTotp.hidden = !verified || hasFactor;
+    totpSecret.textContent = ''; totpCode.value = ''; totpCode.hidden = true; confirmTotp.hidden = true;
+    onboardingText.textContent = !verified
+      ? 'Verificá tu correo electrónico antes de configurar el segundo factor.'
+      : !hasFactor
+        ? 'Para activar Control necesitás un segundo factor. Configurá una aplicación autenticadora.'
+        : 'Ya tenés un segundo factor. Cerrá sesión y volvé a ingresar con Google o contraseña para completar la verificación.';
+  }
+  function fail(error) {
+    clearData();
+    if (error.code === 'STEP_UP_REQUIRED' && identity.currentUser()) {
+      showEnrollment(); message(friendlyError(error)); return;
+    }
+    onboarding.hidden = true; login.hidden = false; googleLogin.hidden = false; signupToggle.hidden = false;
+    if (error.code !== 'ABORTED') message(friendlyError(error));
+  }
+  function showLinkMethods() {
+    const user = identity.currentUser();
+    const providers = new Set(user?.providerData?.map(p => p.providerId) || []);
+    addGoogle.hidden = !user || providers.has('google.com');
+    linkedPassword.hidden = !user || providers.has('password');
+    addPassword.hidden = linkedPassword.hidden;
+  }
   function setBusy(busy) {
     identityBusy = busy; fields.disabled = busy; refresh.disabled = busy; logout.disabled = busy;
+    googleLogin.disabled = busy; signupToggle.disabled = busy;
+    sendVerification.disabled = busy; reloadVerification.disabled = busy; beginTotp.disabled = busy;
+    confirmTotp.disabled = busy; addGoogle.disabled = busy; addPassword.disabled = busy;
     for (const element of login.elements) element.disabled = busy;
   }
   function row(label, value) {
@@ -53,7 +114,11 @@ export async function start() {
   async function checkAccess() {
     clearData(); const task = gate.next();
     logout.hidden = !identity.currentUser();
-    if (!identity.currentUser()) { login.hidden = false; message('Inici\u00e1 sesi\u00f3n para acceder al CRM.'); return; }
+    if (!identity.currentUser()) {
+      login.hidden = false; googleLogin.hidden = false; signupToggle.hidden = false;
+      onboarding.hidden = true; addGoogle.hidden = true; addPassword.hidden = true; linkedPassword.hidden = true;
+      message('Iniciá sesión o creá tu cuenta para acceder al CRM.'); return;
+    }
     message('Verificando identidad, segundo factor y permisos...');
     try {
       const token = await identity.token(); if (!task.current()) return;
@@ -70,7 +135,9 @@ export async function start() {
       const summary = await api(route, token, body, task.signal); if (!task.current()) return;
       if (mode === 'empresa' && summary.companyId !== chosen) throw new CrmError('El servidor devolvi\u00f3 otra empresa. No se muestran sus datos.', 'TENANT_MISMATCH');
       if (Date.now() / 1000 >= permission.stepUpValidUntilEpochSeconds) throw new CrmError('Sesi\u00f3n vencida.', 'STEP_UP_REQUIRED', 403);
-      login.hidden = true; challenge.hidden = true;
+      login.hidden = true; challenge.hidden = true; googleLogin.hidden = true;
+      signupToggle.hidden = true; onboarding.hidden = true;
+      showLinkMethods();
       root.append(make('h2', mode === 'control' ? 'Resumen operativo' : 'Empresa autorizada'));
       if (mode === 'empresa') {
         const select = make('select'); select.setAttribute('aria-label', 'Seleccionar empresa');
@@ -92,7 +159,13 @@ export async function start() {
     const email = $('email').value.trim(), password = $('password').value; $('password').value = '';
     let complete = false;
     try {
-      const result = await identity.signIn(email, password);
+      const result = signupMode ? await identity.register(email, password) : await identity.signIn(email, password);
+      if (signupMode) {
+        try { await identity.sendVerification(); } catch (_) { /* the user can retry */ }
+        signupMode = false;
+        signupToggle.textContent = 'Crear cuenta de Control';
+        login.querySelector('button').textContent = 'Ingresar';
+      }
       if (result.factors) {
         factor.replaceChildren();
         for (const hint of result.factors) { const option = make('option', hint.label); option.value = hint.index; factor.append(option); }
