@@ -128,6 +128,8 @@ export async function start() {
   const cancel = make('button', 'Volver al ingreso'); cancel.type = 'button'; cancel.className = 'crm-btn crm-btn-ghost';
   fields.append(factorLabel, begin, recaptcha, codeLabel, verify, cancel);
   challenge.append(fields); login.insertAdjacentElement('afterend', challenge);
+  // El shell viaja en paralelo con Firebase. El ingreso no lo espera para pintar.
+  const workspaceReady = import('./crm-ui.js');
   const [appSdk, sdk] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),
@@ -264,8 +266,7 @@ export async function start() {
       }
       const brand = document.querySelector('#crm-auth h1')?.textContent || '';
       const lede = document.querySelector('#crm-auth .crm-lede')?.textContent || '';
-      // El shell no hace falta para pintar el ingreso: se pide recién con el resumen.
-      const { mountWorkspace } = await import('./crm-ui.js');
+      const { mountWorkspace } = await workspaceReady;
       mountWorkspace(root, {
         title: mode === 'control' ? 'Resumen operativo' : 'Empresa autorizada',
         brand, lede,
