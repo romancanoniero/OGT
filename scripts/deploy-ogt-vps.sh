@@ -23,23 +23,42 @@ if [ "$MODE" = --check ]; then
   exit 0
 fi
 for tool in java rsync ssh tar; do command -v "$tool" >/dev/null; done
-SDK="${OGT_DB_KMP_SDK_PATH:-/Users/romancanoniero/AndroidStudioProjects/db-kmp-sdk}"
+SDK="${OGT_DB_KMP_SDK_PATH:-$HOME/AndroidStudioProjects/db-kmp-sdk}"
 test -f "$SDK/settings.gradle.kts" || { echo 'Set OGT_DB_KMP_SDK_PATH to the existing private db-kmp-sdk checkout' >&2; exit 1; }
 SDK_SHA="$(git -C "$SDK" rev-parse HEAD)"
 test -z "$(git -C "$SDK" status --porcelain)" || { echo 'Commit the SDK changes before release' >&2; exit 1; }
-# No -x test and no reuse of an unverified static bundle.
-./gradlew "-Pogt.dbKmpSdkPath=$SDK" :backend:test :shared:jvmTest :backend:installDist :shared:syncWebSdk --no-daemon
-# Building may create ignored SDK output, but must not alter tracked source.
+HOST="${OGT_VPS_HOST:-iankmp-vps}"
+[[ "$HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]] || { echo 'Use a configured SSH alias, not a shell expression' >&2; exit 1; }
+SSH=(ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15)
+# Check server prerequisites BEFORE spending time on the build. These reads do not deploy.
+"${SSH[@]}" "$HOST" 'test -f "$HOME/ogt/.env" && test -f "$HOME/ogt/docker-compose.yml"'
+"${SSH[@]}" "$HOST" 'python3 - env "$HOME/ogt/.env"' < scripts/release_guard.py
+# Compile fresh outputs OUTSIDE tracked web/app. syncWebSdk writes to tracked files
+# and would make the subsequent source-integrity check reject a legitimate build.
+./gradlew "-Pogt.dbKmpSdkPath=$SDK" :backend:clean :shared:clean :backend:test :shared:jvmTest :backend:installDist :shared:jsBrowserProductionWebpack --no-daemon
+# Building may create ignored output, but must not alter application or SDK source.
 git diff --exit-code --quiet
 git diff --cached --exit-code --quiet
+git -C "$SDK" diff --exit-code --quiet
+git -C "$SDK" diff --cached --exit-code --quiet
 DIST="$ROOT/backend/build/install/backend"
+BUNDLE="$ROOT/shared/build/kotlin-webpack/js/productionExecutable"
 test -x "$DIST/bin/backend"
-test -s web/app/ogt-sdk.js
+test -s "$BUNDLE/ogt-sdk.js"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$WORK/release/database/migrations" "$WORK/release/scripts"
 cp -R "$DIST" "$WORK/release/backend-dist"
 cp -R web/app "$WORK/release/web-app"
+# Match syncWebSdk's artifact selection, but only in the temporary release package.
+rm -f "$WORK/release/web-app/ogt-sdk.js" "$WORK/release/web-app/ogt-sdk.js.LICENSE.txt"
+for artifact in "$BUNDLE"/*.js "$BUNDLE/ogt-sdk.js.LICENSE.txt"; do
+  test -f "$artifact" || continue
+  name="$(basename "$artifact")"
+  case "$name" in app.js|auth.js|bootstrap.js) echo 'SDK artifact collides with application code' >&2; exit 1;; esac
+  cp "$artifact" "$WORK/release/web-app/$name"
+done
+test -s "$WORK/release/web-app/ogt-sdk.js"
 cp deploy/vps/Dockerfile deploy/vps/docker-compose.yml "$WORK/release/"
 cp web/app/nginx.conf "$WORK/release/web-nginx.conf"
 # Existing application schema is a prerequisite; never replay demo seed migrations.
@@ -48,12 +67,7 @@ cp scripts/release_guard.py scripts/activate-ogt-release.sh "$WORK/release/scrip
 printf '{"sdkCommit":"%s"}\n' "$SDK_SHA" > "$WORK/release/build-inputs.json"
 python3 scripts/release_guard.py manifest "$WORK/release" "$SHA"
 python3 scripts/release_guard.py verify "$WORK/release" "$SHA"
-HOST="${OGT_VPS_HOST:-iankmp-vps}"
-[[ "$HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]] || { echo 'Use a configured SSH alias, not a shell expression' >&2; exit 1; }
 ID="$SHA-$(date -u +%Y%m%dT%H%M%SZ)"
-SSH=(ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15)
-# First check is read-only. The existing installation and credentials must exist.
-"${SSH[@]}" "$HOST" 'test -f "$HOME/ogt/.env" && test -f "$HOME/ogt/docker-compose.yml"'
 "${SSH[@]}" "$HOST" "mkdir -p ogt/releases/$ID"
 rsync -az -e 'ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15' "$WORK/release/" "$HOST:ogt/releases/$ID/"
 "${SSH[@]}" "$HOST" "bash ogt/releases/$ID/scripts/activate-ogt-release.sh $ID $SHA"

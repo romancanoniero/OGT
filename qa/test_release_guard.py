@@ -118,7 +118,8 @@ class DeploymentContractTests(unittest.TestCase):
     def test_local_default_cannot_publish(self):
         source = (ROOT / 'scripts/deploy-ogt-vps.sh').read_text()
         self.assertIn('MODE="${1:---check}"', source)
-        self.assertIn(':backend:test :shared:jvmTest :backend:installDist :shared:syncWebSdk', source)
+        self.assertIn(':backend:test :shared:jvmTest :backend:installDist :shared:jsBrowserProductionWebpack', source)
+        self.assertNotIn(':shared:syncWebSdk', source)
         self.assertNotIn('StrictHostKeyChecking=no', source)
 
 
