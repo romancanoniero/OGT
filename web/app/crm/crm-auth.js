@@ -61,17 +61,29 @@ export function createIdentity(sdk, auth, makeRecaptcha) {
       await sdk.sendEmailVerification(auth.currentUser);
     },
     async startTotpEnrollment() {
-      if (!auth.currentUser?.email) throw new CrmError('Se requiere una cuenta con correo.', 'UNAUTHENTICATED');
-      if (!auth.currentUser.emailVerified) throw new CrmError('Verificá primero tu correo.', 'EMAIL_NOT_VERIFIED');
-      const session = await sdk.multiFactor(auth.currentUser).getSession();
+      const user = auth.currentUser;
+      if (!user?.email) throw new CrmError('Se requiere una cuenta con correo.', 'UNAUTHENTICATED');
+      // Reload first: a newly verified email remains false in the local SDK user
+      // until refreshed, causing repeated "verify email" dead ends.
+      await sdk.reload(user);
+      if (auth.currentUser?.uid !== user.uid) throw new CrmError('La sesión cambió. Ingresá de nuevo.', 'ABORTED');
+      if (!user.emailVerified) throw new CrmError('Verificá primero tu correo y pulsá Ya verifiqué.', 'EMAIL_NOT_VERIFIED');
+      if (sdk.multiFactor(user).enrolledFactors.length) throw new CrmError('Ya existe un segundo factor. Ingresá de nuevo para verificarlo.', 'ALREADY_ENROLLED');
+      enrollmentSecret = null;
+      const session = await sdk.multiFactor(user).getSession();
       enrollmentSecret = await sdk.TotpMultiFactorGenerator.generateSecret(session);
-      return enrollmentSecret.secretKey;
+      if (!enrollmentSecret?.secretKey || typeof enrollmentSecret.generateQrCodeUrl !== 'function')
+        throw new CrmError('Firebase no devolvió un secreto TOTP válido.', 'TOTP_CONFIGURATION');
+      return {
+        secretKey: enrollmentSecret.secretKey,
+        qrCodeUrl: enrollmentSecret.generateQrCodeUrl(user.email, 'Only Good Things'),
+      };
     },
     async confirmTotpEnrollment(code) {
       if (!auth.currentUser || !enrollmentSecret || !/^\d{6}$/.test(code))
         throw new CrmError('Generá la clave e ingresá seis dígitos.', 'INVALID_CODE');
       const assertion = sdk.TotpMultiFactorGenerator.assertionForEnrollment(enrollmentSecret, code);
-      await sdk.multiFactor(auth.currentUser).enroll(assertion, 'OGT Control');
+      await sdk.multiFactor(auth.currentUser).enroll(assertion, 'OGT CRM');
       enrollmentSecret = null;
     },
     hasSecondFactor() {
