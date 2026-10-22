@@ -1,6 +1,8 @@
 """Local helper tests only: these do not connect to Contabo or compile Kotlin."""
 import importlib.util
 import os
+import re
+import subprocess
 import stat
 import tempfile
 import unittest
@@ -154,6 +156,27 @@ class DeploymentSourceTests(unittest.TestCase):
     def test_wrapper_rejects_jump_host_inference(self):
         self.assertIn('proxyjump', self.mac)
         self.assertIn('proxycommand', self.mac)
+
+    def test_remote_ssh_peer_probe_executes_without_losing_quotes(self):
+        # Exercise the exact shell passed to the remote SSH session. A prior
+        # Python one-liner lost its quotes and blocked the real deployment.
+        match = re.search(
+            r"ACTUAL_SERVER=.*?'(set -- \$SSH_CONNECTION;[^']+)'",
+            self.mac,
+        )
+        self.assertIsNotNone(match, 'Remote SSH peer command is missing')
+        script = match.group(1)
+        for connection, expected in [
+            ('198.51.100.5 54321 217.216.82.209 22', '217.216.82.209'),
+            ('198.51.100.5 54321', ''),
+        ]:
+            with self.subTest(connection=connection):
+                env = {**os.environ, 'SSH_CONNECTION': connection}
+                result = subprocess.run(
+                    ['sh', '-c', script], env=env, capture_output=True,
+                    text=True, check=True,
+                )
+                self.assertEqual(result.stdout.strip(), expected)
 
 
 if __name__ == '__main__':
