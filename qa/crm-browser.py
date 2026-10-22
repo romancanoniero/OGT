@@ -157,11 +157,22 @@ with sync_playwright() as pw:
     page.locator('#email').fill('fixture@example.test')
     page.locator('#password').fill('valid-example-password')
     page.get_by_role('button',name='Registrarme').click()
-    expect(page.locator('#crm-status')).to_contain_text('Ya existe una cuenta')
+    expect(page.locator('#crm-status')).to_contain_text('ya tiene una cuenta')
     expect(page.locator('#crm-root')).to_be_empty()
+    expect(page.get_by_role('button',name='Ingresar',exact=True)).to_be_visible()
+    expect(page.get_by_role('button',name='Crear cuenta de Control')).to_be_visible()
+    expect(page.locator('#crm-refresh')).to_be_hidden()
+    assert page.locator('#email').input_value()=='fixture@example.test'
+    assert page.locator('#password').input_value()==''
+    page.get_by_role('button',name='Ingresar con Google').click()
+    expect(page.locator('#crm-mfa')).to_be_visible()
+    page.get_by_role('button',name='Usar este factor').click()
+    page.locator('#crm-code').fill('123456')
+    page.get_by_role('button',name='Verificar e ingresar').click()
+    expect(page.locator('#crm-root')).to_contain_text('Usuarios activos: 17')
     assert not errors,errors
     context.close()
-    results.append('Existing registration gets actionable Firebase error and no privilege')
+    results.append('Existing account signup switches to login; Google MFA authenticates securely')
 
     context=browser.new_context()
     page=context.new_page()
