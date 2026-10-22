@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Borrar cuenta — Only Good Things</title>
+  <style>
+    body{font-family:system-ui,sans-serif;background:#F4F5F7;color:#111213;margin:0;padding:32px 20px}
+    main{max-width:720px;margin:0 auto;background:#fff;border:1px solid #E4E6EA;border-radius:20px;padding:28px 24px 36px;line-height:1.55}
+    h1{font-size:1.7rem;margin:0 0 8px}
+    h2{font-size:1.15rem;margin:28px 0 8px}
+    p,li{color:#243038}
+    .meta{color:#5B6570;margin-top:0}
+    a{color:#0B6B4A}
+    label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;margin-top:16px}
+    input{font:inherit;font-weight:400;color:#111213;background:#F4F5F7;border:1px solid #E4E6EA;border-radius:10px;padding:12px 14px}
+    button{margin-top:16px;background:#BA1A1A;color:#fff;border:0;border-radius:10px;padding:12px 16px;font-weight:600;font:inherit;cursor:pointer}
+    button[disabled]{background:#E4E6EA;color:#5B6570;cursor:default}
+    .err{color:#BA1A1A;font-weight:600}
+    ul{padding-left:1.2rem}
+    li{margin:4px 0}
+  </style>
+</head>
+<body>
+<main>
+  <h1>Borrar la cuenta</h1>
+  <p class="meta">Only Good Things (OGT) · <a href="privacy.html">Privacidad</a> · <a href="terms.html">Términos</a></p>
+  <p>La baja borra la cuenta de OGT y el contenido cuyo autor es esa cuenta: publicaciones, comentarios y el resto de lo que hayas cargado. No queda visible ni atribuido a un nombre vacío.</p>
+  <h2>Qué no se borra</h2>
+  <ul>
+    <li>La copia que otro vecino ya tenga en su chat o en una exportación.</li>
+    <li>Una captura que alguien haya guardado en su teléfono.</li>
+    <li>Un resguardo técnico corto, por seguridad.</li>
+    <li>Lo que haya que conservar si existe un reclamo, una denuncia o un pedido de autoridad.</li>
+  </ul>
+  <p>Esos restos no se reutilizan. El ingreso de Firebase no se borra con este paso: sigue existiendo hasta que lo des de baja en Google. Si volvés a entrar con el mismo acceso, se abre un perfil vacío. No vuelven los datos viejos.</p>
+  <p>En la app: Ajustes, Borrar cuenta, y escribí BAJA.</p>
+
+  <p id="done" hidden>La cuenta de OGT quedó borrada. Tus publicaciones ya no están en el barrio. Si también querés cerrar el ingreso, borralo desde la cuenta de Google o Firebase con la que entrabas.</p>
+
+  <div id="gate">
+    <p>Para hacerlo desde esta página, entrá con el mismo correo, teléfono o Google de la app. Después volvés acá.</p>
+    <p><a href="/#/entrar" id="go-login">Entrar y volver a esta página</a></p>
+  </div>
+
+  <form id="delete-form" hidden>
+    <label>Escribí BAJA para confirmar
+      <input id="confirm" name="confirm" type="text" autocomplete="off" maxlength="8" placeholder="BAJA" spellcheck="false">
+    </label>
+    <button type="submit" id="delete-btn" disabled>Borrar mi cuenta</button>
+    <p class="err" id="delete-err" hidden></p>
+  </form>
+</main>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="/auth.js?v=google-home"></script>
+<script>
+(function () {
+  const done = document.getElementById("done");
+  const gate = document.getElementById("gate");
+  const form = document.getElementById("delete-form");
+  const err = document.getElementById("delete-err");
+  const input = document.getElementById("confirm");
+  const btn = document.getElementById("delete-btn");
+  if (new URLSearchParams(location.search).get("hecha") === "1") {
+    done.hidden = false;
+    gate.hidden = true;
+    form.hidden = true;
+    return;
+  }
+  document.getElementById("go-login").addEventListener("click", function () {
+    sessionStorage.setItem("ogt.returnTo", "borrar-cuenta");
+  });
+  input.addEventListener("input", function () {
+    input.value = input.value.toUpperCase().slice(0, 8);
+    btn.disabled = input.value !== "BAJA";
+  });
+  form.addEventListener("submit", async function (ev) {
+    ev.preventDefault();
+    if (input.value !== "BAJA") return;
+    btn.disabled = true;
+    btn.textContent = "Borrando…";
+    err.hidden = true;
+    try {
+      const bearer = window.OgtAuth ? await window.OgtAuth.getToken() : "";
+      if (!bearer) throw new Error("Entrá con tu cuenta para borrarla");
+      const res = await fetch("/api/v1/account/delete", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + bearer,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ confirm: "BAJA" }),
+      });
+      let json = {};
+      try { json = await res.json(); } catch (_) { json = {}; }
+      if (!json.success) throw new Error(json.message || "No se pudo borrar la cuenta");
+      if (window.OgtAuth) await window.OgtAuth.signOut();
+      location.replace("/borrar-cuenta?hecha=1");
+    } catch (e) {
+      err.textContent = (e && e.message) || "No se pudo borrar la cuenta";
+      err.hidden = false;
+      btn.disabled = input.value !== "BAJA";
+      btn.textContent = "Borrar mi cuenta";
+    }
+  });
+  Promise.resolve(window.OgtAuth && window.OgtAuth.ready).then(async function () {
+    const ok = window.OgtAuth ? await window.OgtAuth.ensureSession() : false;
+    gate.hidden = !!ok;
+    form.hidden = !ok;
+  }).catch(function () {
+    gate.hidden = false;
+    form.hidden = true;
+  });
+})();
+</script>
+</body>
+</html>

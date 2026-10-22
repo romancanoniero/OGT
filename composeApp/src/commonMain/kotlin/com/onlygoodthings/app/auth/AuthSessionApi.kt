@@ -10,6 +10,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 
@@ -44,4 +45,15 @@ class AuthSessionApi(private val session: SessionStore) {
             }.body()
         response.success
     }.getOrDefault(false)
+
+    /** Baja de la propia cuenta. El servidor exige confirm = BAJA y borra el contenido de esa autoría. */
+    suspend fun deleteAccount() {
+        val token = session.firebaseJwt ?: error("Iniciá sesión para borrar la cuenta")
+        val response: ApiResponse<JsonObject> = client.post("${session.apiBaseUrl}/api/v1/account/delete") {
+            contentType(ContentType.Application.Json)
+            header("Authorization", "Bearer $token")
+            setBody(buildJsonObject { put("confirm", JsonPrimitive("BAJA")) })
+        }.body()
+        if (!response.success) error(response.message ?: "No se pudo borrar la cuenta")
+    }
 }
