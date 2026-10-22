@@ -16,7 +16,7 @@ export const getIdToken=async()=> 'fixture-token';
 export const signInWithEmailAndPassword=async()=>{if(window.testEnroll){auth.currentUser={uid:'fixture',email:'fixture@example.test',emailVerified:true,providerData:[],enrolledFactors:[]};listeners.forEach(f=>f());return {user:auth.currentUser};}throw {code:'auth/multi-factor-auth-required'};};
 export class GoogleAuthProvider{addScope(){}}
 export const signInWithPopup=async()=>{throw {code:'auth/multi-factor-auth-required'};};
-export const createUserWithEmailAndPassword=async(a,e,p)=>{auth.currentUser={uid:'fixture',email:e,emailVerified:false,providerData:[],enrolledFactors:[]};listeners.forEach(f=>f());return {user:auth.currentUser};};
+export const createUserWithEmailAndPassword=async(a,e,p)=>{if(window.testRegistrationError)throw {code:window.testRegistrationError};auth.currentUser={uid:'fixture',email:e,emailVerified:false,providerData:[],enrolledFactors:[]};listeners.forEach(f=>f());return {user:auth.currentUser};};
 export const multiFactor=user=>({enrolledFactors:user.enrolledFactors||[],getSession:async()=> 'new-mfa-session',enroll:async()=>{user.enrolledFactors=[{factorId:'totp'}];}});
 export const sendEmailVerification=async()=>{};
 export const reload=async()=>{};
@@ -151,5 +151,34 @@ with sync_playwright() as pw:
         assert not errors,errors
         context.close()
         results.append(mode+' Google logo and accessible eye toggle')
+    context,page,state,errors=session('control')
+    page.evaluate("window.testRegistrationError='auth/email-already-in-use'")
+    page.get_by_role('button',name='Crear cuenta de Control').click()
+    page.locator('#email').fill('fixture@example.test')
+    page.locator('#password').fill('valid-example-password')
+    page.get_by_role('button',name='Registrarme').click()
+    expect(page.locator('#crm-status')).to_contain_text('Ya existe una cuenta')
+    expect(page.locator('#crm-root')).to_be_empty()
+    assert not errors,errors
+    context.close()
+    results.append('Existing registration gets actionable Firebase error and no privilege')
+
+    context=browser.new_context()
+    page=context.new_page()
+    page.set_content('<div id="auth-root"><label>Clave<input id="public-secret" type="password" autocomplete="current-password"></label></div>')
+    source=(ROOT/'web/app/app.js').read_text()
+    start=source.index('function enablePasswordVisibility(')
+    stop=source.index('function paintAuth(',start)
+    snippet=source[start:stop]
+    page.evaluate('() => { '+snippet+' enablePasswordVisibility(document.getElementById("auth-root")); }')
+    eye=page.locator('#auth-root .auth-password-toggle')
+    expect(eye).to_have_attribute('aria-label','Mostrar contraseña')
+    eye.click()
+    expect(page.locator('#public-secret')).to_have_attribute('type','text')
+    expect(eye).to_have_attribute('aria-label','Ocultar contraseña')
+    eye.click()
+    expect(page.locator('#public-secret')).to_have_attribute('type','password')
+    context.close()
+    results.append('Public login and signup shared password eye control')
     browser.close()
 print(json.dumps({'passed':len(results),'scenarios':results,'identityAndApi':'mocked; not real Firebase or Contabo'},ensure_ascii=True,indent=2))
