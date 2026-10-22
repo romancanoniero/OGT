@@ -79,6 +79,10 @@
     }
     if (code.includes("operation-not-allowed")) return "Este método no está habilitado en Firebase";
     if (code.includes("unauthorized-domain")) return "Este dominio no está autorizado en Firebase Auth";
+    // La app no exige un segundo factor. Firebase lo pide solo si esa cuenta lo tiene activado.
+    if (code.includes("multi-factor-auth-required") || /second factor challenge|multi-factor/i.test(String(err && err.message || ""))) {
+      return "El segundo paso no es obligatorio para entrar. Esta cuenta lo tiene activado y Firebase frena la clave. Sin ese paso, el correo y la contraseña alcanzan.";
+    }
     return (err && err.message) || "No se pudo autenticar";
   }
 

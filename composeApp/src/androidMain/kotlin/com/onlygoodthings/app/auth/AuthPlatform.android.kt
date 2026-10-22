@@ -43,8 +43,10 @@ actual class AuthPlatform actual constructor() {
         auth.currentUser?.getIdToken(forceRefresh)?.await()?.token
 
     actual suspend fun signInEmail(email: String, password: String): AuthUser = runAuth {
-        auth.signInWithEmailAndPassword(email, password).await().user
-            ?: error("Firebase no devolvió usuario")
+        auth.sesionOSegundoPaso {
+            auth.signInWithEmailAndPassword(email, password).await().user
+                ?: error("Firebase no devolvió usuario")
+        }
     }
 
     actual suspend fun signUpEmail(email: String, password: String, displayName: String): AuthUser = runAuth {
@@ -132,8 +134,10 @@ actual class AuthPlatform actual constructor() {
         ) {
             val google = GoogleIdTokenCredential.createFrom(credential.data)
             return runAuth {
-                auth.signInWithCredential(GoogleAuthProvider.getCredential(google.idToken, null))
-                    .await().user ?: error("Google no devolvió usuario")
+                auth.sesionOSegundoPaso {
+                    auth.signInWithCredential(GoogleAuthProvider.getCredential(google.idToken, null))
+                        .await().user ?: error("Google no devolvió usuario")
+                }
             }
         }
         throw AuthException("La cuenta de Google no devolvió un token válido")
@@ -222,6 +226,26 @@ private fun mapGoogleOpen(error: Throwable): AuthException = when (error) {
     )
 }
 
+// La app no exige un segundo factor. Firebase lo pide solo si esa cuenta lo tiene activado.
+private const val segundoPasoOpcional =
+    "El segundo paso no es obligatorio para entrar. Esta cuenta lo tiene activado y Firebase frena la clave. Sin ese paso, el correo y la contraseña alcanzan."
+
+private fun pideSegundoPaso(error: Throwable?): Boolean {
+    val code = (error as? com.google.firebase.auth.FirebaseAuthException)?.errorCode
+    if (code == "ERROR_SECOND_FACTOR_REQUIRED" || code == "ERROR_MULTI_FACTOR_AUTH_REQUIRED") return true
+    val text = error?.message.orEmpty()
+    return text.contains("second factor", ignoreCase = true) || text.contains("multi-factor", ignoreCase = true)
+}
+
+private suspend fun FirebaseAuth.sesionOSegundoPaso(block: suspend () -> FirebaseUser): FirebaseUser =
+    try {
+        block()
+    } catch (error: Exception) {
+        // Si Firebase ya dejó sesión, el segundo paso no frena el ingreso a la app.
+        if (!pideSegundoPaso(error)) throw error
+        currentUser ?: throw error
+    }
+
 private fun mapFirebase(error: Throwable?): AuthException {
     val code = (error as? com.google.firebase.auth.FirebaseAuthException)?.errorCode
     val message = when (code) {
@@ -235,7 +259,8 @@ private fun mapFirebase(error: Throwable?): AuthException {
         "ERROR_SESSION_EXPIRED" -> "El código SMS venció. Pedí uno nuevo"
         "ERROR_QUOTA_EXCEEDED" -> "Se agotó la cuota de SMS de Firebase"
         "ERROR_OPERATION_NOT_ALLOWED" -> "Este método de ingreso no está habilitado en Firebase"
-        else -> error?.message ?: "No se pudo autenticar"
+        "ERROR_SECOND_FACTOR_REQUIRED", "ERROR_MULTI_FACTOR_AUTH_REQUIRED" -> segundoPasoOpcional
+        else -> if (pideSegundoPaso(error)) segundoPasoOpcional else error?.message ?: "No se pudo autenticar"
     }
     return AuthException(message, error)
 }
