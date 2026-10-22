@@ -45,6 +45,33 @@ class ReviewConfigurationTests(unittest.TestCase):
         _, networks = review.prepare_text(old, '8.8.8.8')
         self.assertEqual(networks, '1.1.1.1/32,8.8.8.8/32')
 
+    def test_first_owner_email_is_opt_in_and_idempotent(self):
+        configured, _ = review.prepare_text(BASE, '8.8.8.8', 'owner@example.org')
+        self.assertIn('OGT_CONTROL_BOOTSTRAP_EMAIL=owner@example.org', configured)
+        repeated, _ = review.prepare_text(configured, '8.8.8.8', 'owner@example.org')
+        self.assertEqual(configured, repeated)
+        self.assertEqual(configured.count('OGT_CONTROL_BOOTSTRAP_EMAIL='), 1)
+
+    def test_first_owner_email_cannot_be_swapped_silently(self):
+        configured, _ = review.prepare_text(BASE, '8.8.8.8', 'owner@example.org')
+        with self.assertRaises(review.PreparationError):
+            review.prepare_text(configured, '8.8.8.8', 'attacker@example.org')
+
+    def test_first_owner_rejects_shell_code_and_malformed_mail(self):
+        for unsafe in ["owner@example.org';whoami", 'someone without mail', '']:
+            with self.subTest(value=unsafe), self.assertRaises(review.PreparationError):
+                review.prepare_text(BASE, '8.8.8.8', unsafe)
+
+    def test_owner_bootstrap_is_database_serialized_and_audited(self):
+        source = (ROOT / 'backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmRoutes.kt').read_text()
+        self.assertIn('pg_advisory_xact_lock', source)
+        self.assertIn('SELECT EXISTS (SELECT 1 FROM crm_platform_staff)', source)
+        self.assertIn("verified.emailVerified", source)
+        self.assertIn('crm_audit_events', source)
+        self.assertIn('conn.rollback()', source)
+        self.assertIn('crmStepUpAllowed(verified.emailVerified', source)
+        self.assertNotIn('OGT_CONTROL_BOOTSTRAP_EMAIL', (ROOT / 'web/app/crm/crm-runtime.js').read_text())
+
     def test_public_mode_not_overwritten(self):
         with self.assertRaises(ValueError):
             review.prepare_text(BASE + 'OGT_LAUNCH_MODE=public\n', '8.8.8.8')
