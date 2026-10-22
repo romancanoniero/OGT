@@ -59,3 +59,27 @@ test('canonical CRM routes are not sent through the public SPA', () => {
     assert.ok(nginx.includes(`location = /crm/${name} { return 308 /crm/${name}/; }`));
   }
 });
+
+test('Google uses a brand logo beside CRM actions and public sign-in', () => {
+  const logo = readFileSync(new URL('web/app/google-logo.svg', root), 'utf8');
+  const crm = readFileSync(new URL('web/app/crm/crm-runtime.js', root), 'utf8');
+  const publicApp = readFileSync(new URL('web/app/app.js', root), 'utf8');
+  assert.match(logo, /<svg[^>]+viewBox="0 0 24 24"/);
+  for (const color of ['#4285F4', '#34A853', '#FBBC05', '#EA4335']) assert.ok(logo.includes(color));
+  assert.match(crm, /googleLogin\.prepend\(googleIcon\(\)\)/);
+  assert.match(crm, /addGoogle\.prepend\(googleIcon\(\)\)/);
+  assert.match(publicApp, /data-prov="google">\$\{google\}/);
+});
+
+test('all implemented password fields have a show-hide eye control', () => {
+  const crm = readFileSync(new URL('web/app/crm/crm-runtime.js', root), 'utf8');
+  const web = readFileSync(new URL('web/app/app.js', root), 'utf8');
+  const compose = readFileSync(new URL('composeApp/src/commonMain/kotlin/com/onlygoodthings/app/ui/screens/AuthComponents.kt', root), 'utf8');
+  assert.match(crm, /loginPasswordWrap\.append\(loginPass, eyeToggle\(loginPass\)\)/);
+  assert.match(crm, /linkedPasswordWrap = passwordWrap\(linkedPassword\)/);
+  assert.match(crm, /Ocultar contraseña/);
+  assert.match(web, /enablePasswordVisibility\(document\.getElementById\("auth-root"\)\)/);
+  assert.match(web, /Mostrar contraseña/);
+  assert.match(compose, /trailingIcon = if \(secret\)/);
+  assert.match(compose, /passwordVisible/);
+});
