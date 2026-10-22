@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""Prepare only the two review settings on the existing OGT VPS; no service restart."""
+"""Prepare private review settings, or diagnose prerequisites without changing files."""
 import argparse
+import errno
 import fcntl
 import ipaddress
 import os
 import re
+import signal
 import socket
+import stat
 import tempfile
 from pathlib import Path
 
@@ -15,7 +18,6 @@ LAUNCH_KEYS = {'OGT_LAUNCH_MODE', 'OGT_PRELAUNCH_CIDRS'}
 
 class PreparationError(ValueError):
     """A fixed, non-secret explanation safe to display."""
-
 
 
 def parse_env(text):
@@ -40,7 +42,6 @@ def prepare_text(text, client_ip):
     values = parse_env(text)
     if values.get('OGT_LAUNCH_MODE', '') not in ('', 'prelaunch'):
         raise PreparationError('La instalacion no esta marcada para revision privada; no se cambia su politica.')
-    # Do not silently turn a development install into production authentication.
     if values.get('OGT_ENV') != 'production':
         raise PreparationError('OGT_ENV debe ser production; no se modifican credenciales ni autenticacion.')
     if values.get('OGT_ALLOW_DEV_TOKENS', 'false') != 'false' or values.get('FIREBASE_AUTH_EMULATOR_HOST'):
@@ -51,21 +52,26 @@ def prepare_text(text, client_ip):
         raise PreparationError('La configuracion de la base existente requiere revision.')
     if values.get('OGT_FIREBASE_PROJECT_ID', 'goodthings-55612') != 'goodthings-55612':
         raise PreparationError('El proyecto Firebase no corresponde a OGT.')
-    address = ipaddress.ip_address(client_ip)
+    try:
+        address = ipaddress.ip_address(client_ip)
+    except ValueError:
+        raise PreparationError('La IP del revisor en SSH_CONNECTION no es valida.') from None
     if not address.is_global or address.is_multicast:
         raise PreparationError('La IP SSH del revisor no es publica; no se infiere una red permitida.')
     nets = []
     for item in values.get('OGT_PRELAUNCH_CIDRS', '').split(','):
         if not item.strip():
             continue
-        network = ipaddress.ip_network(item.strip(), strict=True)
+        try:
+            network = ipaddress.ip_network(item.strip(), strict=True)
+        except ValueError:
+            raise PreparationError('OGT_PRELAUNCH_CIDRS contiene un CIDR invalido o con bits de host.') from None
         if network.prefixlen == 0 or network.is_multicast or network.is_unspecified:
             raise PreparationError('La lista de redes contiene un rango no permitido.')
         nets.append(network)
     if not any(address.version == net.version and address in net for net in nets):
         nets.append(ipaddress.ip_network(f'{address}/{address.max_prefixlen}', strict=True))
     cidrs = ','.join(str(net) for net in dict.fromkeys(nets))
-    # Already sufficient: preserve original file byte-for-byte.
     if values.get('OGT_LAUNCH_MODE') == 'prelaunch' and values.get('OGT_PRELAUNCH_CIDRS') == cidrs:
         return text, cidrs
     kept = []
@@ -102,31 +108,166 @@ def save_env(path, before, after):
     return Path(backup_name)
 
 
+def safe_failure(stage, error):
+    """Only fixed labels and numeric error codes; never raw exception arguments."""
+    if isinstance(error, PreparationError):
+        detail = str(error)  # Only fixed application messages use this exception.
+    elif isinstance(error, socket.gaierror):
+        names = {getattr(socket, name): name for name in dir(socket) if name.startswith('EAI_')}
+        code = names.get(error.errno, 'EAI_DESCONOCIDO')
+        detail = 'Fallo de resolucion DNS (' + code + ').'
+    elif isinstance(error, UnicodeError):
+        detail = 'El archivo no tiene codificacion UTF-8 valida.'
+    elif isinstance(error, PermissionError):
+        detail = 'Permiso denegado al usuario SSH (EACCES/EPERM).'
+    elif isinstance(error, FileNotFoundError):
+        detail = 'No existe el archivo o directorio requerido (ENOENT).'
+    elif isinstance(error, BlockingIOError):
+        detail = 'Recurso ocupado; si es BLOQUEO, hay otra operacion activa (EAGAIN).'
+    elif isinstance(error, TimeoutError):
+        detail = 'Tiempo limite de la comprobacion agotado.'
+    elif isinstance(error, OSError):
+        detail = 'Fallo del sistema (' + errno.errorcode.get(error.errno, 'ERRNO_DESCONOCIDO') + ').'
+    else:
+        detail = 'Dato no valido en esta etapa; no se muestran valores privados.'
+    return 'ERROR [' + stage + ']: ' + detail
+
+
+def ssh_peer():
+    parts = os.environ.get('SSH_CONNECTION', '').split()
+    if len(parts) != 4:
+        raise PreparationError('Ejecutar a traves del acceso SSH habitual de la Mac.')
+    try:
+        client = ipaddress.ip_address(parts[0])
+        server = ipaddress.ip_address(parts[2])
+    except ValueError:
+        raise PreparationError('SSH_CONNECTION contiene una direccion no valida.') from None
+    return str(client), server
+
+
+def resolve_domain():
+    # POSIX-only helper already requires fcntl. Do not wait indefinitely for DNS.
+    def timed_out(_signum, _frame):
+        raise TimeoutError()
+    previous = signal.signal(signal.SIGALRM, timed_out)
+    signal.alarm(10)
+    try:
+        return {ipaddress.ip_address(row[4][0]) for row in socket.getaddrinfo(DOMAIN, 443)}
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
+
+
+def require_direct(peer, resolved):
+    if peer[1] not in resolved:
+        raise PreparationError('El dominio no resuelve directamente a esta VPS. Revisar proxy/DNS antes de restringir acceso.')
+
+
+def installation(root):
+    if root.is_symlink() or not stat.S_ISDIR(root.stat().st_mode):
+        raise PreparationError('No se encontro la instalacion OGT existente esperada.')
+    return root
+
+
+def read_env(path):
+    # Do not follow links or block on special files. No content is printed.
+    fd = os.open(str(path), os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, 'rb') as stream:
+        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+            raise PreparationError('El .env debe ser un archivo regular, no un enlace o dispositivo.')
+        content = stream.read(1024 * 1024 + 1)
+        if len(content) > 1024 * 1024:
+            raise PreparationError('El .env excede el limite de lectura de 1 MiB.')
+        return content.decode('utf-8')
+
+
+def check_directory_write(root):
+    # Permission check only: do not create a temporary file in diagnostic mode.
+    if not os.access(root, os.W_OK | os.X_OK):
+        raise PermissionError(errno.EACCES, 'fixed')
+
+
+def check_lock_readonly(root):
+    path = root / '.release.lock'
+    if path.is_symlink():
+        raise PreparationError('El archivo de bloqueo es un enlace; no se utiliza.')
+    try:
+        fd = os.open(str(path), os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except FileNotFoundError:
+        check_directory_write(root)
+        return
+    with os.fdopen(fd, 'rb') as lock:
+        if not stat.S_ISREG(os.fstat(lock.fileno()).st_mode):
+            raise PreparationError('El bloqueo debe ser un archivo regular.')
+        if not os.access(path, os.W_OK):
+            raise PermissionError(errno.EACCES, 'fixed')
+        # A shared probe on a read-only fd detects an active exclusive deploy lock.
+        # It neither creates a file nor changes contents and is released immediately.
+        fcntl.flock(lock, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        fcntl.flock(lock, fcntl.LOCK_UN)
+
+
+def diagnose(root=None):
+    """Report independent checks in one run. No file writes, apply, build or restart."""
+    root = Path(root) if root is not None else Path.home() / 'ogt'
+    failed = []
+    skipped = object()
+    def check(stage, action):
+        try:
+            result = action()
+        except (PreparationError, ValueError, OSError) as error:
+            failed.append(stage)
+            print(safe_failure(stage, error))
+            return skipped
+        print('OK [' + stage + ']')
+        return result
+    print('OGT: diagnostico sin modificar archivos, credenciales ni servicios.')
+    peer = check('CONEXION_SSH', ssh_peer)
+    resolved = check('DNS', resolve_domain)
+    if peer is not skipped and resolved is not skipped:
+        check('DESTINO_DNS', lambda: require_direct(peer, resolved))
+    else:
+        print('OMITIDO [DESTINO_DNS]: depende de CONEXION_SSH y DNS.')
+    folder = check('CARPETA_OGT', lambda: installation(root))
+    if folder is not skipped:
+        check('PERMISO_RESPALDO', lambda: check_directory_write(root))
+        check('BLOQUEO', lambda: check_lock_readonly(root))
+        contents = check('LECTURA_ENV', lambda: read_env(root / '.env'))
+        if contents is not skipped and peer is not skipped:
+            check('CONFIGURACION', lambda: prepare_text(contents, peer[0]))
+        else:
+            print('OMITIDO [CONFIGURACION]: depende de LECTURA_ENV y CONEXION_SSH.')
+    print('RESULTADO: ' + (str(len(failed)) + ' bloqueo(s).' if failed else 'comprobaciones de lectura correctas; no es un despliegue.'))
+    return 1 if failed else 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--apply', action='store_true')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--apply', action='store_true')
+    mode.add_argument('--diagnose', action='store_true')
     args = parser.parse_args()
+    if args.diagnose:
+        raise SystemExit(diagnose())
+    stage = 'CONEXION_SSH'
     try:
-        parts = os.environ.get('SSH_CONNECTION', '').split()
-        if len(parts) != 4:
-            raise PreparationError('Ejecutar a traves del acceso SSH habitual de la Mac.')
-        client, _, server, _ = parts
-        server = ipaddress.ip_address(server)
-        # Do not guess a proxy/CDN policy or add shared proxy ranges.
-        resolved = {ipaddress.ip_address(row[4][0]) for row in socket.getaddrinfo(DOMAIN, 443)}
-        if server not in resolved:
-            raise PreparationError('El dominio no resuelve directamente a esta VPS. Revisar proxy/DNS antes de restringir acceso.')
-        root = Path.home() / 'ogt'
-        if root.is_symlink() or not root.is_dir():
-            raise PreparationError('No se encontro la instalacion OGT existente esperada.')
+        peer = ssh_peer()
+        stage = 'DNS'
+        resolved = resolve_domain()
+        stage = 'DESTINO_DNS'
+        require_direct(peer, resolved)
+        stage = 'CARPETA_OGT'
+        root = installation(Path.home() / 'ogt')
+        stage = 'BLOQUEO'
         with (root / '.release.lock').open('a') as lock:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             path = root / '.env'
-            if path.is_symlink():
-                raise PreparationError('No se modifica un .env enlazado simbolicamente.')
-            before = path.read_bytes().decode('utf-8')
-            after, cidrs = prepare_text(before, client)
+            stage = 'LECTURA_ENV'
+            before = read_env(path)
+            stage = 'CONFIGURACION'
+            after, cidrs = prepare_text(before, peer[0])
             if args.apply:
+                stage = 'GUARDADO_ENV'
                 backup = save_env(path, before, after)
                 print('Revision privada configurada.' if backup else 'Revision privada ya configurada.')
                 if backup:
@@ -135,11 +276,8 @@ def main():
                 print('Comprobacion correcta. No se modifico .env.')
             print('Redes de revision: ' + cidrs)
             print('No se reiniciaron servicios ni se modificaron credenciales o datos de la aplicacion.')
-    except PreparationError as error:
-        parser.exit(1, f'Preparacion bloqueada: {error} No se reiniciaron servicios.\n')
-    except (ValueError, OSError, UnicodeError):
-        # Never include raw dotenv content, IP parsing input or secret values in logs.
-        parser.exit(1, 'Preparacion bloqueada: revisar acceso SSH directo, DNS, autenticacion real y configuracion privada existente. No se reiniciaron servicios.\n')
+    except (PreparationError, ValueError, OSError) as error:
+        parser.exit(1, safe_failure(stage, error) + '\nNo se reiniciaron servicios.\n')
 
 
 if __name__ == '__main__':
