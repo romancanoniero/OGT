@@ -70,8 +70,16 @@ export function createIdentity(sdk, auth, makeRecaptcha) {
       if (!user.emailVerified) throw new CrmError('Verificá primero tu correo y pulsá Ya verifiqué.', 'EMAIL_NOT_VERIFIED');
       if (sdk.multiFactor(user).enrolledFactors.length) throw new CrmError('Ya existe un segundo factor. Ingresá de nuevo para verificarlo.', 'ALREADY_ENROLLED');
       enrollmentSecret = null;
-      const session = await sdk.multiFactor(user).getSession();
-      enrollmentSecret = await sdk.TotpMultiFactorGenerator.generateSecret(session);
+      let session;
+      try {
+        session = await sdk.multiFactor(user).getSession();
+        enrollmentSecret = await sdk.TotpMultiFactorGenerator.generateSecret(session);
+      } catch (error) {
+        if (error?.code === 'auth/operation-not-allowed' || error?.code === 'auth/feature-not-enabled') {
+          throw new CrmError('TOTP no está habilitado en Firebase Authentication con Identity Platform del proyecto OGT. Un administrador debe habilitarlo allí antes de continuar.', 'TOTP_NOT_ENABLED');
+        }
+        throw error;
+      }
       if (!enrollmentSecret?.secretKey || typeof enrollmentSecret.generateQrCodeUrl !== 'function')
         throw new CrmError('Firebase no devolvió un secreto TOTP válido.', 'TOTP_CONFIGURATION');
       return {
