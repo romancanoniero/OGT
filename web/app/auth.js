@@ -64,6 +64,13 @@
     }
   }
 
+  // El id del proyecto no sale en pantalla. El nombre visible es Only Good Things.
+  function sinIdDeProyecto(message) {
+    const text = String(message || "");
+    if (/521063054927|goodthings-55612|project-\d/i.test(text)) return "No se pudo completar el ingreso a Only Good Things.";
+    return text;
+  }
+
   function mapAuthError(err) {
     const code = String(err && err.code || "");
     if (code.includes("invalid-email")) return "El correo no es válido";
@@ -79,7 +86,7 @@
     }
     if (code.includes("operation-not-allowed")) return "Este método no está habilitado en Firebase";
     if (code.includes("unauthorized-domain")) return "Este dominio no está autorizado en Firebase Auth";
-    return (err && err.message) || "No se pudo autenticar";
+    return sinIdDeProyecto(err && err.message) || "No se pudo autenticar";
   }
 
   function wrap(fn) {

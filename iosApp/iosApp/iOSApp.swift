@@ -369,6 +369,14 @@ final class OgtFirebaseHost: NSObject, IosAuthHost {
         )
     }
 
+    // El id del proyecto de Firebase no se muestra. El nombre visible es Only Good Things.
+    private static func sinIdDeProyecto(_ message: String) -> String {
+        if message.contains("521063054927") || message.contains("goodthings-55612") || message.contains("project-") {
+            return "No se pudo completar el ingreso a Only Good Things."
+        }
+        return message.isEmpty ? "No se pudo autenticar" : message
+    }
+
     private static func mensaje(_ error: Error) -> String {
         let ns = error as NSError
         switch AuthErrorCode(rawValue: ns.code) {
@@ -382,7 +390,7 @@ final class OgtFirebaseHost: NSObject, IosAuthHost {
         case .sessionExpired: return "El código SMS venció. Pedí uno nuevo"
         case .quotaExceeded: return "Se agotó la cuota de SMS de Firebase"
         case .operationNotAllowed: return "Este método de ingreso no está habilitado en Firebase"
-        default: return ns.localizedDescription
+        default: return sinIdDeProyecto(ns.localizedDescription)
         }
     }
 
