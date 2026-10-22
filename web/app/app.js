@@ -3810,6 +3810,17 @@ async function renderAjustes() {
       </div>
       <button type="submit" class="publish-cta" id="save-profile">Guardar</button>
       <p class="save-ok" id="profile-ok" hidden>Perfil actualizado</p>
+    </form>
+    <form class="profile-edit" id="delete-account">
+      <div class="pref-block">
+        <h2>Borrar cuenta</h2>
+        <p class="hint">Se borra esta cuenta y lo que publicaste con ella: avisos, comentarios y el resto del contenido cuyo autor sos vos. No queda visible ni a nombre de otra persona. No se borra la copia que otro vecino ya tenga en su chat o en una exportación, un resguardo técnico corto, ni lo que haya que conservar por un reclamo o un pedido de autoridad. Esos restos no se reutilizan. El ingreso de Firebase sigue existiendo hasta que lo borres en Google.</p>
+        <label class="field">Escribí BAJA para confirmar
+          <input name="confirm" type="text" autocomplete="off" maxlength="8" placeholder="BAJA" spellcheck="false">
+        </label>
+        <button type="submit" class="publish-cta danger" id="delete-account-btn" disabled>Borrar mi cuenta</button>
+        <p class="delete-err" id="delete-account-err" hidden></p>
+      </div>
     </form>`;
   let pendingPhoto = null;
   const preview = main.querySelector(".avatar.lg");
@@ -3871,6 +3882,33 @@ async function renderAjustes() {
     }
   });
   paintProfileSkills(me.userId, true);
+  const deleteForm = document.getElementById("delete-account");
+  const deleteInput = deleteForm?.querySelector("input[name=confirm]");
+  const deleteBtn = document.getElementById("delete-account-btn");
+  const deleteErr = document.getElementById("delete-account-err");
+  deleteInput?.addEventListener("input", () => {
+    deleteInput.value = deleteInput.value.toUpperCase().slice(0, 8);
+    if (deleteBtn) deleteBtn.disabled = deleteInput.value !== "BAJA";
+  });
+  deleteForm?.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    if (!deleteInput || deleteInput.value !== "BAJA" || !deleteBtn) return;
+    deleteBtn.disabled = true;
+    deleteBtn.textContent = "Borrando…";
+    if (deleteErr) deleteErr.hidden = true;
+    try {
+      await api("/api/v1/account/delete", { confirm: "BAJA" });
+      await clearClientSession();
+      location.replace("/borrar-cuenta?hecha=1");
+    } catch (e) {
+      if (deleteErr) {
+        deleteErr.textContent = e.message || "No se pudo borrar la cuenta";
+        deleteErr.hidden = false;
+      }
+      deleteBtn.disabled = deleteInput.value !== "BAJA";
+      deleteBtn.textContent = "Borrar mi cuenta";
+    }
+  });
 }
 
 const COMMUNITY_RULES = {
@@ -4228,7 +4266,7 @@ function authBar(backHref, backLabel) {
 function authFoot() {
   return `<footer class="auth-foot">
     <p class="auth-foot-brand">${ogtMark("foot")}Only Good Things (OGT) · 2025 · Plataforma de confianza cívica</p>
-    <p><a href="privacy.html">Privacidad</a> · <a href="terms.html">Términos</a> · Centro de ayuda</p>
+    <p><a href="privacy.html">Privacidad</a> · <a href="terms.html">Términos</a> · <a href="/borrar-cuenta">Borrar cuenta</a></p>
   </footer>`;
 }
 
@@ -4546,6 +4584,11 @@ async function enterAfterAuth() {
     }
     sessionStorage.removeItem("ogt.justAuthed");
     sessionStorage.removeItem("ogt.authRedirect");
+    if (sessionStorage.getItem("ogt.returnTo") === "borrar-cuenta") {
+      sessionStorage.removeItem("ogt.returnTo");
+      location.assign("/borrar-cuenta");
+      return;
+    }
     const next = isCompany() ? "#/empresa" : "#/inicio";
     if (location.hash === next) return show();
     location.hash = next;

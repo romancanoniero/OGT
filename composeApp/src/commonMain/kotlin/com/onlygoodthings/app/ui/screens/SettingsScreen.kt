@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,13 +15,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.onlygoodthings.app.data.LocalAuth
 import com.onlygoodthings.app.data.LocalOgtSession
 import com.onlygoodthings.app.i18n.LocalOgtCopy
 import com.onlygoodthings.app.i18n.OgtLang
@@ -33,8 +42,10 @@ import com.onlygoodthings.app.platform.rememberHonorInviteActions
 import com.onlygoodthings.app.platform.rememberOgtCameraAccess
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.theme.OgtMotion
+import com.onlygoodthings.app.theme.ogtOutlinedFieldColors
 import com.onlygoodthings.app.ui.components.CarSilhouette
 import com.onlygoodthings.app.ui.components.OgtCaption
+import com.onlygoodthings.app.ui.components.OgtPrimaryButton
 import com.onlygoodthings.app.ui.components.OgtTopBar
 import com.onlygoodthings.app.ui.components.PrefCategory
 import com.onlygoodthings.app.ui.components.PrefDivider
@@ -46,6 +57,7 @@ import com.onlygoodthings.app.ui.components.PrefRevealDelete
 import com.onlygoodthings.app.ui.components.PrefSwitch
 import com.onlygoodthings.app.ui.components.ScreenColumn
 import com.onlygoodthings.shared.domain.LocationScope
+import kotlinx.coroutines.launch
 
 /**
  * Ajustes al modo sistema: grupos, switch, fila de idioma.
@@ -54,6 +66,10 @@ import com.onlygoodthings.shared.domain.LocationScope
 @Composable
 fun SettingsScreen(onLogout: () -> Unit = {}, onBack: () -> Unit = {}, onOpen: (String) -> Unit) {
     val session = LocalOgtSession.current
+    val auth = LocalAuth.current
+    val scope = rememberCoroutineScope()
+    var confirmOpen by remember { mutableStateOf(false) }
+    var confirmText by remember { mutableStateOf("") }
     val copy = LocalOgtCopy.current
     val me = session.me()
     val gps = LocalOgtLocation.current
@@ -241,6 +257,50 @@ fun SettingsScreen(onLogout: () -> Unit = {}, onBack: () -> Unit = {}, onOpen: (
                     .clickable(onClick = onLogout)
                     .padding(vertical = 16.dp),
             )
+            Text(
+                "Borrar cuenta",
+                color = OgtColors.error,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 16.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        confirmOpen = !confirmOpen
+                        if (confirmOpen) auth.error = null
+                    }
+                    .padding(vertical = 8.dp),
+            )
+            AnimatedVisibility(
+                visible = confirmOpen,
+                enter = fadeIn(OgtMotion.fade) + expandVertically(OgtMotion.size),
+                exit = fadeOut(OgtMotion.fade) + shrinkVertically(OgtMotion.size),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OgtCaption(
+                        "Se borra esta cuenta y lo que publicaste con ella: avisos, comentarios y el resto del contenido cuyo autor sos vos. No queda visible ni a nombre de otra persona. No se borra la copia que otro vecino ya tenga en su chat o en una exportación, un resguardo técnico corto, ni lo que haya que conservar por un reclamo o un pedido de autoridad. Esos restos no se reutilizan. El ingreso de Firebase sigue existiendo hasta que lo borres en Google.",
+                    )
+                    OutlinedTextField(
+                        value = confirmText,
+                        onValueChange = { confirmText = it.uppercase().take(8) },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("BAJA", color = OgtColors.muted) },
+                        singleLine = true,
+                        colors = ogtOutlinedFieldColors(),
+                        shape = RoundedCornerShape(16.dp),
+                    )
+                    auth.error?.let {
+                        Text(it, color = OgtColors.error, fontSize = 13.sp)
+                    }
+                    OgtPrimaryButton(
+                        text = if (auth.busy) "Borrando…" else "Borrar mi cuenta",
+                        enabled = confirmText == "BAJA" && !auth.busy,
+                    ) {
+                        scope.launch {
+                            if (auth.deleteAccount()) onLogout()
+                        }
+                    }
+                }
+            }
             OgtCaption("Only Good Things (OGT) v2.8.4")
             Spacer(Modifier.height(80.dp))
         }
