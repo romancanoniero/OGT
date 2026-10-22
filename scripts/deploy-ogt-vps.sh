@@ -42,7 +42,7 @@ else
   DEFAULT_GRADLE_CACHE="$HOME/.cache/ogt-release-gradle"
 fi
 export GRADLE_USER_HOME="${OGT_RELEASE_GRADLE_HOME:-$DEFAULT_GRADLE_CACHE}"
-mkdir -p "$GRADLE_USER_HOME" || { echo "No se puede crear la cache de Gradle de OGT: $GRADLE_USER_HOME" >&2; exit 1; }
+( umask 077; mkdir -p "$GRADLE_USER_HOME" ) || { echo "No se puede crear la cache de Gradle de OGT: $GRADLE_USER_HOME" >&2; exit 1; }
 test -d "$GRADLE_USER_HOME" && test -w "$GRADLE_USER_HOME" || { echo "La cache de Gradle de OGT no es escribible: $GRADLE_USER_HOME" >&2; exit 1; }
 PROBE="$(mktemp "$GRADLE_USER_HOME/.ogt-write-test.XXXXXX")" || { echo "No se puede escribir en la cache de Gradle de OGT: $GRADLE_USER_HOME" >&2; exit 1; }
 rm -f "$PROBE"
