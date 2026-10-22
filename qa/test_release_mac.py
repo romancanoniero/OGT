@@ -140,25 +140,37 @@ class DeploymentSourceTests(unittest.TestCase):
         self.assertLess(self.deploy.index('python3 - env'), self.deploy.index('./gradlew'))
 
     def test_gradle_release_ignores_inaccessible_global_external_cache(self):
-        # Execute the actual cache setup in a Linux test shell with an
-        # inherited Gradle cache path that must not be reused.
+        # Execute the real cache setup while simulating both macOS and Linux.
+        # This test must run on either OS (including the user's Mac).
         start = self.deploy.index('# Gradle may be configured globally')
         end = self.deploy.index('# Compile fresh outputs OUTSIDE tracked', start)
         setup = self.deploy[start:end]
-        with tempfile.TemporaryDirectory() as folder:
-            env = dict(os.environ)
-            env.update(HOME=folder, GRADLE_USER_HOME='/Volumes/DEV_MAC/IAN/caches/gradle')
-            env.pop('OGT_RELEASE_GRADLE_HOME', None)
-            result = subprocess.run(
-                ['bash', '-euo', 'pipefail', '-c',
-                 setup + '\n' + 'printf "CHOSEN=%s\\n" "$GRADLE_USER_HOME"'],
-                env=env, text=True, capture_output=True, check=True,
-            )
-            expected = str(Path(folder) / '.cache' / 'ogt-release-gradle')
-            self.assertIn('CHOSEN=' + expected, result.stdout)
-            self.assertTrue(Path(expected).is_dir())
-            self.assertEqual(stat.S_IMODE(Path(expected).stat().st_mode), 0o700)
-            self.assertNotIn('/Volumes/DEV_MAC', result.stdout)
+        for simulated_os, cache_subdir in (
+            ('Darwin', 'Library/Caches/OGT/gradle'),
+            ('Linux', '.cache/ogt-release-gradle'),
+        ):
+            with self.subTest(system=simulated_os), tempfile.TemporaryDirectory() as folder:
+                env = dict(os.environ)
+                env.update(
+                    HOME=folder,
+                    TEST_UNAME=simulated_os,
+                    GRADLE_USER_HOME='/Volumes/DEV_MAC/IAN/caches/gradle',
+                )
+                env.pop('OGT_RELEASE_GRADLE_HOME', None)
+                script = (
+                    'uname() { printf "%s\\n" "$TEST_UNAME"; }\n'
+                    + setup
+                    + '\nprintf "CHOSEN=%s\\n" "$GRADLE_USER_HOME"\n'
+                )
+                result = subprocess.run(
+                    ['bash', '-euo', 'pipefail', '-c', script],
+                    env=env, text=True, capture_output=True, check=True,
+                )
+                expected = str(Path(folder) / cache_subdir)
+                self.assertIn('CHOSEN=' + expected, result.stdout)
+                self.assertTrue(Path(expected).is_dir())
+                self.assertEqual(stat.S_IMODE(Path(expected).stat().st_mode), 0o700)
+                self.assertNotIn('/Volumes/DEV_MAC', result.stdout)
 
     def test_gradle_release_cache_writable_probe_and_explicit_home(self):
         self.assertIn('export GRADLE_USER_HOME=', self.deploy)
