@@ -176,6 +176,83 @@ export async function start() {
     finally { setBusy(false); }
     if (complete) await checkAccess(); else if (!challenge.hidden) factor.focus();
   });
+  signupToggle.addEventListener('click', () => {
+    signupMode = !signupMode;
+    signupToggle.textContent = signupMode ? 'Ya tengo una cuenta' : 'Crear cuenta de Control';
+    login.querySelector('button').textContent = signupMode ? 'Registrarme' : 'Ingresar';
+    message(signupMode ? 'Creá tu cuenta. El primer administrador solo se autoriza desde el servidor.' : 'Ingresá con tu cuenta existente.');
+  });
+  googleLogin.addEventListener('click', async () => {
+    if (identityBusy) return;
+    clearData(); hideChallenge(); setBusy(true); message('Ingresando con Google...');
+    let complete = false;
+    try {
+      const result = await identity.signInGoogle();
+      if (result.factors) {
+        factor.replaceChildren();
+        for (const hint of result.factors) {
+          const option = make('option', hint.label); option.value = hint.index; factor.append(option);
+        }
+        login.hidden = true; googleLogin.hidden = true; signupToggle.hidden = true;
+        challenge.hidden = false;
+        message('Seleccioná el segundo factor de tu cuenta Google.');
+      } else complete = true;
+    } catch (error) { fail(error); }
+    finally { setBusy(false); }
+    if (complete) await checkAccess();
+  });
+  sendVerification.addEventListener('click', async () => {
+    try {
+      await identity.sendVerification();
+      message('Enviamos el correo de verificación. Abrilo y después pulsá Ya verifiqué mi correo.');
+    } catch (error) { message(friendlyError(error)); }
+  });
+  reloadVerification.addEventListener('click', async () => {
+    try { await identity.reloadCurrentUser(); void checkAccess(); }
+    catch (error) { message(friendlyError(error)); }
+  });
+  beginTotp.addEventListener('click', async () => {
+    try {
+      const key = await identity.startTotpEnrollment();
+      totpSecret.textContent = 'Ingresá esta clave en tu autenticador: ' + key + '. No la compartas.';
+      totpCode.hidden = false; confirmTotp.hidden = false; beginTotp.hidden = true;
+      message('Ingresá el código de seis dígitos de la aplicación autenticadora.');
+    } catch (error) { message(friendlyError(error)); }
+  });
+  confirmTotp.addEventListener('click', async () => {
+    if (identityBusy) return;
+    setBusy(true);
+    try {
+      await identity.confirmTotpEnrollment(totpCode.value.trim());
+      totpSecret.textContent = ''; totpCode.value = ''; totpCode.hidden = true;
+      confirmTotp.hidden = true;
+      await identity.signOut();
+      onboarding.hidden = true; login.hidden = false; googleLogin.hidden = false;
+      signupToggle.hidden = false; logout.hidden = true;
+      message('Segundo factor configurado. Ingresá nuevamente para activar los permisos.');
+    } catch (error) { message(friendlyError(error)); }
+    finally { setBusy(false); }
+  });
+  addGoogle.addEventListener('click', async () => {
+    if (identityBusy) return;
+    setBusy(true);
+    try {
+      await identity.linkGoogle(); showLinkMethods();
+      message('Google vinculado a esta misma cuenta. Tus permisos se conservaron.');
+    } catch (error) { message(friendlyError(error)); }
+    finally { setBusy(false); }
+  });
+  addPassword.addEventListener('click', async () => {
+    if (identityBusy) return;
+    if (linkedPassword.value.length < 12) { message('Elegí una contraseña de al menos 12 caracteres.'); return; }
+    const value = linkedPassword.value; linkedPassword.value = '';
+    setBusy(true);
+    try {
+      await identity.linkPassword(value); showLinkMethods();
+      message('Contraseña activada en esta misma cuenta. Tus permisos se conservaron.');
+    } catch (error) { message(friendlyError(error)); }
+    finally { setBusy(false); }
+  });
   factor.addEventListener('change', () => { code.value = ''; verify.disabled = true; message('Presion\u00e1 Usar este factor para confirmar la selecci\u00f3n.'); });
   begin.addEventListener('click', async () => {
     if (identityBusy) return; code.value = ''; verify.disabled = true; setBusy(true);
@@ -198,7 +275,12 @@ export async function start() {
   refresh.addEventListener('click', () => { if (!identityBusy) { hideChallenge(); void checkAccess(); } });
   logout.addEventListener('click', async () => {
     if (identityBusy) return; clearData(); hideChallenge(); setBusy(true);
-    try { await identity.signOut(); logout.hidden = true; login.hidden = false; message('Sesi\u00f3n cerrada.'); }
+    try {
+      await identity.signOut();
+      logout.hidden = true; login.hidden = false; googleLogin.hidden = false; signupToggle.hidden = false;
+      onboarding.hidden = true; addGoogle.hidden = true; addPassword.hidden = true; linkedPassword.hidden = true;
+      message('Sesión cerrada.');
+    }
     catch (error) { login.hidden = false; message('Los datos se ocultaron, pero no se pudo cerrar la sesi\u00f3n. Prob\u00e1 nuevamente.'); }
     finally { setBusy(false); }
   });
