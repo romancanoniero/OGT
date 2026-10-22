@@ -41,3 +41,94 @@ test('cancelled challenges cannot be submitted', async () => { const f = fixture
 test('unsupported and out-of-range factors are rejected', async () => { const f = fixture('unsupported'); await f.identity.signIn('email','password'); await assert.rejects(f.identity.beginFactor(0), { code: 'INVALID_FACTOR' }); await assert.rejects(f.identity.beginFactor(-1), { code: 'INVALID_FACTOR' }); });
 test('normal credential failure does not start MFA or invent identity', async () => { const f = fixture('totp', { signInWithEmailAndPassword: async () => { throw { code: 'auth/invalid-credential' }; } }); await assert.rejects(f.identity.signIn('email','password'), { code: 'auth/invalid-credential' }); await assert.rejects(f.identity.beginFactor(0), { code: 'INVALID_FACTOR' }); });
 test('sign out clears Firebase identity and MFA state', async () => { const f = fixture(); await f.identity.signIn('email','password'); await f.identity.beginFactor(0); await f.identity.signOut(); assert.equal(f.identity.currentUser(), null); assert.throws(() => f.identity.token(), { code: 'UNAUTHENTICATED' }); await assert.rejects(f.identity.verify('123456'), { code: 'INVALID_CODE' }); });
+
+test('Google sign-in uses Firebase popup and the same MFA resolver', async () => {
+  let popupCalls = 0;
+  class GoogleAuthProvider { addScope(scope) { assert.equal(scope, 'email'); } }
+  const f = fixture('totp', {
+    GoogleAuthProvider,
+    signInWithPopup: async (auth, provider) => {
+      popupCalls++;
+      assert.ok(provider instanceof GoogleAuthProvider);
+      throw { code: 'auth/multi-factor-auth-required' };
+    },
+  });
+  const result = await f.identity.signInGoogle();
+  assert.equal(popupCalls, 1);
+  assert.equal(result.factors[0].kind, 'totp');
+  await f.identity.beginFactor(0);
+  await f.identity.verify('123456');
+  assert.deepEqual(f.seen, [{ totp: { id: 'factor', code: '123456' } }]);
+});
+test('email registration creates Firebase identity, never grants platform privileges in the browser', async () => {
+  const f = fixture('totp', {
+    createUserWithEmailAndPassword: async (auth, email, password) => {
+      assert.equal(email, 'owner@example.test');
+      assert.equal(password, 'very-long-password');
+      return { user: { uid: 'test' } };
+    },
+  });
+  const result = await f.identity.register('owner@example.test', 'very-long-password');
+  assert.equal(result.user.uid, 'test');
+  assert.equal(result.platformRole, undefined);
+});
+test('linking Google and email password preserves exact Firebase UID', async () => {
+  let linked = 0;
+  class GoogleAuthProvider {}
+  const f = fixture('totp', {
+    GoogleAuthProvider,
+    EmailAuthProvider: { credential: (email, password) => ({ email, password }) },
+    linkWithPopup: async (user, provider) => {
+      linked++;
+      assert.equal(user.uid, 'test');
+      assert.ok(provider instanceof GoogleAuthProvider);
+      return { user };
+    },
+    linkWithCredential: async (user, credential) => {
+      linked++;
+      assert.equal(credential.email, 'owner@example.test');
+      assert.equal(credential.password, 'long-secret');
+      return { user };
+    },
+  });
+  f.auth.currentUser.email = 'owner@example.test';
+  await f.identity.linkGoogle();
+  await f.identity.linkPassword('long-secret');
+  assert.equal(linked, 2);
+  assert.equal(f.identity.currentUser().uid, 'test');
+});
+test('Google link rejects an unexpected changed identity', async () => {
+  const f = fixture('totp', {
+    GoogleAuthProvider: class {},
+    linkWithPopup: async () => ({ user: { uid: 'other-uid' } }),
+  });
+  await assert.rejects(f.identity.linkGoogle(), { code: 'ACCOUNT_MISMATCH' });
+});
+test('TOTP enrollment needs verified email and checks the code with Firebase', async () => {
+  let enrollment = null;
+  const secret = { secretKey: 'test-manual-key' };
+  const user = { uid: 'test', email: 'owner@example.test', emailVerified: false };
+  const f = fixture('totp', {
+    multiFactor: () => ({
+      enrolledFactors: enrollment ? [{ factorId: 'totp' }] : [],
+      getSession: async () => 'mfa-session',
+      enroll: async (assertion, name) => {
+        assert.equal(name, 'OGT Control');
+        assert.deepEqual(assertion, { secret, code: '123456' });
+        enrollment = assertion;
+      },
+    }),
+    TotpMultiFactorGenerator: {
+      generateSecret: async session => { assert.equal(session, 'mfa-session'); return secret; },
+      assertionForEnrollment: (key, code) => ({ secret: key, code }),
+    },
+  });
+  f.auth.currentUser = user;
+  await assert.rejects(f.identity.startTotpEnrollment(), { code: 'EMAIL_NOT_VERIFIED' });
+  user.emailVerified = true;
+  assert.equal(await f.identity.startTotpEnrollment(), 'test-manual-key');
+  await assert.rejects(f.identity.confirmTotpEnrollment('12345'), { code: 'INVALID_CODE' });
+  await f.identity.confirmTotpEnrollment('123456');
+  assert.ok(enrollment);
+  assert.equal(f.identity.hasSecondFactor(), true);
+});
