@@ -147,3 +147,10 @@ test('registration errors identify the Firebase rejection without exposing inter
     assert.doesNotMatch(friendlyError({ code }), /INTERNAL PRIVATE DATA/);
   }
 });
+
+test('unknown Firebase error code is safely shown for troubleshooting without exposing private messages', () => {
+  const result = friendlyError({ code: 'auth/internal-error', message: 'PRIVATE_SDK_MESSAGE' });
+  assert.match(result, /auth\/internal-error/);
+  assert.doesNotMatch(result, /PRIVATE_SDK_MESSAGE/);
+  assert.equal(friendlyError({ code: 'auth/<script>', message: 'SECRET' }), 'No se pudo completar la operación. Probá nuevamente.');
+});
