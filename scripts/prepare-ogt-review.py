@@ -158,8 +158,16 @@ def resolve_domain():
         signal.signal(signal.SIGALRM, previous)
 
 
-def require_direct(peer, resolved):
-    if peer[1] not in resolved:
+def require_direct(peer, resolved=None, expected_server=None):
+    if expected_server:
+        try:
+            expected = ipaddress.ip_address(expected_server)
+        except ValueError:
+            raise PreparationError('La direccion esperada de la VPS no es valida.') from None
+        if peer[1] != expected:
+            raise PreparationError('La sesion SSH no termina en la VPS resuelta por la Mac.')
+        return
+    if resolved is None or peer[1] not in resolved:
         raise PreparationError('El dominio no resuelve directamente a esta VPS. Revisar proxy/DNS antes de restringir acceso.')
 
 
@@ -246,16 +254,21 @@ def main():
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--apply', action='store_true')
     mode.add_argument('--diagnose', action='store_true')
+    parser.add_argument('--expected-server')
     args = parser.parse_args()
     if args.diagnose:
         raise SystemExit(diagnose())
     stage = 'CONEXION_SSH'
     try:
         peer = ssh_peer()
-        stage = 'DNS'
-        resolved = resolve_domain()
-        stage = 'DESTINO_DNS'
-        require_direct(peer, resolved)
+        if args.expected_server:
+            stage = 'DESTINO_DNS'
+            require_direct(peer, expected_server=args.expected_server)
+        else:
+            stage = 'DNS'
+            resolved = resolve_domain()
+            stage = 'DESTINO_DNS'
+            require_direct(peer, resolved=resolved)
         stage = 'CARPETA_OGT'
         root = installation(Path.home() / 'ogt')
         stage = 'BLOQUEO'
