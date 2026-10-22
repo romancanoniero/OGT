@@ -7,13 +7,27 @@ export async function start() {
   const api = createApi(window.fetch.bind(window));
   let expiry = null, access = null, chosen = '', identityBusy = false;
   const make = (tag, text) => { const node = document.createElement(tag); if (text !== undefined) node.textContent = String(text); return node; };
-  const message = text => { status.textContent = text; };
+  const message = text => {
+    status.replaceChildren();
+    if (/Google/i.test(String(text))) status.append(googleIcon());
+    status.append(document.createTextNode(String(text)));
+  };
   const refresh = $('crm-refresh');
   const logout = make('button', 'Cerrar sesi\u00f3n'); logout.type = 'button'; logout.hidden = true;
   refresh.insertAdjacentElement('afterend', logout);
   let signupMode = false;
+  const googleIcon = () => {
+    const icon = make('img');
+    icon.src = '/google-logo.svg';
+    icon.alt = '';
+    icon.className = 'crm-google-mark';
+    icon.width = 20;
+    icon.height = 20;
+    return icon;
+  };
   const googleLogin = make('button', 'Ingresar con Google');
   googleLogin.id = 'crm-google-login'; googleLogin.type = 'button';
+  googleLogin.className = 'crm-google-button'; googleLogin.prepend(googleIcon());
   login.insertAdjacentElement('afterend', googleLogin);
   const signupToggle = make('button', mode === 'control' ? 'Crear cuenta de Control' : 'Crear cuenta de Empresas');
   signupToggle.id = 'crm-signup-toggle'; signupToggle.type = 'button';
@@ -31,12 +45,39 @@ export async function start() {
   onboarding.append(onboardingText, sendVerification, reloadVerification, beginTotp, totpSecret, totpCode, confirmTotp);
   signupToggle.insertAdjacentElement('afterend', onboarding);
   const addGoogle = make('button', 'Vincular Google a esta cuenta'); addGoogle.type = 'button'; addGoogle.hidden = true;
+  addGoogle.className = 'crm-google-button'; addGoogle.prepend(googleIcon());
   const addPassword = make('button', 'Activar contraseña en esta cuenta'); addPassword.type = 'button'; addPassword.hidden = true;
+  function eyeToggle(input) {
+    const button = make('button');
+    button.type = 'button';
+    button.className = 'crm-password-eye';
+    button.setAttribute('aria-label', 'Mostrar contraseña');
+    button.setAttribute('aria-pressed', 'false');
+    button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="crm-eye-slash" d="M3 3 21 21"/></svg>';
+    button.addEventListener('click', () => {
+      const visible = input.type === 'password';
+      input.type = visible ? 'text' : 'password';
+      button.setAttribute('aria-pressed', String(visible));
+      button.setAttribute('aria-label', visible ? 'Ocultar contraseña' : 'Mostrar contraseña');
+    });
+    return button;
+  }
+  function passwordWrap(input) {
+    const wrapper = make('span'); wrapper.className = 'crm-password-wrap';
+    wrapper.append(input, eyeToggle(input));
+    return wrapper;
+  }
+  const loginPass = $('password');
+  const loginPasswordWrap = make('span');
+  loginPasswordWrap.className = 'crm-password-wrap';
+  loginPass.parentNode.insertBefore(loginPasswordWrap, loginPass);
+  loginPasswordWrap.append(loginPass, eyeToggle(loginPass));
   const linkedPassword = make('input'); linkedPassword.type = 'password'; linkedPassword.autocomplete = 'new-password';
   linkedPassword.setAttribute('aria-label', 'Nueva contraseña para OGT');
-  linkedPassword.placeholder = 'Nueva contraseña (mínimo 12 caracteres)'; linkedPassword.hidden = true;
+  linkedPassword.placeholder = 'Nueva contraseña (mínimo 12 caracteres)';
+  const linkedPasswordWrap = passwordWrap(linkedPassword); linkedPasswordWrap.hidden = true;
   logout.insertAdjacentElement('afterend', addGoogle);
-  addGoogle.insertAdjacentElement('afterend', linkedPassword);
+  addGoogle.insertAdjacentElement('afterend', linkedPasswordWrap);
   linkedPassword.insertAdjacentElement('afterend', addPassword);
   const challenge = make('form'); challenge.hidden = true; challenge.id = 'crm-mfa';
   const fields = make('fieldset'), legend = make('legend', 'Verificaci\u00f3n en dos pasos');
@@ -68,7 +109,7 @@ export async function start() {
     if (!user) return;
     onboarding.hidden = false;
     login.hidden = true; googleLogin.hidden = true; signupToggle.hidden = true;
-    addGoogle.hidden = true; addPassword.hidden = true; linkedPassword.hidden = true;
+    addGoogle.hidden = true; addPassword.hidden = true; linkedPasswordWrap.hidden = true;
     logout.hidden = false;
     const verified = !!user.emailVerified, hasFactor = identity.hasSecondFactor();
     sendVerification.hidden = verified; reloadVerification.hidden = verified;
@@ -92,8 +133,8 @@ export async function start() {
     const user = identity.currentUser();
     const providers = new Set(user?.providerData?.map(p => p.providerId) || []);
     addGoogle.hidden = !user || providers.has('google.com');
-    linkedPassword.hidden = !user || providers.has('password');
-    addPassword.hidden = linkedPassword.hidden;
+    linkedPasswordWrap.hidden = !user || providers.has('password');
+    addPassword.hidden = linkedPasswordWrap.hidden;
   }
   function setBusy(busy) {
     identityBusy = busy; fields.disabled = busy; refresh.disabled = busy; logout.disabled = busy;
@@ -116,7 +157,7 @@ export async function start() {
     logout.hidden = !identity.currentUser();
     if (!identity.currentUser()) {
       login.hidden = false; googleLogin.hidden = false; signupToggle.hidden = false;
-      onboarding.hidden = true; addGoogle.hidden = true; addPassword.hidden = true; linkedPassword.hidden = true;
+      onboarding.hidden = true; addGoogle.hidden = true; addPassword.hidden = true; linkedPasswordWrap.hidden = true;
       message('El acceso requiere correo verificado, segundo factor y permisos expresos. Iniciá sesión o creá tu cuenta.'); return;
     }
     message('Verificando identidad, segundo factor y permisos...');
@@ -278,7 +319,7 @@ export async function start() {
     try {
       await identity.signOut();
       logout.hidden = true; login.hidden = false; googleLogin.hidden = false; signupToggle.hidden = false;
-      onboarding.hidden = true; addGoogle.hidden = true; addPassword.hidden = true; linkedPassword.hidden = true;
+      onboarding.hidden = true; addGoogle.hidden = true; addPassword.hidden = true; linkedPasswordWrap.hidden = true;
       message('Sesión cerrada.');
     }
     catch (error) { login.hidden = false; message('Los datos se ocultaron, pero no se pudo cerrar la sesi\u00f3n. Prob\u00e1 nuevamente.'); }
