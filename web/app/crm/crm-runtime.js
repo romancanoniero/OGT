@@ -13,6 +13,7 @@ export async function start() {
     status.append(document.createTextNode(String(text)));
   };
   const refresh = $('crm-refresh');
+  refresh.hidden = true; // Only meaningful after Firebase has an authenticated user.
   const logout = make('button', 'Cerrar sesi\u00f3n'); logout.type = 'button'; logout.hidden = true;
   refresh.insertAdjacentElement('afterend', logout);
   let signupMode = false;
@@ -104,13 +105,19 @@ export async function start() {
   const identity = createIdentity(sdk, auth, () => new sdk.RecaptchaVerifier(auth, 'crm-recaptcha', { size: 'normal' }));
   function clearData() { gate.reset(); clearTimeout(expiry); expiry = null; root.replaceChildren(); access = null; }
   function hideChallenge() { challenge.hidden = true; code.value = ''; verify.disabled = true; identity.cancel(); }
+  function setSignupMode(enabled) {
+    signupMode = enabled;
+    signupToggle.textContent = enabled ? 'Ya tengo una cuenta' : (mode === 'control' ? 'Crear cuenta de Control' : 'Crear cuenta de Empresas');
+    login.querySelector('button[type="submit"]').textContent = enabled ? 'Registrarme' : 'Ingresar';
+    $('password').autocomplete = enabled ? 'new-password' : 'current-password';
+  }
   function showEnrollment() {
     const user = identity.currentUser();
     if (!user) return;
     onboarding.hidden = false;
     login.hidden = true; googleLogin.hidden = true; signupToggle.hidden = true;
     addGoogle.hidden = true; addPassword.hidden = true; linkedPasswordWrap.hidden = true;
-    logout.hidden = false;
+    logout.hidden = false; refresh.hidden = false;
     const verified = !!user.emailVerified, hasFactor = identity.hasSecondFactor();
     sendVerification.hidden = verified; reloadVerification.hidden = verified;
     beginTotp.hidden = !verified || hasFactor;
@@ -123,6 +130,17 @@ export async function start() {
   }
   function fail(error) {
     clearData();
+    refresh.hidden = !identity.currentUser();
+    if (error.code === 'auth/email-already-in-use' && signupMode) {
+      // Registering an existing Firebase identity is not a recoverable signup.
+      // Return to sign-in without losing the entered email or granting access.
+      setSignupMode(false);
+      $('password').value = '';
+      login.hidden = false; googleLogin.hidden = false; signupToggle.hidden = false;
+      onboarding.hidden = true; challenge.hidden = true;
+      message('Esta dirección ya tiene una cuenta. Ingresá con Google o con tu contraseña existente. No hace falta registrarte nuevamente para ser administrador.');
+      return;
+    }
     if (error.code === 'STEP_UP_REQUIRED' && identity.currentUser()) {
       showEnrollment(); message(friendlyError(error)); return;
     }
@@ -157,6 +175,7 @@ export async function start() {
   async function checkAccess() {
     clearData(); const task = gate.next();
     logout.hidden = !identity.currentUser();
+    refresh.hidden = !identity.currentUser();
     if (!identity.currentUser()) {
       login.hidden = false; googleLogin.hidden = false; signupToggle.hidden = false;
       onboarding.hidden = true; addGoogle.hidden = true; addPassword.hidden = true; linkedPasswordWrap.hidden = true;
@@ -205,9 +224,7 @@ export async function start() {
       const result = signupMode ? await identity.register(email, password) : await identity.signIn(email, password);
       if (signupMode) {
         try { await identity.sendVerification(); } catch (_) { /* the user can retry */ }
-        signupMode = false;
-        signupToggle.textContent = mode === 'control' ? 'Crear cuenta de Control' : 'Crear cuenta de Empresas';
-        login.querySelector('button[type="submit"]').textContent = 'Ingresar';
+        setSignupMode(false);
       }
       if (result.factors) {
         factor.replaceChildren();
@@ -220,13 +237,12 @@ export async function start() {
     if (complete) await checkAccess(); else if (!challenge.hidden) factor.focus();
   });
   signupToggle.addEventListener('click', () => {
-    signupMode = !signupMode;
-    signupToggle.textContent = signupMode ? 'Ya tengo una cuenta' : (mode === 'control' ? 'Crear cuenta de Control' : 'Crear cuenta de Empresas');
-    login.querySelector('button[type="submit"]').textContent = signupMode ? 'Registrarme' : 'Ingresar';
+    setSignupMode(!signupMode);
     message(signupMode ? (mode === 'control' ? 'Creá tu cuenta. El primer administrador solo se autoriza desde el servidor.' : 'Creá una cuenta. Para ver datos de empresas necesitás una invitación y permisos de la organización.') : 'Ingresá con tu cuenta existente.');
   });
   googleLogin.addEventListener('click', async () => {
     if (identityBusy) return;
+    setSignupMode(false); // Google is always an existing-account sign-in, not a second registration.
     clearData(); hideChallenge(); setBusy(true); message('Ingresando con Google...');
     let complete = false;
     try {
@@ -335,6 +351,7 @@ export async function start() {
     try {
       await identity.signOut();
       logout.hidden = true; login.hidden = false; googleLogin.hidden = false; signupToggle.hidden = false;
+      refresh.hidden = true; setSignupMode(false);
       onboarding.hidden = true; addGoogle.hidden = true; addPassword.hidden = true; linkedPasswordWrap.hidden = true;
       message('Sesión cerrada.');
     }
