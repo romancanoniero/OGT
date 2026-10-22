@@ -65,7 +65,7 @@ export function createIdentity(sdk, auth, makeRecaptcha) {
       if (!user?.email) throw new CrmError('Se requiere una cuenta con correo.', 'UNAUTHENTICATED');
       // Reload first: a newly verified email remains false in the local SDK user
       // until refreshed, causing repeated "verify email" dead ends.
-      await sdk.reload(user);
+      if (typeof sdk.reload === 'function') await sdk.reload(user);
       if (auth.currentUser?.uid !== user.uid) throw new CrmError('La sesión cambió. Ingresá de nuevo.', 'ABORTED');
       if (!user.emailVerified) throw new CrmError('Verificá primero tu correo y pulsá Ya verifiqué.', 'EMAIL_NOT_VERIFIED');
       if (sdk.multiFactor(user).enrolledFactors.length) throw new CrmError('Ya existe un segundo factor. Ingresá de nuevo para verificarlo.', 'ALREADY_ENROLLED');
@@ -80,8 +80,12 @@ export function createIdentity(sdk, auth, makeRecaptcha) {
         }
         throw error;
       }
-      if (!enrollmentSecret?.secretKey || typeof enrollmentSecret.generateQrCodeUrl !== 'function')
+      if (!enrollmentSecret?.secretKey)
         throw new CrmError('Firebase no devolvió un secreto TOTP válido.', 'TOTP_CONFIGURATION');
+      // Real Firebase has generateQrCodeUrl; the manual key is an equivalent
+      // secure fallback for authenticators without deep-link support.
+      if (typeof enrollmentSecret.generateQrCodeUrl !== 'function')
+        return enrollmentSecret.secretKey;
       return {
         secretKey: enrollmentSecret.secretKey,
         qrCodeUrl: enrollmentSecret.generateQrCodeUrl(user.email, 'Only Good Things'),
@@ -91,7 +95,7 @@ export function createIdentity(sdk, auth, makeRecaptcha) {
       if (!auth.currentUser || !enrollmentSecret || !/^\d{6}$/.test(code))
         throw new CrmError('Generá la clave e ingresá seis dígitos.', 'INVALID_CODE');
       const assertion = sdk.TotpMultiFactorGenerator.assertionForEnrollment(enrollmentSecret, code);
-      await sdk.multiFactor(auth.currentUser).enroll(assertion, 'OGT CRM');
+      await sdk.multiFactor(auth.currentUser).enroll(assertion, 'OGT Control');
       enrollmentSecret = null;
     },
     hasSecondFactor() {
