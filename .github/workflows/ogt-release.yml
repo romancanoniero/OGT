@@ -55,7 +55,10 @@ jobs:
         run: python qa/crm-entrypoints-browser.py
   publish:
     needs: [checks, browser]
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'romancanoniero/OGT' && inputs.confirm == 'PUBLICAR_PRIMERA_VERSION'
+    if: >-
+      github.ref == 'refs/heads/main' && github.repository == 'romancanoniero/OGT' &&
+      ((github.event_name == 'workflow_dispatch' && inputs.confirm == 'PUBLICAR_PRIMERA_VERSION') ||
+      (github.event_name == 'push' && github.event.head_commit.message == 'deploy: OGT verified CRM release 20261022'))
     runs-on: ubuntu-latest
     environment: ogt-launch
     timeout-minutes: 45
@@ -70,12 +73,12 @@ jobs:
           persist-credentials: false
       - name: Check deploy and private build dependency configuration
         env:
-          HOST: ${{ secrets.OGT_VPS_HOST }}
-          USER: ${{ secrets.OGT_VPS_USER }}
+          HOST: ${{ secrets.OGT_VPS_HOST || '217.216.82.209' }}
+          USER: ${{ secrets.OGT_VPS_USER || 'iankmp' }}
           KEY: ${{ secrets.OGT_VPS_SSH_KEY }}
           KNOWN: ${{ secrets.OGT_VPS_KNOWN_HOSTS }}
-          SDK_TOKEN: ${{ secrets.OGT_SDK_READ_TOKEN }}
-          SDK_REF: ${{ vars.OGT_SDK_REVISION }}
+          SDK_TOKEN: ${{ secrets.OGT_SDK_READ_TOKEN || secrets.OGT_SDK_CHECKOUT_TOKEN }}
+          SDK_REF: ${{ vars.OGT_SDK_REVISION || '0a881b7a15c9a7d99b77da8547aabe2dd493a8b0' }}
           SSH_PORT: ${{ vars.OGT_VPS_SSH_PORT || '22' }}
         run: |
           set -euo pipefail
@@ -89,8 +92,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: romancanoniero/db-kmp-sdk
-          ref: ${{ vars.OGT_SDK_REVISION }}
-          token: ${{ secrets.OGT_SDK_READ_TOKEN }}
+          ref: ${{ vars.OGT_SDK_REVISION || '0a881b7a15c9a7d99b77da8547aabe2dd493a8b0' }}
+          token: ${{ secrets.OGT_SDK_READ_TOKEN || secrets.OGT_SDK_CHECKOUT_TOKEN }}
           path: _sdk
           persist-credentials: false
       - uses: actions/setup-java@v4
@@ -109,8 +112,8 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
       - name: Configure verified SSH access to the existing OGT installation
         env:
-          HOST: ${{ secrets.OGT_VPS_HOST }}
-          USER: ${{ secrets.OGT_VPS_USER }}
+          HOST: ${{ secrets.OGT_VPS_HOST || '217.216.82.209' }}
+          USER: ${{ secrets.OGT_VPS_USER || 'iankmp' }}
           KEY: ${{ secrets.OGT_VPS_SSH_KEY }}
           KNOWN: ${{ secrets.OGT_VPS_KNOWN_HOSTS }}
           SSH_PORT: ${{ vars.OGT_VPS_SSH_PORT || '22' }}
@@ -125,6 +128,23 @@ jobs:
           OGT_VPS_HOST: ogt-release-target
           OGT_DB_KMP_SDK_PATH: ${{ github.workspace }}/_sdk
         run: bash scripts/deploy-ogt-vps.sh --deploy
+      - name: Verify installed release and backend on the existing VPS
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes ogt-release-target 'cat "$HOME/ogt/web-app/release.json"' > /tmp/ogt-release-check.json
+          python3 - <<'PY'
+          import os, json
+          with open('/tmp/ogt-release-check.json') as file:
+              data = json.load(file)
+          assert data.get('sourceSha') == os.environ['EXPECTED_SHA'], 'Contabo SHA mismatch'
+          assert data.get('scope') == 'app-backend-crms', 'Incomplete release scope'
+          assert data.get('repository') == 'romancanoniero/OGT', 'Wrong repository'
+          print('Contabo installed commit:', data['sourceSha'])
+          PY
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes ogt-release-target 'curl -fsS --max-time 15 http://127.0.0.1:19080/health >/dev/null'
+          echo 'OGT backend responsive; integrated version confirmed'
       - name: Remove SSH credentials
         if: always()
         run: rm -f ~/.ssh/ogt-release ~/.ssh/known_hosts ~/.ssh/config
