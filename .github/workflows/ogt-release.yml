@@ -54,6 +54,7 @@ jobs:
       - name: Public entrypoint and missing CRM assets regression (local fixtures)
         run: python qa/crm-entrypoints-browser.py
   publish:
+    # Only an explicitly named main-branch release may publish to the existing Contabo installation.
     needs: [checks, browser]
     if: >-
       github.ref == 'refs/heads/main' && github.repository == 'romancanoniero/OGT' &&
