@@ -47,8 +47,28 @@ ssh -G "$OGT_VPS_HOST" | awk '
 ' || { echo 'El acceso usa un proxy SSH. Se requiere configurar la red de revision explicitamente.' >&2; exit 1; }
 echo '[1/4] Comprobando codigo y pruebas locales; no se modifica Contabo.'
 bash scripts/deploy-ogt-vps.sh --check
-echo '[2/4] Preparando acceso privado en la MISMA instalacion OGT.'
-"${SSH[@]}" "$OGT_VPS_HOST" 'python3 - --apply' < scripts/prepare-ogt-review.py
+echo '[2/4] Verificando el dominio desde la Mac y preparando acceso privado en la MISMA instalacion OGT.'
+EXPECTED_SERVER="$(python3 - <<'PY'
+import ipaddress, socket, sys
+rows = socket.getaddrinfo('onlygoodthings.lat', 443, type=socket.SOCK_STREAM)
+addresses = sorted({str(ipaddress.ip_address(row[4][0])) for row in rows})
+if len(addresses) != 1:
+    print('El dominio debe resolver a una unica direccion publica para este procedimiento.', file=sys.stderr)
+    raise SystemExit(1)
+address = ipaddress.ip_address(addresses[0])
+if not address.is_global:
+    print('La direccion publicada del dominio no es global.', file=sys.stderr)
+    raise SystemExit(1)
+print(address)
+PY
+)"
+ACTUAL_SERVER="$("${SSH[@]}" "$OGT_VPS_HOST" 'python3 -c "import os; p=os.environ.get('''SSH_CONNECTION''','''''').split(); print(p[2] if len(p)==4 else '''''')"' )"
+test -n "$ACTUAL_SERVER" || { echo 'No se pudo obtener la direccion de destino de la sesion SSH.' >&2; exit 1; }
+test "$ACTUAL_SERVER" = "$EXPECTED_SERVER" || {
+  echo 'El dominio resuelto por la Mac no apunta al mismo destino que la sesion SSH. No se publica.' >&2
+  exit 1
+}
+"${SSH[@]}" "$OGT_VPS_HOST" "python3 - --apply --expected-server '$EXPECTED_SERVER'" < scripts/prepare-ogt-review.py
 echo '[3/4] Compilando y publicando app, backend y CRM con respaldo previo.'
 bash scripts/deploy-ogt-vps.sh --deploy
 echo '[4/4] Verificando las paginas por HTTPS desde esta Mac.'
