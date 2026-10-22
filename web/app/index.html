@@ -4,17 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Only Good Things (OGT)</title>
-  <link rel="icon" href="ogt-logo.png" type="image/png">
+  <link rel="icon" href="/ogt-logo.png" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=modulos">
+  <link rel="stylesheet" href="/styles.css?v=modulos">
 </head>
 <body>
   <div id="auth-root" hidden></div>
   <div class="shell" id="app-shell">
     <aside class="nav" aria-label="Navegación principal">
       <div class="brand">
-        <img class="ogt-mark ogt-mark--nav" src="ogt-logo.png?v=mark" alt="">
+        <img class="ogt-mark ogt-mark--nav" src="/ogt-logo.png?v=mark" alt="">
         <span class="brand-name">Only Good Things (OGT)</span>
       </div>
       <div id="nav-links"></div>
@@ -68,20 +68,7 @@
   </script>
   <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-  <script src="auth.js?v=google-home"></script>
-  <script>
-    fetch("icons/qs.svg?v=lupa2").then((r) => r.text()).then((svg) => {
-      document.getElementById("icons").innerHTML = svg;
-    }).then(() => {
-      const db = document.createElement("script");
-      db.src = "ogt-sdk.js?v=chat-live";
-      db.onload = function () {
-        const s = document.createElement("script");
-        s.src = "app.js?v=portada";
-        document.body.appendChild(s);
-      };
-      document.body.appendChild(db);
-    });
-  </script>
+  <script src="/auth.js?v=google-home"></script>
+  <script src="/bootstrap.js?v=entrypoint-20261022"></script>
 </body>
 </html>

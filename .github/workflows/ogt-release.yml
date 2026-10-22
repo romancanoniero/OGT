@@ -51,6 +51,8 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Browser regression with mocked identity and API, not live MFA
         run: python qa/crm-browser.py
+      - name: Public entrypoint and missing CRM assets regression (local fixtures)
+        run: python qa/crm-entrypoints-browser.py
   publish:
     needs: [checks, browser]
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'romancanoniero/OGT' && inputs.confirm == 'PUBLICAR_PRIMERA_VERSION'
