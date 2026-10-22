@@ -127,7 +127,9 @@ export async function start() {
       showEnrollment(); message(friendlyError(error)); return;
     }
     onboarding.hidden = true; login.hidden = false; googleLogin.hidden = false; signupToggle.hidden = false;
-    if (error.code !== 'ABORTED') message(friendlyError(error));
+    if (error.code === 'FORBIDDEN' && mode === 'control' && identity.currentUser()) {
+      message('El ingreso fue reconocido, pero faltan permisos de OGT Control. Revisá la autorización inicial del correo OWNER en la configuración privada de Contabo; no se asignan privilegios desde esta pantalla.');
+    } else if (error.code !== 'ABORTED') message(friendlyError(error));
   }
   function showLinkMethods() {
     const user = identity.currentUser();
