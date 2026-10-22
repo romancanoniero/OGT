@@ -61,7 +61,7 @@ export function createApi(fetcher, timeoutMs = 15000) {
 export function friendlyError(error) {
   const code = String(error?.code || '');
   if (/email-already-in-use/.test(code)) return 'Ya existe una cuenta con ese correo. Ingresá con Google o con tu contraseña; no crees otra cuenta de administrador.';
-  if (/operation-not-allowed/.test(code)) return 'El registro con correo y contraseña no está habilitado en Firebase Authentication de OGT. Usá Ingresar con Google o habilitá ese método en Firebase.';
+  if (/operation-not-allowed/.test(code)) return 'El método elegido no está habilitado en Firebase Authentication de OGT. Revisá Google o correo y contraseña en Sign-in method.';
   if (/weak-password|password-does-not-meet-requirements/.test(code)) return 'La contraseña no cumple los requisitos de seguridad de Firebase. Elegí una clave más larga y segura.';
   if (/invalid-email/.test(code)) return 'El correo electrónico ingresado no es válido.';
   if (/account-exists-with-different-credential|credential-already-in-use/.test(code)) return 'La cuenta ya tiene otro método de ingreso. Accedé con el método original y después vinculá Google o la contraseña.';
