@@ -151,7 +151,7 @@ class DeploymentSourceTests(unittest.TestCase):
             env.pop('OGT_RELEASE_GRADLE_HOME', None)
             result = subprocess.run(
                 ['bash', '-euo', 'pipefail', '-c',
-                 setup + '\\n' + 'printf "CHOSEN=%s\\n" "$GRADLE_USER_HOME"'],
+                 setup + '\n' + 'printf "CHOSEN=%s\\n" "$GRADLE_USER_HOME"'],
                 env=env, text=True, capture_output=True, check=True,
             )
             expected = str(Path(folder) / '.cache' / 'ogt-release-gradle')
