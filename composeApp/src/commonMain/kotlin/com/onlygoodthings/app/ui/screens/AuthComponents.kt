@@ -13,12 +13,18 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.contentType
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -61,6 +67,7 @@ internal fun AuthField(
     otp: Boolean = false,
     onChange: (String) -> Unit,
 ) {
+    var passwordVisible by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(label, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
         OutlinedTextField(
@@ -70,8 +77,24 @@ internal fun AuthField(
                 if (otp) Modifier.semantics { contentType = ContentType.SmsOtpCode } else Modifier,
             ),
             placeholder = { Text(hint) },
-            visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
-            keyboardOptions = if (otp) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
+            visualTransformation = if (secret && !passwordVisible) PasswordVisualTransformation() else VisualTransformation.None,
+            keyboardOptions = when {
+                otp -> KeyboardOptions(keyboardType = KeyboardType.Number)
+                secret -> KeyboardOptions(keyboardType = KeyboardType.Password)
+                else -> KeyboardOptions.Default
+            },
+            trailingIcon = if (secret) {
+                {
+                    IconButton(
+                        onClick = { passwordVisible = !passwordVisible },
+                        modifier = Modifier.semantics {
+                            contentDescription = if (passwordVisible) "Ocultar contraseña" else "Mostrar contraseña"
+                        },
+                    ) {
+                        Text(if (passwordVisible) "🙈" else "👁", fontSize = 21.sp)
+                    }
+                }
+            } else null,
             singleLine = true,
             maxLines = 1,
             shape = AuthCorner,
