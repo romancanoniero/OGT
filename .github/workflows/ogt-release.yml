@@ -1,0 +1,128 @@
+name: OGT - primera version integrada
+on:
+  push:
+    branches: [main, 'release/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Publicar app, backend y CRM en la instalacion existente; acceso privado'
+        required: true
+        type: choice
+        default: SOLO_COMPROBAR
+        options: [SOLO_COMPROBAR, PUBLICAR_PRIMERA_VERSION]
+permissions:
+  contents: read
+concurrency:
+  group: ogt-release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Source checks; no server access
+        run: bash scripts/deploy-ogt-vps.sh --check
+      - name: Shell syntax
+        run: bash -n scripts/deploy-ogt-vps.sh scripts/activate-ogt-release.sh
+  browser:
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          pip install 'playwright==1.56.0'
+          python -m playwright install --with-deps chromium
+      - name: Browser regression with mocked identity and API, not live MFA
+        run: python qa/crm-browser.py
+  publish:
+    needs: [checks, browser]
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'romancanoniero/OGT' && inputs.confirm == 'PUBLICAR_PRIMERA_VERSION'
+    runs-on: ubuntu-latest
+    environment: ogt-launch
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: ogt
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: ogt
+          persist-credentials: false
+      - name: Check deploy and private build dependency configuration
+        env:
+          HOST: ${{ secrets.OGT_VPS_HOST }}
+          USER: ${{ secrets.OGT_VPS_USER }}
+          KEY: ${{ secrets.OGT_VPS_SSH_KEY }}
+          KNOWN: ${{ secrets.OGT_VPS_KNOWN_HOSTS }}
+          SDK_TOKEN: ${{ secrets.OGT_SDK_READ_TOKEN }}
+          SDK_REF: ${{ vars.OGT_SDK_REVISION }}
+          SSH_PORT: ${{ vars.OGT_VPS_SSH_PORT || '22' }}
+        run: |
+          set -euo pipefail
+          for name in HOST USER KEY KNOWN SDK_TOKEN SDK_REF; do
+            test -n "${!name}" || { echo "::error::Falta configuracion de ogt-launch: $name. Ver docs/FIRST_RELEASE.md"; exit 1; }
+          done
+          [[ "$HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$USER" =~ ^[a-zA-Z0-9_][a-zA-Z0-9_-]*$ ]]
+          [[ "$SDK_REF" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$SSH_PORT" =~ ^[0-9]{1,5}$ ]] && test "$SSH_PORT" -ge 1 && test "$SSH_PORT" -le 65535
+      - uses: actions/checkout@v4
+        with:
+          repository: romancanoniero/db-kmp-sdk
+          ref: ${{ vars.OGT_SDK_REVISION }}
+          token: ${{ secrets.OGT_SDK_READ_TOKEN }}
+          path: _sdk
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Android build prerequisites
+        run: |
+          test -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Configure verified SSH access to the existing OGT installation
+        env:
+          HOST: ${{ secrets.OGT_VPS_HOST }}
+          USER: ${{ secrets.OGT_VPS_USER }}
+          KEY: ${{ secrets.OGT_VPS_SSH_KEY }}
+          KNOWN: ${{ secrets.OGT_VPS_KNOWN_HOSTS }}
+          SSH_PORT: ${{ vars.OGT_VPS_SSH_PORT || '22' }}
+        run: |
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/ogt-release
+          printf '%s\n' "$KNOWN" > ~/.ssh/known_hosts
+          printf 'Host ogt-release-target\n  HostName %s\n  User %s\n  Port %s\n  IdentityFile ~/.ssh/ogt-release\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n' "$HOST" "$USER" "$SSH_PORT" > ~/.ssh/config
+      - name: Compile, test, back up, migrate and publish the same version
+        env:
+          OGT_VPS_HOST: ogt-release-target
+          OGT_DB_KMP_SDK_PATH: ${{ github.workspace }}/_sdk
+        run: bash scripts/deploy-ogt-vps.sh --deploy
+      - name: Remove SSH credentials
+        if: always()
+        run: rm -f ~/.ssh/ogt-release ~/.ssh/known_hosts ~/.ssh/config

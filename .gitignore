@@ -52,3 +52,7 @@ qa/artifacts/
 /.recovery/
 /secrets
 /README.txt
+
+# Python release validation caches
+__pycache__/
+*.pyc

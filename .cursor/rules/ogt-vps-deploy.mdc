@@ -1,16 +1,13 @@
 ---
-description: Tras un cambio visible, deployar OGT a la VPS
+description: Publicacion integrada de la primera version de OGT
 alwaysApply: true
 ---
-
-# Deploy a la VPS
-
-Después de cada cambio que se pueda probar (web, API, migraciones, feed, auth, media), desplegar a la VPS **sin preguntar**. No esperar a que lo pida.
-
-```bash
-bash scripts/deploy-ogt-vps.sh
-```
-
-Sitio: `https://onlygoodthings.lat`. Health: `http://217.216.82.209:19080/health`.
-
-No subir `.env` ni secretos. No aplica a solo docs, reglas, o un cambio que viva únicamente en el simulador iOS sin tocar backend/web.
+Trabajar exclusivamente en romancanoniero/OGT. Seguir docs/FIRST_RELEASE.md.
+Una release contiene web, SDK, backend, CRM y migracion, nunca solo pantallas.
+Comprobar con bash scripts/deploy-ogt-vps.sh --check.
+Con autorizacion de publicacion, acceso existente y precondiciones verificadas,
+usar bash scripts/deploy-ogt-vps.sh --deploy. No saltar tests, respaldo, MFA o
+control de redes de prelaunch. No interpretar un build correcto como apertura
+publica ni como aceptacion de todos los modulos de negocio.
+No pedir un segundo servidor, DB o dominio de staging. No subir .env ni secretos.
+Sitio previsto: https://onlygoodthings.lat. Acceso directo a puertos solo local.

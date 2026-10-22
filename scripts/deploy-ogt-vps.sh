@@ -1,91 +1,63 @@
 #!/usr/bin/env bash
-# Compila el backend en esta máquina y lo levanta en la VPS (~/ogt) con Docker.
+# One existing installation: app, backend and both CRMs. Never a static-only release.
 set -euo pipefail
-
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-HOST="${OGT_VPS_HOST:-iankmp-vps}"
-REMOTE="${OGT_VPS_DIR:-ogt}"
-PORT="${OGT_VPS_PORT:-19080}"
-
-# Stop before rsync or service changes when production authentication is unsafe.
-ssh -o BatchMode=yes "$HOST" python3 - "$REMOTE" <<'CHECK_AUTH'
-from pathlib import Path
-import sys
-env_path = Path.home() / sys.argv[1] / '.env'
-if not env_path.is_file():
-    sys.exit('Deployment blocked: configure production Firebase credentials and .env first.')
-values = {}
-for line in env_path.read_text().splitlines():
-    if '=' in line and not line.lstrip().startswith('#'):
-        key, value = line.split('=', 1)
-        values[key.strip()] = value.strip().strip('\"\'')
-if values.get('OGT_ENV', 'production') != 'production' or values.get('OGT_ALLOW_DEV_TOKENS', 'false') != 'false' or values.get('FIREBASE_AUTH_EMULATOR_HOST'):
-    sys.exit('Deployment blocked: production must reject laboratory tokens and Firebase emulators.')
-if not (values.get('OGT_FIREBASE_CREDENTIALS') or values.get('GOOGLE_APPLICATION_CREDENTIALS')):
-    sys.exit('Deployment blocked: configure Firebase Admin credentials inside the API container first.')
-CHECK_AUTH
-
 cd "$ROOT"
-echo "Compilando :backend:installDist y el SDK web…"
-./gradlew :backend:installDist :shared:syncWebSdk --quiet
-
+MODE="${1:---check}"
+case "$MODE" in --check|--deploy) ;; *) echo 'Use --check or --deploy' >&2; exit 2;; esac
+REMOTE_URL="$(git remote get-url origin)"
+case "$REMOTE_URL" in https://github.com/romancanoniero/OGT|https://github.com/romancanoniero/OGT.git|git@github.com:romancanoniero/OGT.git) ;; *) echo 'Wrong repository' >&2; exit 1;; esac
+SHA="$(git rev-parse HEAD)"
+test -z "$(git status --porcelain --untracked-files=normal)" || { echo 'Commit or remove local changes before building a release' >&2; exit 1; }
+for tool in node python3 git; do command -v "$tool" >/dev/null; done
+for path in web/app/crm/control/index.html web/app/crm/empresas/index.html backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmRoutes.kt database/migrations/23_crm_foundations.sql; do
+  test -s "$path" || { echo "Missing integrated component: $path" >&2; exit 1; }
+done
+node --check web/app/app.js
+node --check web/app/auth.js
+find web/app/crm -type f -name '*.js' -print0 | xargs -0 -n 1 node --check
+node --test qa/auth-unit.test.mjs qa/crm-*.test.mjs
+python3 -m unittest discover -s qa -p 'test_release*.py' -v
+if [ "$MODE" = --check ]; then
+  echo 'Source checks passed. No build, SSH connection or deployment was performed.'
+  exit 0
+fi
+for tool in java rsync ssh tar; do command -v "$tool" >/dev/null; done
+SDK="${OGT_DB_KMP_SDK_PATH:-/Users/romancanoniero/AndroidStudioProjects/db-kmp-sdk}"
+test -f "$SDK/settings.gradle.kts" || { echo 'Set OGT_DB_KMP_SDK_PATH to the existing private db-kmp-sdk checkout' >&2; exit 1; }
+SDK_SHA="$(git -C "$SDK" rev-parse HEAD)"
+test -z "$(git -C "$SDK" status --porcelain)" || { echo 'Commit the SDK changes before release' >&2; exit 1; }
+# No -x test and no reuse of an unverified static bundle.
+./gradlew "-Pogt.dbKmpSdkPath=$SDK" :backend:test :shared:jvmTest :backend:installDist :shared:syncWebSdk --no-daemon
+# Building may create ignored SDK output, but must not alter tracked source.
+git diff --exit-code --quiet
+git diff --cached --exit-code --quiet
 DIST="$ROOT/backend/build/install/backend"
-if [[ ! -x "$DIST/bin/backend" ]]; then
-  echo "No está el dist de backend en $DIST" >&2
-  exit 1
-fi
-
-ssh -o BatchMode=yes "$HOST" "mkdir -p ~/$REMOTE/database"
-rsync -az --delete "$DIST/" "$HOST:~/$REMOTE/backend-dist/"
-rsync -az --delete "$ROOT/database/migrations/" "$HOST:~/$REMOTE/database/migrations/"
-rsync -az --delete "$ROOT/web/app/" "$HOST:~/$REMOTE/web-app/"
-rsync -az "$ROOT/web/app/nginx.conf" "$HOST:~/$REMOTE/web-nginx.conf"
-rsync -az "$ROOT/deploy/vps/Dockerfile" "$ROOT/deploy/vps/docker-compose.yml" "$HOST:~/$REMOTE/"
-
-ssh -o BatchMode=yes "$HOST" bash -s -- "$REMOTE" "$PORT" <<'REMOTE'
-set -euo pipefail
-REMOTE_DIR="$1"
-PORT="$2"
-cd "$HOME/$REMOTE_DIR"
-if [[ ! -f .env ]]; then
-  PASS="$(openssl rand -hex 18)"
-  umask 077
-  cat > .env <<EOF
-OGT_DB_USER=ogt
-OGT_DB_PASSWORD=$PASS
-OGT_ENV=production
-OGT_ALLOW_DEV_TOKENS=false
-OGT_FIREBASE_PROJECT_ID=goodthings-55612
-OGT_FIREBASE_CREDENTIALS=
-EOF
-  echo "Creé ~/${REMOTE_DIR}/.env (no se sube al repo)."
-fi
-docker compose up -d --build
-# nginx no recarga /db si solo cambió el bind-mount: recrear el contenedor web.
-docker compose up -d --force-recreate --no-deps web
-echo "Aplicando migraciones incrementales…"
-# 01–16 ya están en la VPS. Desde 17 en adelante, cada archivo nuevo.
-for f in database/migrations/1[7-9]_*.sql database/migrations/[2-9][0-9]_*.sql; do
-  if [[ -f "$f" ]]; then
-    echo "  $f"
-    docker exec -i ogt-postgres psql -U ogt -d onlygoodthings < "$f"
-  fi
-done
-echo "Esperando /health…"
-for i in $(seq 1 40); do
-  if curl -fsS "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then
-    curl -sS "http://127.0.0.1:${PORT}/health"
-    echo
-    exit 0
-  fi
-  sleep 2
-done
-echo "El API no respondió en :${PORT}" >&2
-docker compose logs --tail=80 api
-exit 1
-REMOTE
-
-echo "Backend OGT: http://217.216.82.209:${PORT}/health"
-echo "Web OGT:     https://onlygoodthings.lat/"
-echo "Sondeando wss://onlygoodthings.lat/db (corta sola, sin curl -N)…"
-python3 "$ROOT/scripts/probe-ogt-db.py"
+test -x "$DIST/bin/backend"
+test -s web/app/ogt-sdk.js
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+mkdir -p "$WORK/release/database/migrations" "$WORK/release/scripts"
+cp -R "$DIST" "$WORK/release/backend-dist"
+cp -R web/app "$WORK/release/web-app"
+cp deploy/vps/Dockerfile deploy/vps/docker-compose.yml "$WORK/release/"
+cp web/app/nginx.conf "$WORK/release/web-nginx.conf"
+# Existing application schema is a prerequisite; never replay demo seed migrations.
+cp database/migrations/23_crm_foundations.sql "$WORK/release/database/migrations/"
+cp scripts/release_guard.py scripts/activate-ogt-release.sh "$WORK/release/scripts/"
+printf '{"sdkCommit":"%s"}\n' "$SDK_SHA" > "$WORK/release/build-inputs.json"
+python3 scripts/release_guard.py manifest "$WORK/release" "$SHA"
+python3 scripts/release_guard.py verify "$WORK/release" "$SHA"
+HOST="${OGT_VPS_HOST:-iankmp-vps}"
+[[ "$HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]] || { echo 'Use a configured SSH alias, not a shell expression' >&2; exit 1; }
+ID="$SHA-$(date -u +%Y%m%dT%H%M%SZ)"
+SSH=(ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15)
+# First check is read-only. The existing installation and credentials must exist.
+"${SSH[@]}" "$HOST" 'test -f "$HOME/ogt/.env" && test -f "$HOME/ogt/docker-compose.yml"'
+"${SSH[@]}" "$HOST" "mkdir -p ogt/releases/$ID"
+rsync -az -e 'ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15' "$WORK/release/" "$HOST:ogt/releases/$ID/"
+"${SSH[@]}" "$HOST" "bash ogt/releases/$ID/scripts/activate-ogt-release.sh $ID $SHA"
+echo 'Private first-version deployment finished. Public launch and real-account acceptance remain separate.'
+echo 'OGT: https://onlygoodthings.lat/'
+echo 'Control: https://onlygoodthings.lat/crm/control/'
+echo 'Empresas: https://onlygoodthings.lat/crm/empresas/'
