@@ -254,10 +254,23 @@ export async function start() {
   });
   beginTotp.addEventListener('click', async () => {
     try {
-      const key = await identity.startTotpEnrollment();
-      totpSecret.textContent = 'Ingresá esta clave en tu autenticador: ' + key + '. No la compartas.';
+      const setup = await identity.startTotpEnrollment();
+      // The otpauth URI stays in the user's browser; never request QR images
+      // from external servers with the private TOTP enrollment secret.
+      totpSecret.replaceChildren();
+      const instruction = make('span', '1. Agregá una cuenta en tu aplicación autenticadora. Clave manual: ');
+      const secret = make('strong', setup.secretKey);
+      secret.setAttribute('data-totp-secret', '');
+      totpSecret.append(instruction, secret, make('span', '. No la compartas. '));
+      if (setup.qrCodeUrl?.startsWith('otpauth://totp/')) {
+        const deepLink = make('a', 'Abrir mi aplicación autenticadora');
+        deepLink.href = setup.qrCodeUrl;
+        deepLink.rel = 'noreferrer';
+        deepLink.setAttribute('aria-label', 'Abrir configuración TOTP en la aplicación autenticadora');
+        totpSecret.append(make('span', ' '), deepLink);
+      }
       totpCode.hidden = false; confirmTotp.hidden = false; beginTotp.hidden = true;
-      message('Ingresá el código de seis dígitos de la aplicación autenticadora.');
+      message('2. Ingresá el código de seis dígitos que genera tu aplicación y pulsá Confirmar segundo factor.');
     } catch (error) { message(friendlyError(error)); }
   });
   confirmTotp.addEventListener('click', async () => {
@@ -265,7 +278,7 @@ export async function start() {
     setBusy(true);
     try {
       await identity.confirmTotpEnrollment(totpCode.value.trim());
-      totpSecret.textContent = ''; totpCode.value = ''; totpCode.hidden = true;
+      totpSecret.replaceChildren(); totpCode.value = ''; totpCode.hidden = true;
       confirmTotp.hidden = true;
       await identity.signOut();
       onboarding.hidden = true; login.hidden = false; googleLogin.hidden = false;
