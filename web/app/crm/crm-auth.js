@@ -68,7 +68,7 @@ export function createIdentity(sdk, auth, makeRecaptcha) {
       return enrollmentSecret.secretKey;
     },
     async confirmTotpEnrollment(code) {
-      if (!auth.currentUser || !enrollmentSecret || !/^\\d{6}$/.test(code))
+      if (!auth.currentUser || !enrollmentSecret || !/^\d{6}$/.test(code))
         throw new CrmError('Generá la clave e ingresá seis dígitos.', 'INVALID_CODE');
       const assertion = sdk.TotpMultiFactorGenerator.assertionForEnrollment(enrollmentSecret, code);
       await sdk.multiFactor(auth.currentUser).enroll(assertion, 'OGT Control');
