@@ -74,6 +74,7 @@ export function friendlyError(error) {
   if (/too-many-requests/.test(code)) return 'Demasiados intentos. Prob\u00e1 m\u00e1s tarde.';
   if (/code-expired|multi-factor-session/.test(code)) return 'La verificaci\u00f3n venci\u00f3. Inici\u00e1 sesi\u00f3n nuevamente.';
   if (/unauthorized-domain/.test(code)) return 'Este dominio no est\u00e1 autorizado en Firebase.';
+  if (/^auth\/[a-z0-9-]{1,80}$/.test(code)) return 'Firebase rechazó la operación (' + code + '). Revisá el método de acceso e intentá nuevamente.';
   if (error instanceof CrmError) return error.message;
   return 'No se pudo completar la operaci\u00f3n. Prob\u00e1 nuevamente.';
 }
