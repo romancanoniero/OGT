@@ -3,6 +3,24 @@ import { CrmError } from './crm-core.js';
 export function createIdentity(sdk, auth, makeRecaptcha) {
   let resolver, selected, verificationId, recaptcha, generation = 0;
   function cancel() { generation++; resolver = selected = verificationId = null; recaptcha?.clear(); recaptcha = null; }
+  async function authenticate(run) {
+    cancel(); const expected = generation;
+    try {
+      const result = await run();
+      if (generation !== expected) throw new CrmError('Ingreso cancelado.', 'ABORTED');
+      return { user: result.user };
+    } catch (error) {
+      if (generation !== expected) throw new CrmError('Ingreso cancelado.', 'ABORTED');
+      if (error.code !== 'auth/multi-factor-auth-required') throw error;
+      resolver = sdk.getMultiFactorResolver(auth, error);
+      if (!resolver.hints?.length) throw new CrmError('No hay factores disponibles.', 'INVALID_FACTOR');
+      return { factors: resolver.hints.map((hint, index) => ({
+        index, kind: hint.factorId,
+        label: hint.displayName || (hint.factorId === 'phone' ? hint.phoneNumber : 'Aplicación autenticadora'),
+      })) };
+    }
+  }
+  let enrollmentSecret = null;
   return {
     currentUser: () => auth.currentUser,
     subscribe: callback => sdk.onAuthStateChanged(auth, callback),
@@ -10,16 +28,57 @@ export function createIdentity(sdk, auth, makeRecaptcha) {
       if (!auth.currentUser) throw new CrmError('Inici\u00e1 sesi\u00f3n.', 'UNAUTHENTICATED', 401);
       return sdk.getIdToken(auth.currentUser, true);
     },
-    async signIn(email, password) {
-      cancel(); const expected = generation;
-      try { const result = await sdk.signInWithEmailAndPassword(auth, email, password); return { user: result.user }; }
-      catch (error) {
-        if (generation !== expected) throw new CrmError('Ingreso cancelado.', 'ABORTED');
-        if (error.code !== 'auth/multi-factor-auth-required') throw error;
-        resolver = sdk.getMultiFactorResolver(auth, error);
-        if (!resolver.hints?.length) throw new CrmError('No hay factores disponibles.', 'INVALID_FACTOR');
-        return { factors: resolver.hints.map((hint, index) => ({ index, kind: hint.factorId, label: hint.displayName || (hint.factorId === 'phone' ? hint.phoneNumber : 'Aplicaci\u00f3n autenticadora') })) };
-      }
+    signIn(email, password) {
+      return authenticate(() => sdk.signInWithEmailAndPassword(auth, email, password));
+    },
+    signInGoogle() {
+      const provider = new sdk.GoogleAuthProvider();
+      provider.addScope('email');
+      return authenticate(() => sdk.signInWithPopup(auth, provider));
+    },
+    register(email, password) {
+      return authenticate(() => sdk.createUserWithEmailAndPassword(auth, email, password));
+    },
+    async linkGoogle() {
+      const user = auth.currentUser;
+      if (!user) throw new CrmError('Iniciá sesión primero.', 'UNAUTHENTICATED');
+      const uid = user.uid;
+      const result = await sdk.linkWithPopup(user, new sdk.GoogleAuthProvider());
+      if (result.user.uid !== uid) throw new CrmError('La vinculación cambió la identidad.', 'ACCOUNT_MISMATCH');
+      return result.user;
+    },
+    async linkPassword(password) {
+      const user = auth.currentUser;
+      if (!user?.email) throw new CrmError('La cuenta requiere correo.', 'UNAUTHENTICATED');
+      const uid = user.uid;
+      const credential = sdk.EmailAuthProvider.credential(user.email, password);
+      const result = await sdk.linkWithCredential(user, credential);
+      if (result.user.uid !== uid) throw new CrmError('La vinculación cambió la identidad.', 'ACCOUNT_MISMATCH');
+      return result.user;
+    },
+    async sendVerification() {
+      if (!auth.currentUser) throw new CrmError('Iniciá sesión primero.', 'UNAUTHENTICATED');
+      await sdk.sendEmailVerification(auth.currentUser);
+    },
+    async startTotpEnrollment() {
+      if (!auth.currentUser?.email) throw new CrmError('Se requiere una cuenta con correo.', 'UNAUTHENTICATED');
+      if (!auth.currentUser.emailVerified) throw new CrmError('Verificá primero tu correo.', 'EMAIL_NOT_VERIFIED');
+      const session = await sdk.multiFactor(auth.currentUser).getSession();
+      enrollmentSecret = await sdk.TotpMultiFactorGenerator.generateSecret(session);
+      return enrollmentSecret.secretKey;
+    },
+    async confirmTotpEnrollment(code) {
+      if (!auth.currentUser || !enrollmentSecret || !/^\\d{6}$/.test(code))
+        throw new CrmError('Generá la clave e ingresá seis dígitos.', 'INVALID_CODE');
+      const assertion = sdk.TotpMultiFactorGenerator.assertionForEnrollment(enrollmentSecret, code);
+      await sdk.multiFactor(auth.currentUser).enroll(assertion, 'OGT Control');
+      enrollmentSecret = null;
+    },
+    hasSecondFactor() {
+      return !!auth.currentUser && sdk.multiFactor(auth.currentUser).enrolledFactors.length > 0;
+    },
+    async reloadCurrentUser() {
+      if (auth.currentUser) await sdk.reload(auth.currentUser);
     },
     async beginFactor(index) {
       generation++; const expected = generation;
@@ -44,6 +103,6 @@ export function createIdentity(sdk, auth, makeRecaptcha) {
       cancel(); return result.user;
     },
     cancel,
-    async signOut() { cancel(); await sdk.signOut(auth); },
+    async signOut() { cancel(); enrollmentSecret = null; await sdk.signOut(auth); },
   };
 }
