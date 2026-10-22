@@ -9,11 +9,10 @@
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>applinks:onlygoodthings.lat</string>
-		<string>applinks:onlygoodthings.lat?mode=developer</string>
 		<string>applinks:www.onlygoodthings.lat</string>
 		<string>applinks:ogt-app-links.web.app</string>
 	</array>
 	<key>aps-environment</key>
-	<string>development</string>
+	<string>production</string>
 </dict>
 </plist>

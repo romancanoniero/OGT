@@ -1,8 +1,11 @@
 package com.onlygoodthings.app
 
+import android.Manifest
 import android.app.Application
 import android.content.Context
+import android.content.pm.PackageManager
 import androidx.activity.ComponentActivity
+import androidx.core.content.ContextCompat
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.onlygoodthings.app.auth.AuthPrefs
@@ -16,9 +19,15 @@ class OgtApplication : Application() {
         FirebaseApp.initializeApp(this)
         // Emuladores: sin SafetyNet/Play Integrity. El SMS real se reemplaza por números de prueba.
         FirebaseAuth.getInstance().firebaseAuthSettings.setAppVerificationDisabledForTesting(true)
-        if (AuthPrefs().gpsEnabled) {
+        if (AuthPrefs().gpsEnabled && hasForegroundLocation()) {
             runCatching { OgtBackgroundLocation.start() }
         }
+    }
+
+    private fun hasForegroundLocation(): Boolean {
+        val fine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+        val coarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+        return fine == PackageManager.PERMISSION_GRANTED || coarse == PackageManager.PERMISSION_GRANTED
     }
 
     companion object {

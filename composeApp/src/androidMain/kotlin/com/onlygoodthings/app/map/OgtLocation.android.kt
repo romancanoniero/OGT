@@ -53,10 +53,12 @@ actual fun rememberOgtLocation(track: Boolean): OgtLocationState {
     var fix by remember { mutableStateOf<DeviceLocation?>(null) }
     var acquiring by remember { mutableStateOf(false) }
     var pendingAlways by remember { mutableStateOf(false) }
+    var requestInFlight by remember { mutableStateOf(false) }
 
     val backgroundLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) {
+        requestInFlight = false
         permission = readPermission(context, asked = true)
         servicesEnabled = isLocationEnabled(context)
         pendingAlways = false
@@ -64,6 +66,7 @@ actual fun rememberOgtLocation(track: Boolean): OgtLocationState {
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) {
+        requestInFlight = false
         permission = readPermission(context, asked = true)
         servicesEnabled = isLocationEnabled(context)
         if (permission.isGranted() && pendingAlways && Build.VERSION.SDK_INT >= 29) {
@@ -90,6 +93,7 @@ actual fun rememberOgtLocation(track: Boolean): OgtLocationState {
     }
 
     fun requestPermission(scope: LocationScope) {
+        if (requestInFlight) return
         pendingAlways = scope == LocationScope.ALWAYS
         val current = readPermission(context)
         if (current.covers(scope)) {
@@ -117,9 +121,11 @@ actual fun rememberOgtLocation(track: Boolean): OgtLocationState {
                 return
             }
             context.getSharedPreferences("ogt_auth", 0).edit().putBoolean("gps_bg_asked", true).apply()
+            requestInFlight = true
             backgroundLauncher.launch(arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION))
             return
         }
+        requestInFlight = true
         permissionLauncher.launch(
             arrayOf(
                 Manifest.permission.ACCESS_FINE_LOCATION,
