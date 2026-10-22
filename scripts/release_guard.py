@@ -12,6 +12,7 @@ BASE_URL = "https://onlygoodthings.lat"
 REQUIRED = (
     "backend-dist/bin/backend", "docker-compose.yml", "Dockerfile",
     "web-nginx.conf", "web-app/index.html", "web-app/ogt-sdk.js",
+    "web-app/google-logo.svg",
     "web-app/crm/control/index.html", "web-app/crm/empresas/index.html",
     "web-app/crm/crm.js", "web-app/crm/crm-core.js",
     "web-app/crm/crm-auth.js", "web-app/crm/crm-runtime.js",
