@@ -47,6 +47,78 @@ private data class CrmContext(
     val authTimeSeconds: Long,
 )
 
+/**
+ * One-time OWNER bootstrap. There is intentionally no public "first visitor wins"
+ * endpoint. The private server .env must pin the expected verified Firebase email.
+ * PostgreSQL advisory lock serializes concurrent requests; any existing staff row
+ * permanently disables automatic owner assignment.
+ */
+internal fun crmBootstrapEmailMatches(
+    verifiedEmail: String?,
+    emailVerified: Boolean,
+    configuredEmail: String?,
+): Boolean = emailVerified && !configuredEmail.isNullOrBlank() &&
+    !verifiedEmail.isNullOrBlank() &&
+    verifiedEmail.trim().equals(configuredEmail.trim(), ignoreCase = true)
+
+private fun bootstrapFirstControlOwner(
+    db: Database,
+    principal: AuthPrincipal,
+    verified: com.onlygoodthings.backend.auth.VerifiedFirebaseUser,
+) {
+    val expected = System.getenv("OGT_CONTROL_BOOTSTRAP_EMAIL")
+    if (!crmBootstrapEmailMatches(verified.email, verified.emailVerified, expected)) return
+    db.withConnection { conn ->
+        val oldAutoCommit = conn.autoCommit
+        conn.autoCommit = false
+        try {
+            conn.createStatement().use { statement ->
+                statement.execute("SELECT pg_advisory_xact_lock(26052, 12017)")
+            }
+            val anyStaff = conn.createStatement().use { statement ->
+                statement.executeQuery("SELECT EXISTS (SELECT 1 FROM crm_platform_staff)").use { rs ->
+                    rs.next()
+                    rs.getBoolean(1)
+                }
+            }
+            if (!anyStaff) {
+                val inserted = conn.prepareStatement(
+                    """INSERT INTO crm_platform_staff
+                       (user_id, staff_role, enabled, approved_by, approved_at)
+                       SELECT u.id, 'OWNER', TRUE, u.id, now()
+                       FROM users u
+                       WHERE u.id = ?::uuid AND u.firebase_uid = ?
+                         AND u.status = 'ACTIVE' AND lower(u.email) = lower(?)
+                       ON CONFLICT (user_id) DO NOTHING"""
+                ).use { stmt ->
+                    stmt.setString(1, principal.userId)
+                    stmt.setString(2, verified.firebaseUid)
+                    stmt.setString(3, expected!!.trim())
+                    stmt.executeUpdate()
+                }
+                if (inserted == 1) {
+                    conn.prepareStatement(
+                        """INSERT INTO crm_audit_events
+                           (actor_user_id, action, target_type, target_id, reason, outcome)
+                           VALUES (?::uuid, 'CONTROL_OWNER_BOOTSTRAP',
+                                   'platform_staff', ?, 'authorized_first_owner', 'SUCCESS')"""
+                    ).use { stmt ->
+                        stmt.setString(1, principal.userId)
+                        stmt.setString(2, principal.userId)
+                        stmt.executeUpdate()
+                    }
+                }
+            }
+            conn.commit()
+        } catch (error: Exception) {
+            conn.rollback()
+            throw error
+        } finally {
+            conn.autoCommit = oldAutoCommit
+        }
+    }
+}
+
 /** Every CRM request must independently pass MFA and current DB permissions. */
 private suspend fun crmContext(
     call: ApplicationCall, db: Database, verifier: FirebaseTokenVerifier,
@@ -72,6 +144,7 @@ private suspend fun crmContext(
         )
         return null
     }
+    bootstrapFirstControlOwner(db, principal, verified)
     val grants = db.withConnection { conn ->
         val staff = conn.prepareStatement(
             """SELECT s.staff_role FROM crm_platform_staff s
