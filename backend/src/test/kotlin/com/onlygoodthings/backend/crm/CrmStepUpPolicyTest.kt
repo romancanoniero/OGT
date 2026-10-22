@@ -22,4 +22,15 @@ class CrmStepUpPolicyTest {
         assertFalse(crmStepUpAllowed(true, true, now - 901, now))
         assertFalse(crmStepUpAllowed(true, true, now + 61, now))
     }
+
+    @Test fun bootstrapNeedsPinnedVerifiedEmail() {
+        assertTrue(crmBootstrapEmailMatches(
+            "owner@example.org", true, "OWNER@example.org"
+        ))
+        assertFalse(crmBootstrapEmailMatches("owner@example.org", false, "owner@example.org"))
+        assertFalse(crmBootstrapEmailMatches("other@example.org", true, "owner@example.org"))
+        assertFalse(crmBootstrapEmailMatches("owner@example.org", true, null))
+        assertFalse(crmBootstrapEmailMatches(null, true, "owner@example.org"))
+        assertFalse(crmBootstrapEmailMatches("owner@example.org", true, ""))
+    }
 }
