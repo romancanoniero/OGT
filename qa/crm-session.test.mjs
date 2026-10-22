@@ -132,3 +132,18 @@ test('TOTP enrollment needs verified email and checks the code with Firebase', a
   assert.ok(enrollment);
   assert.equal(f.identity.hasSecondFactor(), true);
 });
+
+test('registration errors identify the Firebase rejection without exposing internals', () => {
+  const errors = [
+    ['auth/email-already-in-use', 'Ya existe una cuenta'],
+    ['auth/operation-not-allowed', 'no está habilitado'],
+    ['auth/weak-password', 'no cumple'],
+    ['auth/unauthorized-domain', 'dominio'],
+    ['auth/account-exists-with-different-credential', 'otro método'],
+    ['auth/popup-blocked', 'ventana'],
+  ];
+  for (const [code, expected] of errors) {
+    assert.match(friendlyError({ code, message: 'INTERNAL PRIVATE DATA' }), new RegExp(expected));
+    assert.doesNotMatch(friendlyError({ code }), /INTERNAL PRIVATE DATA/);
+  }
+});
