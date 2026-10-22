@@ -4248,6 +4248,30 @@ function authProviders() {
     </div>`;
 }
 
+function enablePasswordVisibility(container) {
+  // Every password input in the public OGT login and signup screens.
+  for (const input of container.querySelectorAll('input[type="password"]')) {
+    if (input.closest('.auth-password-wrap')) continue;
+    const wrap = document.createElement('span');
+    wrap.className = 'auth-password-wrap';
+    input.parentNode.insertBefore(wrap, input);
+    wrap.append(input);
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'auth-password-toggle';
+    toggle.setAttribute('aria-label', 'Mostrar contraseña');
+    toggle.setAttribute('aria-pressed', 'false');
+    toggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path class="auth-eye-slash" d="M3 3 21 21"/></svg>';
+    toggle.addEventListener('click', () => {
+      const visible = input.type === 'password';
+      input.type = visible ? 'text' : 'password';
+      toggle.setAttribute('aria-pressed', String(visible));
+      toggle.setAttribute('aria-label', visible ? 'Ocultar contraseña' : 'Mostrar contraseña');
+    });
+    wrap.append(toggle);
+  }
+}
+
 function paintAuth(key, still, panel, card) {
   markScreen(key);
   setShell(false);
@@ -4268,6 +4292,7 @@ function paintAuth(key, still, panel, card) {
       ${authFoot()}
     </div>
     ${key === "portal" || key === "entrar" ? publicProductsHtml() : ""}`;
+  enablePasswordVisibility(document.getElementById("auth-root"));
 }
 
 function normalizePhone(raw) {
