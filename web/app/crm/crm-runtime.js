@@ -78,7 +78,7 @@ export async function start() {
   const linkedPasswordWrap = passwordWrap(linkedPassword); linkedPasswordWrap.hidden = true;
   logout.insertAdjacentElement('afterend', addGoogle);
   addGoogle.insertAdjacentElement('afterend', linkedPasswordWrap);
-  linkedPassword.insertAdjacentElement('afterend', addPassword);
+  linkedPasswordWrap.insertAdjacentElement('afterend', addPassword);
   const challenge = make('form'); challenge.hidden = true; challenge.id = 'crm-mfa';
   const fields = make('fieldset'), legend = make('legend', 'Verificaci\u00f3n en dos pasos');
   fields.append(legend);
