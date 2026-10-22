@@ -38,8 +38,15 @@ def parse_env(text):
     return result
 
 
-def prepare_text(text, client_ip):
+def prepare_text(text, client_ip, bootstrap_email=None):
     values = parse_env(text)
+    if bootstrap_email is not None:
+        if not re.fullmatch(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}', bootstrap_email):
+            raise PreparationError('El correo inicial debe tener formato valido.')
+        existing = values.get('OGT_CONTROL_BOOTSTRAP_EMAIL', '')
+        if existing and existing.casefold() != bootstrap_email.casefold():
+            raise PreparationError('La cuenta inicial ya fue configurada para otra identidad; no se cambia.')
+
     if values.get('OGT_LAUNCH_MODE', '') not in ('', 'prelaunch'):
         raise PreparationError('La instalacion no esta marcada para revision privada; no se cambia su politica.')
     if values.get('OGT_ENV') != 'production':
@@ -72,7 +79,7 @@ def prepare_text(text, client_ip):
     if not any(address.version == net.version and address in net for net in nets):
         nets.append(ipaddress.ip_network(f'{address}/{address.max_prefixlen}', strict=True))
     cidrs = ','.join(str(net) for net in dict.fromkeys(nets))
-    if values.get('OGT_LAUNCH_MODE') == 'prelaunch' and values.get('OGT_PRELAUNCH_CIDRS') == cidrs:
+    if values.get('OGT_LAUNCH_MODE') == 'prelaunch' and values.get('OGT_PRELAUNCH_CIDRS') == cidrs and (not bootstrap_email or values.get('OGT_CONTROL_BOOTSTRAP_EMAIL', '').casefold() == bootstrap_email.casefold()):
         return text, cidrs
     kept = []
     for line in text.splitlines(keepends=True):
@@ -81,7 +88,10 @@ def prepare_text(text, client_ip):
     body = ''.join(kept)
     if body and not body.endswith('\n'):
         body += '\n'
-    return body + f'OGT_LAUNCH_MODE=prelaunch\nOGT_PRELAUNCH_CIDRS={cidrs}\n', cidrs
+    configured = body + f'OGT_LAUNCH_MODE=prelaunch\nOGT_PRELAUNCH_CIDRS={cidrs}\n'
+    if bootstrap_email and not values.get('OGT_CONTROL_BOOTSTRAP_EMAIL'):
+        configured += f'OGT_CONTROL_BOOTSTRAP_EMAIL={bootstrap_email}\n'
+    return configured, cidrs
 
 
 def save_env(path, before, after):
@@ -255,6 +265,7 @@ def main():
     mode.add_argument('--apply', action='store_true')
     mode.add_argument('--diagnose', action='store_true')
     parser.add_argument('--expected-server')
+    parser.add_argument('--bootstrap-email')
     args = parser.parse_args()
     if args.diagnose:
         raise SystemExit(diagnose())
@@ -278,7 +289,7 @@ def main():
             stage = 'LECTURA_ENV'
             before = read_env(path)
             stage = 'CONFIGURACION'
-            after, cidrs = prepare_text(before, peer[0])
+            after, cidrs = prepare_text(before, peer[0], args.bootstrap_email)
             if args.apply:
                 stage = 'GUARDADO_ENV'
                 backup = save_env(path, before, after)
