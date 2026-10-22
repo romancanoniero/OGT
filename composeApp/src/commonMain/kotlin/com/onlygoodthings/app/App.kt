@@ -218,7 +218,8 @@ fun App() {
                 route == OgtRoute.ReportAnimal
             if (!session.gpsEnabled || !needsFix) return@LaunchedEffect
             when {
-                location.permission == LocationPermissionState.DENIED_FOREVER -> location.openSettings()
+                // No saltar a Ajustes solos: tapa el diálogo del sistema y Play lo toma como permiso sin aviso.
+                location.permission == LocationPermissionState.DENIED_FOREVER -> Unit
                 !location.permission.covers(session.locationScope) -> location.ensureScope(session.locationScope)
                 !location.servicesEnabled -> location.ensureServices()
                 else -> location.resync()
