@@ -350,6 +350,11 @@ final class OgtFirebaseHost: NSObject, IosAuthHost {
     }
 
     private static func finish(_ user: User?, _ error: Error?, _ onResult: (AuthUser?, String?) -> Void) {
+        // El segundo paso no es requisito de la app. Si Firebase ya dejó sesión, se entra igual.
+        if esSegundoPaso(error), let abierta = Auth.auth().currentUser ?? user {
+            onResult(map(abierta), nil)
+            return
+        }
         if let error {
             onResult(nil, mensaje(error))
         } else if let user {
@@ -382,8 +387,22 @@ final class OgtFirebaseHost: NSObject, IosAuthHost {
         case .sessionExpired: return "El código SMS venció. Pedí uno nuevo"
         case .quotaExceeded: return "Se agotó la cuota de SMS de Firebase"
         case .operationNotAllowed: return "Este método de ingreso no está habilitado en Firebase"
-        default: return ns.localizedDescription
+        case .secondFactorRequired: return Self.segundoPasoOpcional
+        default:
+            if Self.esSegundoPaso(error) { return Self.segundoPasoOpcional }
+            return ns.localizedDescription
         }
+    }
+
+    // La app no exige un segundo factor. Firebase lo pide solo si esa cuenta lo tiene activado.
+    private static let segundoPasoOpcional = "El segundo paso no es obligatorio para entrar. Esta cuenta lo tiene activado y Firebase frena la clave. Sin ese paso, el correo y la contraseña alcanzan."
+
+    private static func esSegundoPaso(_ error: Error?) -> Bool {
+        guard let error else { return false }
+        let ns = error as NSError
+        if AuthErrorCode(rawValue: ns.code) == .secondFactorRequired { return true }
+        let text = ns.localizedDescription.lowercased()
+        return text.contains("second factor") || text.contains("multi-factor") || text.contains("multifactor")
     }
 
     private static func topController() -> UIViewController? {
