@@ -13,9 +13,16 @@ export const getAuth=()=>auth;
 export const setPersistence=async()=>{};
 export function onAuthStateChanged(a,cb){listeners.push(cb);queueMicrotask(cb);return()=>{};}
 export const getIdToken=async()=> 'fixture-token';
-export const signInWithEmailAndPassword=async()=>{throw {code:'auth/multi-factor-auth-required'};};
+export const signInWithEmailAndPassword=async()=>{if(window.testEnroll){auth.currentUser={uid:'fixture',email:'fixture@example.test',emailVerified:true,providerData:[],enrolledFactors:[]};listeners.forEach(f=>f());return {user:auth.currentUser};}throw {code:'auth/multi-factor-auth-required'};};
+export class GoogleAuthProvider{addScope(){}}
+export const signInWithPopup=async()=>{throw {code:'auth/multi-factor-auth-required'};};
+export const createUserWithEmailAndPassword=async(a,e,p)=>{auth.currentUser={uid:'fixture',email:e,emailVerified:false,providerData:[],enrolledFactors:[]};listeners.forEach(f=>f());return {user:auth.currentUser};};
+export const multiFactor=user=>({enrolledFactors:user.enrolledFactors||[],getSession:async()=> 'new-mfa-session',enroll:async()=>{user.enrolledFactors=[{factorId:'totp'}];}});
+export const sendEmailVerification=async()=>{};
+export const reload=async()=>{};
+
 export function getMultiFactorResolver(){return {session:'mfa',hints:[{uid:'factor',factorId:window.testFactor||'totp',displayName:'Factor de prueba'}],resolveSignIn:async a=>{if(a.code!=='123456')throw {code:'auth/invalid-verification-code'};auth.currentUser={uid:'fixture'};listeners.forEach(f=>f());return {user:auth.currentUser};}};}
-export const TotpMultiFactorGenerator={assertionForSignIn:(uid,code)=>({code})};
+export const TotpMultiFactorGenerator={assertionForSignIn:(uid,code)=>({code}),generateSecret:async()=>({secretKey:'TEST-DO-NOT-USE'}),assertionForEnrollment:(secret,code)=>({secret,code})};
 export class PhoneAuthProvider{async verifyPhoneNumber(){return 'verification';}static credential(id,code){return {code};}}
 export const PhoneMultiFactorGenerator={assertion:x=>x};
 export class RecaptchaVerifier{clear(){}}
@@ -28,10 +35,10 @@ base='https://ogt-crm.test'
 with sync_playwright() as pw:
     executable=os.environ.get('CRM_CHROMIUM_PATH')
     browser=pw.chromium.launch(headless=True,**({'executable_path':executable} if executable else {}))
-    def session(mode='control',factor='totp'):
+    def session(mode='control',factor='totp',enroll=False):
         context=browser.new_context()
-        context.add_init_script("window.testFactor="+json.dumps(factor)+"; const original=window.fetch.bind(window); window.fetch=async (url,opts)=>{if(window.testDelay&&String(url).endsWith('/summary'))await new Promise(r=>setTimeout(r,400));return original(url,opts);};")
-        state={'deny':False,'mismatch':False,'requests':[]}
+        context.add_init_script("window.testFactor="+json.dumps(factor)+";window.testEnroll="+json.dumps(enroll)+"; const original=window.fetch.bind(window); window.fetch=async (url,opts)=>{if(window.testDelay&&String(url).endsWith('/summary'))await new Promise(r=>setTimeout(r,400));return original(url,opts);};")
+        state={'deny':False,'mismatch':False,'enroll':enroll,'requests':[]}
         def route(route):
             url=route.request.url
             if 'gstatic.com' in url:
@@ -40,6 +47,8 @@ with sync_playwright() as pw:
             if '/api/v1/crm/' in url:
                 body=route.request.post_data_json or {}
                 state['requests'].append((url,body))
+                if state['enroll']:
+                    route.fulfill(status=403,content_type='application/json',body=json.dumps({'success':False,'errorCode':'STEP_UP_REQUIRED','message':'Segundo factor obligatorio'}));return
                 if state['deny']:
                     route.fulfill(status=403,content_type='application/json',body=json.dumps({'success':False,'errorCode':'FORBIDDEN','message':'Acceso revocado'}));return
                 import time
@@ -91,5 +100,34 @@ with sync_playwright() as pw:
     context,page,state,errors=session('empresas');state['mismatch']=True;begin(page);finish(page)
     expect(page.locator('#crm-status')).to_contain_text('otra empresa');expect(page.locator('#crm-root')).to_be_empty()
     assert not errors,errors;context.close();results.append('Mismatched tenant response never displayed')
+    for mode in ['control','empresas']:
+        context,page,state,errors=session(mode,enroll=True)
+        page.locator('#email').fill('fixture@example.test')
+        page.locator('#password').fill('fixture-password')
+        page.get_by_role('button',name='Ingresar',exact=True).click()
+        expect(page.locator('#crm-onboarding')).to_be_visible()
+        expect(page.locator('#crm-root')).to_be_empty()
+        assert state['requests'] and all(path.endswith('/access') for path,_ in state['requests']),state['requests']
+        page.get_by_role('button',name='Configurar aplicación autenticadora').click()
+        expect(page.get_by_label('Código del autenticador')).to_be_visible()
+        page.get_by_label('Código del autenticador').fill('123456')
+        page.get_by_role('button',name='Confirmar segundo factor').click()
+        expect(page.locator('#crm-login')).to_be_visible()
+        expect(page.locator('#crm-onboarding')).to_be_hidden()
+        expect(page.locator('#crm-root')).to_be_empty()
+        assert not errors,errors
+        context.close()
+        results.append(mode+' cannot access before MFA; enrollment requires a new login')
+    for mode in ['control','empresas']:
+        context,page,state,errors=session(mode)
+        page.get_by_role('button',name='Ingresar con Google').click()
+        expect(page.locator('#crm-mfa')).to_be_visible()
+        page.get_by_role('button',name='Usar este factor').click()
+        page.locator('#crm-code').fill('123456')
+        page.get_by_role('button',name='Verificar e ingresar').click()
+        expect(page.locator('#crm-root')).not_to_be_empty()
+        assert not errors,errors
+        context.close()
+        results.append(mode+' Google sign-in also requires Firebase second factor')
     browser.close()
 print(json.dumps({'passed':len(results),'scenarios':results,'identityAndApi':'mocked; not real Firebase or Contabo'},ensure_ascii=True,indent=2))
