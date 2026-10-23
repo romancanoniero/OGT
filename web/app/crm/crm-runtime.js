@@ -267,12 +267,67 @@ export async function start() {
       const brand = document.querySelector('#crm-auth h1')?.textContent || '';
       const lede = document.querySelector('#crm-auth .crm-lede')?.textContent || '';
       const { mountWorkspace } = await workspaceReady;
+      const canPosts = ['OWNER', 'OPERATIONS', 'TRUST_SAFETY', 'SUPPORT'].includes(permission.platformRole);
+      const formatWhen = iso => {
+        const date = new Date(iso);
+        if (Number.isNaN(date.getTime())) return 'Sin fecha';
+        return new Intl.DateTimeFormat('es-AR', {
+          dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Buenos_Aires',
+        }).format(date);
+      };
       mountWorkspace(root, {
         title: mode === 'control' ? 'Resumen operativo' : 'Empresa autorizada',
         brand, lede,
         rows: summaryRows(summary).map(([label, value]) => ({ label, value })),
         sections: mode === 'control' ? controlSections : empresaSections,
         extra,
+        listings: mode === 'control' ? {
+          publicaciones: {
+            placeholder: 'Autor, texto o id',
+            searchLabel: 'Buscar publicación',
+            columns: ['Autor', 'Texto', 'Fecha', 'Estado', 'Acción'],
+            emptyTitle: canPosts ? 'Sin publicaciones' : 'Sin acceso',
+            emptyDetail: canPosts
+              ? 'Ninguna publicación visible coincide con la búsqueda.'
+              : 'No tenés permiso para administrar publicaciones.',
+            async load(query, cursor) {
+              if (!canPosts) return { items: [], nextCursor: null };
+              const body = { query };
+              if (cursor) body.cursor = cursor;
+              const data = await api('platform/posts/search', token, body, task.signal);
+              const posts = Array.isArray(data.posts) ? data.posts : [];
+              return {
+                items: posts.filter(post => post && post.status === 'VISIBLE' && post.id),
+                nextCursor: data.nextCursor || null,
+              };
+            },
+            present(post) {
+              if (!post || post.status !== 'VISIBLE') return { hidden: true };
+              const when = formatWhen(post.createdAt);
+              return {
+                key: post.id,
+                cells: [
+                  { text: post.authorName || 'Sin nombre' },
+                  { text: post.body || '', clamp: true },
+                  { text: when },
+                  { badge: 'Visible', tone: 'calm' },
+                ],
+                action: canPosts ? 'Quitar' : '',
+                detail: {
+                  title: post.authorName || 'Sin nombre',
+                  meta: `${when} · Visible`,
+                  body: post.body || '',
+                  reasonLabel: 'Motivo',
+                  confirmLabel: 'Confirmar quita',
+                },
+              };
+            },
+            async remove(post, reason) {
+              await api('platform/posts/remove', token, { postId: post.id, reason }, task.signal);
+              message('Publicación quitada. Ya no aparece entre las visibles.', 'ok');
+            },
+          },
+        } : {},
       });
       message('Acceso autorizado. Datos obtenidos del servidor; sesión de administración limitada a 15 minutos.', 'ok');
     } catch (error) { if (task.current()) fail(error); }
