@@ -18,10 +18,14 @@ test('visible post search and removal use the CRM routes', async () => {
   await api('platform/posts/search', 'jwt', { query: 'plaza' });
   await api('platform/posts/detail', 'jwt', { postId: '11111111-1111-4111-8111-111111111111' });
   await api('platform/posts/remove', 'jwt', { postIds: ['11111111-1111-4111-8111-111111111111'], reason: 'Texto ajeno' });
+  await api('platform/posts/comments/remove', 'jwt', { commentId: '22222222-2222-4222-8222-222222222222', reason: 'Texto ajeno' });
+  await api('platform/posts/anecdotes/remove', 'jwt', { anecdoteId: '33333333-3333-4333-8333-333333333333', reason: 'Texto ajeno' });
   assert.deepEqual(seen, [
     ['/api/v1/crm/platform/posts/search', { query: 'plaza' }],
     ['/api/v1/crm/platform/posts/detail', { postId: '11111111-1111-4111-8111-111111111111' }],
     ['/api/v1/crm/platform/posts/remove', { postIds: ['11111111-1111-4111-8111-111111111111'], reason: 'Texto ajeno' }],
+    ['/api/v1/crm/platform/posts/comments/remove', { commentId: '22222222-2222-4222-8222-222222222222', reason: 'Texto ajeno' }],
+    ['/api/v1/crm/platform/posts/anecdotes/remove', { anecdoteId: '33333333-3333-4333-8333-333333333333', reason: 'Texto ajeno' }],
   ]);
 });
 
