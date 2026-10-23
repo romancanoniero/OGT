@@ -3,6 +3,7 @@ package com.onlygoodthings.backend.crm
 import com.onlygoodthings.backend.auth.AuthPrincipal
 import com.onlygoodthings.backend.auth.FirebaseTokenVerifier
 import com.onlygoodthings.backend.http.JsonBody
+import com.onlygoodthings.backend.http.optString
 import com.onlygoodthings.backend.http.reqString
 import com.onlygoodthings.backend.infra.Database
 import com.onlygoodthings.shared.domain.ApiResponse
@@ -14,6 +15,8 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
 import kotlinx.serialization.Serializable
+import java.sql.Connection
+import java.sql.Timestamp
 import java.time.Instant
 import java.util.UUID
 
@@ -32,6 +35,24 @@ data class CrmPlatformSummary(
     val users: Long, val companies: Long, val pendingCompanies: Long,
     val openReports: Long, val visiblePosts: Long,
 )
+
+@Serializable
+data class CrmVisiblePost(
+    val id: String,
+    val authorName: String,
+    val body: String,
+    val createdAt: String,
+    val status: String,
+)
+
+@Serializable
+data class CrmVisiblePostPage(
+    val posts: List<CrmVisiblePost>,
+    val nextCursor: String? = null,
+)
+
+@Serializable
+data class CrmPostRemoved(val removed: Boolean = true)
 
 @Serializable
 data class CrmCompanySummary(
@@ -248,6 +269,47 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier) {
             ApiResponse.fail<Unit>("Empresa no encontrada", "NOT_FOUND"))
         call.respond(ApiResponse.ok(summary))
     }
+    post("/api/v1/crm/platform/posts/search") {
+        val auth = crmContext(call, db, verifier) ?: return@post
+        if (!crmCanManagePosts(auth.platformRole)) {
+            return@post call.respond(HttpStatusCode.Forbidden,
+                ApiResponse.fail<Unit>("Sin permiso para administrar publicaciones", "FORBIDDEN"))
+        }
+        val data = JsonBody.receiveMap(call)
+        val query = data.optString("query")?.trim().orEmpty()
+        if (query.length > 120) {
+            return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("La búsqueda es demasiado larga", "BAD_REQUEST"))
+        }
+        val cursor = data.optString("cursor")?.trim()?.ifBlank { null }?.let { raw ->
+            parseCrmPostCursor(raw) ?: return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Cursor inválido", "BAD_REQUEST"))
+        }
+        val page = db.withConnection { conn -> searchVisiblePosts(conn, query, cursor) }
+        call.respond(ApiResponse.ok(page))
+    }
+    post("/api/v1/crm/platform/posts/remove") {
+        val auth = crmContext(call, db, verifier) ?: return@post
+        if (!crmCanManagePosts(auth.platformRole)) {
+            return@post call.respond(HttpStatusCode.Forbidden,
+                ApiResponse.fail<Unit>("Sin permiso para administrar publicaciones", "FORBIDDEN"))
+        }
+        val data = JsonBody.receiveMap(call)
+        val postId = runCatching { UUID.fromString(data.reqString("postId")).toString() }.getOrNull()
+            ?: return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Publicación inválida", "BAD_REQUEST"))
+        val reason = data.optString("reason")?.trim().orEmpty()
+        if (reason.length !in 3..500) {
+            return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("El motivo tiene que explicar la quita", "BAD_REQUEST"))
+        }
+        val removed = db.withConnection { conn -> removeVisiblePost(conn, auth.userId, postId, reason) }
+        if (!removed) {
+            return@post call.respond(HttpStatusCode.NotFound,
+                ApiResponse.fail<Unit>("Esa publicación ya no está visible", "NOT_FOUND"))
+        }
+        call.respond(ApiResponse.ok(CrmPostRemoved()))
+    }
 }
 
 /** A refreshed JWT is NOT a freshly authenticated session. */
@@ -258,3 +320,135 @@ internal fun crmStepUpAllowed(
     nowSeconds: Long,
 ): Boolean = verifiedEmail && secondFactor &&
     authTimeSeconds != null && authTimeSeconds in (nowSeconds - 900)..(nowSeconds + 60)
+
+internal val crmPostManagers = setOf("OWNER", "OPERATIONS", "TRUST_SAFETY", "SUPPORT")
+
+internal fun crmCanManagePosts(role: String?): Boolean = role != null && role in crmPostManagers
+
+/** Patrón ILIKE acotado. El texto del operador no se concatena en el SQL. */
+internal fun crmLikeContains(raw: String): String {
+    val escaped = raw.trim()
+        .replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+    return "%$escaped%"
+}
+
+internal fun crmPostCursor(createdAtEpochMilli: Long, id: String): String = "$createdAtEpochMilli|$id"
+
+internal fun parseCrmPostCursor(raw: String): Pair<Long, String>? {
+    val divider = raw.indexOf('|')
+    if (divider <= 0 || divider == raw.lastIndex) return null
+    val millis = raw.substring(0, divider).toLongOrNull() ?: return null
+    if (millis < 0) return null
+    val id = runCatching { UUID.fromString(raw.substring(divider + 1)).toString() }.getOrNull() ?: return null
+    return millis to id
+}
+
+internal const val CRM_VISIBLE_POST_SEARCH = """
+SELECT p.id::text, p.body, p.moderation_status::text, p.created_at,
+       COALESCE(NULLIF(u.display_name, ''), NULLIF(c.trade_name, ''), NULLIF(c.legal_name, ''), 'Sin nombre') AS author_name
+FROM social_posts p
+LEFT JOIN users u ON u.id = p.author_user_id
+LEFT JOIN companies c ON c.id = p.author_company_id
+WHERE p.moderation_status = 'VISIBLE'
+"""
+
+internal const val CRM_POST_REMOVE = """
+UPDATE social_posts
+SET moderation_status = 'REMOVED', updated_at = now()
+WHERE id = ?::uuid AND moderation_status = 'VISIBLE'
+"""
+
+private const val CRM_POST_PAGE = 20
+
+private fun searchVisiblePosts(
+    conn: Connection,
+    query: String,
+    cursor: Pair<Long, String>?,
+): CrmVisiblePostPage {
+    val sql = buildString {
+        append(CRM_VISIBLE_POST_SEARCH.trim())
+        if (query.isNotEmpty()) {
+            append(
+                """
+                 AND (
+                   p.body ILIKE ? ESCAPE '\'
+                   OR COALESCE(u.display_name, '') ILIKE ? ESCAPE '\'
+                   OR COALESCE(u.email::text, '') ILIKE ? ESCAPE '\'
+                   OR COALESCE(c.trade_name, '') ILIKE ? ESCAPE '\'
+                   OR COALESCE(c.legal_name, '') ILIKE ? ESCAPE '\'
+                   OR p.id::text = ?
+                 )
+                """.trimIndent()
+            )
+        }
+        if (cursor != null) append(" AND (p.created_at, p.id) < (?::timestamptz, ?::uuid)")
+        append(" ORDER BY p.created_at DESC, p.id DESC LIMIT ${CRM_POST_PAGE + 1}")
+    }
+    val rows = conn.prepareStatement(sql).use { stmt ->
+        var index = 1
+        if (query.isNotEmpty()) {
+            val pattern = crmLikeContains(query)
+            repeat(5) { stmt.setString(index++, pattern) }
+            stmt.setString(index++, query)
+        }
+        if (cursor != null) {
+            stmt.setTimestamp(index++, Timestamp.from(Instant.ofEpochMilli(cursor.first)))
+            stmt.setString(index, cursor.second)
+        }
+        stmt.executeQuery().use { rs ->
+            buildList {
+                while (rs.next()) {
+                    val status = rs.getString("moderation_status")
+                    if (status != "VISIBLE") continue
+                    add(CrmVisiblePost(
+                        id = rs.getString("id"),
+                        authorName = rs.getString("author_name"),
+                        body = rs.getString("body"),
+                        createdAt = rs.getTimestamp("created_at").toInstant().toString(),
+                        status = status,
+                    ))
+                }
+            }
+        }
+    }
+    val page = rows.take(CRM_POST_PAGE)
+    val next = if (rows.size > CRM_POST_PAGE && page.isNotEmpty()) {
+        val last = page.last()
+        crmPostCursor(Instant.parse(last.createdAt).toEpochMilli(), last.id)
+    } else null
+    return CrmVisiblePostPage(posts = page, nextCursor = next)
+}
+
+private fun removeVisiblePost(conn: Connection, actorId: String, postId: String, reason: String): Boolean {
+    val previous = conn.autoCommit
+    conn.autoCommit = false
+    try {
+        val updated = conn.prepareStatement(CRM_POST_REMOVE.trim()).use { stmt ->
+            stmt.setString(1, postId)
+            stmt.executeUpdate()
+        }
+        if (updated == 1) {
+            conn.prepareStatement(
+                """
+                INSERT INTO crm_audit_events
+                (actor_user_id, action, target_type, target_id, reason, outcome)
+                VALUES (?::uuid, 'POST_REMOVE', 'social_post', ?, ?, 'SUCCESS')
+                """.trimIndent()
+            ).use { stmt ->
+                stmt.setString(1, actorId)
+                stmt.setString(2, postId)
+                stmt.setString(3, reason)
+                stmt.executeUpdate()
+            }
+        }
+        conn.commit()
+        return updated == 1
+    } catch (error: Exception) {
+        conn.rollback()
+        throw error
+    } finally {
+        conn.autoCommit = previous
+    }
+}
