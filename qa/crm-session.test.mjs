@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError } from '../web/app/crm/crm-core.js';
+import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn } from '../web/app/crm/crm-core.js';
 import { createIdentity } from '../web/app/crm/crm-auth.js';
 const a = '11111111-1111-4111-8111-111111111111', b = '22222222-2222-4222-8222-222222222222';
 const access = () => ({ platformRole: 'OWNER', companies: [{ companyId: a, role: 'ADMIN' }], stepUpValidUntilEpochSeconds: 2000 });
@@ -11,6 +11,12 @@ test('changing tenant ID is rejected', () => assert.throws(() => requireCompany(
 test('company membership does not imply platform staff', () => assert.throws(() => validateAccess({ ...access(), platformRole: null }, 'control', 1000), { code: 'FORBIDDEN' }));
 test('platform staff does not imply company membership', () => assert.throws(() => validateAccess({ ...access(), companies: [] }, 'empresa', 1000), { code: 'FORBIDDEN' }));
 test('expired step-up is denied at the exact boundary', () => assert.throws(() => validateAccess(access(), 'control', 2000), { code: 'STEP_UP_REQUIRED' }));
+test('a registered second factor returns to the sign-in form', () => {
+  assert.equal(stepUpReturnsToSignIn({ emailVerified: true }, true), true);
+  assert.equal(stepUpReturnsToSignIn({ emailVerified: true }, false), false);
+  assert.equal(stepUpReturnsToSignIn({ emailVerified: false }, true), false);
+  assert.equal(stepUpReturnsToSignIn(null, true), false);
+});
 test('unknown roles, malformed tenants and missing expiry are denied', () => {
   for (const data of [{ ...access(), platformRole: 'SUPERADMIN' }, { ...access(), companies: [{ companyId: a, role: 'SUPERADMIN' }] }, { ...access(), companies: [{ companyId: 'bad', role: 'ADMIN' }] }, { ...access(), stepUpValidUntilEpochSeconds: null }]) assert.throws(() => validateAccess(data, 'control', 1000));
 });

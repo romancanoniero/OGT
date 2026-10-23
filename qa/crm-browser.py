@@ -21,7 +21,7 @@ export const multiFactor=user=>({enrolledFactors:user.enrolledFactors||[],getSes
 export const sendEmailVerification=async()=>{};
 export const reload=async()=>{};
 
-export function getMultiFactorResolver(){return {session:'mfa',hints:[{uid:'factor',factorId:window.testFactor||'totp',displayName:'Factor de prueba'}],resolveSignIn:async a=>{if(a.code!=='123456')throw {code:'auth/invalid-verification-code'};auth.currentUser={uid:'fixture'};listeners.forEach(f=>f());return {user:auth.currentUser};}};}
+export function getMultiFactorResolver(){return {session:'mfa',hints:[{uid:'factor',factorId:window.testFactor||'totp',displayName:'Factor de prueba'}],resolveSignIn:async a=>{if(a.code!=='123456')throw {code:'auth/invalid-verification-code'};auth.currentUser=window.testStale?{uid:'fixture',email:'fixture@example.test',emailVerified:true,providerData:[],enrolledFactors:[{factorId:'totp'}]}:{uid:'fixture'};listeners.forEach(f=>f());return {user:auth.currentUser};}};}
 export const TotpMultiFactorGenerator={assertionForSignIn:(uid,code)=>({code}),generateSecret:async()=>({secretKey:'TEST-DO-NOT-USE'}),assertionForEnrollment:(secret,code)=>({secret,code})};
 export class PhoneAuthProvider{async verifyPhoneNumber(){return 'verification';}static credential(id,code){return {code};}}
 export const PhoneMultiFactorGenerator={assertion:x=>x};
@@ -51,7 +51,7 @@ with sync_playwright() as pw:
             if '/api/v1/crm/' in url:
                 body=route.request.post_data_json or {}
                 state['requests'].append((url,body))
-                if state['enroll']:
+                if state['enroll'] or state.get('stale'):
                     route.fulfill(status=403,content_type='application/json',body=json.dumps({'success':False,'errorCode':'STEP_UP_REQUIRED','message':'Segundo factor obligatorio'}));return
                 if state['deny']:
                     route.fulfill(status=403,content_type='application/json',body=json.dumps({'success':False,'errorCode':'FORBIDDEN','message':'Acceso revocado'}));return
@@ -173,6 +173,24 @@ with sync_playwright() as pw:
     assert not errors,errors
     context.close()
     results.append('Existing account signup switches to login; Google MFA authenticates securely')
+    context,page,state,errors=session('control')
+    state['stale']=True
+    page.evaluate('window.testStale=true')
+    begin(page);finish(page)
+    expect(page.locator('#crm-login')).to_be_visible()
+    expect(page.locator('#email')).to_be_visible()
+    expect(page.locator('#password')).to_be_visible()
+    expect(page.locator('#crm-login .crm-password-eye')).to_be_visible()
+    expect(page.get_by_role('button',name='Ingresar',exact=True)).to_be_visible()
+    expect(page.get_by_role('button',name='Ingresar con Google')).to_be_visible()
+    expect(page.locator('#crm-onboarding')).to_be_hidden()
+    expect(page.get_by_role('button',name='Cerrar sesión')).to_be_hidden()
+    expect(page.locator('#crm-status')).not_to_contain_text('Renovar el token')
+    expect(page.locator('#crm-status')).not_to_contain_text('Cerrá sesión')
+    expect(page.locator('#crm-root')).to_be_empty()
+    assert not errors,errors
+    context.close()
+    results.append('Expired step-up clears the session and shows the sign-in form')
 
     context=browser.new_context()
     page=context.new_page()

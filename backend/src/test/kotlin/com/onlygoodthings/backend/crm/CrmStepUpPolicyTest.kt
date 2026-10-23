@@ -9,7 +9,7 @@ class CrmStepUpPolicyTest {
 
     @Test fun validStepUp() {
         assertTrue(crmStepUpAllowed(true, true, now - 60, now))
-        assertTrue(crmStepUpAllowed(true, true, now - 900, now))
+        assertTrue(crmStepUpAllowed(true, true, now - CRM_STEP_UP_WINDOW_SECONDS, now))
     }
 
     @Test fun rejectsMissingOrUnverifiedFactors() {
@@ -19,7 +19,7 @@ class CrmStepUpPolicyTest {
     }
 
     @Test fun rejectsExpiredAndImplausibleFutureSessions() {
-        assertFalse(crmStepUpAllowed(true, true, now - 901, now))
+        assertFalse(crmStepUpAllowed(true, true, now - CRM_STEP_UP_WINDOW_SECONDS - 1, now))
         assertFalse(crmStepUpAllowed(true, true, now + 61, now))
     }
 
