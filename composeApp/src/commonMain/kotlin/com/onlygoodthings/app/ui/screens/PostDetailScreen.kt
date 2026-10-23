@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -1295,11 +1296,27 @@ private fun DetailMedia(
     onOpen: (Int) -> Unit,
 ) {
     if (media.isEmpty()) {
-        Box(Modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(16.dp)).background(OgtColors.sand))
+        Box(
+            Modifier
+                .ogtBleedHorizontal(OgtDimens.margin)
+                .height(height)
+                .background(OgtColors.sand),
+        )
         return
     }
+    val ratios = remember { mutableStateMapOf<String, Float>() }
     val pager = rememberPagerState { media.size }
-    Box(Modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(16.dp))) {
+    val known = media.getOrNull(pager.currentPage)?.id?.let { ratios[it] }
+    val frame by animateFloatAsState(
+        targetValue = known ?: 1f,
+        animationSpec = OgtMotion.layout,
+        label = "ficha-foto",
+    )
+    Box(
+        Modifier
+            .ogtBleedHorizontal(OgtDimens.margin)
+            .aspectRatio(frame.coerceIn(0.25f, 3f)),
+    ) {
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { media[it].id }) { page ->
             val item = media[page]
             Box(
@@ -1312,6 +1329,8 @@ private fun DetailMedia(
                     fallback = Res.drawable.feed_story_donacion,
                     contentDescription = item.altText ?: tag,
                     modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                    onAspect = { ratio -> ratios[item.id] = ratio },
                 )
                 if (item.kind == MediaKind.VIDEO) {
                     Box(
