@@ -15,6 +15,7 @@ import com.onlygoodthings.shared.domain.MoneyLedgerKind
 import com.onlygoodthings.shared.domain.PostMediaItem
 import com.onlygoodthings.shared.domain.SocialComment
 import com.onlygoodthings.shared.domain.SocialLiveCounters
+import com.onlygoodthings.shared.domain.UserLive
 import com.onlygoodthings.shared.protocol.WsCodec
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
@@ -174,6 +175,13 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
         repository.updateOwnProfile(principal.userId, dataMap)
         val card = repository.neighborCard(principal.userId, principal.userId)
             ?: return@post call.respond(HttpStatusCode.NotFound, ApiResponse.fail<Unit>("Vecino inexistente", "NOT_FOUND"))
+        hub.projectUser(
+            card.userId,
+            WsCodec.json.encodeToString(
+                UserLive.serializer(),
+                UserLive(id = card.userId, displayName = card.displayName, photoUrl = card.photoUrl),
+            ),
+        )
         call.respond(ApiResponse.ok(card, "Perfil actualizado"))
     }
 

@@ -23,12 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.onlygoodthings.app.resources.Res
-import com.onlygoodthings.app.resources.feed_avatar_carlos
-import com.onlygoodthings.app.resources.feed_avatar_mariana
-import com.onlygoodthings.app.resources.feed_avatar_me
-import com.onlygoodthings.app.resources.feed_avatar_reply
-import com.onlygoodthings.app.resources.feed_avatar_roberto
-import com.onlygoodthings.app.resources.feed_avatar_sofia
 import com.onlygoodthings.app.resources.qs_clap
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.ui.components.OgtBottomSheet
@@ -68,11 +62,11 @@ fun CommentReactionSheet(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Image(
-                                painter = painterResource(reactionAvatar(who.id)),
+                            OgtNeighborAvatar(
+                                userId = who.id,
+                                photoUrl = who.photoUrl,
                                 contentDescription = who.displayName,
                                 modifier = Modifier.size(44.dp).clip(CircleShape).border(1.dp, OgtColors.hairline, CircleShape),
-                                contentScale = ContentScale.Crop,
                             )
                             Column(Modifier.weight(1f)) {
                                 Text(who.displayName, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = OgtColors.ink)
@@ -85,11 +79,3 @@ fun CommentReactionSheet(
     }
 }
 
-private fun reactionAvatar(userId: String): DrawableResource = when (userId) {
-    OgtIds.Roberto -> Res.drawable.feed_avatar_roberto
-    OgtIds.Sofia, OgtIds.Camila -> Res.drawable.feed_avatar_sofia
-    OgtIds.CarlosG, OgtIds.CarlosR, OgtIds.DiegoF -> Res.drawable.feed_avatar_carlos
-    OgtIds.Mariana, OgtIds.Lucia, OgtIds.MarianaD, OgtIds.Valeria, OgtIds.ValeriaP -> Res.drawable.feed_avatar_mariana
-    OgtIds.Lucas -> Res.drawable.feed_avatar_me
-    else -> Res.drawable.feed_avatar_reply
-}

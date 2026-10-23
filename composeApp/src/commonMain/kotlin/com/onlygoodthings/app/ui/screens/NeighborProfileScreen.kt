@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,12 +45,7 @@ import com.onlygoodthings.app.data.LocalOgtDb
 import com.onlygoodthings.app.data.LocalOgtSession
 import com.onlygoodthings.app.data.optimisticToggleFollow
 import com.onlygoodthings.app.resources.Res
-import com.onlygoodthings.app.resources.feed_avatar_carlos
-import com.onlygoodthings.app.resources.feed_avatar_mariana
-import com.onlygoodthings.app.resources.feed_avatar_me
 import com.onlygoodthings.app.resources.feed_avatar_reply
-import com.onlygoodthings.app.resources.feed_avatar_roberto
-import com.onlygoodthings.app.resources.feed_avatar_sofia
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.ui.components.OgtBackButton
 import com.onlygoodthings.shared.data.local.OgtIds
@@ -71,7 +67,8 @@ fun NeighborProfileScreen(
     val session = LocalOgtSession.current
     val me = session.me()
     val scope = rememberCoroutineScope()
-    val user = db.userOrNull(userId)
+    val socialTick by db.socialTick.collectAsState()
+    val user = remember(userId, socialTick) { db.userOrNull(userId) }
     if (user == null) {
         Column(
             Modifier
@@ -89,7 +86,6 @@ fun NeighborProfileScreen(
     val posts = remember(userId, db.posts.size) { db.postsOfAuthor(userId) }
     var following by remember(userId, db.follows.size) { mutableStateOf(db.isFollowing(me.id, userId)) }
     val mine = userId == me.id
-    val avatar = neighborAvatar(userId)
     Column(Modifier.fillMaxSize().background(Color(0xFFFBF8FC)).verticalScroll(rememberScrollState())) {
         Row(
             Modifier
@@ -104,11 +100,11 @@ fun NeighborProfileScreen(
         }
         Column(Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 20.dp, vertical = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(
-                    painterResource(avatar),
+                OgtNeighborAvatar(
+                    userId = user.id,
+                    photoUrl = user.photoUrl,
                     contentDescription = user.displayName,
                     modifier = Modifier.size(86.dp).clip(CircleShape).border(2.dp, OgtColors.primary, CircleShape),
-                    contentScale = ContentScale.Crop,
                 )
                 Spacer(Modifier.width(20.dp))
                 ProfileStat("${posts.size}", "acciones")
@@ -200,11 +196,3 @@ private fun ProfileStat(value: String, label: String) {
     }
 }
 
-private fun neighborAvatar(userId: String): DrawableResource = when (userId) {
-    OgtIds.Roberto -> Res.drawable.feed_avatar_roberto
-    OgtIds.Sofia, OgtIds.Camila -> Res.drawable.feed_avatar_sofia
-    OgtIds.CarlosG, OgtIds.CarlosR, OgtIds.DiegoF -> Res.drawable.feed_avatar_carlos
-    OgtIds.Mariana, OgtIds.Lucia, OgtIds.MarianaD -> Res.drawable.feed_avatar_mariana
-    OgtIds.Lucas -> Res.drawable.feed_avatar_me
-    else -> Res.drawable.feed_avatar_reply
-}

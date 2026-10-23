@@ -16,6 +16,7 @@ import com.onlygoodthings.shared.domain.SocialLiveCounters
 import com.onlygoodthings.shared.realtime.gatewayEndpointFromApiBase
 import com.onlygoodthings.shared.realtime.socialCommentFrom
 import com.onlygoodthings.shared.realtime.socialLiveCountersFrom
+import com.onlygoodthings.shared.realtime.userLiveFrom
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -698,5 +699,54 @@ class OgtLocalDatabaseTest {
         assertTrue(other.isFollowing(OgtIds.Mariana, OgtIds.Ana))
         val river = other.composeVisibleRiver(OgtIds.Mariana)
         assertTrue(river.any { it.id == OgtIds.PostTaller })
+    }
+
+    @Test
+    fun laFotoVivaPisaLaCaraYElComentarioNoLaReviveVieja() {
+        val db = OgtLocalDatabase.seeded()
+        val ana = db.user(OgtIds.Ana)
+        assertTrue(db.applyUserLive(ana.id, ana.displayName, "https://onlygoodthings.lat/media/u/ana.jpg"))
+        assertEquals("https://onlygoodthings.lat/media/u/ana.jpg", db.user(ana.id).photoUrl)
+        assertFalse(db.applyUserLive(ana.id, ana.displayName, "https://onlygoodthings.lat/media/u/ana.jpg"))
+        val post = db.post(OgtIds.PostTaller)
+        val comment = SocialComment(
+            id = "c-foto",
+            postId = post.id,
+            authorUserId = ana.id,
+            authorName = ana.displayName,
+            authorPhotoUrl = "https://onlygoodthings.lat/media/u/vieja.jpg",
+            body = "gran hombre",
+            createdAtEpochMs = 1L,
+        )
+        assertTrue(db.applySocialComment(comment))
+        assertEquals("https://onlygoodthings.lat/media/u/ana.jpg", db.user(ana.id).photoUrl)
+        val parsed = userLiveFrom(
+            mapOf("id" to ana.id, "displayName" to "Ana Pérez", "photoUrl" to "https://onlygoodthings.lat/media/u/nueva.jpg"),
+            key = ana.id,
+        )
+        assertEquals("https://onlygoodthings.lat/media/u/nueva.jpg", parsed?.photoUrl)
+    }
+
+    @Test
+    fun cambiarLaAutoriaActualizaElPostYLaCara() {
+        val db = OgtLocalDatabase.seeded()
+        val post = db.post(OgtIds.PostTaller)
+        val before = post.authorUserId
+        val next = db.users.first { it.id != before }
+        val live = SocialLiveCounters(
+            id = post.id,
+            commentCount = post.commentCount,
+            impactCount = post.impactCount,
+            authorUserId = next.id,
+            authorName = "Administrador",
+            authorPhotoUrl = "https://onlygoodthings.lat/media/u/admin.jpg",
+        )
+        assertTrue(db.applySocialLive(live))
+        assertEquals(next.id, db.post(post.id).authorUserId)
+        assertEquals(AuthorKind.USER, db.post(post.id).authorKind)
+        assertEquals("Administrador", db.authorName(db.post(post.id)))
+        assertEquals("https://onlygoodthings.lat/media/u/admin.jpg", db.user(next.id).photoUrl)
+        assertTrue(db.postPeople.any { it.postId == post.id && it.userId == next.id && it.role == PostPersonRole.AUTHOR })
+        assertFalse(db.applySocialLive(live))
     }
 }

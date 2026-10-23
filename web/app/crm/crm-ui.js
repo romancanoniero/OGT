@@ -143,7 +143,9 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     stopCommentWatch = null;
   }
   dialog.addEventListener('close', stopWatchingComments);
-  workspace.append(dialog);
+  const sheet = node('dialog');
+  sheet.className = 'crm-sheet';
+  workspace.append(dialog, sheet);
   root.append(workspace);
 
   let current = sections.some(item => item.id === initialSection) ? initialSection : (sections[0]?.id || 'resumen');
@@ -170,7 +172,8 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     button.className = 'crm-icon-btn';
     button.setAttribute('aria-label', label);
     button.title = label;
-    button.append(productIcon(file));
+    const iconClass = String(file).endsWith('.png') ? 'crm-icon crm-icon-3d' : 'crm-icon';
+    button.append(productIcon(file, iconClass));
     return button;
   }
   function markCurrent() {
@@ -308,6 +311,10 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
         const action = iconButton(spec.icon, spec.label);
         action.addEventListener('click', event => {
           event.stopPropagation();
+          if (spec.name === 'reassign') {
+            void openReassign(listing, item, view);
+            return;
+          }
           open(spec.name === 'remove');
         });
         actionCell.append(action);
@@ -418,11 +425,90 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     const row = node('div');
     row.className = 'crm-subnode';
     row.dataset[kind] = item.id;
-    const text = node('p', `${item.authorName || 'Sin nombre'}: ${item.body || ''}`);
+    const face = node('div');
+    face.className = 'crm-subnode-face';
+    if (kind === 'comment') face.append(commentFace(item));
+    face.append(node('p', `${item.authorName || 'Sin nombre'}: ${item.body || ''}`));
     const button = iconButton('qs_close.svg', label);
     button.disabled = true;
-    row.append(text, button);
+    row.append(face, button);
     return { row, button };
+  }
+  function commentFace(item) {
+    const img = node('img');
+    img.className = 'crm-avatar';
+    img.alt = '';
+    img.dataset.user = item.authorUserId || item.id || '';
+    img.src = item.authorPhotoUrl || item.photoUrl || '../icons/avatar_anonymous.png';
+    img.addEventListener('error', () => { img.src = '../icons/avatar_anonymous.png'; });
+    return img;
+  }
+  async function openReassign(listing, item) {
+    if (typeof listing.searchUsers !== 'function' || typeof listing.reassign !== 'function') return;
+    sheet.replaceChildren();
+    const close = iconButton('qs_close.svg', 'Cerrar');
+    close.addEventListener('click', () => sheet.close());
+    const head = node('div');
+    head.className = 'crm-dialog-head';
+    head.append(productIcon('authorship_reassign.png', 'crm-icon crm-icon-3d'), node('h3', 'Cambiar autoría'), close);
+    const note = node('p', 'La publicación pasa al usuario que elijas. El feed se entera al momento.');
+    const field = node('input');
+    field.className = 'crm-input';
+    field.placeholder = 'Nombre o id';
+    field.setAttribute('aria-label', 'Buscar usuario');
+    const results = node('div');
+    const confirm = node('button', 'Confirmar autoría');
+    confirm.type = 'button';
+    confirm.className = 'crm-btn crm-btn-primary';
+    confirm.disabled = true;
+    let pickedUser = null;
+    let timer = 0;
+    field.addEventListener('input', () => {
+      window.clearTimeout(timer);
+      const typed = field.value.trim();
+      pickedUser = null;
+      confirm.disabled = true;
+      if (typed.length < 2) {
+        results.replaceChildren();
+        return;
+      }
+      timer = window.setTimeout(async () => {
+        try {
+          const page = await listing.searchUsers(typed);
+          const users = Array.isArray(page?.users) ? page.users : [];
+          results.replaceChildren(...(users.length ? users.map(user => {
+            const btn = node('button');
+            btn.type = 'button';
+            btn.className = 'crm-pick';
+            btn.append(commentFace(user), node('span', user.displayName || 'Sin nombre'));
+            btn.addEventListener('click', () => {
+              pickedUser = user;
+              results.querySelectorAll('.crm-pick').forEach(el => el.classList.toggle('on', el === btn));
+              confirm.disabled = false;
+            });
+            return btn;
+          }) : [node('p', 'Nadie coincide.')]));
+        } catch (error) {
+          results.replaceChildren(node('p', error?.message || 'No se pudo buscar.'));
+        }
+      }, 280);
+    });
+    confirm.addEventListener('click', async () => {
+      if (!pickedUser) return;
+      confirm.disabled = true;
+      try {
+        await listing.reassign(item, pickedUser.id);
+        sheet.close();
+        if (dialog.open) dialog.close();
+      } catch (error) {
+        confirm.disabled = false;
+        listError.textContent = error?.message || 'No se pudo cambiar la autoría.';
+        listError.hidden = false;
+      }
+    });
+    sheet.append(head, note, field, results, confirm);
+    if (!sheet.open) sheet.showModal();
+    field.focus();
   }
   async function openDialog(listing, item, view, reasonFocus) {
     const card = view.detail || {};
@@ -469,8 +555,16 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       dialog.close();
       await loadListing(listing, true);
     });
+    const changeAuthor = typeof listing.reassign === 'function' ? node('button', 'Cambiar autoría') : null;
+    if (changeAuthor) {
+      changeAuthor.type = 'button';
+      changeAuthor.className = 'crm-btn crm-btn-secondary';
+      changeAuthor.prepend(productIcon('authorship_reassign.png', 'crm-icon crm-icon-3d'));
+      changeAuthor.addEventListener('click', () => { void openReassign(listing, item); });
+    }
     dialog.append(
       head, meta, ...(photo ? [photo] : []), body,
+      ...(changeAuthor ? [changeAuthor] : []),
       subheading('qs_clap.svg', 'Aplausos'), impact,
       subheading('qs_comment.svg', 'Comentarios'), commentsHost,
       subheading('qs_anecdote.svg', 'Anécdotas'), anecdotesHost,
@@ -589,9 +683,28 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     }
     const gone = live.moderationStatus && live.moderationStatus !== 'VISIBLE';
     if (!gone) {
+      const row = listItems.find(item => item.id === live.id);
+      let authorChanged = false;
+      if (row && live.authorUserId && row.authorUserId !== live.authorUserId) {
+        row.authorUserId = live.authorUserId;
+        authorChanged = true;
+      }
+      if (row && live.authorName && row.authorName !== live.authorName) {
+        row.authorName = live.authorName;
+        authorChanged = true;
+      }
+      if (row && live.authorPhotoUrl && row.authorPhotoUrl !== live.authorPhotoUrl) {
+        row.authorPhotoUrl = live.authorPhotoUrl;
+        authorChanged = true;
+      }
+      if (authorChanged && activeListing && workspaceView(sectionOf(current), listings) === 'listing') {
+        renderListing(activeListing);
+      }
       if (dialogPostId === live.id) {
         const impact = dialog.querySelector('[data-live-impact]');
         if (impact && live.impactCount != null) impact.textContent = String(live.impactCount);
+        const title = dialog.querySelector('.crm-dialog-head h3');
+        if (title && live.authorName) title.textContent = live.authorName;
       }
       return;
     }
@@ -602,6 +715,28 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       if (status) status.textContent = 'Ya no está visible';
     }
     if (activeListing && workspaceView(sectionOf(current), listings) === 'listing') renderListing(activeListing);
+  }
+  function applyUser(live) {
+    if (!live || !live.id) return;
+    let changed = false;
+    listItems.forEach(item => {
+      if (item.authorUserId !== live.id) return;
+      if (live.displayName && item.authorName !== live.displayName) {
+        item.authorName = live.displayName;
+        changed = true;
+      }
+      if (live.photoUrl && item.authorPhotoUrl !== live.photoUrl) {
+        item.authorPhotoUrl = live.photoUrl;
+        changed = true;
+      }
+    });
+    const sel = window.CSS && CSS.escape ? CSS.escape(live.id) : String(live.id);
+    root.querySelectorAll(`img.crm-avatar[data-user="${sel}"]`).forEach(img => {
+      if (live.photoUrl) img.src = live.photoUrl;
+    });
+    if (changed && activeListing && workspaceView(sectionOf(current), listings) === 'listing') {
+      renderListing(activeListing);
+    }
   }
   function shown(value) {
     return value === undefined || value === null || value === '' ? 'No informado' : String(value);
@@ -729,5 +864,5 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     listTimer = window.setTimeout(() => { void loadListing(listing, true); }, 280);
   });
   paint();
-  return { applyLive };
+  return { applyLive, applyUser };
 }

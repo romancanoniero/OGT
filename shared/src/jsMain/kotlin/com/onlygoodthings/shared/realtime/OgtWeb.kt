@@ -4,6 +4,7 @@ package com.onlygoodthings.shared.realtime
 
 import com.onlygoodthings.shared.domain.SocialComment
 import com.onlygoodthings.shared.domain.SocialLiveCounters
+import com.onlygoodthings.shared.domain.UserLive
 import kotlinx.browser.window
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +33,7 @@ private fun defaultGateway(): String {
 class OgtWebRealtime {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var listenJob: Job? = null
+    private var userJob: Job? = null
     private val commentJobs = mutableMapOf<String, Job>()
 
     fun start(token: String, endpoint: String? = null) {
@@ -48,6 +50,18 @@ class OgtWebRealtime {
             }
         }
         listenJob = job
+        return { job.cancel() }
+    }
+
+    /** Cara pública en `ogt/users/{id}`. La misma foto en feed, comentarios y perfil. */
+    fun observeUserProfiles(onLive: (String) -> Unit): () -> Unit {
+        userJob?.cancel()
+        val job = scope.launch {
+            OgtRealtime().observeUserProfiles().collect { live ->
+                onLive(liveJson.encodeToString(UserLive.serializer(), live))
+            }
+        }
+        userJob = job
         return { job.cancel() }
     }
 
@@ -69,6 +83,8 @@ class OgtWebRealtime {
     fun shutdown() {
         listenJob?.cancel()
         listenJob = null
+        userJob?.cancel()
+        userJob = null
         commentJobs.values.forEach { it.cancel() }
         commentJobs.clear()
         OgtSdk.shutdown()

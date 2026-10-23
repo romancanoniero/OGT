@@ -1071,6 +1071,7 @@ class SocialSqlRepository(private val db: Database) {
                    COALESCE(a.heart_count, 0) AS heart_count,
                    EXTRACT(EPOCH FROM a.created_at) * 1000 AS created_ms,
                    u.display_name,
+                   u.photo_url AS author_photo,
                    EXISTS (
                        SELECT 1 FROM anecdote_impacts i
                        WHERE i.anecdote_id = a.id AND i.user_id = ?::uuid
@@ -1145,7 +1146,8 @@ class SocialSqlRepository(private val db: Database) {
             SELECT c.id, c.post_id, c.author_user_id, c.parent_comment_id, c.body, c.anecdote_id,
                    EXTRACT(EPOCH FROM c.created_at) * 1000 AS created_ms,
                    c.edited_at,
-                   u.display_name
+                   u.display_name,
+                   u.photo_url AS author_photo
             FROM post_comments c
             JOIN users u ON u.id = c.author_user_id
             WHERE c.post_id = ?::uuid AND c.moderation_status = 'VISIBLE' AND c.anecdote_id IS NULL
@@ -1156,7 +1158,8 @@ class SocialSqlRepository(private val db: Database) {
             SELECT c.id, c.post_id, c.author_user_id, c.parent_comment_id, c.body, c.anecdote_id,
                    EXTRACT(EPOCH FROM c.created_at) * 1000 AS created_ms,
                    c.edited_at,
-                   u.display_name
+                   u.display_name,
+                   u.photo_url AS author_photo
             FROM post_comments c
             JOIN users u ON u.id = c.author_user_id
             WHERE c.post_id = ?::uuid AND c.moderation_status = 'VISIBLE' AND c.anecdote_id = ?::uuid
@@ -1180,7 +1183,8 @@ class SocialSqlRepository(private val db: Database) {
             SELECT c.id, c.post_id, c.author_user_id, c.parent_comment_id, c.body, c.anecdote_id,
                    EXTRACT(EPOCH FROM c.created_at) * 1000 AS created_ms,
                    c.edited_at,
-                   u.display_name
+                   u.display_name,
+                   u.photo_url AS author_photo
             FROM post_comments c
             JOIN users u ON u.id = c.author_user_id
             WHERE c.id IN ($placeholders)
@@ -1204,7 +1208,8 @@ class SocialSqlRepository(private val db: Database) {
             SELECT c.id, c.post_id, c.author_user_id, c.parent_comment_id, c.body, c.anecdote_id,
                    EXTRACT(EPOCH FROM c.created_at) * 1000 AS created_ms,
                    c.edited_at,
-                   u.display_name
+                   u.display_name,
+                   u.photo_url AS author_photo
             FROM post_comments c
             JOIN users u ON u.id = c.author_user_id
             WHERE c.anecdote_id IN ($placeholders) AND c.moderation_status = 'VISIBLE'
@@ -1237,6 +1242,7 @@ class SocialSqlRepository(private val db: Database) {
                    COALESCE(a.heart_count, 0) AS heart_count,
                    EXTRACT(EPOCH FROM a.created_at) * 1000 AS created_ms,
                    u.display_name,
+                   u.photo_url AS author_photo,
                    EXISTS (
                        SELECT 1 FROM anecdote_impacts i
                        WHERE i.anecdote_id = a.id AND i.user_id = ?::uuid
@@ -1397,6 +1403,7 @@ class SocialSqlRepository(private val db: Database) {
         postId = getString("post_id"),
         authorUserId = getString("author_user_id"),
         authorName = getString("display_name"),
+        authorPhotoUrl = runCatching { stringOrNull("author_photo") }.getOrNull(),
         parentCommentId = stringOrNull("parent_comment_id"),
         body = getString("body"),
         createdAtEpochMs = getLong("created_ms"),
@@ -1409,6 +1416,7 @@ class SocialSqlRepository(private val db: Database) {
         postId = getString("post_id"),
         authorUserId = getString("author_user_id"),
         authorName = getString("display_name") ?: "Alguien de la comunidad",
+        authorPhotoUrl = runCatching { stringOrNull("author_photo") }.getOrNull(),
         body = getString("body"),
         sourceUrl = stringOrNull("source_url"),
         sortOrder = getInt("sort_order"),

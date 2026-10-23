@@ -133,6 +133,66 @@ function stopWatchingChat() {
   stopChatLive = null;
 }
 
+let postComments = [];
+let stopPostComments = null;
+
+function stopWatchingPostComments() {
+  if (typeof stopPostComments === "function") stopPostComments();
+  stopPostComments = null;
+}
+
+function watchPostComments(postId) {
+  stopWatchingPostComments();
+  if (!realtime || typeof realtime.observePostComments !== "function" || !postId) return;
+  stopPostComments = realtime.observePostComments(postId, function (raw) {
+    const live = typeof raw === "string" ? JSON.parse(raw) : raw;
+    applyPostCommentLive(postId, live);
+  });
+}
+
+function applyPostCommentLive(postId, live) {
+  if (!live || !live.id) return;
+  if (route().page !== "p" || route().id !== postId) return;
+  if (live.authorUserId) {
+    rememberFace({ id: live.authorUserId, displayName: live.authorName, photoUrl: live.authorPhotoUrl });
+  }
+  const idx = postComments.findIndex((row) => row.id === live.id);
+  if (idx < 0) postComments.push(live);
+  else postComments[idx] = Object.assign({}, postComments[idx], live);
+  paintPostComments();
+}
+
+function paintPostComments() {
+  const host = document.getElementById("post-comments");
+  if (!host) return;
+  const rows = postComments.filter((row) => !row.anecdoteId && !row.parentCommentId);
+  host.innerHTML = rows.length
+    ? rows.map(commentCard).join("")
+    : `<p class="empty">Todavía no hay comentarios.</p>`;
+}
+
+async function paintLoadedComments(postId) {
+  postComments = [];
+  const article = document.querySelector(`[data-post="${cssAttr(postId)}"]`);
+  if (!article || document.getElementById("post-comments")) {
+    watchPostComments(postId);
+    return;
+  }
+  const host = document.createElement("div");
+  host.id = "post-comments";
+  host.className = "thread";
+  host.innerHTML = `<p class="empty">Cargando comentarios…</p>`;
+  article.append(host);
+  try {
+    const rows = await api("/api/v1/social/comments", { postId });
+    postComments = Array.isArray(rows) ? rows : [];
+  } catch (_) {
+    postComments = [];
+  }
+  paintPostComments();
+  watchPostComments(postId);
+}
+
 function watchChat(matchId) {
   stopWatchingChat();
   if (!realtime || typeof realtime.observeChatMessages !== "function" || !matchId) return;
@@ -207,57 +267,51 @@ function mergePost(next) {
 
 function applyProfileLive(live) {
   if (!live || !live.id) return;
+  rememberFace(live);
   const mine = live.id === me.userId;
   if (mine) {
-    me.displayName = live.displayName || me.displayName;
+    if (live.displayName) me.displayName = live.displayName;
     if (live.photoUrl) me.photoUrl = live.photoUrl;
-    me.communityPoints = live.communityPoints != null ? live.communityPoints : me.communityPoints;
-    me.settings = Object.assign({}, me.settings || defaultSettings(), {
-      language: live.language || (me.settings && me.settings.language),
-      barrio: live.barrio != null ? live.barrio : (me.settings && me.settings.barrio),
-      publicProfileVisible: live.publicProfileVisible,
-      showExactMatchLocation: live.showExactMatchLocation,
-      animalAlertPush: live.animalAlertPush,
-      skillAlertPush: live.skillAlertPush,
-      parkingRadarSounds: live.parkingRadarSounds,
-      radarEnabled: live.radarEnabled,
-      carbonSaveMode: live.carbonSaveMode,
+    if (live.communityPoints != null) me.communityPoints = live.communityPoints;
+    const settingsPatch = {};
+    if (live.language) settingsPatch.language = live.language;
+    if (live.barrio != null) settingsPatch.barrio = live.barrio;
+    ["publicProfileVisible", "showExactMatchLocation", "animalAlertPush", "skillAlertPush", "parkingRadarSounds", "radarEnabled", "carbonSaveMode"].forEach((key) => {
+      if (live[key] != null) settingsPatch[key] = live[key];
     });
+    if (Object.keys(settingsPatch).length) {
+      me.settings = Object.assign({}, me.settings || defaultSettings(), settingsPatch);
+    }
     paintRail();
     const nameField = document.querySelector("#profile-form [name=displayName]");
-    if (nameField && document.activeElement !== nameField) nameField.value = me.displayName;
+    if (nameField && document.activeElement !== nameField && live.displayName) nameField.value = live.displayName;
     const barrioField = document.querySelector("#profile-form [name=barrio]");
     if (barrioField && document.activeElement !== barrioField && live.barrio != null) {
       barrioField.value = live.barrio;
     }
     const strong = document.querySelector(".profile-head strong");
-    if (strong) strong.textContent = me.displayName;
+    if (strong && me.displayName) strong.textContent = me.displayName;
     const av = document.querySelector(".profile-head .avatar, .profile-edit .avatar.lg");
-    if (av && me.photoUrl) av.src = mediaUrl(me.photoUrl);
+    if (av && me.photoUrl) {
+      av.dataset.user = live.id;
+      av.src = mediaUrl(me.photoUrl);
+    }
   }
   lastFeed.forEach((post) => {
     if (post.authorId === live.id) {
-      post.authorName = live.displayName;
+      if (live.displayName) post.authorName = live.displayName;
       if (live.photoUrl) post.authorPhotoUrl = live.photoUrl;
       paintPost(post);
     }
     (post.anecdotes || []).forEach((story) => {
       if (story.authorUserId === live.id) {
-        story.authorName = live.displayName;
+        if (live.displayName) story.authorName = live.displayName;
+        if (live.photoUrl) story.authorPhotoUrl = live.photoUrl;
         paintStory(story);
       }
     });
   });
-  document.querySelectorAll(`a[href="#/perfil/${live.id}"]`).forEach((a) => {
-    a.textContent = live.displayName;
-  });
-  if (live.photoUrl) {
-    document.querySelectorAll(`img.avatar[alt]`).forEach((img) => {
-      const card = img.closest("[data-post], .profile-head, .me");
-      const link = card && card.querySelector(`a[href="#/perfil/${live.id}"]`);
-      if (link) img.src = mediaUrl(live.photoUrl);
-    });
-  }
+  paintFace(live.id, live.displayName, live.photoUrl);
 }
 
 function applyLive(live) {
@@ -277,14 +331,21 @@ function applyLive(live) {
   }
   const idx = lastFeed.findIndex((p) => p.id === live.id);
   if (idx < 0) return;
-  const merged = mergePost({
+  const patch = {
     id: live.id,
     impactCount: live.impactCount,
     commentCount: live.commentCount,
     body: live.body,
     honoreeName: live.honoreeName,
     topic: live.tag || lastFeed[idx].topic,
-  });
+  };
+  if (live.authorUserId) {
+    patch.authorId = live.authorUserId;
+    if (live.authorName) patch.authorName = live.authorName;
+    if (live.authorPhotoUrl) patch.authorPhotoUrl = live.authorPhotoUrl;
+    rememberFace({ id: live.authorUserId, displayName: live.authorName, photoUrl: live.authorPhotoUrl });
+  }
+  const merged = mergePost(patch);
   paintPost(merged);
   paintPulse();
   if (document.getElementById("feed-list") && !document.querySelector(`[data-post="${merged.id}"]`)) {
@@ -310,6 +371,40 @@ function paintPost(post) {
     const body = card.querySelector(":scope > .body");
     if (body) body.textContent = post.body;
   }
+  paintAuthor(card, post);
+}
+
+function paintAuthor(card, post) {
+  const head = card.querySelector(":scope > .post-head");
+  if (!head) return;
+  const name = post.authorName || "Vecino";
+  const who = head.querySelector(".who");
+  if (who) {
+    who.innerHTML = post.authorId
+      ? `<a href="#/perfil/${escapeHtml(post.authorId)}">${escapeHtml(name)}</a>`
+      : escapeHtml(name);
+  }
+  const img = head.querySelector("img.avatar");
+  if (!img) return;
+  if (post.authorId) img.dataset.user = post.authorId;
+  img.src = avatarSrc(post.authorId, post.authorPhotoUrl);
+  img.alt = name;
+}
+
+function paintFace(userId, displayName, photoUrl) {
+  if (!userId) return;
+  const sel = cssAttr(userId);
+  document.querySelectorAll(`img.avatar[data-user="${sel}"], img.crm-avatar[data-user="${sel}"]`).forEach((img) => {
+    if (photoUrl) img.src = mediaUrl(photoUrl);
+    if (displayName) img.alt = displayName;
+  });
+  if (!displayName) return;
+  document.querySelectorAll(`a[href="#/perfil/${sel}"]`).forEach((a) => {
+    a.textContent = displayName;
+  });
+  document.querySelectorAll(`.comment[data-user="${sel}"] .who, .reply[data-user="${sel}"] .who, .story[data-author="${sel}"] .who`).forEach((el) => {
+    el.textContent = displayName;
+  });
 }
 
 function paintStory(story) {
@@ -325,6 +420,15 @@ function paintStory(story) {
     const body = node.querySelector(":scope > .body");
     if (body) body.textContent = story.body;
   }
+  const img = node.querySelector(".story-head img.avatar");
+  if (img) {
+    if (story.authorUserId) img.dataset.user = story.authorUserId;
+    img.src = avatarSrc(story.authorUserId, story.authorPhotoUrl);
+    if (story.authorName) img.alt = story.authorName;
+  }
+  const who = node.querySelector(".story-head .who");
+  if (who && story.authorName) who.textContent = story.authorName;
+  if (story.authorUserId) node.dataset.author = story.authorUserId;
 }
 
 function mergeStory(post, story) {
@@ -688,8 +792,9 @@ window.addEventListener("resize", () => {
   applyFabPos(fab, clampFabPos(rect.left, rect.top));
 });
 
-/** Tiles Quiet Studio. El mapa nombra a los de Stitch; el resto se reparte estable por id. */
-const AVATAR_TILES = ["mariana", "carlos", "sofia", "roberto", "me", "reply"];
+/** Tiles con nombre. Quien no está en el mapa y no tiene foto usa el busto anónimo. */
+const ANONYMOUS_AVATAR = "avatars/avatar_anonymous.png";
+const liveFaces = new Map();
 const AVATAR_SEED = {
   "user-roberto": "roberto",
   "user-mateo": "roberto",
@@ -710,25 +815,39 @@ const AVATAR_SEED = {
   "44444444-4444-4444-4444-444444444444": "roberto",
 };
 
-function avatarTile(userId) {
-  const named = AVATAR_SEED[userId];
-  if (named) return named;
-  const id = String(userId || "");
-  if (!id) return "reply";
-  let hash = 0;
-  for (let i = 0; i < id.length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
-  return AVATAR_TILES[hash % AVATAR_TILES.length];
+function rememberFace(live) {
+  if (!live || !live.id) return null;
+  const prev = liveFaces.get(live.id) || {};
+  const next = {
+    displayName: live.displayName || prev.displayName || "",
+    photoUrl: live.photoUrl || prev.photoUrl || "",
+  };
+  liveFaces.set(live.id, next);
+  return next;
+}
+
+function faceOf(userId) {
+  return liveFaces.get(userId) || null;
+}
+
+function cssAttr(value) {
+  return String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
 function avatarSrc(userId, photoUrl) {
-  if (photoUrl) return mediaUrl(photoUrl);
-  return `avatars/feed_avatar_${avatarTile(userId)}.jpg`;
+  const live = faceOf(userId);
+  const url = photoUrl || (live && live.photoUrl);
+  if (url) return mediaUrl(url);
+  const named = AVATAR_SEED[userId];
+  if (named) return `avatars/feed_avatar_${named}.jpg`;
+  return ANONYMOUS_AVATAR;
 }
 
 function avatarHtml(userId, name, extra, photoUrl) {
   const cls = extra ? `avatar ${extra}` : "avatar";
   const src = avatarSrc(userId, photoUrl);
-  return `<img class="${cls}" src="${escapeHtml(src)}" alt="${escapeHtml(name || "")}">`;
+  const id = userId ? ` data-user="${escapeHtml(userId)}"` : "";
+  return `<img class="${cls}"${id} src="${escapeHtml(src)}" alt="${escapeHtml(name || "")}">`;
 }
 
 const NAME_PARTICLES = new Set([
@@ -1454,9 +1573,20 @@ function openMenu(btn, post, onDetail) {
 
 function replyCard(row) {
   const who = row.authorName || "Alguien de la comunidad";
-  return `<div class="reply">
-    ${avatarHtml(row.authorUserId, who)}
+  return `<div class="reply" data-user="${escapeHtml(row.authorUserId || "")}">
+    ${avatarHtml(row.authorUserId, who, "", row.authorPhotoUrl)}
     <div class="reply-copy">
+      <div class="who">${escapeHtml(who)}</div>
+      <p class="body">${escapeHtml(row.body || "")}</p>
+    </div>
+  </div>`;
+}
+
+function commentCard(row) {
+  const who = row.authorName || "Alguien de la comunidad";
+  return `<div class="comment" data-comment="${escapeHtml(row.id || "")}" data-user="${escapeHtml(row.authorUserId || "")}">
+    ${avatarHtml(row.authorUserId, who, "", row.authorPhotoUrl)}
+    <div class="comment-copy">
       <div class="who">${escapeHtml(who)}</div>
       <p class="body">${escapeHtml(row.body || "")}</p>
     </div>
@@ -1477,9 +1607,9 @@ function storiesCaptionHtml(count, { preview = false } = {}) {
 
 function storyCard(story, post) {
   const replies = Array.isArray(story.comments) ? story.comments : [];
-  return `<article class="story" data-story="${escapeHtml(story.id)}" data-story-parent="${escapeHtml(post.id)}">
+  return `<article class="story" data-story="${escapeHtml(story.id)}" data-story-parent="${escapeHtml(post.id)}" data-author="${escapeHtml(story.authorUserId || "")}">
     <div class="story-head">
-      ${avatarHtml(story.authorUserId, story.authorName || "Vecino")}
+      ${avatarHtml(story.authorUserId, story.authorName || "Vecino", "", story.authorPhotoUrl)}
       <div class="who">${escapeHtml(story.authorName || "Vecino")}</div>
       <button type="button" class="more" data-story-more="${escapeHtml(story.id)}" aria-label="Más acciones">${icon("qs-more")}</button>
     </div>
@@ -2071,6 +2201,7 @@ async function renderPost(id) {
       postCard(post, { openable: false, previewStories: false, compose: true })
     }`;
     bindSocial(main, { onDetail: true });
+    await paintLoadedComments(post.id);
   } catch (e) {
     main.innerHTML = `<div class="chrome"><a href="#/inicio">Inicio</a><h1>Publicación</h1></div><p class="err">${escapeHtml(e.message)}</p>`;
   }
@@ -3880,7 +4011,12 @@ async function renderAjustes() {
         carbonSaveMode: form.carbonSaveMode.checked,
       };
       if (photoUrl) payload.photoUrl = photoUrl;
-      await api("/api/v1/users/profile/update", payload);
+      const card = await api("/api/v1/users/profile/update", payload);
+      applyProfileLive({
+        id: (card && card.userId) || me.userId,
+        displayName: (card && card.displayName) || payload.displayName,
+        photoUrl: (card && card.photoUrl) || photoUrl,
+      });
       if (window.OgtAuth && window.OgtAuth.syncFirebaseProfile) {
         await window.OgtAuth.syncFirebaseProfile(payload.displayName, photoUrl).catch(() => {});
       }
@@ -4907,6 +5043,7 @@ async function show() {
   const screenKey = page === "empresa" && id ? `empresa/${id}` : page;
   markScreen(screenKey);
   if (!(page === "mensajes" && id)) stopWatchingChat();
+  if (page !== "p") stopWatchingPostComments();
   if (page === "empresa" && id === "campanas") return withSectionTools(renderEmpresaCampanas());
   if (page === "empresa" && id === "comunidad") return withSectionTools(renderEmpresaComunidad());
   if (page === "empresa") return withSectionTools(renderEmpresaPanel());
