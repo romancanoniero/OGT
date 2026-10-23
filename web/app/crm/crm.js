@@ -1,4 +1,4 @@
-import { start } from './crm-runtime.js?v=listado-2';
+import { start } from './crm-runtime.js?v=ingreso-12h';
 
 start().catch(() => {
   document.getElementById('crm-root').replaceChildren();

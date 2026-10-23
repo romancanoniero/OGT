@@ -7,6 +7,10 @@ export class CrmError extends Error {
 const routes = new Set(['access', 'platform/summary', 'company/summary', 'platform/posts/search', 'platform/posts/detail', 'platform/posts/remove']);
 const staffRoles = new Set(['OWNER','OPERATIONS','TRUST_SAFETY','FINANCE','SUPPORT','ANALYST']);
 const companyRoles = new Set(['OWNER','ADMIN','CAMPAIGN_MANAGER','FINANCE','ANALYST','VIEWER']);
+/** La ventana ya venció y el segundo factor está registrado: hay que ingresar de nuevo. */
+export function stepUpReturnsToSignIn(user, hasSecondFactor) {
+  return !!user?.emailVerified && hasSecondFactor === true;
+}
 export function validateAccess(data, mode, now = Date.now() / 1000) {
   if (!data || !Array.isArray(data.companies) || !['control','empresa'].includes(mode)) throw new CrmError('Respuesta de permisos inv\u00e1lida.', 'INVALID_ACCESS');
   if (!Number.isSafeInteger(data.stepUpValidUntilEpochSeconds) || data.stepUpValidUntilEpochSeconds <= now) throw new CrmError('Ingres\u00e1 nuevamente con segundo factor.', 'STEP_UP_REQUIRED', 403);

@@ -1,5 +1,5 @@
-import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError } from './crm-core.js?v=listado-2';
-import { createIdentity } from './crm-auth.js?v=listado-2';
+import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn } from './crm-core.js?v=ingreso-12h';
+import { createIdentity } from './crm-auth.js?v=ingreso-12h';
 
 const controlSections = [
   { id: 'resumen', label: 'Resumen', icon: 'qs_feed.svg', keys: null },
@@ -20,7 +20,7 @@ export async function start() {
   const root = $('crm-root'), status = $('crm-status'), login = $('crm-login');
   const mode = document.documentElement.dataset.crm, gate = sessionGate();
   const api = createApi(window.fetch.bind(window));
-  let expiry = null, access = null, chosen = '', identityBusy = false, sectionId = 'resumen';
+  let expiry = null, access = null, chosen = '', identityBusy = false, sectionId = 'resumen', returning = false;
   let desk = null, liveClient = null;
   const make = (tag, text) => { const node = document.createElement(tag); if (text !== undefined) node.textContent = String(text); return node; };
   const message = (text, tone = 'info') => {
@@ -130,7 +130,7 @@ export async function start() {
   fields.append(factorLabel, begin, recaptcha, codeLabel, verify, cancel);
   challenge.append(fields); login.insertAdjacentElement('afterend', challenge);
   // El shell viaja en paralelo con Firebase. El ingreso no lo espera para pintar.
-  const workspaceReady = import('./crm-ui.js?v=listado-2');
+  const workspaceReady = import('./crm-ui.js?v=ingreso-12h');
   const [appSdk, sdk] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),
@@ -196,6 +196,10 @@ export async function start() {
       return;
     }
     if (error.code === 'STEP_UP_REQUIRED' && identity.currentUser()) {
+      if (stepUpReturnsToSignIn(identity.currentUser(), identity.hasSecondFactor())) {
+        void returnToSignIn();
+        return;
+      }
       showEnrollment(); message(friendlyError(error), 'error'); return;
     }
     onboarding.hidden = true; login.hidden = false; googleLogin.hidden = false; signupToggle.hidden = false;
@@ -222,7 +226,39 @@ export async function start() {
       ? [['Usuarios activos', summary.users], ['Empresas', summary.companies], ['Empresas por verificar', summary.pendingCompanies], ['Denuncias pendientes', summary.openReports], ['Publicaciones visibles', summary.visiblePosts]]
       : [['Empresa', summary.tradeName || summary.legalName], ['Estado', summary.verificationStatus], ['Campañas', summary.campaigns], ['Campañas activas', summary.activeCampaigns], ['Cupones emitidos', summary.issuedCoupons], ['Saldo en centavos', summary.balanceCents], ['Puntaje de impacto', summary.impactScore]];
   }
+  async function returnToSignIn() {
+    if (returning) return;
+    returning = true;
+    clearData();
+    hideChallenge();
+    setSignupMode(false);
+    onboarding.hidden = true;
+    logout.hidden = true;
+    refresh.hidden = true;
+    addGoogle.hidden = true;
+    addPassword.hidden = true;
+    linkedPasswordWrap.hidden = true;
+    showEntry();
+    status.replaceChildren();
+    try {
+      await identity.signOut();
+    } catch (_) {
+      returning = false;
+      showEntry();
+      message('No se pudo cerrar la sesión local. Probá nuevamente.', 'error');
+      return;
+    }
+    returning = false;
+    if (!identity.currentUser()) {
+      showEntry();
+      logout.hidden = true;
+      onboarding.hidden = true;
+      message('El acceso requiere correo verificado, segundo factor y permisos expresos. Iniciá sesión o creá tu cuenta.');
+      $('email').focus();
+    }
+  }
   async function checkAccess() {
+    if (returning) return;
     clearData(); const task = gate.next();
     logout.hidden = !identity.currentUser();
     refresh.hidden = !identity.currentUser();
@@ -239,7 +275,7 @@ export async function start() {
       if (!task.current()) return;
       access = permission;
       clearTimeout(expiry);
-      expiry = setTimeout(() => { hideChallenge(); fail(new CrmError('Sesión vencida.', 'STEP_UP_REQUIRED', 403)); }, Math.max(0, permission.stepUpValidUntilEpochSeconds * 1000 - Date.now()));
+      expiry = setTimeout(() => { void returnToSignIn(); }, Math.max(0, permission.stepUpValidUntilEpochSeconds * 1000 - Date.now()));
       let body = {}, route = 'platform/summary';
       if (mode === 'empresa') {
         if (!permission.companies.some(item => item.companyId === chosen)) chosen = permission.companies[0].companyId;
@@ -247,7 +283,7 @@ export async function start() {
       }
       const summary = await api(route, token, body, task.signal); if (!task.current()) return;
       if (mode === 'empresa' && summary.companyId !== chosen) throw new CrmError('El servidor devolvió otra empresa. No se muestran sus datos.', 'TENANT_MISMATCH');
-      if (Date.now() / 1000 >= permission.stepUpValidUntilEpochSeconds) throw new CrmError('Sesión vencida.', 'STEP_UP_REQUIRED', 403);
+      if (Date.now() / 1000 >= permission.stepUpValidUntilEpochSeconds) { void returnToSignIn(); return; }
       login.hidden = true; challenge.hidden = true; googleLogin.hidden = true;
       signupToggle.hidden = true; onboarding.hidden = true; refresh.hidden = false;
       showLinkMethods();
@@ -344,7 +380,7 @@ export async function start() {
       });
       desk = mounted;
       startPostLive(token);
-      message('Acceso autorizado. Datos obtenidos del servidor; sesión de administración limitada a 15 minutos.', 'ok');
+      message('Acceso autorizado. Datos obtenidos del servidor; sesión de administración limitada a 12 horas.', 'ok');
     } catch (error) { if (task.current()) fail(error); }
   }
   function startPostLive(token) {
@@ -500,7 +536,7 @@ export async function start() {
     catch (error) { showEntry(); message('Los datos se ocultaron, pero no se pudo cerrar la sesión. Probá nuevamente.', 'error'); }
     finally { setBusy(false); }
   });
-  identity.subscribe(() => { if (!identityBusy) { hideChallenge(); void checkAccess(); } });
+  identity.subscribe(() => { if (!identityBusy && !returning) { hideChallenge(); void checkAccess(); } });
   window.addEventListener('pagehide', () => { clearData(); identity.cancel(); });
   window.addEventListener('pageshow', event => { if (event.persisted && !identityBusy) void checkAccess(); });
 }

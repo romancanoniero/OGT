@@ -244,7 +244,7 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: Realtime
         call.respond(ApiResponse.ok(CrmAccessResponse(
             platformRole = auth.platformRole,
             companies = auth.companies,
-            stepUpValidUntilEpochSeconds = auth.authTimeSeconds + 900,
+            stepUpValidUntilEpochSeconds = auth.authTimeSeconds + CRM_STEP_UP_WINDOW_SECONDS,
         )))
     }
     post("/api/v1/crm/platform/summary") {
@@ -383,14 +383,18 @@ internal fun crmPostIds(data: Map<String, Any?>): List<String> {
     }.distinct()
 }
 
-/** A refreshed JWT is NOT a freshly authenticated session. */
+/** Doce horas de ingreso reciente. El segundo factor sigue siendo obligatorio. */
+internal const val CRM_STEP_UP_WINDOW_SECONDS = 12L * 60 * 60
+
+/** Un JWT renovado no es un ingreso nuevo. */
 internal fun crmStepUpAllowed(
     verifiedEmail: Boolean,
     secondFactor: Boolean,
     authTimeSeconds: Long?,
     nowSeconds: Long,
 ): Boolean = verifiedEmail && secondFactor &&
-    authTimeSeconds != null && authTimeSeconds in (nowSeconds - 900)..(nowSeconds + 60)
+    authTimeSeconds != null &&
+    authTimeSeconds in (nowSeconds - CRM_STEP_UP_WINDOW_SECONDS)..(nowSeconds + 60)
 
 internal val crmPostManagers = setOf("OWNER", "OPERATIONS", "TRUST_SAFETY", "SUPPORT")
 
