@@ -9,6 +9,7 @@ import com.onlygoodthings.shared.domain.ParkingSpot
 import com.onlygoodthings.shared.domain.ParkingStatus
 import com.onlygoodthings.shared.domain.SocialComment
 import com.onlygoodthings.shared.domain.SocialLiveCounters
+import com.onlygoodthings.shared.domain.UserLive
 import com.onlygoodthings.shared.protocol.frames.ImpactAlertFrame
 import com.onlygoodthings.shared.protocol.frames.ImpactKind
 import com.onlygoodthings.shared.protocol.frames.LocationRole
@@ -40,6 +41,11 @@ class OgtRealtime(
         observeChildren(OgtDbPaths.socialComments(postId)) { snap ->
             snap.toSocialComment(postId)
         }
+
+    /** Nombre y foto públicos. El cliente pinta esta cara en todas las superficies. */
+    fun observeUserProfiles(): Flow<UserLive> = observeChildren(OgtDbPaths.USERS) { snap ->
+        snap.toUserLive()
+    }
 
     suspend fun pushSocialCounters(live: SocialLiveCounters) {
         db.getReference(OgtDbPaths.socialPost(live.id)).setValue(live.toTreeMap())
@@ -157,6 +163,12 @@ private fun DataSnapshot.toSocialComment(fallbackPostId: String): SocialComment?
     return socialCommentFrom(raw, key(), fallbackPostId)
 }
 
+@Suppress("UNCHECKED_CAST")
+private fun DataSnapshot.toUserLive(): UserLive? {
+    val raw = getValue() as? Map<String, Any?> ?: return null
+    return userLiveFrom(raw, key())
+}
+
 fun socialLiveCountersFrom(raw: Map<String, Any?>, key: String?): SocialLiveCounters? {
     val id = raw["id"] as? String ?: key ?: return null
     return SocialLiveCounters(
@@ -165,6 +177,8 @@ fun socialLiveCountersFrom(raw: Map<String, Any?>, key: String?): SocialLiveCoun
         impactCount = (raw["impactCount"] as? Number)?.toInt() ?: 0,
         heartCount = (raw["heartCount"] as? Number)?.toInt() ?: 0,
         authorUserId = raw["authorUserId"] as? String,
+        authorName = raw["authorName"] as? String,
+        authorPhotoUrl = raw["authorPhotoUrl"] as? String,
         body = raw["body"] as? String,
         tag = raw["tag"] as? String,
         place = raw["place"] as? String,
@@ -174,6 +188,14 @@ fun socialLiveCountersFrom(raw: Map<String, Any?>, key: String?): SocialLiveCoun
         moderationStatus = (raw["moderationStatus"] as? String)?.takeIf { it.isNotBlank() } ?: "VISIBLE",
         removedAnecdoteId = (raw["removedAnecdoteId"] as? String)?.takeIf { it.isNotBlank() },
     )
+}
+
+fun userLiveFrom(raw: Map<String, Any?>, key: String?): UserLive? {
+    val id = raw["id"] as? String ?: key ?: return null
+    val name = (raw["displayName"] as? String)?.trim().orEmpty()
+    if (id.isBlank() || name.isBlank()) return null
+    val photo = (raw["photoUrl"] as? String)?.trim()?.takeIf { it.isNotBlank() }
+    return UserLive(id = id, displayName = name, photoUrl = photo)
 }
 
 fun socialCommentFrom(raw: Map<String, Any?>, key: String?, fallbackPostId: String?): SocialComment? {
@@ -189,6 +211,7 @@ fun socialCommentFrom(raw: Map<String, Any?>, key: String?, fallbackPostId: Stri
         postId = postId,
         authorUserId = authorUserId.orEmpty(),
         authorName = raw["authorName"] as? String ?: "",
+        authorPhotoUrl = raw["authorPhotoUrl"] as? String,
         parentCommentId = raw["parentCommentId"] as? String,
         body = body.orEmpty(),
         createdAtEpochMs = (raw["createdAtEpochMs"] as? Number)?.toLong() ?: 0L,
@@ -204,6 +227,8 @@ private fun SocialLiveCounters.toTreeMap(): Map<String, Any?> = buildMap {
     put("impactCount", impactCount)
     put("heartCount", heartCount)
     authorUserId?.let { put("authorUserId", it) }
+    authorName?.let { put("authorName", it) }
+    authorPhotoUrl?.let { put("authorPhotoUrl", it) }
     body?.let { put("body", it) }
     tag?.let { put("tag", it) }
     place?.let { put("place", it) }
@@ -219,6 +244,7 @@ private fun SocialComment.toTreeMap(): Map<String, Any?> = mapOf(
     "postId" to postId,
     "authorUserId" to authorUserId,
     "authorName" to authorName,
+    "authorPhotoUrl" to authorPhotoUrl,
     "parentCommentId" to parentCommentId,
     "body" to body,
     "createdAtEpochMs" to createdAtEpochMs,

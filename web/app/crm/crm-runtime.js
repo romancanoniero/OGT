@@ -362,6 +362,7 @@ export async function start() {
                 mark: true,
                 actions: canPosts ? [
                   { icon: 'qs_anecdote.svg', label: 'Ver publicación', name: 'open' },
+                  { icon: 'authorship_reassign.png', label: 'Cambiar autoría', name: 'reassign' },
                   { icon: 'qs_close.svg', label: 'Quitar', name: 'remove' },
                 ] : [{ icon: 'qs_anecdote.svg', label: 'Ver publicación', name: 'open' }],
                 detail: {
@@ -376,6 +377,24 @@ export async function start() {
             },
         async loadDetail(post) {
           return api('platform/posts/detail', token, { postId: post.id }, task.signal);
+        },
+        async searchUsers(query) {
+          return api('platform/users/search', token, { query }, task.signal);
+        },
+        async reassign(post, userId) {
+          const moved = await api('platform/posts/reassign', token, { postId: post.id, userId }, task.signal);
+          if (moved && desk && typeof desk.applyLive === 'function') {
+            desk.applyLive({
+              id: moved.id,
+              authorUserId: moved.authorUserId,
+              authorName: moved.authorName,
+              authorPhotoUrl: moved.authorPhotoUrl,
+              commentCount: moved.commentCount,
+              impactCount: moved.impactCount,
+              moderationStatus: 'VISIBLE',
+            });
+          }
+          return moved;
         },
         async removeMany(posts, reason) {
           const postIds = posts.map(post => post.id).filter(Boolean);
@@ -425,6 +444,12 @@ export async function start() {
           const event = typeof raw === 'string' ? JSON.parse(raw) : raw;
           if (desk && typeof desk.applyLive === 'function') desk.applyLive(event);
         });
+        if (typeof liveClient.observeUserProfiles === 'function') {
+          liveClient.observeUserProfiles(raw => {
+            const event = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (desk && typeof desk.applyUser === 'function') desk.applyUser(event);
+          });
+        }
       }
     } catch (_) { /* El listado sigue por REST si el árbol no arranca. */ }
   }

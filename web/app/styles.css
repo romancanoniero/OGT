@@ -19,6 +19,7 @@
   --nav: 244px;
   --rail: 320px;
   --col: 680px;
+  --fade: 220ms;
 }
 
 * { box-sizing: border-box; }
@@ -421,6 +422,33 @@ span.avatar svg { width: 18px; height: 18px; }
 .reply-copy { min-width: 0; flex: 1; }
 .reply .who { font-size: 13px; }
 .reply .body { font-size: 14px; margin: 4px 0 0; }
+.thread {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.comment {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  background: var(--sand);
+  animation: ogt-comment-in var(--fade) ease;
+}
+.comment-copy { min-width: 0; flex: 1; }
+.comment .who { font-size: 14px; }
+.comment .body { font-size: 15px; line-height: 21px; margin: 4px 0 0; }
+@keyframes ogt-comment-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@media (max-width: 720px) {
+  .comment { padding: 10px; }
+  .comment .avatar, .thread .avatar { width: 36px; height: 36px; }
+}
 .count { color: var(--muted); font-size: 13px; align-self: center; }
 
 .rail {

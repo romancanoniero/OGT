@@ -28,7 +28,7 @@ import com.onlygoodthings.app.resources.qs_yield
 import com.onlygoodthings.app.resources.feed_avatar_carlos
 import com.onlygoodthings.app.resources.feed_avatar_mariana
 import com.onlygoodthings.app.resources.feed_avatar_me
-import com.onlygoodthings.app.resources.feed_avatar_reply
+import com.onlygoodthings.app.resources.avatar_anonymous
 import com.onlygoodthings.app.resources.feed_avatar_roberto
 import com.onlygoodthings.app.resources.feed_avatar_sofia
 import com.onlygoodthings.app.theme.OgtColors
@@ -99,5 +99,5 @@ fun neighborAvatarArt(userId: String): DrawableResource = when (userId) {
     OgtIds.CarlosG, OgtIds.CarlosR, OgtIds.DiegoF -> Res.drawable.feed_avatar_carlos
     OgtIds.Mariana, OgtIds.Lucia, OgtIds.MarianaD, OgtIds.Valeria, OgtIds.ValeriaP -> Res.drawable.feed_avatar_mariana
     OgtIds.Lucas -> Res.drawable.feed_avatar_me
-    else -> Res.drawable.feed_avatar_reply
+    else -> Res.drawable.avatar_anonymous
 }

@@ -64,6 +64,12 @@ class RealtimeHub(private val redis: RedisCache) {
         fanoutTree(path, payloadJson)
     }
 
+    fun projectUser(userId: String, payloadJson: String) {
+        val path = OgtDbPaths.user(userId)
+        redis.publish("ogt:tree:$path", payloadJson)
+        fanoutTree(path, payloadJson)
+    }
+
     fun projectSocialComment(postId: String, commentId: String, payloadJson: String) {
         val path = OgtDbPaths.socialComment(postId, commentId)
         redis.publish("ogt:tree:$path", payloadJson)

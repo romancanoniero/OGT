@@ -17,6 +17,8 @@ class DbListenPolicyTest {
             OgtDbPaths.IMPACT_ALERTS,
             OgtDbPaths.SOCIAL_FEED,
             "${OgtDbPaths.SOCIAL_FEED}/post-1/comments",
+            OgtDbPaths.USERS,
+            OgtDbPaths.user(userA),
             OgtDbPaths.presence(userA),
             "${OgtDbPaths.presence(userA)}/meta",
         )) {
@@ -35,7 +37,6 @@ class DbListenPolicyTest {
             "${OgtDbPaths.presence(userA)}/lat",
             "ogt/social",
             "ogt/parking",
-            "ogt/users/${userA}",
             "ogt/private/inbox",
             "secret",
             "../ogt/social/posts",

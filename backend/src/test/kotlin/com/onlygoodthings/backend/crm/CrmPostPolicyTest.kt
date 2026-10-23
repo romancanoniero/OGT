@@ -27,6 +27,8 @@ class CrmPostPolicyTest {
         assertTrue(CRM_POST_REMOVE.contains("moderation_status = 'REMOVED'"))
         assertTrue(CRM_POST_REMOVE.contains("moderation_status = 'VISIBLE'"))
         assertFalse(CRM_POST_REMOVE.contains("DELETE"))
+        assertTrue(CRM_VISIBLE_POST_SEARCH.contains("author_user_id"))
+        assertTrue(CRM_VISIBLE_POST_SEARCH.contains("author_photo"))
     }
 
     @Test fun imageUrlUsesTheStoredHttpAddressOnly() {
