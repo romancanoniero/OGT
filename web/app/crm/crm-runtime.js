@@ -1,5 +1,5 @@
-import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError } from './crm-core.js?v=listado-1';
-import { createIdentity } from './crm-auth.js?v=listado-1';
+import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError } from './crm-core.js?v=listado-2';
+import { createIdentity } from './crm-auth.js?v=listado-2';
 
 const controlSections = [
   { id: 'resumen', label: 'Resumen', icon: 'qs_feed.svg', keys: null },
@@ -21,6 +21,7 @@ export async function start() {
   const mode = document.documentElement.dataset.crm, gate = sessionGate();
   const api = createApi(window.fetch.bind(window));
   let expiry = null, access = null, chosen = '', identityBusy = false, sectionId = 'resumen';
+  let desk = null, liveClient = null;
   const make = (tag, text) => { const node = document.createElement(tag); if (text !== undefined) node.textContent = String(text); return node; };
   const message = (text, tone = 'info') => {
     status.replaceChildren();
@@ -129,7 +130,7 @@ export async function start() {
   fields.append(factorLabel, begin, recaptcha, codeLabel, verify, cancel);
   challenge.append(fields); login.insertAdjacentElement('afterend', challenge);
   // El shell viaja en paralelo con Firebase. El ingreso no lo espera para pintar.
-  const workspaceReady = import('./crm-ui.js?v=listado-1');
+  const workspaceReady = import('./crm-ui.js?v=listado-2');
   const [appSdk, sdk] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),
@@ -279,6 +280,7 @@ export async function start() {
             placeholder: 'Autor, texto o id',
             searchLabel: 'Buscar publicación',
             columns: ['Autor', 'Texto', 'Fecha', 'Estado', 'Acción'],
+            mark: true,
             emptyTitle: canPosts ? 'Sin publicaciones' : 'Sin acceso',
             emptyDetail: canPosts
               ? 'Ninguna publicación visible coincide con la búsqueda.'
@@ -305,7 +307,11 @@ export async function start() {
                   { text: when },
                   { badge: 'Visible', tone: 'calm' },
                 ],
-                action: canPosts ? 'Quitar' : '',
+                mark: true,
+                actions: canPosts ? [
+                  { icon: 'qs_anecdote.svg', label: 'Ver publicación', name: 'open' },
+                  { icon: 'qs_close.svg', label: 'Quitar', name: 'remove' },
+                ] : [{ icon: 'qs_anecdote.svg', label: 'Ver publicación', name: 'open' }],
                 detail: {
                   title: post.authorName || 'Sin nombre',
                   meta: `${when} · Visible`,
@@ -315,15 +321,19 @@ export async function start() {
                 },
               };
             },
-        async remove(post, reason) {
-          await api('platform/posts/remove', token, { postId: post.id, reason }, task.signal);
-          message('Publicación quitada. Ya no aparece entre las visibles.', 'ok');
+        async loadDetail(post) {
+          return api('platform/posts/detail', token, { postId: post.id }, task.signal);
+        },
+        async removeMany(posts, reason) {
+          const postIds = posts.map(post => post.id).filter(Boolean);
+          await api('platform/posts/remove', token, { postIds, reason }, task.signal);
+          message(postIds.length > 1 ? 'Publicaciones quitadas. Ya no aparecen entre las visibles.' : 'Publicación quitada. Ya no aparece entre las visibles.', 'ok');
         },
       };
       const sections = (mode === 'control' ? controlSections : empresaSections).map(section =>
         section.view === 'listing' ? { ...section, listing: postListing } : section
       );
-      mountWorkspace(root, {
+      const mounted = mountWorkspace(root, {
         title: mode === 'control' ? 'Resumen operativo' : 'Empresa autorizada',
         brand, lede,
         rows: summaryRows(summary).map(([label, value]) => ({ label, value })),
@@ -332,8 +342,24 @@ export async function start() {
         initialSection: sectionId,
         onNavigate: id => { sectionId = id; },
       });
+      desk = mounted;
+      startPostLive(token);
       message('Acceso autorizado. Datos obtenidos del servidor; sesión de administración limitada a 15 minutos.', 'ok');
     } catch (error) { if (task.current()) fail(error); }
+  }
+  function startPostLive(token) {
+    if (!window.OgtRealtime) return;
+    try {
+      if (!liveClient) liveClient = new window.OgtRealtime();
+      liveClient.start(token);
+      if (!liveClient.ogtWatching) {
+        liveClient.ogtWatching = true;
+        liveClient.observeSocialPosts(raw => {
+          const event = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          if (desk && typeof desk.applyLive === 'function') desk.applyLive(event);
+        });
+      }
+    } catch (_) { /* El listado sigue por REST si el árbol no arranca. */ }
   }
   login.addEventListener('submit', async event => {
     event.preventDefault(); if (identityBusy) return;

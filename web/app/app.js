@@ -262,6 +262,18 @@ function applyProfileLive(live) {
 
 function applyLive(live) {
   if (!live || !live.id || hiddenIds.has(live.id)) return;
+  if (live.moderationStatus && live.moderationStatus !== "VISIBLE") {
+    lastFeed = lastFeed.filter((p) => p.id !== live.id);
+    document.querySelectorAll(`[data-post="${live.id}"]`).forEach((node) => node.remove());
+    if (route().page === "p" && route().id === live.id) {
+      const main = document.getElementById("main");
+      if (main) {
+        main.innerHTML = `<div class="chrome"><a href="#/inicio">Inicio</a><h1>Publicación</h1></div><p class="empty">Esta publicación ya no está visible.</p>`;
+      }
+    }
+    paintPulse();
+    return;
+  }
   const idx = lastFeed.findIndex((p) => p.id === live.id);
   if (idx < 0) return;
   const merged = mergePost({

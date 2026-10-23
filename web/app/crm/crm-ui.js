@@ -108,6 +108,9 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   more.type = 'button';
   more.className = 'crm-btn crm-btn-secondary crm-list-more';
   more.hidden = true;
+  const bulkBar = node('div');
+  bulkBar.className = 'crm-bulk';
+  bulkBar.hidden = true;
   const listError = node('p');
   listError.className = 'crm-list-error';
   listError.hidden = true;
@@ -129,12 +132,18 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   const detailLine = node('p');
   const detailNote = node('p', 'El servidor informó este total. Desde acá no se editan permisos ni registros.');
   detail.append(detailTitle, detailLine, detailNote);
-  panel.append(panelTitle, tableWrap, entityWrap, more, listError, empty.box, detail);
+  panel.append(panelTitle, bulkBar, tableWrap, entityWrap, more, listError, empty.box, detail);
   main.append(header, tools, kpis, panel);
   workspace.append(nav, main);
+  const dialog = node('dialog');
+  dialog.className = 'crm-dialog';
+  workspace.append(dialog);
   root.append(workspace);
 
   let current = sections.some(item => item.id === initialSection) ? initialSection : (sections[0]?.id || 'resumen');
+  const picked = new Set();
+  let dialogPostId = null;
+  let activeListing = null;
   let query = '';
   let listItems = [];
   let listCursor = null;
@@ -148,6 +157,15 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   function listingOf(id) {
     const section = sectionOf(id);
     return section?.listing || listings[id] || null;
+  }
+  function iconButton(file, label) {
+    const button = node('button');
+    button.type = 'button';
+    button.className = 'crm-icon-btn';
+    button.setAttribute('aria-label', label);
+    button.title = label;
+    button.append(productIcon(file));
+    return button;
   }
   function markCurrent() {
     for (const button of buttons) {
@@ -199,7 +217,22 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     entityWrap.hidden = false;
     panelTitle.textContent = sectionOf(current)?.label || title;
     markCurrent();
+    activeListing = listing;
     const headRow = node('tr');
+    if (listing.mark) {
+      const markHead = node('th');
+      const all = node('input');
+      all.type = 'checkbox';
+      all.setAttribute('aria-label', 'Marcar página');
+      const keys = listItems.map(item => listing.present(item)?.key).filter(Boolean);
+      all.checked = keys.length > 0 && keys.every(key => picked.has(key));
+      all.addEventListener('change', () => {
+        keys.forEach(key => { if (all.checked) picked.add(key); else picked.delete(key); });
+        renderListing(listing);
+      });
+      markHead.append(all);
+      headRow.append(markHead);
+    }
     for (const name of listing.columns) headRow.append(node('th', name));
     entityHead.replaceChildren(headRow);
     entityBody.replaceChildren();
@@ -217,19 +250,34 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
         focusReason = reasonFocus;
         for (const other of entityBody.querySelectorAll('tr')) other.removeAttribute('aria-selected');
         tr.setAttribute('aria-selected', 'true');
-        fillDetail(listing, item, view);
+        void openDialog(listing, item, view, reasonFocus);
       };
+      if (view.mark) {
+        const markCell = node('td');
+        const box = node('input');
+        box.type = 'checkbox';
+        box.checked = picked.has(view.key);
+        box.setAttribute('aria-label', 'Marcar');
+        box.addEventListener('click', event => event.stopPropagation());
+        box.addEventListener('change', () => {
+          if (box.checked) picked.add(view.key); else picked.delete(view.key);
+          paintBulk(listing);
+        });
+        markCell.append(box);
+        tr.append(markCell);
+      }
       for (const cell of view.cells) {
         const td = node('td');
         td.append(cellNode(cell));
         tr.append(td);
       }
       const actionCell = node('td');
-      if (view.action) {
-        const action = node('button', view.action);
-        action.type = 'button';
-        action.className = 'crm-btn crm-btn-secondary crm-btn-small';
-        action.addEventListener('click', event => { event.stopPropagation(); open(true); });
+      for (const spec of view.actions || []) {
+        const action = iconButton(spec.icon, spec.label);
+        action.addEventListener('click', event => {
+          event.stopPropagation();
+          open(spec.name === 'remove');
+        });
         actionCell.append(action);
       }
       tr.append(actionCell);
@@ -242,6 +290,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     }
     if (selected) fillDetail(listing, selected.item, selected.view);
     more.hidden = !listCursor;
+    paintBulk(listing);
     const isEmpty = !listLoading && listItems.length === 0;
     empty.box.hidden = !isEmpty;
     empty.title.textContent = listing.emptyTitle;
@@ -293,6 +342,153 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     focusReason = false;
   }
 
+  function paintBulk(listing) {
+    bulkBar.replaceChildren();
+    const keys = listItems.map(item => listing.present(item)?.key).filter(key => key && picked.has(key));
+    bulkBar.hidden = keys.length === 0;
+    if (!keys.length) return;
+    bulkBar.append(node('span', keys.length === 1 ? '1 marcada' : `${keys.length} marcadas`));
+    const button = iconButton('qs_close.svg', 'Quitar selección');
+    button.addEventListener('click', () => openBulk(listing));
+    bulkBar.append(button);
+  }
+  function reasonField(card) {
+    const label = node('label');
+    label.className = 'crm-field';
+    const caption = node('span', card?.reasonLabel || 'Motivo');
+    caption.className = 'crm-field-label';
+    const input = node('textarea');
+    input.className = 'crm-input';
+    input.rows = 3;
+    input.maxLength = 500;
+    input.placeholder = 'Por qué se hace esta acción';
+    input.setAttribute('aria-label', card?.reasonLabel || 'Motivo');
+    label.append(caption, input);
+    return { label, input };
+  }
+  function subheading(icon, text) {
+    const row = node('div');
+    row.className = 'crm-subhead';
+    row.append(productIcon(icon), node('span', text));
+    return row;
+  }
+  async function openDialog(listing, item, view, reasonFocus) {
+    const card = view.detail || {};
+    dialogPostId = view.key;
+    dialog.replaceChildren();
+    const close = iconButton('qs_close.svg', 'Cerrar');
+    close.addEventListener('click', () => dialog.close());
+    const head = node('div');
+    head.className = 'crm-dialog-head';
+    head.append(node('h3', card.title || ''), close);
+    const meta = node('p', card.meta || '');
+    meta.dataset.liveStatus = '1';
+    const body = node('p', card.body || '');
+    body.className = 'crm-detail-body';
+    const impact = node('p', '…');
+    impact.dataset.liveImpact = '1';
+    const commentsHost = node('div');
+    const reportsHost = node('div');
+    const reason = reasonField(card);
+    const confirm = iconButton('qs_close.svg', card.confirmLabel || 'Confirmar quita');
+    confirm.disabled = true;
+    reason.input.addEventListener('input', () => { confirm.disabled = reason.input.value.trim().length < 3; });
+    confirm.addEventListener('click', async () => {
+      const text = reason.input.value.trim();
+      if (text.length < 3) return;
+      confirm.disabled = true;
+      try {
+        await listing.removeMany([item], text);
+      } catch (error) {
+        if (error?.code === 'ABORTED') return;
+        confirm.disabled = false;
+        listError.textContent = error?.message || 'No se pudo quitar la publicación.';
+        listError.hidden = false;
+        return;
+      }
+      picked.delete(view.key);
+      dialog.close();
+      await loadListing(listing, true);
+    });
+    dialog.append(
+      head, meta, body,
+      subheading('qs_clap.svg', 'Aplausos'), impact,
+      subheading('qs_comment.svg', 'Comentarios'), commentsHost,
+      subheading('qs_notifications.svg', 'Denuncias'), reportsHost,
+      reason.label, confirm,
+    );
+    if (!dialog.open) dialog.showModal();
+    if (reasonFocus) reason.input.focus();
+    if (typeof listing.loadDetail !== 'function') return;
+    try {
+      const data = await listing.loadDetail(item);
+      if (dialogPostId !== view.key || !data) return;
+      impact.textContent = String(data.impactCount ?? 0);
+      const comments = Array.isArray(data.comments) ? data.comments : [];
+      commentsHost.replaceChildren(...(comments.length
+        ? comments.map(comment => node('p', `${comment.authorName || 'Sin nombre'}: ${comment.body || ''}`))
+        : [node('p', 'Sin comentarios')]));
+      const reports = Array.isArray(data.reports) ? data.reports : [];
+      reportsHost.replaceChildren(...(reports.length
+        ? reports.map(report => node('p', `${report.reason || ''} · ${report.status || ''}`))
+        : [node('p', 'Sin denuncias')]));
+    } catch (error) {
+      if (error?.code !== 'ABORTED') commentsHost.replaceChildren(node('p', 'No se pudo leer el detalle.'));
+    }
+  }
+  function openBulk(listing) {
+    const items = listItems.filter(item => picked.has(listing.present(item)?.key));
+    if (!items.length) return;
+    dialogPostId = null;
+    dialog.replaceChildren();
+    const close = iconButton('qs_close.svg', 'Cerrar');
+    close.addEventListener('click', () => dialog.close());
+    const head = node('div');
+    head.className = 'crm-dialog-head';
+    head.append(node('h3', items.length === 1 ? 'Quitar publicación' : `Quitar ${items.length}`), close);
+    const reason = reasonField({ reasonLabel: 'Motivo' });
+    const confirm = iconButton('qs_close.svg', 'Confirmar quita');
+    confirm.disabled = true;
+    reason.input.addEventListener('input', () => { confirm.disabled = reason.input.value.trim().length < 3; });
+    confirm.addEventListener('click', async () => {
+      const text = reason.input.value.trim();
+      if (text.length < 3) return;
+      confirm.disabled = true;
+      try {
+        await listing.removeMany(items, text);
+      } catch (error) {
+        if (error?.code === 'ABORTED') return;
+        confirm.disabled = false;
+        listError.textContent = error?.message || 'No se pudo quitar la publicación.';
+        listError.hidden = false;
+        return;
+      }
+      items.forEach(item => picked.delete(listing.present(item)?.key));
+      dialog.close();
+      await loadListing(listing, true);
+    });
+    dialog.append(head, node('p', 'Un motivo para toda la selección. Las filas quedan en la base y salen del listado.'), reason.label, confirm);
+    if (!dialog.open) dialog.showModal();
+    reason.input.focus();
+  }
+  function applyLive(live) {
+    if (!live || !live.id) return;
+    const gone = live.moderationStatus && live.moderationStatus !== 'VISIBLE';
+    if (!gone) {
+      if (dialogPostId === live.id) {
+        const impact = dialog.querySelector('[data-live-impact]');
+        if (impact && live.impactCount != null) impact.textContent = String(live.impactCount);
+      }
+      return;
+    }
+    listItems = listItems.filter(item => item.id !== live.id);
+    picked.delete(live.id);
+    if (dialogPostId === live.id) {
+      const status = dialog.querySelector('[data-live-status]');
+      if (status) status.textContent = 'Ya no está visible';
+    }
+    if (activeListing && workspaceView(sectionOf(current), listings) === 'listing') renderListing(activeListing);
+  }
   function shown(value) {
     return value === undefined || value === null || value === '' ? 'No informado' : String(value);
   }
@@ -418,4 +614,5 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     listTimer = window.setTimeout(() => { void loadListing(listing, true); }, 280);
   });
   paint();
+  return { applyLive };
 }

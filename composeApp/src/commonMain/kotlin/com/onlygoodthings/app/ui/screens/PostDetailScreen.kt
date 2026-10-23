@@ -157,6 +157,12 @@ fun PostDetailScreen(
     val copy = LocalOgtCopy.current
     val socialTick by db.socialTick.collectAsState()
     val post = remember(postId, socialTick) { db.post(postId) }
+    if (post == null) {
+        Column(Modifier.fillMaxSize().padding(24.dp)) {
+            Text("Esta publicación ya no está visible.", color = OgtColors.ink)
+        }
+        return
+    }
     val author = db.userOrNull(post.authorUserId)
     val listing = remember(post.id, db.lostEpoch) {
         post.listingId?.let { id -> db.animals.firstOrNull { it.id == id } }

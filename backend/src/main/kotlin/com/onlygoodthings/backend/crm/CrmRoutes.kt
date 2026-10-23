@@ -6,7 +6,11 @@ import com.onlygoodthings.backend.http.JsonBody
 import com.onlygoodthings.backend.http.optString
 import com.onlygoodthings.backend.http.reqString
 import com.onlygoodthings.backend.infra.Database
+import com.onlygoodthings.backend.realtime.RealtimeHub
 import com.onlygoodthings.shared.domain.ApiResponse
+import com.onlygoodthings.shared.domain.SocialLiveCounters
+import com.onlygoodthings.shared.protocol.WsCodec
+import com.onlygoodthings.shared.realtime.OgtDbPaths
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
@@ -52,7 +56,41 @@ data class CrmVisiblePostPage(
 )
 
 @Serializable
-data class CrmPostRemoved(val removed: Boolean = true)
+data class CrmPostComment(
+    val id: String,
+    val authorName: String,
+    val body: String,
+    val createdAt: String,
+)
+
+@Serializable
+data class CrmPostReport(
+    val id: String,
+    val reason: String,
+    val status: String,
+    val createdAt: String,
+)
+
+@Serializable
+data class CrmPostDetail(
+    val post: CrmVisiblePost,
+    val impactCount: Long,
+    val comments: List<CrmPostComment>,
+    val reports: List<CrmPostReport>,
+)
+
+@Serializable
+data class CrmPostRemoved(val removed: Boolean = true, val ids: List<String> = emptyList())
+
+/** Nodo que ya escucha el feed: `ogt/social/posts/{id}`. */
+internal fun crmRemovedPostLive(postId: String): SocialLiveCounters = SocialLiveCounters(
+    id = postId,
+    commentCount = 0,
+    impactCount = 0,
+    moderationStatus = "REMOVED",
+)
+
+internal fun crmRemovedPostPath(postId: String): String = OgtDbPaths.socialPost(postId)
 
 @Serializable
 data class CrmCompanySummary(
@@ -200,7 +238,7 @@ private suspend fun crmContext(
     return CrmContext(principal.userId, grants.first, grants.second, verified.authTimeEpochSeconds!!)
 }
 
-fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier) {
+fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: RealtimeHub) {
     post("/api/v1/crm/access") {
         val auth = crmContext(call, db, verifier) ?: return@post
         call.respond(ApiResponse.ok(CrmAccessResponse(
@@ -288,7 +326,7 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier) {
         val page = db.withConnection { conn -> searchVisiblePosts(conn, query, cursor) }
         call.respond(ApiResponse.ok(page))
     }
-    post("/api/v1/crm/platform/posts/remove") {
+    post("/api/v1/crm/platform/posts/detail") {
         val auth = crmContext(call, db, verifier) ?: return@post
         if (!crmCanManagePosts(auth.platformRole)) {
             return@post call.respond(HttpStatusCode.Forbidden,
@@ -298,18 +336,51 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier) {
         val postId = runCatching { UUID.fromString(data.reqString("postId")).toString() }.getOrNull()
             ?: return@post call.respond(HttpStatusCode.BadRequest,
                 ApiResponse.fail<Unit>("Publicación inválida", "BAD_REQUEST"))
+        val detail = db.withConnection { conn -> loadVisiblePostDetail(conn, postId) }
+            ?: return@post call.respond(HttpStatusCode.NotFound,
+                ApiResponse.fail<Unit>("Esa publicación ya no está visible", "NOT_FOUND"))
+        call.respond(ApiResponse.ok(detail))
+    }
+    post("/api/v1/crm/platform/posts/remove") {
+        val auth = crmContext(call, db, verifier) ?: return@post
+        if (!crmCanManagePosts(auth.platformRole)) {
+            return@post call.respond(HttpStatusCode.Forbidden,
+                ApiResponse.fail<Unit>("Sin permiso para administrar publicaciones", "FORBIDDEN"))
+        }
+        val data = JsonBody.receiveMap(call)
+        val postIds = crmPostIds(data)
+        if (postIds.isEmpty() || postIds.size > 50) {
+            return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Publicación inválida", "BAD_REQUEST"))
+        }
         val reason = data.optString("reason")?.trim().orEmpty()
         if (reason.length !in 3..500) {
             return@post call.respond(HttpStatusCode.BadRequest,
                 ApiResponse.fail<Unit>("El motivo tiene que explicar la quita", "BAD_REQUEST"))
         }
-        val removed = db.withConnection { conn -> removeVisiblePost(conn, auth.userId, postId, reason) }
-        if (!removed) {
+        val removed = db.withConnection { conn -> removeVisiblePosts(conn, auth.userId, postIds, reason) }
+        if (removed.isEmpty()) {
             return@post call.respond(HttpStatusCode.NotFound,
                 ApiResponse.fail<Unit>("Esa publicación ya no está visible", "NOT_FOUND"))
         }
-        call.respond(ApiResponse.ok(CrmPostRemoved()))
+        removed.forEach { postId ->
+            hub.projectSocialPost(
+                postId,
+                WsCodec.json.encodeToString(SocialLiveCounters.serializer(), crmRemovedPostLive(postId)),
+            )
+        }
+        call.respond(ApiResponse.ok(CrmPostRemoved(ids = removed)))
     }
+}
+
+internal fun crmPostIds(data: Map<String, Any?>): List<String> {
+    val raw = mutableListOf<String>()
+    data.optString("postId")?.let { raw.add(it) }
+    val many = data["postIds"]
+    if (many is List<*>) many.forEach { if (it is String) raw.add(it) }
+    return raw.mapNotNull { value ->
+        runCatching { UUID.fromString(value.trim()).toString() }.getOrNull()
+    }.distinct()
 }
 
 /** A refreshed JWT is NOT a freshly authenticated session. */
@@ -421,30 +492,105 @@ private fun searchVisiblePosts(
     return CrmVisiblePostPage(posts = page, nextCursor = next)
 }
 
-private fun removeVisiblePost(conn: Connection, actorId: String, postId: String, reason: String): Boolean {
+private fun loadVisiblePostDetail(conn: Connection, postId: String): CrmPostDetail? {
+    val post = conn.prepareStatement(
+        """
+        ${CRM_VISIBLE_POST_SEARCH.trim()}
+        AND p.id = ?::uuid
+        """.trimIndent()
+    ).use { stmt ->
+        stmt.setString(1, postId)
+        stmt.executeQuery().use { rs ->
+            if (!rs.next() || rs.getString("moderation_status") != "VISIBLE") null
+            else CrmVisiblePost(
+                id = rs.getString("id"),
+                authorName = rs.getString("author_name"),
+                body = rs.getString("body"),
+                createdAt = rs.getTimestamp("created_at").toInstant().toString(),
+                status = rs.getString("moderation_status"),
+            )
+        }
+    } ?: return null
+    val impact = conn.prepareStatement(
+        "SELECT impact_count FROM social_posts WHERE id = ?::uuid"
+    ).use { stmt ->
+        stmt.setString(1, postId)
+        stmt.executeQuery().use { rs -> if (rs.next()) rs.getLong(1) else 0L }
+    }
+    val comments = conn.prepareStatement(
+        """
+        SELECT c.id::text, COALESCE(NULLIF(u.display_name, ''), 'Sin nombre'), c.body, c.created_at
+        FROM post_comments c
+        LEFT JOIN users u ON u.id = c.author_user_id
+        WHERE c.post_id = ?::uuid AND c.moderation_status = 'VISIBLE'
+        ORDER BY c.created_at
+        LIMIT 40
+        """.trimIndent()
+    ).use { stmt ->
+        stmt.setString(1, postId)
+        stmt.executeQuery().use { rs ->
+            buildList {
+                while (rs.next()) add(CrmPostComment(
+                    id = rs.getString(1),
+                    authorName = rs.getString(2),
+                    body = rs.getString(3),
+                    createdAt = rs.getTimestamp(4).toInstant().toString(),
+                ))
+            }
+        }
+    }
+    val reports = conn.prepareStatement(
+        """
+        SELECT id::text, reason, status::text, created_at
+        FROM content_reports
+        WHERE post_id = ?::uuid
+        ORDER BY created_at DESC
+        LIMIT 40
+        """.trimIndent()
+    ).use { stmt ->
+        stmt.setString(1, postId)
+        stmt.executeQuery().use { rs ->
+            buildList {
+                while (rs.next()) add(CrmPostReport(
+                    id = rs.getString(1),
+                    reason = rs.getString(2),
+                    status = rs.getString(3),
+                    createdAt = rs.getTimestamp(4).toInstant().toString(),
+                ))
+            }
+        }
+    }
+    return CrmPostDetail(post = post, impactCount = impact, comments = comments, reports = reports)
+}
+
+private fun removeVisiblePosts(conn: Connection, actorId: String, postIds: List<String>, reason: String): List<String> {
     val previous = conn.autoCommit
     conn.autoCommit = false
     try {
-        val updated = conn.prepareStatement(CRM_POST_REMOVE.trim()).use { stmt ->
-            stmt.setString(1, postId)
-            stmt.executeUpdate()
-        }
-        if (updated == 1) {
-            conn.prepareStatement(
-                """
-                INSERT INTO crm_audit_events
-                (actor_user_id, action, target_type, target_id, reason, outcome)
-                VALUES (?::uuid, 'POST_REMOVE', 'social_post', ?, ?, 'SUCCESS')
-                """.trimIndent()
-            ).use { stmt ->
-                stmt.setString(1, actorId)
-                stmt.setString(2, postId)
-                stmt.setString(3, reason)
-                stmt.executeUpdate()
+        val removed = buildList {
+            for (postId in postIds) {
+                val updated = conn.prepareStatement(CRM_POST_REMOVE.trim()).use { stmt ->
+                    stmt.setString(1, postId)
+                    stmt.executeUpdate()
+                }
+                if (updated != 1) continue
+                conn.prepareStatement(
+                    """
+                    INSERT INTO crm_audit_events
+                    (actor_user_id, action, target_type, target_id, reason, outcome)
+                    VALUES (?::uuid, 'POST_REMOVE', 'social_post', ?, ?, 'SUCCESS')
+                    """.trimIndent()
+                ).use { stmt ->
+                    stmt.setString(1, actorId)
+                    stmt.setString(2, postId)
+                    stmt.setString(3, reason)
+                    stmt.executeUpdate()
+                }
+                add(postId)
             }
         }
         conn.commit()
-        return updated == 1
+        return removed
     } catch (error: Exception) {
         conn.rollback()
         throw error

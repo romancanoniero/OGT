@@ -4,7 +4,7 @@ export class CrmError extends Error {
     super(message); this.name = 'CrmError'; this.code = code; this.status = status;
   }
 }
-const routes = new Set(['access', 'platform/summary', 'company/summary', 'platform/posts/search', 'platform/posts/remove']);
+const routes = new Set(['access', 'platform/summary', 'company/summary', 'platform/posts/search', 'platform/posts/detail', 'platform/posts/remove']);
 const staffRoles = new Set(['OWNER','OPERATIONS','TRUST_SAFETY','FINANCE','SUPPORT','ANALYST']);
 const companyRoles = new Set(['OWNER','ADMIN','CAMPAIGN_MANAGER','FINANCE','ANALYST','VIEWER']);
 export function validateAccess(data, mode, now = Date.now() / 1000) {

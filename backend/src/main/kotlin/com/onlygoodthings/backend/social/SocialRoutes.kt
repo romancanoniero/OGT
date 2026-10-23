@@ -439,7 +439,15 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
         )
         val objectMapper = JsonBody.objectMapper
         val dataMap = objectMapper.readValue(call.receiveText(), object : com.fasterxml.jackson.core.type.TypeReference<Map<String, Any?>>() {})
-        repository.deletePost(dataMap.reqString("postId"), principal.userId)
+        val postId = dataMap.reqString("postId")
+        repository.deletePost(postId, principal.userId)
+        hub.projectSocialPost(
+            postId,
+            WsCodec.json.encodeToString(
+                SocialLiveCounters.serializer(),
+                SocialLiveCounters(postId, 0, 0, moderationStatus = "REMOVED"),
+            ),
+        )
         call.respond(ApiResponse.ok("ok", "Publicación eliminada"))
     }
 
