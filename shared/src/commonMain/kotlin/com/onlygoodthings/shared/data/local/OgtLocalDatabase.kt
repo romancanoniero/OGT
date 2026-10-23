@@ -34,6 +34,7 @@ import com.onlygoodthings.shared.domain.SocialPost
 import com.onlygoodthings.shared.domain.AnimalListingDto
 import com.onlygoodthings.shared.domain.OgtCrmDefaults
 import com.onlygoodthings.shared.domain.UserProfile
+import com.onlygoodthings.shared.domain.UserRole
 import com.onlygoodthings.shared.feed.FeedCandidate
 import com.onlygoodthings.shared.feed.FeedEventSignal
 import com.onlygoodthings.shared.feed.FeedRanker
