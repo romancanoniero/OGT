@@ -172,24 +172,29 @@ fun socialLiveCountersFrom(raw: Map<String, Any?>, key: String?): SocialLiveCoun
         listingId = raw["listingId"] as? String,
         honoreeName = raw["honoreeName"] as? String,
         moderationStatus = (raw["moderationStatus"] as? String)?.takeIf { it.isNotBlank() } ?: "VISIBLE",
+        removedAnecdoteId = (raw["removedAnecdoteId"] as? String)?.takeIf { it.isNotBlank() },
     )
 }
 
 fun socialCommentFrom(raw: Map<String, Any?>, key: String?, fallbackPostId: String?): SocialComment? {
     val id = raw["id"] as? String ?: key ?: return null
     val postId = raw["postId"] as? String ?: fallbackPostId ?: return null
-    val authorUserId = raw["authorUserId"] as? String ?: return null
-    val body = raw["body"] as? String ?: return null
+    val status = (raw["moderationStatus"] as? String)?.takeIf { it.isNotBlank() } ?: "VISIBLE"
+    val authorUserId = raw["authorUserId"] as? String
+    val body = raw["body"] as? String
+    // Una baja puede llegar solo con id y estado. Un comentario visible necesita autor y texto.
+    if ((authorUserId == null || body == null) && status.equals("VISIBLE", ignoreCase = true)) return null
     return SocialComment(
         id = id,
         postId = postId,
-        authorUserId = authorUserId,
+        authorUserId = authorUserId.orEmpty(),
         authorName = raw["authorName"] as? String ?: "",
         parentCommentId = raw["parentCommentId"] as? String,
-        body = body,
+        body = body.orEmpty(),
         createdAtEpochMs = (raw["createdAtEpochMs"] as? Number)?.toLong() ?: 0L,
         anecdoteId = raw["anecdoteId"] as? String,
         edited = raw["edited"] as? Boolean ?: false,
+        moderationStatus = status,
     )
 }
 
@@ -206,6 +211,7 @@ private fun SocialLiveCounters.toTreeMap(): Map<String, Any?> = buildMap {
     listingId?.let { put("listingId", it) }
     honoreeName?.let { put("honoreeName", it) }
     put("moderationStatus", moderationStatus)
+    removedAnecdoteId?.let { put("removedAnecdoteId", it) }
 }
 
 private fun SocialComment.toTreeMap(): Map<String, Any?> = mapOf(
@@ -218,6 +224,7 @@ private fun SocialComment.toTreeMap(): Map<String, Any?> = mapOf(
     "createdAtEpochMs" to createdAtEpochMs,
     "anecdoteId" to anecdoteId,
     "edited" to edited,
+    "moderationStatus" to moderationStatus,
 )
 
 fun LocationTickFrame.Companion.now(

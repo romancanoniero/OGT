@@ -60,4 +60,24 @@ class CrmPostPolicyTest {
         assertEquals(listOf(id), crmPostIds(mapOf("postId" to id)))
         assertEquals(listOf(id), crmPostIds(mapOf("postIds" to listOf(id, id))))
     }
+
+    @Test fun removalOfCommentAndAnecdoteKeepsTheRowAndProjectsTheListenedNode() {
+        val postId = UUID.randomUUID().toString()
+        val commentId = UUID.randomUUID().toString()
+        val anecdoteId = UUID.randomUUID().toString()
+        val comment = crmRemovedCommentLive(postId, commentId, "author", "gran hombre")
+        assertEquals("REMOVED", comment.moderationStatus)
+        assertEquals("ogt/social/posts/$postId/comments/$commentId", crmRemovedCommentPath(postId, commentId))
+        assertFalse(CRM_COMMENT_REMOVE.contains("DELETE"))
+        assertTrue(CRM_COMMENT_REMOVE.contains("moderation_status = 'REMOVED'"))
+        val anecdote = crmRemovedAnecdoteLive(postId, anecdoteId, 1, 0)
+        assertEquals(anecdoteId, anecdote.removedAnecdoteId)
+        assertEquals("VISIBLE", anecdote.moderationStatus)
+        assertEquals("ogt/social/posts/$postId", crmRemovedAnecdotePath(postId))
+        assertFalse(CRM_ANECDOTE_REMOVE.contains("DELETE"))
+        assertTrue(CRM_ANECDOTE_REMOVE.contains("moderation_status = 'REMOVED'"))
+        assertEquals(commentId, crmOneId(mapOf("commentId" to commentId), "commentId"))
+        assertEquals("texto ajeno", crmActionReason(mapOf("reason" to "texto ajeno")))
+        assertNull(crmActionReason(mapOf("reason" to "no")))
+    }
 }

@@ -8,6 +8,7 @@ import com.onlygoodthings.backend.http.reqString
 import com.onlygoodthings.backend.infra.Database
 import com.onlygoodthings.backend.realtime.RealtimeHub
 import com.onlygoodthings.shared.domain.ApiResponse
+import com.onlygoodthings.shared.domain.SocialComment
 import com.onlygoodthings.shared.domain.SocialLiveCounters
 import com.onlygoodthings.shared.protocol.WsCodec
 import com.onlygoodthings.shared.realtime.OgtDbPaths
@@ -67,6 +68,14 @@ data class CrmPostComment(
 )
 
 @Serializable
+data class CrmPostAnecdote(
+    val id: String,
+    val authorName: String,
+    val body: String,
+    val createdAt: String,
+)
+
+@Serializable
 data class CrmPostReport(
     val id: String,
     val reason: String,
@@ -80,10 +89,14 @@ data class CrmPostDetail(
     val impactCount: Long,
     val comments: List<CrmPostComment>,
     val reports: List<CrmPostReport>,
+    val anecdotes: List<CrmPostAnecdote> = emptyList(),
 )
 
 @Serializable
 data class CrmPostRemoved(val removed: Boolean = true, val ids: List<String> = emptyList())
+
+@Serializable
+data class CrmSubnodeRemoved(val removed: Boolean = true, val id: String, val postId: String)
 
 /** Nodo que ya escucha el feed: `ogt/social/posts/{id}`. */
 internal fun crmRemovedPostLive(postId: String): SocialLiveCounters = SocialLiveCounters(
@@ -94,6 +107,40 @@ internal fun crmRemovedPostLive(postId: String): SocialLiveCounters = SocialLive
 )
 
 internal fun crmRemovedPostPath(postId: String): String = OgtDbPaths.socialPost(postId)
+
+/** Nodo que ya escucha la ficha: `ogt/social/posts/{postId}/comments/{commentId}`. */
+internal fun crmRemovedCommentPath(postId: String, commentId: String): String =
+    OgtDbPaths.socialComment(postId, commentId)
+
+internal fun crmRemovedCommentLive(
+    postId: String,
+    commentId: String,
+    authorUserId: String,
+    body: String,
+): SocialComment = SocialComment(
+    id = commentId,
+    postId = postId,
+    authorUserId = authorUserId,
+    authorName = "",
+    body = body,
+    createdAtEpochMs = 0L,
+    moderationStatus = "REMOVED",
+)
+
+/** La anécdota no tiene nodo propio. Sale por el post que el feed y la ficha ya escuchan. */
+internal fun crmRemovedAnecdotePath(postId: String): String = OgtDbPaths.socialPost(postId)
+
+internal fun crmRemovedAnecdoteLive(
+    postId: String,
+    anecdoteId: String,
+    commentCount: Int,
+    impactCount: Int,
+): SocialLiveCounters = SocialLiveCounters(
+    id = postId,
+    commentCount = commentCount,
+    impactCount = impactCount,
+    removedAnecdoteId = anecdoteId,
+)
 
 @Serializable
 data class CrmCompanySummary(
@@ -374,6 +421,84 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: Realtime
         }
         call.respond(ApiResponse.ok(CrmPostRemoved(ids = removed)))
     }
+    post("/api/v1/crm/platform/posts/comments/remove") {
+        val auth = crmContext(call, db, verifier) ?: return@post
+        if (!crmCanManagePosts(auth.platformRole)) {
+            return@post call.respond(HttpStatusCode.Forbidden,
+                ApiResponse.fail<Unit>("Sin permiso para administrar publicaciones", "FORBIDDEN"))
+        }
+        val data = JsonBody.receiveMap(call)
+        val commentId = crmOneId(data, "commentId")
+            ?: return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Comentario inválido", "BAD_REQUEST"))
+        val reason = crmActionReason(data)
+            ?: return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("El motivo tiene que explicar la quita", "BAD_REQUEST"))
+        val removed = db.withConnection { conn -> removeVisibleComment(conn, auth.userId, commentId, reason) }
+            ?: return@post call.respond(HttpStatusCode.NotFound,
+                ApiResponse.fail<Unit>("Ese comentario ya no está visible", "NOT_FOUND"))
+        hub.projectSocialComment(
+            removed.postId,
+            removed.id,
+            WsCodec.json.encodeToString(
+                SocialComment.serializer(),
+                crmRemovedCommentLive(removed.postId, removed.id, removed.authorUserId, removed.body),
+            ),
+        )
+        val counts = db.withConnection { conn -> postLiveCounts(conn, removed.postId) }
+        if (counts != null) {
+            hub.projectSocialPost(
+                removed.postId,
+                WsCodec.json.encodeToString(SocialLiveCounters.serializer(), counts),
+            )
+        }
+        call.respond(ApiResponse.ok(CrmSubnodeRemoved(id = removed.id, postId = removed.postId)))
+    }
+    post("/api/v1/crm/platform/posts/anecdotes/remove") {
+        val auth = crmContext(call, db, verifier) ?: return@post
+        if (!crmCanManagePosts(auth.platformRole)) {
+            return@post call.respond(HttpStatusCode.Forbidden,
+                ApiResponse.fail<Unit>("Sin permiso para administrar publicaciones", "FORBIDDEN"))
+        }
+        val data = JsonBody.receiveMap(call)
+        val anecdoteId = crmOneId(data, "anecdoteId")
+            ?: return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Anécdota inválida", "BAD_REQUEST"))
+        val reason = crmActionReason(data)
+            ?: return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("El motivo tiene que explicar la quita", "BAD_REQUEST"))
+        val removed = db.withConnection { conn -> removeVisibleAnecdote(conn, auth.userId, anecdoteId, reason) }
+            ?: return@post call.respond(HttpStatusCode.NotFound,
+                ApiResponse.fail<Unit>("Esa anécdota ya no está visible", "NOT_FOUND"))
+        removed.comments.forEach { comment ->
+            hub.projectSocialComment(
+                comment.postId,
+                comment.id,
+                WsCodec.json.encodeToString(
+                    SocialComment.serializer(),
+                    crmRemovedCommentLive(comment.postId, comment.id, comment.authorUserId, comment.body),
+                ),
+            )
+        }
+        hub.projectSocialPost(
+            removed.postId,
+            WsCodec.json.encodeToString(
+                SocialLiveCounters.serializer(),
+                crmRemovedAnecdoteLive(removed.postId, removed.id, removed.commentCount, removed.impactCount),
+            ),
+        )
+        call.respond(ApiResponse.ok(CrmSubnodeRemoved(id = removed.id, postId = removed.postId)))
+    }
+}
+
+internal fun crmOneId(data: Map<String, Any?>, key: String): String? =
+    data.optString(key)?.let { value ->
+        runCatching { UUID.fromString(value.trim()).toString() }.getOrNull()
+    }
+
+internal fun crmActionReason(data: Map<String, Any?>): String? {
+    val reason = data.optString("reason")?.trim().orEmpty()
+    return reason.takeIf { it.length in 3..500 }
 }
 
 internal fun crmPostIds(data: Map<String, Any?>): List<String> {
@@ -455,6 +580,18 @@ private fun ResultSet.toCrmVisiblePost(): CrmVisiblePost = CrmVisiblePost(
 
 internal const val CRM_POST_REMOVE = """
 UPDATE social_posts
+SET moderation_status = 'REMOVED', updated_at = now()
+WHERE id = ?::uuid AND moderation_status = 'VISIBLE'
+"""
+
+internal const val CRM_COMMENT_REMOVE = """
+UPDATE post_comments
+SET moderation_status = 'REMOVED'
+WHERE id = ?::uuid AND moderation_status = 'VISIBLE'
+"""
+
+internal const val CRM_ANECDOTE_REMOVE = """
+UPDATE post_anecdotes
 SET moderation_status = 'REMOVED', updated_at = now()
 WHERE id = ?::uuid AND moderation_status = 'VISIBLE'
 """
@@ -576,7 +713,29 @@ private fun loadVisiblePostDetail(conn: Connection, postId: String): CrmPostDeta
             }
         }
     }
-    return CrmPostDetail(post = post, impactCount = impact, comments = comments, reports = reports)
+    val anecdotes = conn.prepareStatement(
+        """
+        SELECT a.id::text, COALESCE(NULLIF(u.display_name, ''), 'Sin nombre'), a.body, a.created_at
+        FROM post_anecdotes a
+        LEFT JOIN users u ON u.id = a.author_user_id
+        WHERE a.post_id = ?::uuid AND a.moderation_status = 'VISIBLE'
+        ORDER BY a.sort_order, a.created_at
+        LIMIT 40
+        """.trimIndent()
+    ).use { stmt ->
+        stmt.setString(1, postId)
+        stmt.executeQuery().use { rs ->
+            buildList {
+                while (rs.next()) add(CrmPostAnecdote(
+                    id = rs.getString(1),
+                    authorName = rs.getString(2),
+                    body = rs.getString(3),
+                    createdAt = rs.getTimestamp(4).toInstant().toString(),
+                ))
+            }
+        }
+    }
+    return CrmPostDetail(post = post, impactCount = impact, comments = comments, reports = reports, anecdotes = anecdotes)
 }
 
 private fun removeVisiblePosts(conn: Connection, actorId: String, postIds: List<String>, reason: String): List<String> {
@@ -607,6 +766,210 @@ private fun removeVisiblePosts(conn: Connection, actorId: String, postIds: List<
         }
         conn.commit()
         return removed
+    } catch (error: Exception) {
+        conn.rollback()
+        throw error
+    } finally {
+        conn.autoCommit = previous
+    }
+}
+
+private data class CrmHiddenComment(
+    val id: String,
+    val postId: String,
+    val anecdoteId: String?,
+    val authorUserId: String,
+    val body: String,
+)
+
+private data class CrmHiddenAnecdote(
+    val id: String,
+    val postId: String,
+    val comments: List<CrmHiddenComment>,
+    val commentCount: Int,
+    val impactCount: Int,
+)
+
+private fun writeAudit(conn: Connection, actorId: String, action: String, targetType: String, targetId: String, reason: String) {
+    conn.prepareStatement(
+        """
+        INSERT INTO crm_audit_events
+        (actor_user_id, action, target_type, target_id, reason, outcome)
+        VALUES (?::uuid, ?, ?, ?, ?, 'SUCCESS')
+        """.trimIndent()
+    ).use { stmt ->
+        stmt.setString(1, actorId)
+        stmt.setString(2, action)
+        stmt.setString(3, targetType)
+        stmt.setString(4, targetId)
+        stmt.setString(5, reason)
+        stmt.executeUpdate()
+    }
+}
+
+private fun recountVisibleComments(conn: Connection, postId: String, anecdoteId: String?) {
+    if (anecdoteId.isNullOrBlank()) {
+        conn.prepareStatement(
+            """
+            UPDATE social_posts
+            SET comment_count = (
+                SELECT COUNT(*) FROM post_comments
+                WHERE post_id = ?::uuid AND anecdote_id IS NULL AND moderation_status = 'VISIBLE'
+            ),
+            updated_at = now()
+            WHERE id = ?::uuid
+            """.trimIndent()
+        ).use { stmt ->
+            stmt.setString(1, postId)
+            stmt.setString(2, postId)
+            stmt.executeUpdate()
+        }
+    } else {
+        conn.prepareStatement(
+            """
+            UPDATE post_anecdotes
+            SET comment_count = (
+                SELECT COUNT(*) FROM post_comments
+                WHERE anecdote_id = ?::uuid AND moderation_status = 'VISIBLE'
+            ),
+            updated_at = now()
+            WHERE id = ?::uuid
+            """.trimIndent()
+        ).use { stmt ->
+            stmt.setString(1, anecdoteId)
+            stmt.setString(2, anecdoteId)
+            stmt.executeUpdate()
+        }
+    }
+}
+
+private fun postLiveCounts(conn: Connection, postId: String): SocialLiveCounters? =
+    conn.prepareStatement(
+        "SELECT id::text, comment_count, impact_count FROM social_posts WHERE id = ?::uuid"
+    ).use { stmt ->
+        stmt.setString(1, postId)
+        stmt.executeQuery().use { rs ->
+            if (!rs.next()) null
+            else SocialLiveCounters(
+                id = rs.getString(1),
+                commentCount = rs.getInt(2),
+                impactCount = rs.getInt(3),
+            )
+        }
+    }
+
+private fun readVisibleComment(conn: Connection, commentId: String): CrmHiddenComment? =
+    conn.prepareStatement(
+        """
+        SELECT id::text, post_id::text, anecdote_id::text, author_user_id::text, body
+        FROM post_comments
+        WHERE id = ?::uuid AND moderation_status = 'VISIBLE'
+        """.trimIndent()
+    ).use { stmt ->
+        stmt.setString(1, commentId)
+        stmt.executeQuery().use { rs ->
+            if (!rs.next()) null
+            else CrmHiddenComment(
+                id = rs.getString(1),
+                postId = rs.getString(2),
+                anecdoteId = rs.getString(3),
+                authorUserId = rs.getString(4),
+                body = rs.getString(5),
+            )
+        }
+    }
+
+private fun removeVisibleComment(conn: Connection, actorId: String, commentId: String, reason: String): CrmHiddenComment? {
+    val previous = conn.autoCommit
+    conn.autoCommit = false
+    try {
+        val row = readVisibleComment(conn, commentId)
+        if (row == null) {
+            conn.rollback()
+            return null
+        }
+        val updated = conn.prepareStatement(CRM_COMMENT_REMOVE.trim()).use { stmt ->
+            stmt.setString(1, commentId)
+            stmt.executeUpdate()
+        }
+        if (updated != 1) {
+            conn.rollback()
+            return null
+        }
+        recountVisibleComments(conn, row.postId, row.anecdoteId)
+        writeAudit(conn, actorId, "COMMENT_REMOVE", "post_comment", row.id, reason)
+        conn.commit()
+        return row
+    } catch (error: Exception) {
+        conn.rollback()
+        throw error
+    } finally {
+        conn.autoCommit = previous
+    }
+}
+
+private fun removeVisibleAnecdote(conn: Connection, actorId: String, anecdoteId: String, reason: String): CrmHiddenAnecdote? {
+    val previous = conn.autoCommit
+    conn.autoCommit = false
+    try {
+        val postId = conn.prepareStatement(
+            """
+            SELECT post_id::text FROM post_anecdotes
+            WHERE id = ?::uuid AND moderation_status = 'VISIBLE'
+            """.trimIndent()
+        ).use { stmt ->
+            stmt.setString(1, anecdoteId)
+            stmt.executeQuery().use { rs -> if (rs.next()) rs.getString(1) else null }
+        }
+        if (postId == null) {
+            conn.rollback()
+            return null
+        }
+        val updated = conn.prepareStatement(CRM_ANECDOTE_REMOVE.trim()).use { stmt ->
+            stmt.setString(1, anecdoteId)
+            stmt.executeUpdate()
+        }
+        if (updated != 1) {
+            conn.rollback()
+            return null
+        }
+        val comments = conn.prepareStatement(
+            """
+            SELECT id::text, post_id::text, anecdote_id::text, author_user_id::text, body
+            FROM post_comments
+            WHERE anecdote_id = ?::uuid AND moderation_status = 'VISIBLE'
+            """.trimIndent()
+        ).use { stmt ->
+            stmt.setString(1, anecdoteId)
+            stmt.executeQuery().use { rs ->
+                buildList {
+                    while (rs.next()) add(CrmHiddenComment(
+                        id = rs.getString(1),
+                        postId = rs.getString(2),
+                        anecdoteId = rs.getString(3),
+                        authorUserId = rs.getString(4),
+                        body = rs.getString(5),
+                    ))
+                }
+            }
+        }
+        comments.forEach { comment ->
+            conn.prepareStatement(CRM_COMMENT_REMOVE.trim()).use { stmt ->
+                stmt.setString(1, comment.id)
+                stmt.executeUpdate()
+            }
+            writeAudit(conn, actorId, "COMMENT_REMOVE", "post_comment", comment.id, reason)
+        }
+        writeAudit(conn, actorId, "ANECDOTE_REMOVE", "post_anecdote", anecdoteId, reason)
+        val counts = postLiveCounts(conn, postId)
+        conn.commit()
+        return CrmHiddenAnecdote(
+            id = anecdoteId,
+            postId = postId,
+            comments = comments,
+            commentCount = counts?.commentCount ?: 0,
+            impactCount = counts?.impactCount ?: 0,
+        )
     } catch (error: Exception) {
         conn.rollback()
         throw error

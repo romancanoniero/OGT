@@ -73,6 +73,8 @@ data class SocialComment(
     val replies: List<SocialComment> = emptyList(),
     val anecdoteId: String? = null,
     val edited: Boolean = false,
+    /** VISIBLE sigue en la ficha. REMOVED lo saca sin borrar la fila. */
+    val moderationStatus: String = "VISIBLE",
 )
 
 /**
@@ -94,6 +96,8 @@ data class SocialLiveCounters(
     val honoreeName: String? = null,
     /** VISIBLE sigue en el feed. REMOVED lo saca de las pantallas que ya lo muestran. */
     val moderationStatus: String = "VISIBLE",
+    /** Anécdota que sale del homenaje. Las pantallas ya escuchan este post, no un nodo nuevo. */
+    val removedAnecdoteId: String? = null,
 ) {
     val canIngest: Boolean
         get() = !authorUserId.isNullOrBlank() && !body.isNullOrBlank()

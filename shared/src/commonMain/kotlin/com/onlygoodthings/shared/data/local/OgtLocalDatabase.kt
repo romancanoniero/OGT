@@ -138,7 +138,7 @@ class OgtLocalDatabase {
         )
     }
 
-    /** Aplica un nodo social: inserta el post si es nuevo o actualiza contadores. */
+    /** Aplica un nodo social: inserta el post si es nuevo, actualiza contadores o saca una anécdota. */
     fun applySocialLive(live: SocialLiveCounters): Boolean {
         if (!live.moderationStatus.equals("VISIBLE", ignoreCase = true)) {
             val removed = posts.removeAll { it.id == live.id }
@@ -147,9 +147,19 @@ class OgtLocalDatabase {
             bumpSocial()
             return true
         }
+        var changed = false
+        val goneAnecdote = live.removedAnecdoteId?.takeIf { it.isNotBlank() }
+        if (goneAnecdote != null) {
+            val storyGone = anecdotes.removeAll { it.id == goneAnecdote }
+            val notesGone = comments.removeAll { it.anecdoteId == goneAnecdote }
+            if (storyGone || notesGone) changed = true
+        }
         val idx = posts.indexOfFirst { it.id == live.id }
         if (idx < 0) {
-            if (!live.canIngest) return false
+            if (!live.canIngest) {
+                if (changed) bumpSocial()
+                return changed
+            }
             posts += LocalSocialPost(
                 id = live.id,
                 authorKind = AuthorKind.USER,
@@ -178,7 +188,10 @@ class OgtLocalDatabase {
             impactCount = maxOf(current.impactCount, live.impactCount),
             heartCount = maxOf(current.heartCount, live.heartCount),
         )
-        if (next == current) return false
+        if (next == current) {
+            if (changed) bumpSocial()
+            return changed
+        }
         posts[idx] = next
         bumpSocial()
         return true
@@ -213,8 +226,23 @@ class OgtLocalDatabase {
         honoreeName = post.honoreeName,
     )
 
-    /** Inserta un comentario remoto sin duplicar el que ya publicamos acá. */
+    /** Inserta un comentario remoto, o lo saca si el nodo llegó como REMOVED. */
     fun applySocialComment(comment: SocialComment): Boolean {
+        if (!comment.moderationStatus.equals("VISIBLE", ignoreCase = true)) {
+            val row = comments.firstOrNull { it.id == comment.id } ?: return false
+            comments.removeAll { it.id == comment.id }
+            if (row.anecdoteId.isNullOrBlank()) {
+                val idx = posts.indexOfFirst { it.id == row.postId }
+                if (idx >= 0) {
+                    val current = posts[idx]
+                    posts[idx] = current.copy(commentCount = commentsOf(row.postId).size)
+                }
+            } else {
+                recountAnecdoteComments(row.anecdoteId)
+            }
+            bumpSocial()
+            return true
+        }
         if (comments.any { it.id == comment.id }) return false
         comments += LocalComment(
             id = comment.id,

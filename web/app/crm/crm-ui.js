@@ -54,7 +54,7 @@ export function workspaceView(section, listings = {}) {
  * Shell del panel: navegación, indicadores y tabla del resumen que ya devuelve el servidor.
  * `rows` conserva el texto "Etiqueta: valor".
  */
-export function mountWorkspace(root, { title, brand, lede, rows, sections, extra, listings = {}, initialSection, onNavigate }) {
+export function mountWorkspace(root, { title, brand, lede, rows, sections, extra, listings = {}, initialSection, onNavigate, watchComments }) {
   root.replaceChildren();
   const workspace = node('div');
   workspace.className = 'crm-workspace';
@@ -137,6 +137,12 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   workspace.append(nav, main);
   const dialog = node('dialog');
   dialog.className = 'crm-dialog';
+  let stopCommentWatch = null;
+  function stopWatchingComments() {
+    if (typeof stopCommentWatch === 'function') stopCommentWatch();
+    stopCommentWatch = null;
+  }
+  dialog.addEventListener('close', stopWatchingComments);
   workspace.append(dialog);
   root.append(workspace);
 
@@ -181,8 +187,20 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     img.addEventListener('error', () => img.remove());
     return img;
   }
-  function cellNode(cell) {
-    if (cell && cell.image) return photoNode(cell.image, 'crm-post-photo');
+  function cellNode(cell, onOpen) {
+    if (cell && cell.image) {
+      const button = node('button');
+      button.type = 'button';
+      button.className = 'crm-photo-btn';
+      button.setAttribute('aria-label', 'Ver publicación');
+      button.title = 'Ver publicación';
+      button.append(photoNode(cell.image, 'crm-post-photo'));
+      button.addEventListener('click', event => {
+        event.stopPropagation();
+        if (typeof onOpen === 'function') onOpen(false);
+      });
+      return button;
+    }
     if (cell && cell.badge) return badge(cell.badge, cell.tone || 'calm');
     const span = node('span', cell?.text ?? '');
     if (cell?.clamp) span.className = 'crm-clamp';
@@ -252,7 +270,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       const view = listing.present(item);
       if (!view || view.hidden) continue;
       const tr = node('tr');
-      tr.tabIndex = 0;
+      tr.className = 'crm-row-static';
       if (view.key === selectedKey) tr.setAttribute('aria-selected', 'true');
       const open = (reasonFocus) => {
         selectedKey = view.key;
@@ -277,7 +295,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       }
       for (const cell of view.cells) {
         const td = node('td');
-        td.append(cellNode(cell));
+        td.append(cellNode(cell, open));
         tr.append(td);
       }
       const actionCell = node('td');
@@ -290,10 +308,6 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
         actionCell.append(action);
       }
       tr.append(actionCell);
-      tr.addEventListener('click', () => open(false));
-      tr.addEventListener('keydown', event => {
-        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(false); }
-      });
       entityBody.append(tr);
       if (view.key === selectedKey) selected = { item, view };
     }
@@ -382,6 +396,23 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     row.append(productIcon(icon), node('span', text));
     return row;
   }
+  function dropSubnode(kind, id, emptyText) {
+    if (!id) return;
+    const row = dialog.querySelector(`[data-${kind}="${CSS.escape(String(id))}"]`);
+    const host = row?.parentElement;
+    row?.remove();
+    if (host && !host.querySelector(`[data-${kind}]`)) host.replaceChildren(node('p', emptyText));
+  }
+  function subnodeRow(kind, item, label) {
+    const row = node('div');
+    row.className = 'crm-subnode';
+    row.dataset[kind] = item.id;
+    const text = node('p', `${item.authorName || 'Sin nombre'}: ${item.body || ''}`);
+    const button = iconButton('qs_close.svg', label);
+    button.disabled = true;
+    row.append(text, button);
+    return { row, button };
+  }
   async function openDialog(listing, item, view, reasonFocus) {
     const card = view.detail || {};
     dialogPostId = view.key;
@@ -399,11 +430,17 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     const impact = node('p', '…');
     impact.dataset.liveImpact = '1';
     const commentsHost = node('div');
+    const anecdotesHost = node('div');
     const reportsHost = node('div');
     const reason = reasonField(card);
     const confirm = iconButton('qs_close.svg', card.confirmLabel || 'Confirmar quita');
     confirm.disabled = true;
-    reason.input.addEventListener('input', () => { confirm.disabled = reason.input.value.trim().length < 3; });
+    function armRemoves() {
+      const ready = reason.input.value.trim().length >= 3;
+      confirm.disabled = !ready;
+      dialog.querySelectorAll('.crm-subnode .crm-icon-btn').forEach(button => { button.disabled = !ready; });
+    }
+    reason.input.addEventListener('input', armRemoves);
     confirm.addEventListener('click', async () => {
       const text = reason.input.value.trim();
       if (text.length < 3) return;
@@ -425,9 +462,19 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       head, meta, ...(photo ? [photo] : []), body,
       subheading('qs_clap.svg', 'Aplausos'), impact,
       subheading('qs_comment.svg', 'Comentarios'), commentsHost,
+      subheading('qs_anecdote.svg', 'Anécdotas'), anecdotesHost,
       subheading('qs_notifications.svg', 'Denuncias'), reportsHost,
       reason.label, confirm,
     );
+    stopWatchingComments();
+    if (typeof watchComments === 'function' && item.id) {
+      stopCommentWatch = watchComments(item.id, live => {
+        if (!live || dialogPostId !== item.id) return;
+        if (live.moderationStatus && live.moderationStatus !== 'VISIBLE') {
+          dropSubnode('comment', live.id, 'Sin comentarios');
+        }
+      });
+    }
     if (!dialog.open) dialog.showModal();
     if (reasonFocus) reason.input.focus();
     if (typeof listing.loadDetail !== 'function') return;
@@ -437,8 +484,49 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       impact.textContent = String(data.impactCount ?? 0);
       const comments = Array.isArray(data.comments) ? data.comments : [];
       commentsHost.replaceChildren(...(comments.length
-        ? comments.map(comment => node('p', `${comment.authorName || 'Sin nombre'}: ${comment.body || ''}`))
+        ? comments.map(comment => {
+          const line = subnodeRow('comment', comment, 'Quitar comentario');
+          line.button.addEventListener('click', async () => {
+            const text = reason.input.value.trim();
+            if (text.length < 3 || typeof listing.removeComment !== 'function') return;
+            line.button.disabled = true;
+            try {
+              await listing.removeComment(item, comment, text);
+            } catch (error) {
+              if (error?.code === 'ABORTED') return;
+              line.button.disabled = false;
+              listError.textContent = error?.message || 'No se pudo quitar el comentario.';
+              listError.hidden = false;
+              return;
+            }
+            dropSubnode('comment', comment.id, 'Sin comentarios');
+          });
+          return line.row;
+        })
         : [node('p', 'Sin comentarios')]));
+      const anecdotes = Array.isArray(data.anecdotes) ? data.anecdotes : [];
+      anecdotesHost.replaceChildren(...(anecdotes.length
+        ? anecdotes.map(story => {
+          const line = subnodeRow('anecdote', story, 'Quitar anécdota');
+          line.button.addEventListener('click', async () => {
+            const text = reason.input.value.trim();
+            if (text.length < 3 || typeof listing.removeAnecdote !== 'function') return;
+            line.button.disabled = true;
+            try {
+              await listing.removeAnecdote(item, story, text);
+            } catch (error) {
+              if (error?.code === 'ABORTED') return;
+              line.button.disabled = false;
+              listError.textContent = error?.message || 'No se pudo quitar la anécdota.';
+              listError.hidden = false;
+              return;
+            }
+            dropSubnode('anecdote', story.id, 'Sin anécdotas');
+          });
+          return line.row;
+        })
+        : [node('p', 'Sin anécdotas')]));
+      armRemoves();
       const reports = Array.isArray(data.reports) ? data.reports : [];
       reportsHost.replaceChildren(...(reports.length
         ? reports.map(report => node('p', `${report.reason || ''} · ${report.status || ''}`))
@@ -450,6 +538,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   function openBulk(listing) {
     const items = listItems.filter(item => picked.has(listing.present(item)?.key));
     if (!items.length) return;
+    stopWatchingComments();
     dialogPostId = null;
     dialog.replaceChildren();
     const close = iconButton('qs_close.svg', 'Cerrar');
@@ -484,6 +573,9 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   }
   function applyLive(live) {
     if (!live || !live.id) return;
+    if (live.removedAnecdoteId && dialogPostId === live.id) {
+      dropSubnode('anecdote', live.removedAnecdoteId, 'Sin anécdotas');
+    }
     const gone = live.moderationStatus && live.moderationStatus !== 'VISIBLE';
     if (!gone) {
       if (dialogPostId === live.id) {

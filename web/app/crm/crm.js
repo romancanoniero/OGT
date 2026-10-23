@@ -1,6 +1,7 @@
-import { start } from './crm-runtime.js?v=imagen-2';
+import { start } from './crm-runtime.js?v=quita-1';
 
 start().catch(() => {
+  document.body.dataset.crmView = 'auth';
   document.getElementById('crm-root').replaceChildren();
   const status = document.getElementById('crm-status');
   status.dataset.tone = 'error';

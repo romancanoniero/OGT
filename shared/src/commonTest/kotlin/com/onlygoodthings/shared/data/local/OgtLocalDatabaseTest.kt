@@ -543,6 +543,27 @@ class OgtLocalDatabaseTest {
         assertTrue(db.applySocialComment(remote))
         assertTrue(!db.applySocialComment(remote))
         assertTrue(db.commentsOf(post.id).any { it.id == "c-live-1" })
+        assertTrue(db.applySocialComment(remote.copy(moderationStatus = "REMOVED")))
+        assertTrue(db.commentsOf(post.id).none { it.id == "c-live-1" })
+    }
+
+    @Test
+    fun bajaDeAnecdotaSaleDelHomenajeSinBorrarElPost() {
+        val db = OgtLocalDatabase.seeded()
+        val me = db.user(OgtIds.Mariana)
+        val post = db.post(OgtIds.PostHomenaje)
+        val story = db.addAnecdote(me, post.id, "Una historia")
+        assertTrue(story != null)
+        val anecdoteId = story?.id ?: return
+        val live = SocialLiveCounters(
+            id = post.id,
+            commentCount = post.commentCount,
+            impactCount = post.impactCount,
+            removedAnecdoteId = anecdoteId,
+        )
+        assertTrue(db.applySocialLive(live))
+        assertTrue(db.anecdotesOf(post.id).none { it.id == anecdoteId })
+        assertTrue(db.posts.any { it.id == post.id })
     }
 
     @Test
@@ -559,6 +580,18 @@ class OgtLocalDatabaseTest {
             fallbackPostId = "p1",
         )
         assertEquals("hola", comment?.body)
+        assertEquals("VISIBLE", comment?.moderationStatus)
+        val removed = socialCommentFrom(
+            mapOf("id" to "c1", "postId" to "p1", "moderationStatus" to "REMOVED"),
+            key = "c1",
+            fallbackPostId = "p1",
+        )
+        assertEquals("REMOVED", removed?.moderationStatus)
+        val story = socialLiveCountersFrom(
+            mapOf("id" to "p1", "commentCount" to 1, "impactCount" to 0, "removedAnecdoteId" to "a1"),
+            key = "p1",
+        )
+        assertEquals("a1", story?.removedAnecdoteId)
         assertEquals("ws://127.0.0.1:8080/db", gatewayEndpointFromApiBase("http://127.0.0.1:8080"))
         assertEquals("wss://api.onlygoodthings.lat/db", gatewayEndpointFromApiBase("https://api.onlygoodthings.lat"))
     }
