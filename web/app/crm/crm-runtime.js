@@ -1,5 +1,5 @@
-import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn } from './crm-core.js?v=imagen-1';
-import { createIdentity } from './crm-auth.js?v=imagen-1';
+import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn } from './crm-core.js?v=imagen-2';
+import { createIdentity } from './crm-auth.js?v=imagen-2';
 
 const controlSections = [
   { id: 'resumen', label: 'Resumen', icon: 'qs_feed.svg', keys: null },
@@ -130,7 +130,7 @@ export async function start() {
   fields.append(factorLabel, begin, recaptcha, codeLabel, verify, cancel);
   challenge.append(fields); login.insertAdjacentElement('afterend', challenge);
   // El shell viaja en paralelo con Firebase. El ingreso no lo espera para pintar.
-  const workspaceReady = import('./crm-ui.js?v=imagen-1');
+  const workspaceReady = import('./crm-ui.js?v=imagen-2');
   const [appSdk, sdk] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),
@@ -315,7 +315,13 @@ export async function start() {
       function publicationImage(url) {
         if (typeof url !== 'string') return '';
         const value = url.trim();
-        return /^https?:\/\//i.test(value) ? value : '';
+        if (!/^https?:\/\//i.test(value)) return '';
+        try {
+          const parsed = new URL(value);
+          // El archivo es el de post_media.url. El puerto 19080 no sale del servidor.
+          if (/^\/media\/u\/[0-9a-f-]{36}\.(?:jpe?g|png|webp)$/i.test(parsed.pathname)) return parsed.pathname;
+        } catch (_) { return ''; }
+        return value;
       }
       const postListing = {
             placeholder: 'Autor, texto o id',

@@ -618,8 +618,8 @@ body[data-crm-view="app"] .crm-password-wrap { width: min(280px, 100%); }
 }
 .crm-dialog-photo {
   width: 100%;
-  max-height: 280px;
-  object-fit: cover;
+  max-height: 360px;
+  object-fit: contain;
   border-radius: 16px;
   margin-top: 12px;
   display: block;
