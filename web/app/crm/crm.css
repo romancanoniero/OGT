@@ -631,12 +631,15 @@ body[data-crm-view="app"] .crm-password-wrap { width: min(280px, 100%); }
   .crm-workspace-main { padding: 20px 16px 32px; }
   .crm-kpis { grid-template-columns: 1fr 1fr; }
 }
+/* La foto de la publicación es apaisada. La miniatura muestra el rectángulo entero. */
 .crm-post-photo {
-  width: 64px;
-  height: 64px;
-  object-fit: cover;
-  border-radius: 12px;
+  width: 120px;
+  height: 72px;
+  object-fit: contain;
+  object-position: center;
+  border-radius: 8px;
   display: block;
+  background: var(--ogt-sand);
 }
 .crm-dialog-photo {
   width: 100%;
@@ -648,10 +651,14 @@ body[data-crm-view="app"] .crm-password-wrap { width: min(280px, 100%); }
 }
 .crm-photo-btn {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  height: 72px;
   padding: 0;
   border: 0;
   border-radius: 8px;
-  background: transparent;
+  background: var(--ogt-sand);
   cursor: pointer;
 }
 .crm-photo-btn:active { transform: scale(var(--ogt-press)); }
