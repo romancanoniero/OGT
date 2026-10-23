@@ -140,6 +140,13 @@ class OgtLocalDatabase {
 
     /** Aplica un nodo social: inserta el post si es nuevo o actualiza contadores. */
     fun applySocialLive(live: SocialLiveCounters): Boolean {
+        if (!live.moderationStatus.equals("VISIBLE", ignoreCase = true)) {
+            val removed = posts.removeAll { it.id == live.id }
+            if (!removed) return false
+            bumpFeed()
+            bumpSocial()
+            return true
+        }
         val idx = posts.indexOfFirst { it.id == live.id }
         if (idx < 0) {
             if (!live.canIngest) return false

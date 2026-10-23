@@ -420,6 +420,39 @@ img { max-width: 100%; }
   font-weight: 600;
   letter-spacing: -0.01em;
 }
+.crm-icon-btn {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.crm-icon-btn img { width: 22px; height: 22px; }
+.crm-icon-btn:disabled { opacity: 0.4; }
+.crm-bulk {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 12px 8px;
+  color: var(--ogt-ink);
+}
+.crm-dialog {
+  width: min(560px, calc(100vw - 32px));
+  border: 0;
+  border-radius: 20px;
+  padding: 20px;
+  color: var(--ogt-ink);
+  background: var(--ogt-surface);
+}
+.crm-dialog::backdrop { background: color-mix(in srgb, var(--ogt-ink) 32%, transparent); }
+.crm-dialog-head, .crm-subhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.crm-subhead { justify-content: flex-start; margin-top: 16px; font-weight: 600; }
+.crm-subhead img { width: 20px; height: 20px; }
 .crm-table-wrap { overflow-x: auto; }
 .crm-table { width: 100%; border-collapse: collapse; text-align: left; }
 .crm-table th {

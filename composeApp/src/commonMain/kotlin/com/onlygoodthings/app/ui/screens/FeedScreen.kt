@@ -410,7 +410,7 @@ fun FeedScreen(
             )
         }
         sharePostId?.let { postId ->
-            val post = remember(postId, socialTick) { db.post(postId) }
+            val post = remember(postId, socialTick) { db.post(postId) } ?: return@let
             val listing = remember(postId, lostTick) { post.listingId?.let { id -> db.animals.firstOrNull { it.id == id } } }
             val honorLink = post.anecdoteParentId() ?: post.id
             PostShareSheet(

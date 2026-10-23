@@ -16,10 +16,12 @@ test('visible post search and removal use the CRM routes', async () => {
     return response({ success: true, data });
   });
   await api('platform/posts/search', 'jwt', { query: 'plaza' });
-  await api('platform/posts/remove', 'jwt', { postId: '11111111-1111-4111-8111-111111111111', reason: 'Texto ajeno' });
+  await api('platform/posts/detail', 'jwt', { postId: '11111111-1111-4111-8111-111111111111' });
+  await api('platform/posts/remove', 'jwt', { postIds: ['11111111-1111-4111-8111-111111111111'], reason: 'Texto ajeno' });
   assert.deepEqual(seen, [
     ['/api/v1/crm/platform/posts/search', { query: 'plaza' }],
-    ['/api/v1/crm/platform/posts/remove', { postId: '11111111-1111-4111-8111-111111111111', reason: 'Texto ajeno' }],
+    ['/api/v1/crm/platform/posts/detail', { postId: '11111111-1111-4111-8111-111111111111' }],
+    ['/api/v1/crm/platform/posts/remove', { postIds: ['11111111-1111-4111-8111-111111111111'], reason: 'Texto ajeno' }],
   ]);
 });
 
@@ -33,6 +35,7 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   const html = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\.svg', view: 'listing'/);
   assert.doesNotMatch(runtime, /id: 'publicaciones'[^}]*keys:/);
-  assert.match(runtime, /crm-ui\.js\?v=listado-1/);
-  assert.match(html, /crm\.js\?v=listado-1/);
+  assert.match(runtime, /crm-ui\.js\?v=listado-2/);
+  assert.match(html, /crm\.js\?v=listado-2/);
+  assert.match(runtime, /platform\/posts\/detail/);
 });

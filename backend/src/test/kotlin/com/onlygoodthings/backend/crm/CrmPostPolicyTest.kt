@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
+import com.onlygoodthings.shared.realtime.OgtDbPaths
 import org.junit.jupiter.api.Test
 import java.util.UUID
 
@@ -38,5 +39,15 @@ class CrmPostPolicyTest {
         assertNull(parseCrmPostCursor("no"))
         assertNull(parseCrmPostCursor("-1|$id"))
         assertNull(parseCrmPostCursor("10|not-a-uuid"))
+    }
+
+    @Test fun removalProjectsTheExistingPostNodeAsRemoved() {
+        val id = UUID.randomUUID().toString()
+        val live = crmRemovedPostLive(id)
+        assertEquals("REMOVED", live.moderationStatus)
+        assertEquals("ogt/social/posts/$id", crmRemovedPostPath(id))
+        assertEquals(OgtDbPaths.socialPost(id), crmRemovedPostPath(id))
+        assertEquals(listOf(id), crmPostIds(mapOf("postId" to id)))
+        assertEquals(listOf(id), crmPostIds(mapOf("postIds" to listOf(id, id))))
     }
 }

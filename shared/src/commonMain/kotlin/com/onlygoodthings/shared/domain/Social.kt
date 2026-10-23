@@ -92,6 +92,8 @@ data class SocialLiveCounters(
     val createdAtEpochMs: Long = 0L,
     val listingId: String? = null,
     val honoreeName: String? = null,
+    /** VISIBLE sigue en el feed. REMOVED lo saca de las pantallas que ya lo muestran. */
+    val moderationStatus: String = "VISIBLE",
 ) {
     val canIngest: Boolean
         get() = !authorUserId.isNullOrBlank() && !body.isNullOrBlank()
