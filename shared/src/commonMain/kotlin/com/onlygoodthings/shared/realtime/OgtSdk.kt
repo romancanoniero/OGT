@@ -8,26 +8,30 @@ import com.iyr.db.database.DbDatabase
  * Boot del cliente de sockets propio (db-kmp-sdk).
  * La UI solo necesita llamar [start] con el JWT de Firebase.
  *
- * El SDK pide `tokenProvider: suspend (forceRefresh) -> String?`.
- * `true` tiene que llegar al proveedor: si no, un token vencido no se renueva.
+ * El SDK en SHA 0a881b7 expone `tokenProvider: suspend () -> String?` y
+ * `persistenceEnabled`. No hay `persistenceDir` ni `forceReconnect`.
  */
 object OgtSdk {
     fun start(
         gatewayEndpoint: String,
         tokenProvider: suspend (forceRefresh: Boolean) -> String?,
         persistenceDir: String? = null,
-    ): DbDatabase = open(gatewayEndpoint, tokenProvider, persistenceDir)
+    ): DbDatabase = startZeroArg(
+        gatewayEndpoint = gatewayEndpoint,
+        tokenProvider = { tokenProvider(false) },
+        persistenceDir = persistenceDir,
+    )
 
     /** Proveedor sin bandera de refresh. Lo usa la fachada JS (`{ token }`). */
     fun start(
         gatewayEndpoint: String,
         tokenProvider: suspend () -> String?,
         persistenceDir: String? = null,
-    ): DbDatabase = open(gatewayEndpoint, { _ -> tokenProvider() }, persistenceDir)
+    ): DbDatabase = startZeroArg(gatewayEndpoint, tokenProvider, persistenceDir)
 
-    private fun open(
+    private fun startZeroArg(
         gatewayEndpoint: String,
-        tokenProvider: suspend (forceRefresh: Boolean) -> String?,
+        tokenProvider: suspend () -> String?,
         persistenceDir: String?,
     ): DbDatabase {
         if (!DbApp.isInitialized()) {
