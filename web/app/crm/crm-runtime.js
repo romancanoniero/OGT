@@ -1,12 +1,12 @@
-import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError } from './crm-core.js';
-import { createIdentity } from './crm-auth.js';
+import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError } from './crm-core.js?v=listado-1';
+import { createIdentity } from './crm-auth.js?v=listado-1';
 
 const controlSections = [
   { id: 'resumen', label: 'Resumen', icon: 'qs_feed.svg', keys: null },
   { id: 'usuarios', label: 'Usuarios', icon: 'qs_skills.svg', keys: ['Usuarios activos'] },
   { id: 'empresas', label: 'Empresas', icon: 'qs_form.svg', keys: ['Empresas', 'Empresas por verificar'] },
   { id: 'denuncias', label: 'Denuncias', icon: 'qs_notifications.svg', keys: ['Denuncias pendientes'] },
-  { id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote.svg', keys: ['Publicaciones visibles'] },
+  { id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote.svg', view: 'listing' },
 ];
 const empresaSections = [
   { id: 'resumen', label: 'Resumen', icon: 'qs_feed.svg', keys: null },
@@ -20,7 +20,7 @@ export async function start() {
   const root = $('crm-root'), status = $('crm-status'), login = $('crm-login');
   const mode = document.documentElement.dataset.crm, gate = sessionGate();
   const api = createApi(window.fetch.bind(window));
-  let expiry = null, access = null, chosen = '', identityBusy = false;
+  let expiry = null, access = null, chosen = '', identityBusy = false, sectionId = 'resumen';
   const make = (tag, text) => { const node = document.createElement(tag); if (text !== undefined) node.textContent = String(text); return node; };
   const message = (text, tone = 'info') => {
     status.replaceChildren();
@@ -129,7 +129,7 @@ export async function start() {
   fields.append(factorLabel, begin, recaptcha, codeLabel, verify, cancel);
   challenge.append(fields); login.insertAdjacentElement('afterend', challenge);
   // El shell viaja en paralelo con Firebase. El ingreso no lo espera para pintar.
-  const workspaceReady = import('./crm-ui.js');
+  const workspaceReady = import('./crm-ui.js?v=listado-1');
   const [appSdk, sdk] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),
@@ -275,14 +275,7 @@ export async function start() {
           dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Buenos_Aires',
         }).format(date);
       };
-      mountWorkspace(root, {
-        title: mode === 'control' ? 'Resumen operativo' : 'Empresa autorizada',
-        brand, lede,
-        rows: summaryRows(summary).map(([label, value]) => ({ label, value })),
-        sections: mode === 'control' ? controlSections : empresaSections,
-        extra,
-        listings: mode === 'control' ? {
-          publicaciones: {
+      const postListing = {
             placeholder: 'Autor, texto o id',
             searchLabel: 'Buscar publicación',
             columns: ['Autor', 'Texto', 'Fecha', 'Estado', 'Acción'],
@@ -322,12 +315,22 @@ export async function start() {
                 },
               };
             },
-            async remove(post, reason) {
-              await api('platform/posts/remove', token, { postId: post.id, reason }, task.signal);
-              message('Publicación quitada. Ya no aparece entre las visibles.', 'ok');
-            },
-          },
-        } : {},
+        async remove(post, reason) {
+          await api('platform/posts/remove', token, { postId: post.id, reason }, task.signal);
+          message('Publicación quitada. Ya no aparece entre las visibles.', 'ok');
+        },
+      };
+      const sections = (mode === 'control' ? controlSections : empresaSections).map(section =>
+        section.view === 'listing' ? { ...section, listing: postListing } : section
+      );
+      mountWorkspace(root, {
+        title: mode === 'control' ? 'Resumen operativo' : 'Empresa autorizada',
+        brand, lede,
+        rows: summaryRows(summary).map(([label, value]) => ({ label, value })),
+        sections,
+        extra,
+        initialSection: sectionId,
+        onNavigate: id => { sectionId = id; },
       });
       message('Acceso autorizado. Datos obtenidos del servidor; sesión de administración limitada a 15 minutos.', 'ok');
     } catch (error) { if (task.current()) fail(error); }
