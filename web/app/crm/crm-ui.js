@@ -206,7 +206,12 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     if (cell?.clamp) span.className = 'crm-clamp';
     return span;
   }
+  function clearBulk() {
+    bulkBar.replaceChildren();
+    bulkBar.hidden = true;
+  }
   function showMetricMode() {
+    clearBulk();
     entityWrap.hidden = true;
     more.hidden = true;
     listError.hidden = true;
@@ -367,12 +372,18 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   }
 
   function paintBulk(listing) {
+    // El patrón del listado: la acción solo está con una selección. Sin texto; el nombre va en el hint.
     bulkBar.replaceChildren();
-    const keys = listItems.map(item => listing.present(item)?.key).filter(key => key && picked.has(key));
-    bulkBar.hidden = keys.length === 0;
-    if (!keys.length) return;
-    bulkBar.append(node('span', keys.length === 1 ? '1 marcada' : `${keys.length} marcadas`));
-    const button = iconButton('qs_close.svg', 'Quitar selección');
+    const action = listing?.bulk;
+    const keys = action
+      ? listItems.map(item => listing.present(item)?.key).filter(key => key && picked.has(key))
+      : [];
+    if (!action || !keys.length) {
+      bulkBar.hidden = true;
+      return;
+    }
+    bulkBar.hidden = false;
+    const button = iconButton(action.icon, action.label);
     button.addEventListener('click', () => openBulk(listing));
     bulkBar.append(button);
   }
@@ -611,6 +622,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     more.hidden = true;
     listError.hidden = true;
     detail.hidden = true;
+    clearBulk();
     panelTitle.textContent = section?.label || title;
     empty.title.textContent = 'Sin listado';
     empty.detail.textContent = 'Esta sección no pudo abrir su listado.';
