@@ -173,7 +173,16 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       else button.removeAttribute('aria-current');
     }
   }
+  function photoNode(url, className) {
+    const img = node('img');
+    img.className = className;
+    img.src = url;
+    img.alt = 'Foto de la publicación';
+    img.addEventListener('error', () => img.remove());
+    return img;
+  }
   function cellNode(cell) {
+    if (cell && cell.image) return photoNode(cell.image, 'crm-post-photo');
     if (cell && cell.badge) return badge(cell.badge, cell.tone || 'calm');
     const span = node('span', cell?.text ?? '');
     if (cell?.clamp) span.className = 'crm-clamp';
@@ -305,6 +314,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     const meta = node('p', card.meta || '');
     const body = node('p', card.body || '');
     body.className = 'crm-detail-body';
+    const photo = card.image ? photoNode(card.image, 'crm-dialog-photo') : null;
     const label = node('label');
     label.className = 'crm-field';
     const caption = node('span', card.reasonLabel || 'Motivo');
@@ -337,7 +347,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       await loadListing(listing, true);
     });
     label.append(caption, reason);
-    detail.append(detailTitle, meta, body, label, confirm);
+    detail.append(detailTitle, meta, ...(photo ? [photo] : []), body, label, confirm);
     if (focusReason) reason.focus();
     focusReason = false;
   }
@@ -385,6 +395,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     meta.dataset.liveStatus = '1';
     const body = node('p', card.body || '');
     body.className = 'crm-detail-body';
+    const photo = card.image ? photoNode(card.image, 'crm-dialog-photo') : null;
     const impact = node('p', '…');
     impact.dataset.liveImpact = '1';
     const commentsHost = node('div');
@@ -411,7 +422,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       await loadListing(listing, true);
     });
     dialog.append(
-      head, meta, body,
+      head, meta, ...(photo ? [photo] : []), body,
       subheading('qs_clap.svg', 'Aplausos'), impact,
       subheading('qs_comment.svg', 'Comentarios'), commentsHost,
       subheading('qs_notifications.svg', 'Denuncias'), reportsHost,

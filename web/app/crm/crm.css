@@ -609,3 +609,18 @@ body[data-crm-view="app"] .crm-password-wrap { width: min(280px, 100%); }
   .crm-workspace-main { padding: 20px 16px 32px; }
   .crm-kpis { grid-template-columns: 1fr 1fr; }
 }
+.crm-post-photo {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 12px;
+  display: block;
+}
+.crm-dialog-photo {
+  width: 100%;
+  max-height: 280px;
+  object-fit: cover;
+  border-radius: 16px;
+  margin-top: 12px;
+  display: block;
+}

@@ -19,12 +19,22 @@ class CrmPostPolicyTest {
     }
 
     @Test fun searchStaysOnVisibleRowsAndRemovalDoesNotDelete() {
+        assertTrue(CRM_VISIBLE_POST_SEARCH.contains("post_media"))
+        assertTrue(CRM_VISIBLE_POST_SEARCH.contains("m.url"))
         assertTrue(CRM_VISIBLE_POST_SEARCH.contains("moderation_status = 'VISIBLE'"))
         assertFalse(CRM_VISIBLE_POST_SEARCH.contains("REMOVED"))
         assertFalse(CRM_VISIBLE_POST_SEARCH.contains("DELETE"))
         assertTrue(CRM_POST_REMOVE.contains("moderation_status = 'REMOVED'"))
         assertTrue(CRM_POST_REMOVE.contains("moderation_status = 'VISIBLE'"))
         assertFalse(CRM_POST_REMOVE.contains("DELETE"))
+    }
+
+    @Test fun imageUrlUsesTheStoredHttpAddressOnly() {
+        val stored = "https://onlygoodthings.lat/media/u/34b9a70e-7779-492e-81f9-c305a53201ad.jpg"
+        assertEquals(stored, crmPostImageUrl("  $stored  "))
+        assertNull(crmPostImageUrl(null))
+        assertNull(crmPostImageUrl("  "))
+        assertNull(crmPostImageUrl("file:///tmp/foto.jpg"))
     }
 
     @Test fun likePatternDoesNotTreatOperatorTextAsWildcards() {

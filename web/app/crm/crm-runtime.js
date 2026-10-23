@@ -1,5 +1,5 @@
-import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn } from './crm-core.js?v=ingreso-12h';
-import { createIdentity } from './crm-auth.js?v=ingreso-12h';
+import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn } from './crm-core.js?v=imagen-1';
+import { createIdentity } from './crm-auth.js?v=imagen-1';
 
 const controlSections = [
   { id: 'resumen', label: 'Resumen', icon: 'qs_feed.svg', keys: null },
@@ -130,7 +130,7 @@ export async function start() {
   fields.append(factorLabel, begin, recaptcha, codeLabel, verify, cancel);
   challenge.append(fields); login.insertAdjacentElement('afterend', challenge);
   // El shell viaja en paralelo con Firebase. El ingreso no lo espera para pintar.
-  const workspaceReady = import('./crm-ui.js?v=ingreso-12h');
+  const workspaceReady = import('./crm-ui.js?v=imagen-1');
   const [appSdk, sdk] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),
@@ -312,10 +312,15 @@ export async function start() {
           dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Buenos_Aires',
         }).format(date);
       };
+      function publicationImage(url) {
+        if (typeof url !== 'string') return '';
+        const value = url.trim();
+        return /^https?:\/\//i.test(value) ? value : '';
+      }
       const postListing = {
             placeholder: 'Autor, texto o id',
             searchLabel: 'Buscar publicación',
-            columns: ['Autor', 'Texto', 'Fecha', 'Estado', 'Acción'],
+            columns: ['Foto', 'Autor', 'Texto', 'Fecha', 'Estado', 'Acción'],
             mark: true,
             emptyTitle: canPosts ? 'Sin publicaciones' : 'Sin acceso',
             emptyDetail: canPosts
@@ -335,9 +340,11 @@ export async function start() {
             present(post) {
               if (!post || post.status !== 'VISIBLE') return { hidden: true };
               const when = formatWhen(post.createdAt);
+              const image = publicationImage(post.imageUrl);
               return {
                 key: post.id,
                 cells: [
+                  image ? { image } : { text: '' },
                   { text: post.authorName || 'Sin nombre' },
                   { text: post.body || '', clamp: true },
                   { text: when },
@@ -352,6 +359,7 @@ export async function start() {
                   title: post.authorName || 'Sin nombre',
                   meta: `${when} · Visible`,
                   body: post.body || '',
+                  image,
                   reasonLabel: 'Motivo',
                   confirmLabel: 'Confirmar quita',
                 },
