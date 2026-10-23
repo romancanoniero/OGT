@@ -277,18 +277,35 @@ function applyLive(live) {
   }
   const idx = lastFeed.findIndex((p) => p.id === live.id);
   if (idx < 0) return;
-  const merged = mergePost({
+  const patch = {
     id: live.id,
     impactCount: live.impactCount,
     commentCount: live.commentCount,
     body: live.body,
     honoreeName: live.honoreeName,
     topic: live.tag || lastFeed[idx].topic,
-  });
+  };
+  if (live.authorName) {
+    patch.authorName = live.authorName;
+    if (live.authorUserId) patch.authorId = live.authorUserId;
+  }
+  const merged = mergePost(patch);
   paintPost(merged);
+  if (patch.authorName) paintAuthor(merged);
   paintPulse();
   if (document.getElementById("feed-list") && !document.querySelector(`[data-post="${merged.id}"]`)) {
     paintFeedList();
+  }
+}
+
+function paintAuthor(post) {
+  const card = document.querySelector(`[data-post="${post.id}"]`);
+  const who = card && card.querySelector(".post-head .who");
+  if (!who || !post.authorName) return;
+  if (post.authorId) {
+    who.innerHTML = `<a href="#/perfil/${escapeHtml(post.authorId)}">${escapeHtml(post.authorName)}</a>`;
+  } else {
+    who.textContent = post.authorName;
   }
 }
 

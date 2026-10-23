@@ -88,6 +88,8 @@ data class SocialLiveCounters(
     val impactCount: Int,
     val heartCount: Int = 0,
     val authorUserId: String? = null,
+    /** Nombre del autor nuevo. Si viene, las pantallas que ya escuchan el post lo pintan sin recargar. */
+    val authorName: String? = null,
     val body: String? = null,
     val tag: String? = null,
     val place: String? = null,

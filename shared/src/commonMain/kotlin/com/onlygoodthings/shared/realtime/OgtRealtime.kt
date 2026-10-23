@@ -165,6 +165,7 @@ fun socialLiveCountersFrom(raw: Map<String, Any?>, key: String?): SocialLiveCoun
         impactCount = (raw["impactCount"] as? Number)?.toInt() ?: 0,
         heartCount = (raw["heartCount"] as? Number)?.toInt() ?: 0,
         authorUserId = raw["authorUserId"] as? String,
+        authorName = (raw["authorName"] as? String)?.takeIf { it.isNotBlank() },
         body = raw["body"] as? String,
         tag = raw["tag"] as? String,
         place = raw["place"] as? String,
@@ -204,6 +205,7 @@ private fun SocialLiveCounters.toTreeMap(): Map<String, Any?> = buildMap {
     put("impactCount", impactCount)
     put("heartCount", heartCount)
     authorUserId?.let { put("authorUserId", it) }
+    authorName?.let { put("authorName", it) }
     body?.let { put("body", it) }
     tag?.let { put("tag", it) }
     place?.let { put("place", it) }

@@ -80,4 +80,21 @@ class CrmPostPolicyTest {
         assertEquals("texto ajeno", crmActionReason(mapOf("reason" to "texto ajeno")))
         assertNull(crmActionReason(mapOf("reason" to "no")))
     }
+
+    @Test fun attributionKeepsTheRowAndProjectsTheSamePostNode() {
+        val postId = UUID.randomUUID().toString()
+        val userId = UUID.randomUUID().toString()
+        val live = crmAttributedLive(postId, userId, "Administrador", 2, 1)
+        assertEquals("Administrador", live.authorName)
+        assertEquals(userId, live.authorUserId)
+        assertEquals("VISIBLE", live.moderationStatus)
+        assertEquals("ogt/social/posts/$postId", crmRemovedPostPath(postId))
+        assertFalse(CRM_POST_ATTRIBUTE.contains("DELETE"))
+        assertTrue(CRM_POST_ATTRIBUTE.contains("author_user_id"))
+        assertTrue(CRM_POST_ATTRIBUTE.contains("moderation_status = 'VISIBLE'"))
+        assertTrue(CRM_USER_SEARCH.contains("display_name"))
+        assertTrue(CRM_USER_SEARCH.contains("email"))
+        assertFalse(CRM_USER_SEARCH.contains("firebase_uid"))
+        assertEquals(userId, crmOneId(mapOf("userId" to userId), "userId"))
+    }
 }

@@ -298,11 +298,13 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
         markCell.append(box);
         tr.append(markCell);
       }
-      for (const cell of view.cells) {
+      view.cells.forEach((cell, index) => {
         const td = node('td');
+        if (listing.columns[index] === 'Autor') td.dataset.field = 'author';
         td.append(cellNode(cell, open));
         tr.append(td);
-      }
+      });
+      tr.dataset.post = view.key;
       const actionCell = node('td');
       for (const spec of view.actions || []) {
         const action = iconButton(spec.icon, spec.label);
@@ -414,12 +416,90 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     row?.remove();
     if (host && !host.querySelector(`[data-${kind}]`)) host.replaceChildren(node('p', emptyText));
   }
+  function attributeControl(listing, item, head) {
+    const button = iconButton('qs_invite.svg', 'Atribuir');
+    const panel = node('div');
+    panel.className = 'crm-assign';
+    panel.hidden = true;
+    const label = node('label');
+    label.className = 'crm-field';
+    const caption = node('span', 'Nombre o correo');
+    caption.className = 'crm-field-label';
+    const input = node('input');
+    input.className = 'crm-input';
+    input.type = 'search';
+    input.setAttribute('aria-label', 'Nombre o correo');
+    input.placeholder = 'Nombre o correo';
+    label.append(caption, input);
+    const results = node('div');
+    results.className = 'crm-assign-results';
+    const confirm = iconButton('qs_send.svg', 'Confirmar atribución');
+    confirm.disabled = true;
+    let picked = null;
+    let timer = 0;
+    button.addEventListener('click', () => {
+      panel.hidden = !panel.hidden;
+      if (!panel.hidden) input.focus();
+    });
+    input.addEventListener('input', () => {
+      picked = null;
+      confirm.disabled = true;
+      window.clearTimeout(timer);
+      const query = input.value.trim();
+      if (query.length < 2) {
+        results.replaceChildren();
+        return;
+      }
+      timer = window.setTimeout(async () => {
+        try {
+          const data = await listing.searchUsers(query);
+          const users = Array.isArray(data?.users) ? data.users : [];
+          results.replaceChildren(...(users.length ? users.map(user => {
+            const hit = node('button', `${user.displayName || 'Sin nombre'}${user.email ? ` · ${user.email}` : ''}`);
+            hit.type = 'button';
+            hit.className = 'crm-assign-hit';
+            hit.addEventListener('click', () => {
+              picked = user;
+              results.querySelectorAll('.crm-assign-hit').forEach(other => other.removeAttribute('aria-pressed'));
+              hit.setAttribute('aria-pressed', 'true');
+              confirm.disabled = false;
+            });
+            return hit;
+          }) : [node('p', 'Nadie coincide.')]));
+        } catch (error) {
+          if (error?.code === 'ABORTED') return;
+          results.replaceChildren(node('p', 'No se pudo buscar.'));
+        }
+      }, 280);
+    });
+    confirm.addEventListener('click', async () => {
+      if (!picked) return;
+      confirm.disabled = true;
+      try {
+        const data = await listing.attribute(item, picked.id);
+        const name = data?.authorName || picked.displayName;
+        if (name) {
+          item.authorName = name;
+          const title = head.querySelector('h3');
+          if (title) title.textContent = name;
+        }
+        panel.hidden = true;
+      } catch (error) {
+        if (error?.code === 'ABORTED') return;
+        confirm.disabled = false;
+        listError.textContent = error?.message || 'No se pudo atribuir la publicación.';
+        listError.hidden = false;
+      }
+    });
+    panel.append(label, results, confirm);
+    return { button, panel };
+  }
   function subnodeRow(kind, item, label) {
     const row = node('div');
     row.className = 'crm-subnode';
     row.dataset[kind] = item.id;
     const text = node('p', `${item.authorName || 'Sin nombre'}: ${item.body || ''}`);
-    const button = iconButton('qs_close.svg', label);
+    const button = iconButton('qs_trash.png', label);
     button.disabled = true;
     row.append(text, button);
     return { row, button };
@@ -432,7 +512,12 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     close.addEventListener('click', () => dialog.close());
     const head = node('div');
     head.className = 'crm-dialog-head';
-    head.append(node('h3', card.title || ''), close);
+    const tools = node('div');
+    tools.className = 'crm-dialog-tools';
+    const assign = typeof listing.attribute === 'function' ? attributeControl(listing, item, head) : null;
+    if (assign) tools.append(assign.button);
+    tools.append(close);
+    head.append(node('h3', card.title || ''), tools);
     const meta = node('p', card.meta || '');
     meta.dataset.liveStatus = '1';
     const body = node('p', card.body || '');
@@ -444,7 +529,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     const anecdotesHost = node('div');
     const reportsHost = node('div');
     const reason = reasonField(card);
-    const confirm = iconButton('qs_close.svg', card.confirmLabel || 'Confirmar quita');
+    const confirm = iconButton('qs_trash.png', card.confirmLabel || 'Confirmar quita');
     confirm.disabled = true;
     function armRemoves() {
       const ready = reason.input.value.trim().length >= 3;
@@ -471,6 +556,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     });
     dialog.append(
       head, meta, ...(photo ? [photo] : []), body,
+      ...(assign ? [assign.panel] : []),
       subheading('qs_clap.svg', 'Aplausos'), impact,
       subheading('qs_comment.svg', 'Comentarios'), commentsHost,
       subheading('qs_anecdote.svg', 'Anécdotas'), anecdotesHost,
@@ -558,7 +644,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     head.className = 'crm-dialog-head';
     head.append(node('h3', items.length === 1 ? 'Quitar publicación' : `Quitar ${items.length}`), close);
     const reason = reasonField({ reasonLabel: 'Motivo' });
-    const confirm = iconButton('qs_close.svg', 'Confirmar quita');
+    const confirm = iconButton('qs_trash.png', 'Confirmar quita');
     confirm.disabled = true;
     reason.input.addEventListener('input', () => { confirm.disabled = reason.input.value.trim().length < 3; });
     confirm.addEventListener('click', async () => {
@@ -589,6 +675,16 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     }
     const gone = live.moderationStatus && live.moderationStatus !== 'VISIBLE';
     if (!gone) {
+      if (live.authorName) {
+        const row = listItems.find(item => item.id === live.id);
+        if (row) row.authorName = live.authorName;
+        const cell = entityBody.querySelector(`tr[data-post="${CSS.escape(live.id)}"] [data-field="author"] span`);
+        if (cell) cell.textContent = live.authorName;
+        if (dialogPostId === live.id) {
+          const title = dialog.querySelector('.crm-dialog-head h3');
+          if (title) title.textContent = live.authorName;
+        }
+      }
       if (dialogPostId === live.id) {
         const impact = dialog.querySelector('[data-live-impact]');
         if (impact && live.impactCount != null) impact.textContent = String(live.impactCount);
