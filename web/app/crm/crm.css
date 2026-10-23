@@ -451,6 +451,23 @@ img { max-width: 100%; }
 }
 .crm-dialog::backdrop { background: color-mix(in srgb, var(--ogt-ink) 32%, transparent); }
 .crm-dialog-head, .crm-subhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.crm-dialog-tools { display: flex; align-items: center; }
+.crm-icon-btn img[src$="qs_trash.png"] { width: 28px; height: 28px; object-fit: contain; }
+.crm-assign { margin-top: 12px; }
+.crm-assign[hidden] { display: none !important; }
+.crm-assign-hit {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ogt-ink);
+  text-align: left;
+  cursor: pointer;
+}
+.crm-assign-hit[aria-pressed="true"] { background: var(--ogt-sand); }
 .crm-subhead { justify-content: flex-start; margin-top: 16px; font-weight: 600; }
 .crm-subhead img { width: 20px; height: 20px; }
 .crm-table-wrap { overflow-x: auto; }

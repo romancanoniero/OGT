@@ -548,6 +548,24 @@ class OgtLocalDatabaseTest {
     }
 
     @Test
+    fun atribucionCambiaElAutorSinBorrarElPost() {
+        val db = OgtLocalDatabase.seeded()
+        val post = db.posts.first()
+        val live = SocialLiveCounters(
+            id = post.id,
+            commentCount = post.commentCount,
+            impactCount = post.impactCount,
+            authorUserId = "admin-live",
+            authorName = "Administrador",
+        )
+        assertTrue(db.applySocialLive(live))
+        val updated = db.posts.first { it.id == post.id }
+        assertEquals("admin-live", updated.authorUserId)
+        assertEquals(AuthorKind.USER, updated.authorKind)
+        assertEquals("Administrador", db.authorName(updated))
+    }
+
+    @Test
     fun bajaDeAnecdotaSaleDelHomenajeSinBorrarElPost() {
         val db = OgtLocalDatabase.seeded()
         val me = db.user(OgtIds.Mariana)
@@ -592,6 +610,11 @@ class OgtLocalDatabaseTest {
             key = "p1",
         )
         assertEquals("a1", story?.removedAnecdoteId)
+        val named = socialLiveCountersFrom(
+            mapOf("id" to "p1", "commentCount" to 1, "impactCount" to 0, "authorUserId" to "admin", "authorName" to "Administrador"),
+            key = "p1",
+        )
+        assertEquals("Administrador", named?.authorName)
         assertEquals("ws://127.0.0.1:8080/db", gatewayEndpointFromApiBase("http://127.0.0.1:8080"))
         assertEquals("wss://api.onlygoodthings.lat/db", gatewayEndpointFromApiBase("https://api.onlygoodthings.lat"))
     }

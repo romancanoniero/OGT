@@ -34,6 +34,7 @@ import com.onlygoodthings.shared.domain.SocialPost
 import com.onlygoodthings.shared.domain.AnimalListingDto
 import com.onlygoodthings.shared.domain.OgtCrmDefaults
 import com.onlygoodthings.shared.domain.UserProfile
+import com.onlygoodthings.shared.domain.UserRole
 import com.onlygoodthings.shared.feed.FeedCandidate
 import com.onlygoodthings.shared.feed.FeedEventSignal
 import com.onlygoodthings.shared.feed.FeedRanker
@@ -183,11 +184,23 @@ class OgtLocalDatabase {
             return true
         }
         val current = posts[idx]
-        val next = current.copy(
+        val namedAuthor = live.authorName?.trim()?.takeIf { it.isNotEmpty() }
+        val nextAuthorId = live.authorUserId?.takeIf { it.isNotBlank() }
+        if (namedAuthor != null && nextAuthorId != null) rememberLiveAuthor(nextAuthorId, namedAuthor)
+        var next = current.copy(
             commentCount = maxOf(current.commentCount, live.commentCount),
             impactCount = maxOf(current.impactCount, live.impactCount),
             heartCount = maxOf(current.heartCount, live.heartCount),
         )
+        if (namedAuthor != null && nextAuthorId != null &&
+            (current.authorUserId != nextAuthorId || current.authorKind != AuthorKind.USER || current.authorCompanyId != null)
+        ) {
+            next = next.copy(
+                authorKind = AuthorKind.USER,
+                authorUserId = nextAuthorId,
+                authorCompanyId = null,
+            )
+        }
         if (next == current) {
             if (changed) bumpSocial()
             return changed
@@ -195,6 +208,27 @@ class OgtLocalDatabase {
         posts[idx] = next
         bumpSocial()
         return true
+    }
+
+    /** El autor llegó por el nodo del post. Si no está en el catálogo local, se guarda el nombre para pintarlo. */
+    private fun rememberLiveAuthor(userId: String, displayName: String) {
+        if (userOrNull(userId) != null) return
+        users += LocalUser(
+            id = userId,
+            firebaseUid = "",
+            email = null,
+            phoneE164 = null,
+            displayName = displayName,
+            photoUrl = null,
+            role = UserRole.USER,
+            communityPoints = 0,
+            inviteCode = "live-$userId",
+            barrio = "",
+            levelLabel = "",
+            honorTag = "",
+            latitude = 0.0,
+            longitude = 0.0,
+        )
     }
 
     /** Marca un posteo recién grabado para que el Feed lo recargue. */

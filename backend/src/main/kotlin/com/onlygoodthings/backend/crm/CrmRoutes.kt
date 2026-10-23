@@ -98,6 +98,20 @@ data class CrmPostRemoved(val removed: Boolean = true, val ids: List<String> = e
 @Serializable
 data class CrmSubnodeRemoved(val removed: Boolean = true, val id: String, val postId: String)
 
+@Serializable
+data class CrmUserMatch(val id: String, val displayName: String, val email: String? = null)
+
+@Serializable
+data class CrmUserSearch(val users: List<CrmUserMatch>)
+
+@Serializable
+data class CrmPostAttributed(
+    val postId: String,
+    val authorUserId: String,
+    val authorName: String,
+    val changed: Boolean,
+)
+
 /** Nodo que ya escucha el feed: `ogt/social/posts/{id}`. */
 internal fun crmRemovedPostLive(postId: String): SocialLiveCounters = SocialLiveCounters(
     id = postId,
@@ -129,6 +143,22 @@ internal fun crmRemovedCommentLive(
 
 /** La anécdota no tiene nodo propio. Sale por el post que el feed y la ficha ya escuchan. */
 internal fun crmRemovedAnecdotePath(postId: String): String = OgtDbPaths.socialPost(postId)
+
+/** El mismo nodo `ogt/social/posts/{id}`, ahora con el autor nuevo. */
+internal fun crmAttributedLive(
+    postId: String,
+    authorUserId: String,
+    authorName: String,
+    commentCount: Int,
+    impactCount: Int,
+): SocialLiveCounters = SocialLiveCounters(
+    id = postId,
+    commentCount = commentCount,
+    impactCount = impactCount,
+    authorUserId = authorUserId,
+    authorName = authorName,
+    moderationStatus = "VISIBLE",
+)
 
 internal fun crmRemovedAnecdoteLive(
     postId: String,
@@ -489,6 +519,59 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: Realtime
         )
         call.respond(ApiResponse.ok(CrmSubnodeRemoved(id = removed.id, postId = removed.postId)))
     }
+    post("/api/v1/crm/platform/users/search") {
+        val auth = crmContext(call, db, verifier) ?: return@post
+        if (!crmCanManagePosts(auth.platformRole)) {
+            return@post call.respond(HttpStatusCode.Forbidden,
+                ApiResponse.fail<Unit>("Sin permiso para administrar publicaciones", "FORBIDDEN"))
+        }
+        val data = JsonBody.receiveMap(call)
+        val query = data.optString("query")?.trim().orEmpty()
+        if (query.length !in 2..80) {
+            return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("La búsqueda es demasiado corta", "BAD_REQUEST"))
+        }
+        val users = db.withConnection { conn -> searchActiveUsers(conn, query) }
+        call.respond(ApiResponse.ok(CrmUserSearch(users = users)))
+    }
+    post("/api/v1/crm/platform/posts/attribute") {
+        val auth = crmContext(call, db, verifier) ?: return@post
+        if (!crmCanManagePosts(auth.platformRole)) {
+            return@post call.respond(HttpStatusCode.Forbidden,
+                ApiResponse.fail<Unit>("Sin permiso para administrar publicaciones", "FORBIDDEN"))
+        }
+        val data = JsonBody.receiveMap(call)
+        val postId = crmOneId(data, "postId")
+            ?: return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Publicación inválida", "BAD_REQUEST"))
+        val userId = crmOneId(data, "userId")
+            ?: return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Persona inválida", "BAD_REQUEST"))
+        val attributed = db.withConnection { conn -> attributeVisiblePost(conn, auth.userId, postId, userId) }
+            ?: return@post call.respond(HttpStatusCode.NotFound,
+                ApiResponse.fail<Unit>("No se pudo atribuir esa publicación", "NOT_FOUND"))
+        if (attributed.changed) {
+            hub.projectSocialPost(
+                postId,
+                WsCodec.json.encodeToString(
+                    SocialLiveCounters.serializer(),
+                    crmAttributedLive(
+                        postId,
+                        attributed.authorUserId,
+                        attributed.authorName,
+                        attributed.commentCount,
+                        attributed.impactCount,
+                    ),
+                ),
+            )
+        }
+        call.respond(ApiResponse.ok(CrmPostAttributed(
+            postId = postId,
+            authorUserId = attributed.authorUserId,
+            authorName = attributed.authorName,
+            changed = attributed.changed,
+        )))
+    }
 }
 
 internal fun crmOneId(data: Map<String, Any?>, key: String): String? =
@@ -581,6 +664,29 @@ private fun ResultSet.toCrmVisiblePost(): CrmVisiblePost = CrmVisiblePost(
 internal const val CRM_POST_REMOVE = """
 UPDATE social_posts
 SET moderation_status = 'REMOVED', updated_at = now()
+WHERE id = ?::uuid AND moderation_status = 'VISIBLE'
+"""
+
+/** Nombre o correo de una cuenta activa. No devuelve firebase_uid. */
+internal const val CRM_USER_SEARCH = """
+SELECT u.id::text, u.display_name, u.email::text
+FROM users u
+WHERE u.status = 'ACTIVE'
+  AND (
+    u.display_name ILIKE ? ESCAPE '\'
+    OR COALESCE(u.email::text, '') ILIKE ? ESCAPE '\'
+  )
+ORDER BY u.display_name
+LIMIT 8
+"""
+
+/** Cambia el autor. La fila sigue. No es un DELETE. */
+internal const val CRM_POST_ATTRIBUTE = """
+UPDATE social_posts
+SET author_kind = 'USER',
+    author_user_id = ?::uuid,
+    author_company_id = NULL,
+    updated_at = now()
 WHERE id = ?::uuid AND moderation_status = 'VISIBLE'
 """
 
@@ -789,6 +895,79 @@ private data class CrmHiddenAnecdote(
     val commentCount: Int,
     val impactCount: Int,
 )
+
+private data class CrmAttribution(
+    val authorUserId: String,
+    val authorName: String,
+    val commentCount: Int,
+    val impactCount: Int,
+    val changed: Boolean,
+)
+
+private fun searchActiveUsers(conn: Connection, query: String): List<CrmUserMatch> {
+    val like = crmLikeContains(query)
+    return conn.prepareStatement(CRM_USER_SEARCH.trim()).use { stmt ->
+        stmt.setString(1, like)
+        stmt.setString(2, like)
+        stmt.executeQuery().use { rs ->
+            buildList {
+                while (rs.next()) {
+                    add(CrmUserMatch(
+                        id = rs.getString(1),
+                        displayName = rs.getString(2),
+                        email = rs.getString(3),
+                    ))
+                }
+            }
+        }
+    }
+}
+
+private fun attributeVisiblePost(conn: Connection, actorId: String, postId: String, userId: String): CrmAttribution? {
+    val person = conn.prepareStatement(
+        "SELECT display_name FROM users WHERE id = ?::uuid AND status = 'ACTIVE'"
+    ).use { stmt ->
+        stmt.setString(1, userId)
+        stmt.executeQuery().use { rs -> if (rs.next()) rs.getString(1) else null }
+    } ?: return null
+    val snap = conn.prepareStatement(
+        """
+        SELECT author_user_id::text, comment_count, impact_count, moderation_status::text
+        FROM social_posts WHERE id = ?::uuid
+        """.trimIndent()
+    ).use { stmt ->
+        stmt.setString(1, postId)
+        stmt.executeQuery().use { rs ->
+            if (!rs.next()) null
+            else listOf(rs.getString(1).orEmpty(), rs.getInt(2).toString(), rs.getInt(3).toString(), rs.getString(4))
+        }
+    } ?: return null
+    if (snap[3] != "VISIBLE") return null
+    val commentCount = snap[1].toInt()
+    val impactCount = snap[2].toInt()
+    if (snap[0] == userId) return CrmAttribution(userId, person, commentCount, impactCount, changed = false)
+    val previous = conn.autoCommit
+    conn.autoCommit = false
+    try {
+        val updated = conn.prepareStatement(CRM_POST_ATTRIBUTE.trim()).use { stmt ->
+            stmt.setString(1, userId)
+            stmt.setString(2, postId)
+            stmt.executeUpdate()
+        }
+        if (updated != 1) {
+            conn.rollback()
+            return null
+        }
+        writeAudit(conn, actorId, "POST_ATTRIBUTE", "social_post", postId, "Atribución a $person")
+        conn.commit()
+        return CrmAttribution(userId, person, commentCount, impactCount, changed = true)
+    } catch (error: Exception) {
+        conn.rollback()
+        throw error
+    } finally {
+        conn.autoCommit = previous
+    }
+}
 
 private fun writeAudit(conn: Connection, actorId: String, action: String, targetType: String, targetId: String, reason: String) {
     conn.prepareStatement(

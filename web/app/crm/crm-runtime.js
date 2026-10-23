@@ -1,5 +1,5 @@
-import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn } from './crm-core.js?v=seleccion-1';
-import { createIdentity } from './crm-auth.js?v=seleccion-1';
+import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn } from './crm-core.js?v=tacho-1';
+import { createIdentity } from './crm-auth.js?v=tacho-1';
 
 const controlSections = [
   { id: 'resumen', label: 'Resumen', icon: 'qs_feed.svg', keys: null },
@@ -130,7 +130,7 @@ export async function start() {
   fields.append(factorLabel, begin, recaptcha, codeLabel, verify, cancel);
   challenge.append(fields); login.insertAdjacentElement('afterend', challenge);
   // El shell viaja en paralelo con Firebase. El ingreso no lo espera para pintar.
-  const workspaceReady = import('./crm-ui.js?v=seleccion-1');
+  const workspaceReady = import('./crm-ui.js?v=tacho-1');
   const [appSdk, sdk] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),
@@ -328,7 +328,7 @@ export async function start() {
       const postListing = {
             placeholder: 'Autor, texto o id',
             searchLabel: 'Buscar publicación',
-            bulk: canPosts ? { icon: 'qs_close.svg', label: 'Quitar selección' } : null,
+            bulk: canPosts ? { icon: 'qs_trash.png', label: 'Quitar selección' } : null,
             columns: ['Foto', 'Autor', 'Texto', 'Fecha', 'Estado', 'Acción'],
             mark: true,
             emptyTitle: canPosts ? 'Sin publicaciones' : 'Sin acceso',
@@ -362,7 +362,7 @@ export async function start() {
                 mark: true,
                 actions: canPosts ? [
                   { icon: 'qs_anecdote.svg', label: 'Ver publicación', name: 'open' },
-                  { icon: 'qs_close.svg', label: 'Quitar', name: 'remove' },
+                  { icon: 'qs_trash.png', label: 'Quitar', name: 'remove' },
                 ] : [{ icon: 'qs_anecdote.svg', label: 'Ver publicación', name: 'open' }],
                 detail: {
                   title: post.authorName || 'Sin nombre',
@@ -388,6 +388,14 @@ export async function start() {
         async removeAnecdote(post, story, reason) {
           await api('platform/posts/anecdotes/remove', token, { anecdoteId: story.id, reason }, task.signal);
         },
+        ...(canPosts ? {
+          async searchUsers(query) {
+            return api('platform/users/search', token, { query }, task.signal);
+          },
+          async attribute(post, userId) {
+            return api('platform/posts/attribute', token, { postId: post.id, userId }, task.signal);
+          },
+        } : {}),
       };
       const sections = (mode === 'control' ? controlSections : empresaSections).map(section =>
         section.view === 'listing' ? { ...section, listing: postListing } : section
