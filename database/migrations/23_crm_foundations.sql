@@ -69,3 +69,7 @@ DROP TRIGGER IF EXISTS trg_crm_audit_immutable ON crm_audit_events;
 CREATE TRIGGER trg_crm_audit_immutable
     BEFORE UPDATE OR DELETE ON crm_audit_events
     FOR EACH ROW EXECUTE FUNCTION crm_audit_immutable();
+
+-- La anécdota es un subnodo del homenaje. Control la pasa a REMOVED; no borra la fila.
+ALTER TABLE post_anecdotes
+    ADD COLUMN IF NOT EXISTS moderation_status moderation_status NOT NULL DEFAULT 'VISIBLE';

@@ -262,6 +262,7 @@ function applyProfileLive(live) {
 
 function applyLive(live) {
   if (!live || !live.id || hiddenIds.has(live.id)) return;
+  if (live.removedAnecdoteId) dropLiveAnecdote(live.id, live.removedAnecdoteId);
   if (live.moderationStatus && live.moderationStatus !== "VISIBLE") {
     lastFeed = lastFeed.filter((p) => p.id !== live.id);
     document.querySelectorAll(`[data-post="${live.id}"]`).forEach((node) => node.remove());
@@ -333,6 +334,18 @@ function mergeStory(post, story) {
   if (idx < 0) post.anecdotes.push(story);
   else post.anecdotes[idx] = Object.assign({}, post.anecdotes[idx], story);
   return post.anecdotes[idx < 0 ? post.anecdotes.length - 1 : idx];
+}
+
+function dropLiveAnecdote(postId, storyId) {
+  const post = lastFeed.find((p) => p.id === postId);
+  if (post && Array.isArray(post.anecdotes)) {
+    post.anecdotes = post.anecdotes.filter((s) => s.id !== storyId);
+  }
+  document.querySelector(`[data-story="${storyId}"]`)?.remove();
+  const card = document.querySelector(`[data-post="${postId}"]`);
+  const caption = card?.querySelector(".caption");
+  const left = post ? storiesOf(post).length : 0;
+  if (caption) caption.outerHTML = storiesCaptionHtml(left);
 }
 
 function removeStoryCard(storyId, postId) {

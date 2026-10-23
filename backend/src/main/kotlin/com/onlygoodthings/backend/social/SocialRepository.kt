@@ -1082,6 +1082,7 @@ class SocialSqlRepository(private val db: Database) {
             FROM post_anecdotes a
             JOIN users u ON u.id = a.author_user_id
             WHERE a.post_id IN ($placeholders)
+              AND a.moderation_status = 'VISIBLE'
             ORDER BY a.post_id, a.sort_order, a.created_at
             """.trimIndent(),
         ).use { stmt ->
@@ -1247,6 +1248,7 @@ class SocialSqlRepository(private val db: Database) {
             FROM post_anecdotes a
             JOIN users u ON u.id = a.author_user_id
             WHERE a.id = ?::uuid
+              AND a.moderation_status = 'VISIBLE'
             """.trimIndent(),
         ).use { stmt ->
             stmt.setString(1, viewerId)

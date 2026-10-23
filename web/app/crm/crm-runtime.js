@@ -1,5 +1,5 @@
-import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn } from './crm-core.js?v=imagen-2';
-import { createIdentity } from './crm-auth.js?v=imagen-2';
+import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn } from './crm-core.js?v=quita-1';
+import { createIdentity } from './crm-auth.js?v=quita-1';
 
 const controlSections = [
   { id: 'resumen', label: 'Resumen', icon: 'qs_feed.svg', keys: null },
@@ -130,7 +130,7 @@ export async function start() {
   fields.append(factorLabel, begin, recaptcha, codeLabel, verify, cancel);
   challenge.append(fields); login.insertAdjacentElement('afterend', challenge);
   // El shell viaja en paralelo con Firebase. El ingreso no lo espera para pintar.
-  const workspaceReady = import('./crm-ui.js?v=imagen-2');
+  const workspaceReady = import('./crm-ui.js?v=quita-1');
   const [appSdk, sdk] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),
@@ -259,16 +259,19 @@ export async function start() {
   }
   async function checkAccess() {
     if (returning) return;
-    clearData(); const task = gate.next();
-    logout.hidden = !identity.currentUser();
-    refresh.hidden = !identity.currentUser();
+    gate.reset();
+    clearTimeout(expiry);
+    expiry = null;
+    access = null;
+    const task = gate.next();
     if (!identity.currentUser()) {
+      root.replaceChildren();
       showEntry();
       onboarding.hidden = true; addGoogle.hidden = true; addPassword.hidden = true; linkedPasswordWrap.hidden = true;
+      logout.hidden = true;
       message('El acceso requiere correo verificado, segundo factor y permisos expresos. Iniciá sesión o creá tu cuenta.'); return;
     }
-    showApp();
-    message('Verificando identidad, segundo factor y permisos...');
+    logout.hidden = false;
     try {
       const token = await identity.token(); if (!task.current()) return;
       const permission = validateAccess(await api('access', token, {}, task.signal), mode);
@@ -287,7 +290,6 @@ export async function start() {
       login.hidden = true; challenge.hidden = true; googleLogin.hidden = true;
       signupToggle.hidden = true; onboarding.hidden = true; refresh.hidden = false;
       showLinkMethods();
-      showApp();
       let extra = null;
       if (mode === 'empresa') {
         extra = make('div'); extra.className = 'crm-field crm-field-inline';
@@ -379,6 +381,12 @@ export async function start() {
           await api('platform/posts/remove', token, { postIds, reason }, task.signal);
           message(postIds.length > 1 ? 'Publicaciones quitadas. Ya no aparecen entre las visibles.' : 'Publicación quitada. Ya no aparece entre las visibles.', 'ok');
         },
+        async removeComment(post, comment, reason) {
+          await api('platform/posts/comments/remove', token, { commentId: comment.id, reason }, task.signal);
+        },
+        async removeAnecdote(post, story, reason) {
+          await api('platform/posts/anecdotes/remove', token, { anecdoteId: story.id, reason }, task.signal);
+        },
       };
       const sections = (mode === 'control' ? controlSections : empresaSections).map(section =>
         section.view === 'listing' ? { ...section, listing: postListing } : section
@@ -391,10 +399,18 @@ export async function start() {
         extra,
         initialSection: sectionId,
         onNavigate: id => { sectionId = id; },
+        watchComments(postId, onComment) {
+          if (!liveClient || typeof liveClient.observePostComments !== 'function') return () => {};
+          return liveClient.observePostComments(postId, raw => {
+            const event = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            onComment(event);
+          });
+        },
       });
       desk = mounted;
       startPostLive(token);
       message('Acceso autorizado. Datos obtenidos del servidor; sesión de administración limitada a 12 horas.', 'ok');
+      showApp();
     } catch (error) { if (task.current()) fail(error); }
   }
   function startPostLive(token) {
