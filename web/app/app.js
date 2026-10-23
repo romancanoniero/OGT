@@ -3918,7 +3918,8 @@ function soon(title, body) {
 }
 
 const AUTH_PAGES = new Set(["intro", "portal", "entrar", "registro", "recuperar", "telefono", "sms"]);
-const AUTH_STILL = "auth-still.png";
+// Clay 3D Quiet Studio ya existente: anécdota / relato de la comunidad. Fondo con alfa.
+const AUTH_STILL = "anecdote_action.png";
 const OGT_LOGO = "ogt-logo.png?v=mark";
 const PHONE_KEY = "ogt.phonePending";
 
@@ -4043,60 +4044,91 @@ function holdIntroKeys(ev) {
   if (ev.code === "Space" || ev.key === " ") ev.preventDefault();
 }
 
-function playIntroClip(video) {
-  const run = video.play();
-  if (run && run.catch) run.catch(() => {});
-}
-
-function unmuteNearEnd(video) {
-  const arm = () => {
-    const dur = Number(video.duration);
-    if (!dur || !Number.isFinite(dur)) return;
-    const wait = Math.max(0, (dur - 10) * 1000);
-    window.setTimeout(() => {
-      if (leaveIntro.busy) return;
-      video.muted = false;
-      playIntroClip(video);
-    }, wait);
-  };
-  if (video.readyState >= 1) arm();
-  else video.addEventListener("loadedmetadata", arm, { once: true });
-}
-
 function bindIntroVideo(video, frame, miss) {
   const loader = frame.querySelector(".intro-loader");
+  const sound = frame.querySelector(".intro-sound");
+  // El autoplay con sonido lo bloquea el navegador. Arranca en mute y el botón lo activa.
+  let quiereSonido = false;
+  let reintentando = false;
+  let intento = 0;
+  let arranque = null;
+  let corteListo = false;
+
   video.controls = false;
-  video.defaultMuted = false;
-  video.muted = false;
+  video.defaultMuted = true;
+  video.muted = true;
+  video.autoplay = true;
   video.playsInline = true;
   video.preload = "auto";
   video.disablePictureInPicture = true;
+  video.setAttribute("muted", "");
+  video.setAttribute("autoplay", "");
   video.setAttribute("playsinline", "");
   video.setAttribute("webkit-playsinline", "");
   video.setAttribute("controlslist", "nodownload nofullscreen noremoteplayback");
   video.setAttribute("disablepictureinpicture", "");
 
+  const syncSound = () => {
+    if (!sound) return;
+    const playing = !video.paused && !video.ended;
+    sound.hidden = !playing;
+    sound.textContent = video.muted ? "Activar sonido" : "Silenciar";
+    sound.setAttribute("aria-pressed", video.muted ? "false" : "true");
+  };
+
   const reveal = () => {
-    if (leaveIntro.busy) return;
+    if (leaveIntro.busy || video.paused || video.ended) return;
     frame.classList.add("is-playing");
     if (loader) loader.hidden = true;
+    syncSound();
+    if (corteListo) return;
+    corteListo = true;
+    const ms = Math.round((Number(video.duration) || 10) * 1000 + 300);
+    window.setTimeout(() => leaveIntro(), ms);
   };
 
-  const start = async () => {
-    if (leaveIntro.busy || start.busy) return;
-    start.busy = true;
-    try {
-      video.muted = false;
-      await video.play();
-    } catch (_) {
-      video.muted = true;
-      playIntroClip(video);
-      unmuteNearEnd(video);
+  const start = () => {
+    if (leaveIntro.busy || video.ended || reintentando) return;
+    if (!video.paused) {
+      reveal();
+      return;
     }
-    reveal();
+    if (!quiereSonido) {
+      video.muted = true;
+      video.setAttribute("muted", "");
+    }
+    const run = video.play();
+    arranque = run;
+    if (!run || typeof run.then !== "function") {
+      intento = 0;
+      reveal();
+      return;
+    }
+    run.then(() => {
+      if (arranque !== run) return;
+      intento = 0;
+      reveal();
+    }).catch(() => {
+      if (arranque !== run || leaveIntro.busy) return;
+      // Si el sonido fue rechazado, el siguiente intento vuelve a mute.
+      if (quiereSonido) {
+        quiereSonido = false;
+        video.muted = true;
+        video.setAttribute("muted", "");
+      }
+      intento += 1;
+      if (intento > 8) return;
+      reintentando = true;
+      window.setTimeout(() => {
+        reintentando = false;
+        start();
+      }, 180 * intento);
+    });
   };
 
-  video.addEventListener("canplay", start, { once: true });
+  start();
+  video.addEventListener("loadeddata", start);
+  video.addEventListener("canplay", start);
   video.addEventListener("playing", reveal);
   video.addEventListener("ended", leaveIntro);
   video.addEventListener("error", () => {
@@ -4104,15 +4136,29 @@ function bindIntroVideo(video, frame, miss) {
     if (loader) loader.hidden = true;
   });
   video.addEventListener("pause", () => {
-    if (leaveIntro.busy) return;
-    playIntroClip(video);
+    if (leaveIntro.busy || video.ended || reintentando) return;
+    if (Number.isFinite(video.duration) && video.currentTime >= video.duration - 0.25) return;
+    start();
   });
-  video.addEventListener("loadedmetadata", () => {
-    const ms = Math.round((Number(video.duration) || 10) * 1000 + 300);
-    window.setTimeout(() => leaveIntro(), ms);
+  sound?.addEventListener("click", () => {
+    quiereSonido = video.muted;
+    video.muted = !quiereSonido;
+    if (quiereSonido) video.removeAttribute("muted");
+    else video.setAttribute("muted", "");
+    const run = video.play();
+    if (!run || typeof run.then !== "function") {
+      syncSound();
+      return;
+    }
+    run.then(() => syncSound()).catch(() => {
+      quiereSonido = false;
+      video.muted = true;
+      video.setAttribute("muted", "");
+      const retry = video.play();
+      if (retry && typeof retry.then === "function") retry.then(() => syncSound()).catch(() => syncSound());
+      else syncSound();
+    });
   });
-  if (video.readyState >= 3) start();
-  else if (video.ended) leaveIntro();
 }
 
 function renderIntro() {
@@ -4127,7 +4173,8 @@ function renderIntro() {
       <p class="intro-kicker">Only Good Things (OGT)</p>
       <div class="intro-frame">
         <div class="intro-loader" aria-hidden="true"></div>
-        <video src="${INTRO_VIDEO}" playsinline disablepictureinpicture controlslist="nodownload nofullscreen noremoteplayback" preload="auto"></video>
+        <video src="${INTRO_VIDEO}" muted autoplay playsinline disablepictureinpicture controlslist="nodownload nofullscreen noremoteplayback" preload="auto"></video>
+        <button type="button" class="intro-sound" hidden>Activar sonido</button>
       </div>
       <h1>Las buenas acciones se encuentran.</h1>
       <p class="hint">Vecinos, empresas y hechos que suman.</p>
@@ -4246,7 +4293,7 @@ function authFoot() {
 
 function authStill(title, sub) {
   return `<section class="auth-still">
-    <img src="${AUTH_STILL}" alt="Composición Quiet Studio: perro, manos, plantín y placa cívica" onerror="this.remove()">
+    <img src="${AUTH_STILL}" alt="Cuaderno de anécdota en clay 3D, Quiet Studio" onerror="this.remove()">
     ${title ? `<p class="auth-still-title">${title}</p>` : ""}
     ${sub ? `<p class="auth-still-sub">${sub}</p>` : ""}
   </section>`;
@@ -4458,8 +4505,109 @@ function startSmsTimer() {
   }, 1000);
 }
 
+function tituloFactor(factor) {
+  if (!factor) return "Segundo factor";
+  if (factor.kind === "phone") return `SMS · ${factor.label}`;
+  if (factor.kind === "totp") return factor.label || "Aplicación autenticadora";
+  return "Este factor no está disponible en la web";
+}
+
+function renderMfa(factors, err, step, opts) {
+  const lista = Array.isArray(factors) ? factors : [];
+  const hold = Boolean(opts && opts.hold);
+  const elegido = step && step.kind ? step : null;
+  const pista = elegido
+    ? (elegido.kind === "phone"
+      ? `Ingresá el código de seis dígitos que enviamos a ${elegido.label}.`
+      : "Ingresá el código de seis dígitos de tu aplicación autenticadora.")
+    : "Tu cuenta pide un segundo factor para completar el ingreso.";
+  const factores = !elegido && lista.length > 1
+    ? `<div class="auth-factors" role="list">${lista.map((factor) =>
+      `<button type="button" class="auth-secondary auth-factor" data-factor="${factor.index}">${escapeHtml(tituloFactor(factor))}</button>`
+    ).join("")}</div>`
+    : "";
+  const reintentar = hold && !elegido && lista.length === 1
+    ? `<button type="button" class="auth-primary" id="mfa-retry">Reintentar</button>`
+    : "";
+  const form = elegido
+    ? `<form class="auth-form" id="mfa-form">
+        <label class="auth-field">Código
+          <input name="code" inputmode="numeric" autocomplete="one-time-code" required maxlength="6" pattern="[0-9]*" placeholder="123456">
+        </label>
+        <button type="submit" class="auth-primary">Confirmar</button>
+      </form>`
+    : "";
+  const panel = `
+    ${ogtMark("panel")}
+    <div class="auth-mfa">
+      <p class="auth-kicker">SEGUNDO FACTOR</p>
+      <h1>Confirmá que sos vos</h1>
+      <p class="hint">${escapeHtml(pista)}</p>
+      ${authErrorBox(err)}
+      ${factores}
+      ${reintentar}
+      ${form}
+      <p class="auth-links"><button type="button" class="auth-text" id="mfa-back">Volver al ingreso</button></p>
+    </div>`;
+  paintAuth("entrar", authStill("Las buenas acciones se encuentran.", "Archivo cívico · Red de confianza y colaboración comunitaria"), panel, true);
+  bindMfa(lista, elegido, { hold });
+}
+
+function bindMfa(lista, step, opts) {
+  const auth = window.OgtAuth;
+  const hold = Boolean(opts && opts.hold);
+  document.getElementById("mfa-back")?.addEventListener("click", () => {
+    auth?.cancelSecondFactor();
+    renderAuth("entrar");
+  });
+  document.getElementById("mfa-retry")?.addEventListener("click", () => {
+    if (lista[0]) arrancarFactor(lista[0].index, lista);
+  });
+  if (!step && !hold && lista.length === 1) {
+    arrancarFactor(lista[0].index, lista);
+    return;
+  }
+  if (!step) {
+    document.querySelectorAll("[data-factor]").forEach((btn) => {
+      btn.addEventListener("click", () => arrancarFactor(Number(btn.dataset.factor), lista));
+    });
+    return;
+  }
+  document.getElementById("mfa-form")?.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const code = String(new FormData(ev.target).get("code") || "").trim();
+    try {
+      if (!auth) throw new Error("Auth no cargó");
+      setAuthBusy(true, "Confirmando…");
+      await auth.confirmSecondFactor(code);
+      await enterAfterAuth();
+    } catch (e) {
+      setAuthBusy(false);
+      if (e && e.code === "MFA_REQUIRED") {
+        renderMfa(e.factors || lista, e.message, null, { hold: !(e.factors && e.factors.length) });
+        return;
+      }
+      renderMfa(lista, e.message || "No se pudo confirmar", step);
+    }
+  });
+}
+
+async function arrancarFactor(index, lista) {
+  const auth = window.OgtAuth;
+  try {
+    if (!auth) throw new Error("Auth no cargó");
+    setAuthBusy(true, "Preparando verificación…");
+    const step = await auth.beginSecondFactor(index);
+    setAuthBusy(false);
+    renderMfa(lista, "", step);
+  } catch (e) {
+    setAuthBusy(false);
+    renderMfa(lista, (e && e.message) || "No se pudo preparar la verificación", null, { hold: true });
+  }
+}
+
 function setAuthBusy(busy, label) {
-  document.querySelectorAll("#auth-form button, #phone-form button, #sms-form button, [data-prov], [data-lab]")
+  document.querySelectorAll("#auth-form button, #phone-form button, #sms-form button, #mfa-form button, #mfa-retry, [data-factor], [data-prov], [data-lab]")
     .forEach((btn) => {
       btn.disabled = Boolean(busy);
       if (btn.matches(".auth-primary") && label) {
@@ -4473,7 +4621,16 @@ function bindAuth(page) {
   const auth = window.OgtAuth;
   const fail = (e) => {
     setAuthBusy(false);
-    const msg = e.message || String(e);
+    const code = String(e && e.code || "");
+    const crudo = String(e && (e.message || e) || "");
+    if (code === "MFA_REQUIRED" || /multi-factor-auth-required|Proof of ownership/i.test(`${code} ${crudo}`)) {
+      const factors = (e && e.factors) || (auth && auth.pendingFactors ? auth.pendingFactors() : []);
+      const aviso = factors.length ? "" : "Hace falta un segundo factor para completar el ingreso.";
+      return renderMfa(factors, aviso, null, { hold: factors.length === 0 });
+    }
+    const msg = /Firebase:|auth\/|Proof of ownership/i.test(crudo)
+      ? "No se pudo autenticar"
+      : (e.message || String(e));
     if (page === "telefono") return renderPhone(msg);
     if (page === "sms") return renderSms(msg);
     return renderAuth(page, msg);
