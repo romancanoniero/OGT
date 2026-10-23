@@ -35,8 +35,10 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   const html = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\.svg', view: 'listing'/);
   assert.doesNotMatch(runtime, /id: 'publicaciones'[^}]*keys:/);
-  assert.match(runtime, /crm-ui\.js\?v=ingreso-12h/);
-  assert.match(html, /crm\.js\?v=ingreso-12h/);
+  assert.match(runtime, /crm-ui\.js\?v=imagen-1/);
+  assert.match(html, /crm\.js\?v=imagen-1/);
+  assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
+  assert.match(html, /crm\.css\?v=imagen-1/);
   assert.match(runtime, /limitada a 12 horas/);
   assert.match(runtime, /async function returnToSignIn/);
   assert.doesNotMatch(runtime, /limitada a 15 minutos/);

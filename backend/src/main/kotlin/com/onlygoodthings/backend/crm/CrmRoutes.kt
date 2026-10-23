@@ -20,6 +20,7 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
 import kotlinx.serialization.Serializable
 import java.sql.Connection
+import java.sql.ResultSet
 import java.sql.Timestamp
 import java.time.Instant
 import java.util.UUID
@@ -47,6 +48,8 @@ data class CrmVisiblePost(
     val body: String,
     val createdAt: String,
     val status: String,
+    /** Primera foto IMAGE de `post_media.url`. Vacío si el post no tiene imagen. */
+    val imageUrl: String? = null,
 )
 
 @Serializable
@@ -422,12 +425,33 @@ internal fun parseCrmPostCursor(raw: String): Pair<Long, String>? {
 
 internal const val CRM_VISIBLE_POST_SEARCH = """
 SELECT p.id::text, p.body, p.moderation_status::text, p.created_at,
-       COALESCE(NULLIF(u.display_name, ''), NULLIF(c.trade_name, ''), NULLIF(c.legal_name, ''), 'Sin nombre') AS author_name
+       COALESCE(NULLIF(u.display_name, ''), NULLIF(c.trade_name, ''), NULLIF(c.legal_name, ''), 'Sin nombre') AS author_name,
+       (SELECT m.url FROM post_media m
+         WHERE m.post_id = p.id AND m.kind = 'IMAGE'
+         ORDER BY m.sort_order LIMIT 1) AS image_url
 FROM social_posts p
 LEFT JOIN users u ON u.id = p.author_user_id
 LEFT JOIN companies c ON c.id = p.author_company_id
 WHERE p.moderation_status = 'VISIBLE'
 """
+
+/** La URL que ya guarda `post_media.url`. Sin esquema http no es una foto publicable. */
+internal fun crmPostImageUrl(raw: String?): String? {
+    val url = raw?.trim().orEmpty()
+    if (url.length !in 8..2000) return null
+    val lower = url.lowercase()
+    if (!lower.startsWith("https://") && !lower.startsWith("http://")) return null
+    return url
+}
+
+private fun ResultSet.toCrmVisiblePost(): CrmVisiblePost = CrmVisiblePost(
+    id = getString("id"),
+    authorName = getString("author_name"),
+    body = getString("body"),
+    createdAt = getTimestamp("created_at").toInstant().toString(),
+    status = getString("moderation_status"),
+    imageUrl = crmPostImageUrl(getString("image_url")),
+)
 
 internal const val CRM_POST_REMOVE = """
 UPDATE social_posts
@@ -477,13 +501,7 @@ private fun searchVisiblePosts(
                 while (rs.next()) {
                     val status = rs.getString("moderation_status")
                     if (status != "VISIBLE") continue
-                    add(CrmVisiblePost(
-                        id = rs.getString("id"),
-                        authorName = rs.getString("author_name"),
-                        body = rs.getString("body"),
-                        createdAt = rs.getTimestamp("created_at").toInstant().toString(),
-                        status = status,
-                    ))
+                    add(rs.toCrmVisiblePost())
                 }
             }
         }
@@ -506,13 +524,7 @@ private fun loadVisiblePostDetail(conn: Connection, postId: String): CrmPostDeta
         stmt.setString(1, postId)
         stmt.executeQuery().use { rs ->
             if (!rs.next() || rs.getString("moderation_status") != "VISIBLE") null
-            else CrmVisiblePost(
-                id = rs.getString("id"),
-                authorName = rs.getString("author_name"),
-                body = rs.getString("body"),
-                createdAt = rs.getTimestamp("created_at").toInstant().toString(),
-                status = rs.getString("moderation_status"),
-            )
+            else rs.toCrmVisiblePost()
         }
     } ?: return null
     val impact = conn.prepareStatement(
