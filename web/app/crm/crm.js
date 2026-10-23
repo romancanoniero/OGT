@@ -1,4 +1,4 @@
-import { start } from './crm-runtime.js?v=quita-1';
+import { start } from './crm-runtime.js?v=seleccion-1';
 
 start().catch(() => {
   document.body.dataset.crmView = 'auth';

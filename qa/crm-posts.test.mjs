@@ -39,10 +39,11 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   const html = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\.svg', view: 'listing'/);
   assert.doesNotMatch(runtime, /id: 'publicaciones'[^}]*keys:/);
-  assert.match(runtime, /crm-ui\.js\?v=quita-1/);
-  assert.match(html, /crm\.js\?v=quita-1/);
+  assert.match(runtime, /crm-ui\.js\?v=seleccion-1/);
+  assert.match(html, /crm\.js\?v=seleccion-1/);
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
-  assert.match(html, /crm\.css\?v=quita-1/);
+  assert.match(html, /crm\.css\?v=seleccion-1/);
+  assert.match(runtime, /icon: 'qs_close\.svg', label: 'Quitar selección'/);
   assert.match(html, /data-crm-view="pending"/);
   assert.doesNotMatch(runtime, /Verificando identidad/);
   assert.match(runtime, /platform\/posts\/comments\/remove/);
@@ -52,6 +53,8 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   assert.match(ui, /crm-photo-btn/);
   assert.match(ui, /Quitar comentario/);
   assert.match(ui, /Quitar anécdota/);
+  assert.match(ui, /iconButton\(action\.icon, action\.label\)/);
+  assert.doesNotMatch(ui, /marcada/);
   assert.doesNotMatch(ui, /tr\.addEventListener\('click', \(\) => open/);
   assert.match(css, /data-crm-view="pending"/);
   assert.match(runtime, /limitada a 12 horas/);
