@@ -46,7 +46,7 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   assert.match(runtime, /crm-ui\.js\?v=tacho-1/);
   assert.match(html, /crm\.js\?v=tacho-1/);
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
-  assert.match(html, /crm\.css\?v=horizontal-1/);
+  assert.match(html, /crm\.css\?v=fullbleed-1/);
   assert.match(runtime, /icon: 'qs_trash\.png', label: 'Quitar selección'/);
   assert.match(runtime, /platform\/posts\/reassign/);
   assert.match(runtime, /platform\/users\/search/);
@@ -61,8 +61,15 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   assert.ok(photo);
   assert.match(photo[0], /width: 120px/);
   assert.match(photo[0], /height: 72px/);
-  assert.match(photo[0], /object-fit: contain/);
-  assert.doesNotMatch(photo[0], /cover/);
+  assert.match(photo[0], /object-fit: cover/);
+  assert.match(photo[0], /object-position: center center/);
+  const ficha = css.match(/\.crm-dialog-photo \{[^}]+\}/);
+  assert.ok(ficha);
+  assert.match(ficha[0], /width: calc\(100% \+ 40px\)/);
+  assert.match(ficha[0], /max-width: none/);
+  assert.match(ficha[0], /height: auto/);
+  assert.match(ficha[0], /object-fit: contain/);
+  assert.doesNotMatch(ficha[0], /max-height/);
   assert.match(ui, /crm-photo-btn/);
   assert.match(ui, /Quitar comentario/);
   assert.match(ui, /Quitar anécdota/);

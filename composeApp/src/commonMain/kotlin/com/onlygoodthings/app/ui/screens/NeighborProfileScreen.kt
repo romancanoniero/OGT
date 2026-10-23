@@ -169,6 +169,7 @@ fun NeighborProfileScreen(
                                     fallback = Res.drawable.feed_avatar_reply,
                                     contentDescription = post.tag,
                                     modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop,
                                 )
                             } else {
                                 Image(

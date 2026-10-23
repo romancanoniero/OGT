@@ -64,6 +64,7 @@ import com.onlygoodthings.app.resources.qs_plus
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.theme.OgtMotion
 import com.onlygoodthings.app.ui.screens.OgtPostImage
+import com.onlygoodthings.app.ui.screens.ogtBleedHorizontal
 import com.onlygoodthings.shared.domain.MediaKind
 import com.onlygoodthings.shared.domain.PostMediaRules
 import kotlinx.coroutines.withTimeoutOrNull
@@ -130,7 +131,7 @@ fun OgtDraftMediaStrip(
         ) {
             Box(
                 Modifier
-                    .fillMaxWidth()
+                    .ogtBleedHorizontal(10.dp)
                     .height(176.dp)
                     .onGloballyPositioned { heroBounds = it.boundsInWindow() }
                     .clip(HeroShape)
@@ -306,6 +307,7 @@ private fun DraftStill(item: OgtPickedMedia, description: String, modifier: Modi
         fallback = Res.drawable.publish_photo,
         contentDescription = description,
         modifier = modifier,
+        contentScale = ContentScale.Crop,
         posterUrl = item.posterPath?.let { "file://$it" },
     )
 }
