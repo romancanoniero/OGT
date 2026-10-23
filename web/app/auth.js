@@ -18,6 +18,11 @@
   let pendingPhone = null;
   let recaptcha = null;
   let emulatorConfigured = false;
+  // Desafío MFA en curso. Lo llena Firebase en el cliente; el backend no lo emite.
+  let mfaResolver = null;
+  let mfaHint = null;
+  let mfaVerificationId = null;
+  let mfaRecaptcha = null;
 
   function persist(next) {
     token = next || "";
@@ -79,18 +84,138 @@
     if (code.includes("email-already-in-use")) return "Ese correo ya está registrado";
     if (code.includes("weak-password")) return "La contraseña es demasiado débil";
     if (code.includes("too-many-requests")) return "Demasiados intentos. Probá más tarde";
-    if (code.includes("invalid-verification-code")) return "El código SMS no es válido";
+    if (code.includes("invalid-verification-code") || code.includes("invalid-verification-id") || code.includes("invalid-totp")) return "El código no es válido";
+    if (code.includes("missing-verification-code") || code.includes("missing-code")) return "Ingresá los seis dígitos";
+    if (code.includes("code-expired") || code.includes("session-expired") || code.includes("multi-factor-session") || code.includes("invalid-multi-factor-session")) {
+      return "La verificación venció. Volvé a ingresar.";
+    }
+    if (code.includes("multi-factor-auth-required")) return "Hace falta un segundo factor para completar el ingreso.";
+    if (code.includes("internal-error")) return "No se pudo confirmar el segundo factor. Volvé a ingresar.";
+    if (code.includes("captcha-check-failed") || code.includes("quota-exceeded")) return "No se pudo enviar el SMS. Probá de nuevo.";
     if (code.includes("popup-closed")) return "Cerraste la ventana de ingreso";
     if (code.includes("account-exists-with-different-credential")) {
       return "Ese correo ya está en otra cuenta. Entrá con el medio que usaste primero o vinculalo en la app.";
     }
     if (code.includes("operation-not-allowed")) return "Este método no está habilitado en Firebase";
     if (code.includes("unauthorized-domain")) return "Este dominio no está autorizado en Firebase Auth";
-    return sinIdDeProyecto(err && err.message) || "No se pudo autenticar";
+    const text = sinIdDeProyecto(err && err.message) || "No se pudo autenticar";
+    // Nunca devolver el message crudo de Firebase (inglés + código auth/…).
+    if (/Firebase:|auth\/|Proof of ownership/i.test(text)) return "No se pudo autenticar";
+    return text;
+  }
+
+  function etiquetaFactor(hint) {
+    if (!hint) return "Segundo factor";
+    if (hint.factorId === "phone") return hint.phoneNumber || "SMS";
+    if (hint.factorId === "totp") return hint.displayName || "Aplicación autenticadora";
+    return hint.displayName || "Segundo factor";
+  }
+
+  function listarFactores() {
+    const hints = mfaResolver && mfaResolver.hints ? Array.from(mfaResolver.hints) : [];
+    return hints.map((hint, index) => ({
+      index,
+      kind: hint.factorId === "phone" || hint.factorId === "totp" ? hint.factorId : "otro",
+      label: etiquetaFactor(hint),
+    }));
+  }
+
+  function limpiarMfa() {
+    mfaResolver = null;
+    mfaHint = null;
+    mfaVerificationId = null;
+    if (mfaRecaptcha) {
+      try { mfaRecaptcha.clear(); } catch (_) { /* el widget ya no está */ }
+      mfaRecaptcha = null;
+    }
+  }
+
+  function resolverDe(error) {
+    if (error && error.resolver && error.resolver.hints) return error.resolver;
+    try {
+      const instance = auth();
+      if (typeof instance.getMultiFactorResolver === "function") return instance.getMultiFactorResolver(error);
+    } catch (_) { /* sin resolver en este error */ }
+    return null;
+  }
+
+  // Abre el segundo factor que Firebase ya devolvió. No pide nada al backend.
+  function abrirMfa(error) {
+    limpiarMfa();
+    const resolver = resolverDe(error);
+    const hints = resolver && resolver.hints ? Array.from(resolver.hints) : [];
+    if (!hints.length) {
+      const vacio = new Error("No hay un segundo factor disponible para esta cuenta. Volvé a ingresar.");
+      vacio.code = "MFA_REQUIRED";
+      vacio.factors = [];
+      throw vacio;
+    }
+    mfaResolver = resolver;
+    const pedido = new Error("Hace falta un segundo factor para completar el ingreso.");
+    pedido.code = "MFA_REQUIRED";
+    pedido.factors = listarFactores();
+    throw pedido;
+  }
+
+  // firebase-auth-compat 10.13.2 conoce el hint TOTP pero no exporta TotpMultiFactorGenerator.
+  // El resolver del SDK llama assertion._process(auth, session); la finalización es el
+  // mismo endpoint que usa el SDK, con la credencial que Firebase ya devolvió.
+  function assertionTotp(enrollmentId, code) {
+    return {
+      factorId: "totp",
+      async _process(innerAuth, session) {
+        const pending = session && (session.credential || session.mfaPendingCredential);
+        if (!pending) {
+          const vencida = new Error("La verificación venció. Volvé a ingresar.");
+          vencida.code = "auth/invalid-multi-factor-session";
+          throw vencida;
+        }
+        const key = (innerAuth && innerAuth.config && innerAuth.config.apiKey) || CFG.apiKey;
+        const base = window.OGT_AUTH_EMULATOR
+          ? String(window.OGT_AUTH_EMULATOR).replace(/\/$/, "")
+          : "https://identitytoolkit.googleapis.com";
+        const res = await fetch(`${base}/v2/accounts/mfaSignIn:finalize?key=${encodeURIComponent(key)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mfaPendingCredential: pending,
+            mfaEnrollmentId: enrollmentId,
+            totpVerificationInfo: { verificationCode: code },
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.idToken) {
+          const message = String(data && data.error && data.error.message || "");
+          const fallo = new Error(message || "No se pudo confirmar");
+          if (/INVALID_CODE|INVALID_OTP|INVALID_VERIFICATION/i.test(message)) fallo.code = "auth/invalid-verification-code";
+          else if (/EXPIRED|INVALID_MFA_PENDING|SESSION/i.test(message)) fallo.code = "auth/code-expired";
+          else fallo.code = "auth/internal-error";
+          throw fallo;
+        }
+        return data;
+      },
+    };
+  }
+
+  function recaptchaMfa() {
+    const box = document.getElementById("recaptcha");
+    if (!box) throw new Error("Falta el contenedor de verificación");
+    if (recaptcha) {
+      try { recaptcha.clear(); } catch (_) { /* se rearma abajo */ }
+      recaptcha = null;
+    }
+    if (mfaRecaptcha) {
+      try { mfaRecaptcha.clear(); } catch (_) { /* se rearma abajo */ }
+      mfaRecaptcha = null;
+    }
+    mfaRecaptcha = new firebase.auth.RecaptchaVerifier("recaptcha", { size: "invisible" });
+    return mfaRecaptcha;
   }
 
   function wrap(fn) {
     return fn().catch((err) => {
+      if (err && err.code === "MFA_REQUIRED") throw err;
+      if (String(err && err.code || "").includes("multi-factor-auth-required")) abrirMfa(err);
       throw new Error(mapAuthError(err));
     });
   }
@@ -186,7 +311,58 @@
       await postJson("/api/v1/auth/session", { token: lab }, lab);
       persist(lab);
     },
+    pendingFactors() {
+      return listarFactores();
+    },
+    // Elige SMS o TOTP según el hint que devolvió Firebase. El SMS sale por el SDK.
+    async beginSecondFactor(index) {
+      return wrap(async () => {
+        if (!mfaResolver) throw new Error("El ingreso seguro venció. Volvé a ingresar.");
+        const hints = Array.from(mfaResolver.hints || []);
+        const hint = hints[index];
+        if (!hint) throw new Error("Elegí un segundo factor válido");
+        mfaHint = hint;
+        mfaVerificationId = null;
+        if (hint.factorId === "totp") return { kind: "totp", label: etiquetaFactor(hint) };
+        if (hint.factorId !== "phone") {
+          throw new Error("Ese segundo factor no está disponible en la web. Usá el SMS o la aplicación autenticadora.");
+        }
+        const provider = new firebase.auth.PhoneAuthProvider(auth());
+        mfaVerificationId = await provider.verifyPhoneNumber({
+          multiFactorHint: hint,
+          session: mfaResolver.session,
+        }, recaptchaMfa());
+        return { kind: "phone", label: etiquetaFactor(hint) };
+      });
+    },
+    async confirmSecondFactor(code) {
+      return wrap(async () => {
+        const clean = String(code || "").replace(/\s/g, "");
+        if (!mfaResolver || !mfaHint) throw new Error("El ingreso seguro venció. Volvé a ingresar.");
+        if (!/^\d{6}$/.test(clean)) throw new Error("Ingresá los seis dígitos");
+        let assertion;
+        if (mfaHint.factorId === "totp") {
+          const totp = firebase.auth.TotpMultiFactorGenerator;
+          assertion = totp && typeof totp.assertionForSignIn === "function"
+            ? totp.assertionForSignIn(mfaHint.uid, clean)
+            : assertionTotp(mfaHint.uid, clean);
+        } else if (mfaHint.factorId === "phone") {
+          if (!mfaVerificationId) throw new Error("Pedí el código SMS primero");
+          const cred = firebase.auth.PhoneAuthProvider.credential(mfaVerificationId, clean);
+          assertion = firebase.auth.PhoneMultiFactorGenerator.assertion(cred);
+        } else {
+          throw new Error("Ese segundo factor no está disponible en la web.");
+        }
+        const cred = await mfaResolver.resolveSignIn(assertion);
+        limpiarMfa();
+        await openSession(cred.user);
+      });
+    },
+    cancelSecondFactor() {
+      limpiarMfa();
+    },
     async signOut() {
+      limpiarMfa();
       try { await auth().signOut(); } catch (_) { /* sin Firebase */ }
       persist("");
       pendingPhone = null;
