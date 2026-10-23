@@ -1,6 +1,5 @@
 package com.onlygoodthings.app.ui.screens
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -13,10 +12,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,9 +32,7 @@ import com.onlygoodthings.app.ui.components.OgtCaption
 import com.onlygoodthings.app.ui.components.OgtPill
 import com.onlygoodthings.app.ui.components.OgtPrimaryButton
 import com.onlygoodthings.app.ui.components.OgtStitchIcon
-import com.onlygoodthings.app.ui.components.neighborAvatarArt
 import com.onlygoodthings.shared.data.local.LocalSighting
-import org.jetbrains.compose.resources.painterResource
 
 /** Ficha del avistaje: quién lo reportó y qué dijo. No abre el perfil. */
 @Composable
@@ -42,7 +41,8 @@ fun SightingReportDialog(
     onDismiss: () -> Unit,
 ) {
     val db = LocalOgtDb.current
-    val who = db.userOrNull(sighting.userId)
+    val socialTick by db.socialTick.collectAsState()
+    val who = remember(sighting.userId, socialTick) { db.userOrNull(sighting.userId) }
     val name = who?.displayName ?: "Vecino"
     val wrote = sighting.wroteNote()
     Dialog(onDismissRequest = onDismiss) {
@@ -59,11 +59,11 @@ fun SightingReportDialog(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Image(
-                    painter = painterResource(neighborAvatarArt(sighting.userId)),
+                OgtNeighborAvatar(
+                    userId = sighting.userId,
+                    photoUrl = who?.photoUrl,
                     contentDescription = name,
                     modifier = Modifier.size(48.dp).clip(CircleShape).border(1.dp, OgtColors.hairline, CircleShape),
-                    contentScale = ContentScale.Crop,
                 )
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(name, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = OgtColors.ink)

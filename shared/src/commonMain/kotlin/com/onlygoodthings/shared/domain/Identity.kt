@@ -22,6 +22,17 @@ data class AuthMe(
     val levelLabel: String = "",
 )
 
+/**
+ * Cara pública de un usuario. Postgres manda; este nodo es la proyección en vivo.
+ * No incluye correo, teléfono ni ajustes.
+ */
+@Serializable
+data class UserLive(
+    val id: String,
+    val displayName: String,
+    val photoUrl: String? = null,
+)
+
 @Serializable
 data class UserProfile(
     val id: String,

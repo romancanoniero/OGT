@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
+import com.onlygoodthings.shared.domain.SocialLiveCounters
 import com.onlygoodthings.shared.realtime.OgtDbPaths
 import org.junit.jupiter.api.Test
 import java.util.UUID
@@ -27,6 +28,8 @@ class CrmPostPolicyTest {
         assertTrue(CRM_POST_REMOVE.contains("moderation_status = 'REMOVED'"))
         assertTrue(CRM_POST_REMOVE.contains("moderation_status = 'VISIBLE'"))
         assertFalse(CRM_POST_REMOVE.contains("DELETE"))
+        assertTrue(CRM_VISIBLE_POST_SEARCH.contains("author_user_id"))
+        assertTrue(CRM_VISIBLE_POST_SEARCH.contains("author_photo"))
     }
 
     @Test fun imageUrlUsesTheStoredHttpAddressOnly() {
@@ -84,7 +87,14 @@ class CrmPostPolicyTest {
     @Test fun attributionKeepsTheRowAndProjectsTheSamePostNode() {
         val postId = UUID.randomUUID().toString()
         val userId = UUID.randomUUID().toString()
-        val live = crmAttributedLive(postId, userId, "Administrador", 2, 1)
+        val live = SocialLiveCounters(
+            id = postId,
+            commentCount = 2,
+            impactCount = 1,
+            authorUserId = userId,
+            authorName = "Administrador",
+            moderationStatus = "VISIBLE",
+        )
         assertEquals("Administrador", live.authorName)
         assertEquals(userId, live.authorUserId)
         assertEquals("VISIBLE", live.moderationStatus)

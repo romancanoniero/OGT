@@ -432,6 +432,8 @@ img { max-width: 100%; }
   cursor: pointer;
 }
 .crm-icon-btn img { width: 22px; height: 22px; }
+.crm-icon-3d { width: 28px; height: 28px; object-fit: contain; }
+.crm-icon-btn:active:not(:disabled) { transform: scale(var(--ogt-press)); }
 .crm-icon-btn:disabled { opacity: 0.4; }
 .crm-bulk {
   display: flex;
@@ -662,6 +664,53 @@ body[data-crm-view="app"] .crm-password-wrap { width: min(280px, 100%); }
 }
 .crm-subnode p { margin: 0; }
 .crm-subnode .crm-icon-btn { flex: none; }
+.crm-subnode-face { display: flex; gap: 10px; align-items: flex-start; min-width: 0; flex: 1; }
+.crm-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  object-fit: cover;
+  flex: none;
+  background: var(--ogt-sand);
+}
+.crm-sheet {
+  width: min(420px, calc(100vw - 24px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  border: 0;
+  border-radius: 20px;
+  padding: 20px;
+  color: var(--ogt-ink);
+  background: var(--ogt-canvas);
+  box-shadow: var(--ogt-shadow);
+  animation: crm-sheet-in var(--ogt-fade) ease;
+}
+.crm-sheet::backdrop { background: color-mix(in srgb, var(--ogt-ink) 32%, transparent); }
+.crm-sheet .crm-btn { margin-top: 16px; }
+@keyframes crm-sheet-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.crm-pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--ogt-hairline);
+  background: var(--ogt-sand);
+  border-radius: 16px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  cursor: pointer;
+  color: var(--ogt-ink);
+  transition: transform var(--ogt-fade) ease, border-color var(--ogt-fade) ease;
+}
+.crm-pick:active { transform: scale(var(--ogt-press)); }
+.crm-pick.on { border-color: var(--ogt-secondary); }
+@media (max-width: 720px) {
+  .crm-sheet { width: calc(100vw - 16px); padding: 16px; }
+}
 body[data-crm-view="pending"] .crm-auth-card { animation: none; }
 body[data-crm-view="pending"] .crm-auth-card > :not(.crm-auth-head) { display: none !important; }
 body[data-crm-view="pending"] #crm-root { display: none !important; }

@@ -1,6 +1,5 @@
 package com.onlygoodthings.app.ui.components
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,6 +16,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,7 +24,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.onlygoodthings.app.data.LocalOgtDb
@@ -37,8 +36,8 @@ import com.onlygoodthings.shared.domain.GeoPoint
 import com.onlygoodthings.shared.domain.lostTimelineStops
 import com.onlygoodthings.shared.domain.movementRoute
 import com.onlygoodthings.shared.domain.sightingsUntil
+import com.onlygoodthings.app.ui.screens.OgtNeighborAvatar
 import com.onlygoodthings.shared.realtime.currentEpochMs
-import org.jetbrains.compose.resources.painterResource
 
 /** Mapa de un aviso: origen, radio y avistajes con avatar. */
 @Composable
@@ -55,6 +54,10 @@ fun LostAlertMap(
     onExpand: (() -> Unit)? = null,
 ) {
     val db = LocalOgtDb.current
+    val socialTick by db.socialTick.collectAsState()
+    val knownFaces = remember(socialTick, sightings) {
+        sightings.associate { it.id to db.userOrNull(it.userId) }
+    }
     val originLat = listing.latitude
     val originLng = listing.longitude
     if (originLat == null || originLng == null) return
@@ -89,7 +92,7 @@ fun LostAlertMap(
             ),
         )
         visible.forEach { row ->
-            val who = db.userOrNull(row.userId)
+            val who = knownFaces[row.id]
             add(
                 BarrioMarker(
                     id = row.id,
@@ -152,9 +155,11 @@ fun LostAlertMap(
         if (!fill && sightings.isNotEmpty()) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 sightings.take(6).forEach { row ->
-                    Image(
-                        painter = painterResource(neighborAvatarArt(row.userId)),
-                        contentDescription = db.userOrNull(row.userId)?.displayName,
+                    val who = knownFaces[row.id]
+                    OgtNeighborAvatar(
+                        userId = row.userId,
+                        photoUrl = who?.photoUrl,
+                        contentDescription = who?.displayName,
                         modifier = Modifier
                             .size(32.dp)
                             .clip(CircleShape)
@@ -163,7 +168,6 @@ fun LostAlertMap(
                                 selectedId = row.id
                                 onSelectSighting(row)
                             },
-                        contentScale = ContentScale.Crop,
                     )
                 }
                 OgtCaption("${sightings.size} lo vieron cerca")

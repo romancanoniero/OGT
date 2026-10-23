@@ -10,6 +10,7 @@ import com.onlygoodthings.backend.realtime.RealtimeHub
 import com.onlygoodthings.shared.domain.ApiResponse
 import com.onlygoodthings.shared.domain.SocialComment
 import com.onlygoodthings.shared.domain.SocialLiveCounters
+import com.onlygoodthings.shared.domain.UserLive
 import com.onlygoodthings.shared.protocol.WsCodec
 import com.onlygoodthings.shared.realtime.OgtDbPaths
 import io.ktor.http.HttpStatusCode
@@ -51,6 +52,9 @@ data class CrmVisiblePost(
     val status: String,
     /** Primera foto IMAGE de `post_media.url`. Vacío si el post no tiene imagen. */
     val imageUrl: String? = null,
+    val authorUserId: String? = null,
+    /** Foto viva del autor. No es una copia guardada en el post. */
+    val authorPhotoUrl: String? = null,
 )
 
 @Serializable
@@ -65,6 +69,28 @@ data class CrmPostComment(
     val authorName: String,
     val body: String,
     val createdAt: String,
+    val authorUserId: String? = null,
+    val authorPhotoUrl: String? = null,
+)
+
+@Serializable
+data class CrmUserPick(
+    val id: String,
+    val displayName: String,
+    val photoUrl: String? = null,
+)
+
+@Serializable
+data class CrmUserPickPage(val users: List<CrmUserPick>)
+
+@Serializable
+data class CrmPostReassigned(
+    val id: String,
+    val authorUserId: String,
+    val authorName: String,
+    val authorPhotoUrl: String? = null,
+    val commentCount: Int = 0,
+    val impactCount: Int = 0,
 )
 
 @Serializable
@@ -98,20 +124,6 @@ data class CrmPostRemoved(val removed: Boolean = true, val ids: List<String> = e
 @Serializable
 data class CrmSubnodeRemoved(val removed: Boolean = true, val id: String, val postId: String)
 
-@Serializable
-data class CrmUserMatch(val id: String, val displayName: String, val email: String? = null)
-
-@Serializable
-data class CrmUserSearch(val users: List<CrmUserMatch>)
-
-@Serializable
-data class CrmPostAttributed(
-    val postId: String,
-    val authorUserId: String,
-    val authorName: String,
-    val changed: Boolean,
-)
-
 /** Nodo que ya escucha el feed: `ogt/social/posts/{id}`. */
 internal fun crmRemovedPostLive(postId: String): SocialLiveCounters = SocialLiveCounters(
     id = postId,
@@ -143,22 +155,6 @@ internal fun crmRemovedCommentLive(
 
 /** La anécdota no tiene nodo propio. Sale por el post que el feed y la ficha ya escuchan. */
 internal fun crmRemovedAnecdotePath(postId: String): String = OgtDbPaths.socialPost(postId)
-
-/** El mismo nodo `ogt/social/posts/{id}`, ahora con el autor nuevo. */
-internal fun crmAttributedLive(
-    postId: String,
-    authorUserId: String,
-    authorName: String,
-    commentCount: Int,
-    impactCount: Int,
-): SocialLiveCounters = SocialLiveCounters(
-    id = postId,
-    commentCount = commentCount,
-    impactCount = impactCount,
-    authorUserId = authorUserId,
-    authorName = authorName,
-    moderationStatus = "VISIBLE",
-)
 
 internal fun crmRemovedAnecdoteLive(
     postId: String,
@@ -421,6 +417,72 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: Realtime
                 ApiResponse.fail<Unit>("Esa publicación ya no está visible", "NOT_FOUND"))
         call.respond(ApiResponse.ok(detail))
     }
+    /**
+     * Busca un usuario activo para atribuirle una publicación.
+     * Body: `{ "query": "Ana" }`
+     */
+    post("/api/v1/crm/platform/users/search") {
+        val auth = crmContext(call, db, verifier) ?: return@post
+        if (!crmCanManagePosts(auth.platformRole)) {
+            return@post call.respond(HttpStatusCode.Forbidden,
+                ApiResponse.fail<Unit>("Sin permiso para administrar publicaciones", "FORBIDDEN"))
+        }
+        val data = JsonBody.receiveMap(call)
+        val query = data.optString("query")?.trim().orEmpty()
+        if (query.length !in 2..120) {
+            return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Escribí al menos dos letras", "BAD_REQUEST"))
+        }
+        val users = db.withConnection { conn -> searchActiveUsers(conn, query) }
+        call.respond(ApiResponse.ok(CrmUserPickPage(users)))
+    }
+    /**
+     * Pasa la autoría de una publicación visible a otro usuario.
+     * Body: `{ "postId": "55555555-5555-5555-5555-555555555555", "userId": "11111111-1111-1111-1111-111111111111" }`
+     */
+    post("/api/v1/crm/platform/posts/reassign") {
+        val auth = crmContext(call, db, verifier) ?: return@post
+        if (!crmCanManagePosts(auth.platformRole)) {
+            return@post call.respond(HttpStatusCode.Forbidden,
+                ApiResponse.fail<Unit>("Sin permiso para administrar publicaciones", "FORBIDDEN"))
+        }
+        val data = JsonBody.receiveMap(call)
+        val postId = runCatching { UUID.fromString(data.reqString("postId")).toString() }.getOrNull()
+            ?: return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Publicación inválida", "BAD_REQUEST"))
+        val userId = runCatching { UUID.fromString(data.reqString("userId")).toString() }.getOrNull()
+            ?: return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Usuario inválido", "BAD_REQUEST"))
+        val moved = db.withConnection { conn -> reassignVisiblePost(conn, auth.userId, postId, userId) }
+            ?: return@post call.respond(HttpStatusCode.NotFound,
+                ApiResponse.fail<Unit>("No se pudo cambiar la autoría", "NOT_FOUND"))
+        hub.projectSocialPost(
+            moved.id,
+            WsCodec.json.encodeToString(
+                SocialLiveCounters.serializer(),
+                SocialLiveCounters(
+                    id = moved.id,
+                    commentCount = moved.commentCount,
+                    impactCount = moved.impactCount,
+                    authorUserId = moved.authorUserId,
+                    authorName = moved.authorName,
+                    authorPhotoUrl = moved.authorPhotoUrl,
+                ),
+            ),
+        )
+        hub.projectUser(
+            moved.authorUserId,
+            WsCodec.json.encodeToString(
+                UserLive.serializer(),
+                UserLive(
+                    id = moved.authorUserId,
+                    displayName = moved.authorName,
+                    photoUrl = moved.authorPhotoUrl,
+                ),
+            ),
+        )
+        call.respond(ApiResponse.ok(moved, "La publicación quedó a nombre de ${moved.authorName}"))
+    }
     post("/api/v1/crm/platform/posts/remove") {
         val auth = crmContext(call, db, verifier) ?: return@post
         if (!crmCanManagePosts(auth.platformRole)) {
@@ -519,59 +581,6 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: Realtime
         )
         call.respond(ApiResponse.ok(CrmSubnodeRemoved(id = removed.id, postId = removed.postId)))
     }
-    post("/api/v1/crm/platform/users/search") {
-        val auth = crmContext(call, db, verifier) ?: return@post
-        if (!crmCanManagePosts(auth.platformRole)) {
-            return@post call.respond(HttpStatusCode.Forbidden,
-                ApiResponse.fail<Unit>("Sin permiso para administrar publicaciones", "FORBIDDEN"))
-        }
-        val data = JsonBody.receiveMap(call)
-        val query = data.optString("query")?.trim().orEmpty()
-        if (query.length !in 2..80) {
-            return@post call.respond(HttpStatusCode.BadRequest,
-                ApiResponse.fail<Unit>("La búsqueda es demasiado corta", "BAD_REQUEST"))
-        }
-        val users = db.withConnection { conn -> searchActiveUsers(conn, query) }
-        call.respond(ApiResponse.ok(CrmUserSearch(users = users)))
-    }
-    post("/api/v1/crm/platform/posts/attribute") {
-        val auth = crmContext(call, db, verifier) ?: return@post
-        if (!crmCanManagePosts(auth.platformRole)) {
-            return@post call.respond(HttpStatusCode.Forbidden,
-                ApiResponse.fail<Unit>("Sin permiso para administrar publicaciones", "FORBIDDEN"))
-        }
-        val data = JsonBody.receiveMap(call)
-        val postId = crmOneId(data, "postId")
-            ?: return@post call.respond(HttpStatusCode.BadRequest,
-                ApiResponse.fail<Unit>("Publicación inválida", "BAD_REQUEST"))
-        val userId = crmOneId(data, "userId")
-            ?: return@post call.respond(HttpStatusCode.BadRequest,
-                ApiResponse.fail<Unit>("Persona inválida", "BAD_REQUEST"))
-        val attributed = db.withConnection { conn -> attributeVisiblePost(conn, auth.userId, postId, userId) }
-            ?: return@post call.respond(HttpStatusCode.NotFound,
-                ApiResponse.fail<Unit>("No se pudo atribuir esa publicación", "NOT_FOUND"))
-        if (attributed.changed) {
-            hub.projectSocialPost(
-                postId,
-                WsCodec.json.encodeToString(
-                    SocialLiveCounters.serializer(),
-                    crmAttributedLive(
-                        postId,
-                        attributed.authorUserId,
-                        attributed.authorName,
-                        attributed.commentCount,
-                        attributed.impactCount,
-                    ),
-                ),
-            )
-        }
-        call.respond(ApiResponse.ok(CrmPostAttributed(
-            postId = postId,
-            authorUserId = attributed.authorUserId,
-            authorName = attributed.authorName,
-            changed = attributed.changed,
-        )))
-    }
 }
 
 internal fun crmOneId(data: Map<String, Any?>, key: String): String? =
@@ -634,6 +643,8 @@ internal fun parseCrmPostCursor(raw: String): Pair<Long, String>? {
 internal const val CRM_VISIBLE_POST_SEARCH = """
 SELECT p.id::text, p.body, p.moderation_status::text, p.created_at,
        COALESCE(NULLIF(u.display_name, ''), NULLIF(c.trade_name, ''), NULLIF(c.legal_name, ''), 'Sin nombre') AS author_name,
+       p.author_user_id::text AS author_user_id,
+       u.photo_url AS author_photo,
        (SELECT m.url FROM post_media m
          WHERE m.post_id = p.id AND m.kind = 'IMAGE'
          ORDER BY m.sort_order LIMIT 1) AS image_url
@@ -659,6 +670,8 @@ private fun ResultSet.toCrmVisiblePost(): CrmVisiblePost = CrmVisiblePost(
     createdAt = getTimestamp("created_at").toInstant().toString(),
     status = getString("moderation_status"),
     imageUrl = crmPostImageUrl(getString("image_url")),
+    authorUserId = getString("author_user_id"),
+    authorPhotoUrl = getString("author_photo")?.trim()?.takeIf { it.isNotEmpty() },
 )
 
 internal const val CRM_POST_REMOVE = """
@@ -667,17 +680,18 @@ SET moderation_status = 'REMOVED', updated_at = now()
 WHERE id = ?::uuid AND moderation_status = 'VISIBLE'
 """
 
-/** Nombre o correo de una cuenta activa. No devuelve firebase_uid. */
+/** Nombre, correo o id de una cuenta activa. No devuelve firebase_uid ni el correo. */
 internal const val CRM_USER_SEARCH = """
-SELECT u.id::text, u.display_name, u.email::text
-FROM users u
-WHERE u.status = 'ACTIVE'
+SELECT id::text, display_name, photo_url
+FROM users
+WHERE status = 'ACTIVE'
   AND (
-    u.display_name ILIKE ? ESCAPE '\'
-    OR COALESCE(u.email::text, '') ILIKE ? ESCAPE '\'
+    display_name ILIKE ? ESCAPE '\'
+    OR COALESCE(email::text, '') ILIKE ? ESCAPE '\'
+    OR id::text = ?
   )
-ORDER BY u.display_name
-LIMIT 8
+ORDER BY display_name
+LIMIT 12
 """
 
 /** Cambia el autor. La fila sigue. No es un DELETE. */
@@ -757,6 +771,101 @@ private fun searchVisiblePosts(
     return CrmVisiblePostPage(posts = page, nextCursor = next)
 }
 
+private fun searchActiveUsers(conn: Connection, query: String): List<CrmUserPick> {
+    val pattern = crmLikeContains(query)
+    return conn.prepareStatement(CRM_USER_SEARCH.trim()).use { stmt ->
+        stmt.setString(1, pattern)
+        stmt.setString(2, pattern)
+        stmt.setString(3, query)
+        stmt.executeQuery().use { rs ->
+            buildList {
+                while (rs.next()) add(CrmUserPick(
+                    id = rs.getString(1),
+                    displayName = rs.getString(2) ?: "Vecino",
+                    photoUrl = rs.getString(3)?.trim()?.takeIf { it.isNotEmpty() },
+                ))
+            }
+        }
+    }
+}
+
+/** La fila de users sigue siendo la foto. Acá solo cambia quién firmó el post. */
+private fun reassignVisiblePost(conn: Connection, actorId: String, postId: String, userId: String): CrmPostReassigned? {
+    val target = conn.prepareStatement(
+        """
+        SELECT display_name, photo_url
+        FROM users
+        WHERE id = ?::uuid AND status = 'ACTIVE'
+        """.trimIndent()
+    ).use { stmt ->
+        stmt.setString(1, userId)
+        stmt.executeQuery().use { rs ->
+            if (!rs.next()) null else (rs.getString(1) ?: "Vecino") to rs.getString(2)?.trim()?.takeIf { it.isNotEmpty() }
+        }
+    } ?: return null
+    conn.autoCommit = false
+    try {
+        val updated = conn.prepareStatement(CRM_POST_ATTRIBUTE.trim()).use { stmt ->
+            stmt.setString(1, userId)
+            stmt.setString(2, postId)
+            stmt.executeUpdate()
+        }
+        if (updated == 0) {
+            conn.rollback()
+            return null
+        }
+        conn.prepareStatement(
+            """
+            DELETE FROM post_people
+            WHERE post_id = ?::uuid AND role = 'AUTHOR' AND user_id IS DISTINCT FROM ?::uuid
+            """.trimIndent()
+        ).use { stmt ->
+            stmt.setString(1, postId)
+            stmt.setString(2, userId)
+            stmt.executeUpdate()
+        }
+        conn.prepareStatement(
+            """
+            INSERT INTO post_people (post_id, user_id, role)
+            SELECT ?::uuid, ?::uuid, 'AUTHOR'
+            WHERE NOT EXISTS (
+                SELECT 1 FROM post_people
+                WHERE post_id = ?::uuid AND user_id = ?::uuid AND role = 'AUTHOR'
+            )
+            """.trimIndent()
+        ).use { stmt ->
+            stmt.setString(1, postId)
+            stmt.setString(2, userId)
+            stmt.setString(3, postId)
+            stmt.setString(4, userId)
+            stmt.executeUpdate()
+        }
+        val counts = conn.prepareStatement(
+            "SELECT comment_count, impact_count FROM social_posts WHERE id = ?::uuid"
+        ).use { stmt ->
+            stmt.setString(1, postId)
+            stmt.executeQuery().use { rs ->
+                if (!rs.next()) 0 to 0 else rs.getInt(1) to rs.getInt(2)
+            }
+        }
+        writeAudit(conn, actorId, "POST_ATTRIBUTE", "social_post", postId, "Atribución a ${target.first}")
+        conn.commit()
+        return CrmPostReassigned(
+            id = postId,
+            authorUserId = userId,
+            authorName = target.first,
+            authorPhotoUrl = target.second,
+            commentCount = counts.first,
+            impactCount = counts.second,
+        )
+    } catch (error: Exception) {
+        conn.rollback()
+        throw error
+    } finally {
+        conn.autoCommit = true
+    }
+}
+
 private fun loadVisiblePostDetail(conn: Connection, postId: String): CrmPostDetail? {
     val post = conn.prepareStatement(
         """
@@ -778,7 +887,8 @@ private fun loadVisiblePostDetail(conn: Connection, postId: String): CrmPostDeta
     }
     val comments = conn.prepareStatement(
         """
-        SELECT c.id::text, COALESCE(NULLIF(u.display_name, ''), 'Sin nombre'), c.body, c.created_at
+        SELECT c.id::text, c.author_user_id::text,
+               COALESCE(NULLIF(u.display_name, ''), 'Sin nombre'), u.photo_url, c.body, c.created_at
         FROM post_comments c
         LEFT JOIN users u ON u.id = c.author_user_id
         WHERE c.post_id = ?::uuid AND c.moderation_status = 'VISIBLE'
@@ -791,9 +901,11 @@ private fun loadVisiblePostDetail(conn: Connection, postId: String): CrmPostDeta
             buildList {
                 while (rs.next()) add(CrmPostComment(
                     id = rs.getString(1),
-                    authorName = rs.getString(2),
-                    body = rs.getString(3),
-                    createdAt = rs.getTimestamp(4).toInstant().toString(),
+                    authorUserId = rs.getString(2),
+                    authorName = rs.getString(3),
+                    authorPhotoUrl = rs.getString(4)?.trim()?.takeIf { it.isNotEmpty() },
+                    body = rs.getString(5),
+                    createdAt = rs.getTimestamp(6).toInstant().toString(),
                 ))
             }
         }
@@ -895,79 +1007,6 @@ private data class CrmHiddenAnecdote(
     val commentCount: Int,
     val impactCount: Int,
 )
-
-private data class CrmAttribution(
-    val authorUserId: String,
-    val authorName: String,
-    val commentCount: Int,
-    val impactCount: Int,
-    val changed: Boolean,
-)
-
-private fun searchActiveUsers(conn: Connection, query: String): List<CrmUserMatch> {
-    val like = crmLikeContains(query)
-    return conn.prepareStatement(CRM_USER_SEARCH.trim()).use { stmt ->
-        stmt.setString(1, like)
-        stmt.setString(2, like)
-        stmt.executeQuery().use { rs ->
-            buildList {
-                while (rs.next()) {
-                    add(CrmUserMatch(
-                        id = rs.getString(1),
-                        displayName = rs.getString(2),
-                        email = rs.getString(3),
-                    ))
-                }
-            }
-        }
-    }
-}
-
-private fun attributeVisiblePost(conn: Connection, actorId: String, postId: String, userId: String): CrmAttribution? {
-    val person = conn.prepareStatement(
-        "SELECT display_name FROM users WHERE id = ?::uuid AND status = 'ACTIVE'"
-    ).use { stmt ->
-        stmt.setString(1, userId)
-        stmt.executeQuery().use { rs -> if (rs.next()) rs.getString(1) else null }
-    } ?: return null
-    val snap = conn.prepareStatement(
-        """
-        SELECT author_user_id::text, comment_count, impact_count, moderation_status::text
-        FROM social_posts WHERE id = ?::uuid
-        """.trimIndent()
-    ).use { stmt ->
-        stmt.setString(1, postId)
-        stmt.executeQuery().use { rs ->
-            if (!rs.next()) null
-            else listOf(rs.getString(1).orEmpty(), rs.getInt(2).toString(), rs.getInt(3).toString(), rs.getString(4))
-        }
-    } ?: return null
-    if (snap[3] != "VISIBLE") return null
-    val commentCount = snap[1].toInt()
-    val impactCount = snap[2].toInt()
-    if (snap[0] == userId) return CrmAttribution(userId, person, commentCount, impactCount, changed = false)
-    val previous = conn.autoCommit
-    conn.autoCommit = false
-    try {
-        val updated = conn.prepareStatement(CRM_POST_ATTRIBUTE.trim()).use { stmt ->
-            stmt.setString(1, userId)
-            stmt.setString(2, postId)
-            stmt.executeUpdate()
-        }
-        if (updated != 1) {
-            conn.rollback()
-            return null
-        }
-        writeAudit(conn, actorId, "POST_ATTRIBUTE", "social_post", postId, "Atribución a $person")
-        conn.commit()
-        return CrmAttribution(userId, person, commentCount, impactCount, changed = true)
-    } catch (error: Exception) {
-        conn.rollback()
-        throw error
-    } finally {
-        conn.autoCommit = previous
-    }
-}
 
 private fun writeAudit(conn: Connection, actorId: String, action: String, targetType: String, targetId: String, reason: String) {
     conn.prepareStatement(

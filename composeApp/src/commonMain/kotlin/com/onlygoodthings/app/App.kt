@@ -59,6 +59,8 @@ import com.onlygoodthings.shared.domain.ParkingRules
 import com.onlygoodthings.shared.domain.ParkingStatus
 import com.onlygoodthings.shared.domain.decideParkedPresence
 import com.onlygoodthings.shared.domain.shouldAskYieldOnApproach
+import com.onlygoodthings.shared.realtime.OgtRealtime
+import com.onlygoodthings.shared.realtime.OgtSdk
 import com.onlygoodthings.shared.realtime.currentEpochMs
 import androidx.compose.runtime.CompositionLocalProvider
 import com.onlygoodthings.app.nav.ComposePostKind
@@ -331,6 +333,14 @@ fun App() {
             OgtIncomingLinks.clear()
             if (!authGate && route != OgtRoute.ClaimHonor) {
                 route = OgtRoute.ClaimHonor
+            }
+        }
+        LaunchedEffect(Unit) {
+            if (!OgtSdk.isStarted()) return@LaunchedEffect
+            runCatching {
+                OgtRealtime().observeUserProfiles().collect { live ->
+                    db.applyUserLive(live.id, live.displayName, live.photoUrl)
+                }
             }
         }
         LaunchedEffect(Unit) {

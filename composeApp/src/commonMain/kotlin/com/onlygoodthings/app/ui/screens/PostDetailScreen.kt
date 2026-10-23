@@ -82,12 +82,6 @@ import com.onlygoodthings.app.ui.components.PostOverflowSheet
 import com.onlygoodthings.app.ui.components.PostReportSheet
 import com.onlygoodthings.app.ui.components.PostShareSheet
 import com.onlygoodthings.app.resources.Res
-import com.onlygoodthings.app.resources.feed_avatar_carlos
-import com.onlygoodthings.app.resources.feed_avatar_mariana
-import com.onlygoodthings.app.resources.feed_avatar_me
-import com.onlygoodthings.app.resources.feed_avatar_reply
-import com.onlygoodthings.app.resources.feed_avatar_roberto
-import com.onlygoodthings.app.resources.feed_avatar_sofia
 import com.onlygoodthings.app.resources.qs_clap
 import com.onlygoodthings.app.resources.qs_close
 import com.onlygoodthings.app.resources.qs_expand
@@ -466,6 +460,7 @@ fun PostDetailScreen(
                         val mine = myCommentClaps[row.id] == true
                         CommentCard(
                             authorUserId = row.authorUserId,
+                            photoUrl = who?.photoUrl,
                             author = who?.displayName ?: "Alguien de la comunidad",
                             meta = if (row.edited) "${row.timeLabel} · editado" else row.timeLabel,
                             body = row.body,
@@ -544,6 +539,7 @@ fun PostDetailScreen(
                     val mine = myCommentClaps[row.id] == true
                     CommentCard(
                         authorUserId = row.authorUserId,
+                        photoUrl = who?.photoUrl,
                         author = who?.displayName ?: "Alguien de la comunidad",
                         meta = if (row.edited) "${row.timeLabel} · editado" else row.timeLabel,
                         body = row.body,
@@ -1155,6 +1151,7 @@ private fun HomageAnecdoteCard(
                 val who = db.userOrNull(row.authorUserId)
                 CommentCard(
                     authorUserId = row.authorUserId,
+                    photoUrl = who?.photoUrl,
                     author = who?.displayName ?: "Alguien de la comunidad",
                     meta = if (row.edited) "${row.timeLabel} · editado" else row.timeLabel,
                     body = row.body,
@@ -1378,6 +1375,7 @@ private fun detailTitle(
 @Composable
 private fun CommentCard(
     authorUserId: String,
+    photoUrl: String?,
     author: String,
     meta: String,
     body: String,
@@ -1401,11 +1399,11 @@ private fun CommentCard(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.Top,
     ) {
-        Image(
-            painter = painterResource(commentAuthorAvatar(authorUserId)),
+        OgtNeighborAvatar(
+            userId = authorUserId,
+            photoUrl = photoUrl,
             contentDescription = author,
             modifier = Modifier.size(36.dp).clip(CircleShape).border(1.dp, OgtColors.hairline, CircleShape),
-            contentScale = ContentScale.Crop,
         )
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(
@@ -1519,11 +1517,3 @@ private fun CommentComposer(
     }
 }
 
-private fun commentAuthorAvatar(userId: String): DrawableResource = when (userId) {
-    OgtIds.Roberto -> Res.drawable.feed_avatar_roberto
-    OgtIds.Sofia, OgtIds.Camila -> Res.drawable.feed_avatar_sofia
-    OgtIds.CarlosG, OgtIds.CarlosR, OgtIds.DiegoF -> Res.drawable.feed_avatar_carlos
-    OgtIds.Mariana, OgtIds.Lucia, OgtIds.MarianaD, OgtIds.Valeria, OgtIds.ValeriaP -> Res.drawable.feed_avatar_mariana
-    OgtIds.Lucas -> Res.drawable.feed_avatar_me
-    else -> Res.drawable.feed_avatar_reply
-}

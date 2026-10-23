@@ -49,6 +49,8 @@ data class SocialAnecdote(
     val postId: String,
     val authorUserId: String,
     val authorName: String,
+    /** Foto viva de `users.photo_url` al leer. No hay columna en la anécdota. */
+    val authorPhotoUrl: String? = null,
     val body: String,
     val sourceUrl: String? = null,
     val sortOrder: Int = 0,
@@ -67,6 +69,8 @@ data class SocialComment(
     val postId: String,
     val authorUserId: String,
     val authorName: String,
+    /** Foto viva de `users.photo_url` al leer. El comentario no guarda una copia. */
+    val authorPhotoUrl: String? = null,
     val parentCommentId: String? = null,
     val body: String,
     val createdAtEpochMs: Long,
@@ -90,6 +94,8 @@ data class SocialLiveCounters(
     val authorUserId: String? = null,
     /** Nombre del autor nuevo. Si viene, las pantallas que ya escuchan el post lo pintan sin recargar. */
     val authorName: String? = null,
+    /** Foto viva del autor cuando la autoría cambia. No es una copia en el post. */
+    val authorPhotoUrl: String? = null,
     val body: String? = null,
     val tag: String? = null,
     val place: String? = null,

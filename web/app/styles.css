@@ -19,6 +19,7 @@
   --nav: 244px;
   --rail: 320px;
   --col: 680px;
+  --fade: 220ms;
 }
 
 * { box-sizing: border-box; }
@@ -421,6 +422,33 @@ span.avatar svg { width: 18px; height: 18px; }
 .reply-copy { min-width: 0; flex: 1; }
 .reply .who { font-size: 13px; }
 .reply .body { font-size: 14px; margin: 4px 0 0; }
+.thread {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.comment {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  background: var(--sand);
+  animation: ogt-comment-in var(--fade) ease;
+}
+.comment-copy { min-width: 0; flex: 1; }
+.comment .who { font-size: 14px; }
+.comment .body { font-size: 15px; line-height: 21px; margin: 4px 0 0; }
+@keyframes ogt-comment-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@media (max-width: 720px) {
+  .comment { padding: 10px; }
+  .comment .avatar, .thread .avatar { width: 36px; height: 36px; }
+}
 .count { color: var(--muted); font-size: 13px; align-self: center; }
 
 .rail {
@@ -1111,6 +1139,24 @@ body.intro #auth-root {
   opacity: 0;
 }
 .intro-frame.is-playing video { opacity: 1; }
+.intro-sound {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 2;
+  pointer-events: auto;
+  border: 0;
+  border-radius: var(--radius-button);
+  background: var(--secondary);
+  color: var(--on-primary);
+  box-shadow: 0 0 0 1px var(--canvas);
+  padding: 10px 14px;
+  font-weight: 600;
+  font-size: 13px;
+  animation: ogt-fade-up 220ms ease;
+}
+.intro-sound[hidden] { display: none; }
+.intro-sound:active { transform: scale(0.96); }
 .intro-loader {
   position: absolute;
   inset: 0;
@@ -1437,6 +1483,15 @@ body.auth-split #auth-root {
   margin: 0 0 8px;
   color: var(--error);
   font-size: 13px;
+}
+.auth-mfa { animation: ogt-fade-up 220ms ease; }
+.auth-factors { display: flex; flex-direction: column; gap: 8px; }
+.auth-factors .auth-secondary { margin-top: 0; }
+.auth-factor:active,
+.auth-mfa .auth-primary:active { transform: scale(0.96); }
+@keyframes ogt-fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
 }
 .auth-panel .hint { margin: 0 0 18px; }
 

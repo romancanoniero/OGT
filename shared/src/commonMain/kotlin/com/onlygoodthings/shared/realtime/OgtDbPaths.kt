@@ -9,6 +9,8 @@ object OgtDbPaths {
     const val PARKING_TICKS = "ogt/parking/ticks"
     const val IMPACT_ALERTS = "ogt/alerts"
     const val SOCIAL_FEED = "ogt/social/posts"
+    /** Cara pública (nombre y foto). No lleva datos privados. */
+    const val USERS = "ogt/users"
     const val PRESENCE = "ogt/presence"
 
     fun parkingSpot(spotId: String): String = "$PARKING_SPOTS/$spotId"
@@ -17,6 +19,7 @@ object OgtDbPaths {
     fun socialPost(postId: String): String = "$SOCIAL_FEED/$postId"
     fun socialComments(postId: String): String = "${socialPost(postId)}/comments"
     fun socialComment(postId: String, commentId: String): String = "${socialComments(postId)}/$commentId"
+    fun user(userId: String): String = "$USERS/$userId"
     fun presence(userId: String): String = "$PRESENCE/$userId"
 }
 

@@ -21,6 +21,7 @@ import com.onlygoodthings.app.media.isRemoteMediaUrl
 import com.onlygoodthings.app.platform.localFilePath
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.ui.components.OgtLoader
+import com.onlygoodthings.app.ui.components.neighborAvatarArt
 import com.onlygoodthings.shared.data.local.LocalPostMedia
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
@@ -102,6 +103,35 @@ fun OgtPostImage(
 internal fun posterAssetKey(item: LocalPostMedia): String {
     val poster = item.posterUrl.orEmpty()
     return if (poster.startsWith("asset://")) poster.removePrefix("asset://") else item.assetKey
+}
+
+/** Foto viva del usuario, o el busto anónimo si todavía no tiene imagen. */
+@Composable
+fun OgtNeighborAvatar(
+    userId: String,
+    photoUrl: String?,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+) {
+    val fallback = neighborAvatarArt(userId)
+    val url = photoUrl?.trim().orEmpty()
+    if (!canFetch(url)) {
+        Image(
+            painterResource(fallback),
+            contentDescription = contentDescription,
+            modifier = modifier,
+            contentScale = ContentScale.Crop,
+        )
+        return
+    }
+    OgtPostImage(
+        url = url,
+        assetKey = "",
+        fallback = fallback,
+        contentDescription = contentDescription,
+        modifier = modifier,
+        contentScale = ContentScale.Crop,
+    )
 }
 
 private fun canFetch(url: String): Boolean =

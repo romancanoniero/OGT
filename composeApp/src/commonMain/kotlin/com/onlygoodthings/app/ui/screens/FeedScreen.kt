@@ -81,6 +81,7 @@ import com.onlygoodthings.app.data.optimisticHidePost
 import com.onlygoodthings.app.data.optimisticReportPost
 import com.onlygoodthings.app.media.OgtMediaCache
 import com.onlygoodthings.app.resources.Res
+import com.onlygoodthings.app.resources.avatar_anonymous
 import com.onlygoodthings.app.resources.feed_avatar_carlos
 import com.onlygoodthings.app.resources.feed_avatar_mariana
 import com.onlygoodthings.app.resources.feed_avatar_me
@@ -940,6 +941,7 @@ private fun LostPetFeedCard(
             time = post.timeLabel,
             createdAtEpochMs = post.createdAtEpochMs,
             avatar = profile.avatar,
+            authorUserId = post.authorUserId,
             verified = profile.verified,
             onOpenAuthor = onOpenAuthor,
             onOverflow = onOverflow,
@@ -1016,6 +1018,7 @@ private fun AdoptionFeedCard(
             time = post.timeLabel,
             createdAtEpochMs = post.createdAtEpochMs,
             avatar = profile.avatar,
+            authorUserId = post.authorUserId,
             verified = profile.verified,
             onOpenAuthor = onOpenAuthor,
             onOverflow = onOverflow,
@@ -1094,6 +1097,7 @@ private fun TernuraFeedCard(
             time = post.timeLabel,
             createdAtEpochMs = post.createdAtEpochMs,
             avatar = profile.avatar,
+            authorUserId = post.authorUserId,
             verified = profile.verified,
             onOpenAuthor = onOpen,
             onOverflow = onOverflow,
@@ -1157,6 +1161,7 @@ private fun HomenajeFeedCard(
             time = post.timeLabel,
             createdAtEpochMs = post.createdAtEpochMs,
             avatar = profile.avatar,
+            authorUserId = post.authorUserId,
             verified = profile.verified,
             onOpenAuthor = onOpen,
             onOverflow = onOverflow,
@@ -1299,6 +1304,7 @@ private fun StoryFeedCard(
             time = post.timeLabel,
             createdAtEpochMs = post.createdAtEpochMs,
             avatar = profile.avatar,
+            authorUserId = post.authorUserId,
             verified = profile.verified,
             onOpenAuthor = onOpenAuthor,
             onOverflow = onOverflow,
@@ -1419,7 +1425,7 @@ private fun commentAvatar(userId: String): DrawableResource = when (userId) {
     OgtIds.CarlosG, OgtIds.CarlosR, OgtIds.DiegoF -> Res.drawable.feed_avatar_carlos
     OgtIds.Mariana, OgtIds.Lucia, OgtIds.MarianaD -> Res.drawable.feed_avatar_mariana
     OgtIds.Lucas -> Res.drawable.feed_avatar_me
-    else -> Res.drawable.feed_avatar_reply
+    else -> Res.drawable.avatar_anonymous
 }
 
 @Composable
@@ -1444,17 +1450,33 @@ private fun PostHeader(
     time: String,
     createdAtEpochMs: Long,
     avatar: DrawableResource,
+    authorUserId: String? = null,
     verified: Boolean,
     star: Boolean = false,
     onOpenAuthor: () -> Unit = {},
     onOverflow: () -> Unit = {},
 ) {
+    val db = LocalOgtDb.current
+    val socialTick by db.socialTick.collectAsState()
+    // La foto vive en el usuario. El drawable solo cubre el hueco (seed con nombre o busto anónimo).
+    val face = remember(authorUserId, socialTick) {
+        authorUserId?.let { db.userOrNull(it)?.photoUrl }?.trim().orEmpty()
+    }
     val meta = postMetaLine(place, time, createdAtEpochMs, currentEpochMs())
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).clickable(onClick = onOpenAuthor),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CirclePhoto(avatar, 36.dp)
+        if (face.isNotBlank()) {
+            OgtNeighborAvatar(
+                userId = authorUserId.orEmpty(),
+                photoUrl = face,
+                contentDescription = name,
+                modifier = Modifier.size(36.dp).clip(CircleShape),
+            )
+        } else {
+            CirclePhoto(avatar, 36.dp)
+        }
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {

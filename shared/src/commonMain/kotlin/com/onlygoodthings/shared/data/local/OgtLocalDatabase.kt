@@ -161,6 +161,7 @@ class OgtLocalDatabase {
                 if (changed) bumpSocial()
                 return changed
             }
+            applyUserLive(live.authorUserId.orEmpty(), live.authorName, live.authorPhotoUrl)
             posts += LocalSocialPost(
                 id = live.id,
                 authorKind = AuthorKind.USER,
@@ -184,22 +185,24 @@ class OgtLocalDatabase {
             return true
         }
         val current = posts[idx]
-        val namedAuthor = live.authorName?.trim()?.takeIf { it.isNotEmpty() }
-        val nextAuthorId = live.authorUserId?.takeIf { it.isNotBlank() }
-        if (namedAuthor != null && nextAuthorId != null) rememberLiveAuthor(nextAuthorId, namedAuthor)
-        var next = current.copy(
+        val authorId = live.authorUserId?.takeIf { it.isNotBlank() }
+        if (authorId != null && applyUserLive(authorId, live.authorName, live.authorPhotoUrl)) {
+            changed = true
+        }
+        val next = current.copy(
             commentCount = maxOf(current.commentCount, live.commentCount),
             impactCount = maxOf(current.impactCount, live.impactCount),
             heartCount = maxOf(current.heartCount, live.heartCount),
+            authorUserId = authorId ?: current.authorUserId,
+            authorKind = if (authorId != null) AuthorKind.USER else current.authorKind,
+            authorCompanyId = if (authorId != null) null else current.authorCompanyId,
         )
-        if (namedAuthor != null && nextAuthorId != null &&
-            (current.authorUserId != nextAuthorId || current.authorKind != AuthorKind.USER || current.authorCompanyId != null)
-        ) {
-            next = next.copy(
-                authorKind = AuthorKind.USER,
-                authorUserId = nextAuthorId,
-                authorCompanyId = null,
-            )
+        if (authorId != null && authorId != current.authorUserId) {
+            postPeople.removeAll { it.postId == live.id && it.role == PostPersonRole.AUTHOR && it.userId != authorId }
+            if (postPeople.none { it.postId == live.id && it.userId == authorId && it.role == PostPersonRole.AUTHOR }) {
+                postPeople += LocalPostPerson(live.id, authorId, PostPersonRole.AUTHOR)
+            }
+            changed = true
         }
         if (next == current) {
             if (changed) bumpSocial()
@@ -210,25 +213,43 @@ class OgtLocalDatabase {
         return true
     }
 
-    /** El autor llegó por el nodo del post. Si no está en el catálogo local, se guarda el nombre para pintarlo. */
-    private fun rememberLiveAuthor(userId: String, displayName: String) {
-        if (userOrNull(userId) != null) return
-        users += LocalUser(
-            id = userId,
-            firebaseUid = "",
-            email = null,
-            phoneE164 = null,
-            displayName = displayName,
-            photoUrl = null,
-            role = UserRole.USER,
-            communityPoints = 0,
-            inviteCode = "live-$userId",
-            barrio = "",
-            levelLabel = "",
-            honorTag = "",
-            latitude = 0.0,
-            longitude = 0.0,
-        )
+    /**
+     * Pinta la cara que ya está en `users`. Un comentario no pisa una foto más nueva:
+     * solo completa el hueco si esa persona todavía no tiene imagen local.
+     */
+    fun applyUserLive(id: String, displayName: String?, photoUrl: String?): Boolean {
+        if (id.isBlank()) return false
+        val name = displayName?.trim()?.takeIf { it.isNotBlank() }
+        val photo = photoUrl?.trim()?.takeIf { it.isNotBlank() }
+        val idx = users.indexOfFirst { it.owns(id) }
+        if (idx >= 0) {
+            val current = users[idx]
+            val nextName = name ?: current.displayName
+            val nextPhoto = photo ?: current.photoUrl
+            if (nextName == current.displayName && nextPhoto == current.photoUrl) return false
+            users[idx] = current.copy(displayName = nextName, photoUrl = nextPhoto)
+        } else {
+            if (name == null && photo == null) return false
+            users += LocalUser(
+                id = id,
+                firebaseUid = id,
+                email = null,
+                phoneE164 = null,
+                displayName = name ?: "Vecino",
+                photoUrl = photo,
+                role = UserRole.USER,
+                communityPoints = 0,
+                inviteCode = "",
+                barrio = "",
+                levelLabel = "",
+                honorTag = "",
+                latitude = 0.0,
+                longitude = 0.0,
+            )
+        }
+        bumpSocial()
+        bumpFeed()
+        return true
     }
 
     /** Marca un posteo recién grabado para que el Feed lo recargue. */
@@ -277,7 +298,8 @@ class OgtLocalDatabase {
             bumpSocial()
             return true
         }
-        if (comments.any { it.id == comment.id }) return false
+        val faceChanged = rememberAuthorFace(comment.authorUserId, comment.authorName, comment.authorPhotoUrl)
+        if (comments.any { it.id == comment.id }) return faceChanged
         comments += LocalComment(
             id = comment.id,
             postId = comment.postId,
@@ -302,6 +324,17 @@ class OgtLocalDatabase {
         }
         bumpSocial()
         return true
+    }
+
+    /** La foto del comentario solo llena un usuario que todavía no tiene cara. */
+    private fun rememberAuthorFace(userId: String, displayName: String?, photoUrl: String?): Boolean {
+        if (userId.isBlank()) return false
+        val existing = userOrNull(userId)
+        if (existing == null) return applyUserLive(userId, displayName, photoUrl)
+        val fillName = displayName?.takeIf { existing.displayName.isBlank() }
+        val fillPhoto = photoUrl?.takeIf { existing.photoUrl.isNullOrBlank() }
+        if (fillName == null && fillPhoto.isNullOrBlank()) return false
+        return applyUserLive(userId, fillName, fillPhoto)
     }
 
     private var liveNeighborIssued = false

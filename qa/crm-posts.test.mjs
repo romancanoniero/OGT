@@ -21,7 +21,7 @@ test('visible post search and removal use the CRM routes', async () => {
   await api('platform/posts/comments/remove', 'jwt', { commentId: '22222222-2222-4222-8222-222222222222', reason: 'Texto ajeno' });
   await api('platform/posts/anecdotes/remove', 'jwt', { anecdoteId: '33333333-3333-4333-8333-333333333333', reason: 'Texto ajeno' });
   await api('platform/users/search', 'jwt', { query: 'ana' });
-  await api('platform/posts/attribute', 'jwt', { postId: '11111111-1111-4111-8111-111111111111', userId: '44444444-4444-4444-8444-444444444444' });
+  await api('platform/posts/reassign', 'jwt', { postId: '11111111-1111-4111-8111-111111111111', userId: '44444444-4444-4444-8444-444444444444' });
   assert.deepEqual(seen, [
     ['/api/v1/crm/platform/posts/search', { query: 'plaza' }],
     ['/api/v1/crm/platform/posts/detail', { postId: '11111111-1111-4111-8111-111111111111' }],
@@ -29,7 +29,7 @@ test('visible post search and removal use the CRM routes', async () => {
     ['/api/v1/crm/platform/posts/comments/remove', { commentId: '22222222-2222-4222-8222-222222222222', reason: 'Texto ajeno' }],
     ['/api/v1/crm/platform/posts/anecdotes/remove', { anecdoteId: '33333333-3333-4333-8333-333333333333', reason: 'Texto ajeno' }],
     ['/api/v1/crm/platform/users/search', { query: 'ana' }],
-    ['/api/v1/crm/platform/posts/attribute', { postId: '11111111-1111-4111-8111-111111111111', userId: '44444444-4444-4444-8444-444444444444' }],
+    ['/api/v1/crm/platform/posts/reassign', { postId: '11111111-1111-4111-8111-111111111111', userId: '44444444-4444-4444-8444-444444444444' }],
   ]);
 });
 
@@ -48,8 +48,9 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
   assert.match(html, /crm\.css\?v=tacho-1/);
   assert.match(runtime, /icon: 'qs_trash\.png', label: 'Quitar selección'/);
-  assert.match(runtime, /platform\/posts\/attribute/);
+  assert.match(runtime, /platform\/posts\/reassign/);
   assert.match(runtime, /platform\/users\/search/);
+  assert.match(runtime, /authorship_reassign\.png', label: 'Cambiar autoría'/);
   assert.match(html, /data-crm-view="pending"/);
   assert.doesNotMatch(runtime, /Verificando identidad/);
   assert.match(runtime, /platform\/posts\/comments\/remove/);
@@ -61,8 +62,9 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   assert.match(ui, /Quitar anécdota/);
   assert.match(ui, /qs_trash\.png/);
   assert.match(ui, /qs_close\.svg', 'Cerrar'/);
-  assert.match(ui, /Atribuir/);
-  assert.match(ui, /Confirmar atribución/);
+  assert.match(ui, /Cambiar autoría/);
+  assert.match(ui, /authorship_reassign\.png/);
+  assert.doesNotMatch(ui, /function attributeControl/);
   assert.match(ui, /iconButton\(action\.icon, action\.label\)/);
   assert.doesNotMatch(ui, /marcada/);
   assert.doesNotMatch(ui, /tr\.addEventListener\('click', \(\) => open/);

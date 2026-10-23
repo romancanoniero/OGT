@@ -1,6 +1,5 @@
 package com.onlygoodthings.app.ui.components
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,19 +27,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.onlygoodthings.app.data.LocalOgtDb
 import com.onlygoodthings.app.theme.OgtColors
+import com.onlygoodthings.app.ui.screens.OgtNeighborAvatar
 import com.onlygoodthings.app.theme.OgtDimens
 import com.onlygoodthings.app.theme.ogtOutlinedFieldColors
 import com.onlygoodthings.shared.domain.titleCasePersonName
 import com.onlygoodthings.shared.domain.MentionCandidate
 import com.onlygoodthings.shared.domain.mentionHandle
 import com.onlygoodthings.shared.domain.searchMentions
-import org.jetbrains.compose.resources.painterResource
 
 /**
  * Typeahead de @ como Instagram: @nick, nombre y foto.
@@ -211,12 +211,7 @@ private fun MentionChip(hit: MentionCandidate, onRemove: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Image(
-            painterResource(neighborAvatarArt(hit.userId.orEmpty())),
-            contentDescription = null,
-            modifier = Modifier.size(40.dp).clip(CircleShape),
-            contentScale = ContentScale.Crop,
-        )
+        MentionFace(hit.userId, hit.displayName, 40.dp)
         Column(Modifier.weight(1f)) {
             Text(hit.displayName, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
@@ -241,15 +236,23 @@ private fun MentionRow(hit: MentionCandidate, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Image(
-            painterResource(neighborAvatarArt(hit.userId.orEmpty())),
-            contentDescription = null,
-            modifier = Modifier.size(44.dp).clip(CircleShape),
-            contentScale = ContentScale.Crop,
-        )
+        MentionFace(hit.userId, hit.displayName, 44.dp)
         Column(Modifier.weight(1f)) {
             Text(hit.displayName, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = OgtColors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(hit.atHandle, color = OgtColors.muted, fontSize = 13.sp, maxLines = 1)
         }
     }
+}
+
+@Composable
+private fun MentionFace(userId: String?, name: String, size: androidx.compose.ui.unit.Dp) {
+    val db = LocalOgtDb.current
+    val socialTick by db.socialTick.collectAsState()
+    val photo = remember(userId, socialTick) { userId?.let { db.userOrNull(it)?.photoUrl } }
+    OgtNeighborAvatar(
+        userId = userId.orEmpty(),
+        photoUrl = photo,
+        contentDescription = name,
+        modifier = Modifier.size(size).clip(CircleShape),
+    )
 }
