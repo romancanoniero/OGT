@@ -43,11 +43,18 @@ function emptyState() {
   return { box, title, detail };
 }
 
+/** El ítem del menú decide la vista. Un listado no cae en el tablero de Resumen. */
+export function workspaceView(section, listings = {}) {
+  if (section?.view === 'listing' || section?.listing) return 'listing';
+  if (section && Object.hasOwn(listings, section.id)) return 'listing';
+  return 'metrics';
+}
+
 /**
  * Shell del panel: navegación, indicadores y tabla del resumen que ya devuelve el servidor.
  * `rows` conserva el texto "Etiqueta: valor".
  */
-export function mountWorkspace(root, { title, brand, lede, rows, sections, extra, listings = {} }) {
+export function mountWorkspace(root, { title, brand, lede, rows, sections, extra, listings = {}, initialSection, onNavigate }) {
   root.replaceChildren();
   const workspace = node('div');
   workspace.className = 'crm-workspace';
@@ -127,7 +134,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   workspace.append(nav, main);
   root.append(workspace);
 
-  let current = sections[0]?.id || 'resumen';
+  let current = sections.some(item => item.id === initialSection) ? initialSection : (sections[0]?.id || 'resumen');
   let query = '';
   let listItems = [];
   let listCursor = null;
@@ -137,7 +144,17 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   let focusReason = false;
   let listLoading = false;
   const buttons = [];
-  function listingOf(id) { return listings[id] || null; }
+  function sectionOf(id) { return sections.find(item => item.id === id) || null; }
+  function listingOf(id) {
+    const section = sectionOf(id);
+    return section?.listing || listings[id] || null;
+  }
+  function markCurrent() {
+    for (const button of buttons) {
+      if (button.dataset.section === current) button.setAttribute('aria-current', 'page');
+      else button.removeAttribute('aria-current');
+    }
+  }
   function cellNode(cell) {
     if (cell && cell.badge) return badge(cell.badge, cell.tone || 'calm');
     const span = node('span', cell?.text ?? '');
@@ -180,11 +197,8 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     kpis.hidden = true;
     tableWrap.hidden = true;
     entityWrap.hidden = false;
-    panelTitle.textContent = sections.find(item => item.id === current)?.label || title;
-    for (const button of buttons) {
-      if (button.dataset.section === current) button.setAttribute('aria-current', 'page');
-      else button.removeAttribute('aria-current');
-    }
+    panelTitle.textContent = sectionOf(current)?.label || title;
+    markCurrent();
     const headRow = node('tr');
     for (const name of listing.columns) headRow.append(node('th', name));
     entityHead.replaceChildren(headRow);
@@ -288,21 +302,38 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     const q = query.trim().toLowerCase();
     return q ? base.filter(row => `${row.label} ${shown(row.value)}`.toLowerCase().includes(q)) : base;
   }
+  function showMissingListing(section) {
+    heading.textContent = section?.label || title;
+    search.placeholder = 'Buscar';
+    search.setAttribute('aria-label', 'Buscar');
+    kpis.hidden = true;
+    tableWrap.hidden = true;
+    entityWrap.hidden = true;
+    more.hidden = true;
+    listError.hidden = true;
+    detail.hidden = true;
+    panelTitle.textContent = section?.label || title;
+    empty.title.textContent = 'Sin listado';
+    empty.detail.textContent = 'Esta sección no pudo abrir su listado.';
+    empty.box.hidden = false;
+    markCurrent();
+  }
   function paint() {
-    const listing = listingOf(current);
-    if (listing) {
+    const section = sectionOf(current);
+    if (workspaceView(section, listings) === 'listing') {
+      const listing = listingOf(current);
+      if (!listing) {
+        showMissingListing(section);
+        return;
+      }
       void loadListing(listing, true);
       return;
     }
     showMetricMode();
     detail.replaceChildren(detailTitle, detailLine, detailNote);
     const list = visibleRows();
-    const section = sections.find(item => item.id === current);
     panelTitle.textContent = section?.label || 'Indicadores';
-    for (const button of buttons) {
-      if (button.dataset.section === current) button.setAttribute('aria-current', 'page');
-      else button.removeAttribute('aria-current');
-    }
+    markCurrent();
     kpis.replaceChildren();
     tbody.replaceChildren();
     detail.hidden = true;
@@ -367,6 +398,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       window.clearTimeout(listTimer);
       listTicket += 1;
       current = section.id;
+      if (typeof onNavigate === 'function') onNavigate(current);
       query = '';
       search.value = '';
       paint();
