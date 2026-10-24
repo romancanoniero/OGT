@@ -1,11 +1,15 @@
 ---
-description: Dónde seguir en main, la foto de la sesión y la búsqueda ya publicada
+description: La fuente de verdad es OGT en main, no las carpetas ogt-
 alwaysApply: true
 ---
 
-# Continuar en este árbol
+# Continuar en OGT
 
-El código que corre es este repo, rama `main` (`/Volumes/DEV_MAC/ogt-deploy-main`). No editar `/Volumes/DEV_MAC/OGT` ni otro checkout: los cambios se cruzan. No abrir ramas nuevas ni otro PR. Commit y push a `origin/main`, sin `--force`. Si `origin/main` avanzó, `git fetch` y rebase antes de push.
+La fuente de verdad es este repositorio, `romancanoniero/OGT`, rama `main`. La versión actualizada es `origin/main`. No crear ni usar carpetas `ogt-*` en `/Volumes/DEV_MAC` (`ogt-deploy-main`, `ogt-sdk-committed-*` y el resto): son copias y se cruzan.
+
+En la Mac el checkout es `/Volumes/DEV_MAC/OGT`. Si quedó atrás, `git fetch` y actualizar esa carpeta desde `origin/main`. No abrir otro árbol.
+
+Commit y push a `origin/main`, sin `--force`. Si `origin/main` avanzó, `git fetch` y rebase antes de push.
 
 Simulador: iPhone 17 Pro `B8D6D203-C781-446E-B85B-07631CE9A9FC`, `com.onlygoodthings.app`. No usar IAN Test. No abrir el sitio público.
 
@@ -25,7 +29,7 @@ Encuadre, grilla, clic de la foto y búsqueda por autor ya estaban en `main` ant
 
 ## Deploy, si hay que publicar de nuevo
 
-Worktree limpio en `main`. `unset TMPDIR` / `env -u TMPDIR`. SDK `OGT_DB_KMP_SDK_PATH=/Volumes/DEV_MAC/ogt-sdk-committed-6a02167` (HEAD `6a02167`, limpio). `OGT_RELEASE_GRADLE_HOME=/Volumes/DEV_MAC/Caches/OGT/gradle`. `OGT_VPS_HOST=iankmp-vps`. Ese SDK pide `tokenProvider: suspend () -> String?`. `OgtSdk` adapta el proveedor con bandera llamando `tokenProvider(false)`. No pasar la lambda de un argumento al `DbOptions` de este SDK.
+Worktree limpio de OGT en `main`. `unset TMPDIR` / `env -u TMPDIR`. SDK `OGT_DB_KMP_SDK_PATH=/Users/romancanoniero/AndroidStudioProjects/db-kmp-sdk` (main público `0a881b7`). `OGT_RELEASE_GRADLE_HOME=/Volumes/DEV_MAC/Caches/OGT/gradle`. `OGT_VPS_HOST=iankmp-vps`. Ese SDK pide `tokenProvider: suspend () -> String?`. `OgtSdk` adapta el proveedor con bandera llamando `tokenProvider(false)`. No pasar la lambda de un argumento al `DbOptions` de este SDK.
 
 `bash scripts/deploy-ogt-vps.sh --check` y después `--deploy`. No saltear pruebas, respaldo, MFA ni prelaunch. El log va a `/Volumes/DEV_MAC/Caches/OGT/tmp/`. Leer `CHECK_EXIT` y `DEPLOY_EXIT` dentro del log. Confirmar el SHA con `ssh iankmp-vps 'curl -fsS http://127.0.0.1:19081/release.json'`. No abrir la URL pública que imprime el script. La migración 26 es idempotente y ya está aplicada.
 
