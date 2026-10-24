@@ -11,7 +11,7 @@ Simulador: iPhone 17 Pro `B8D6D203-C781-446E-B85B-07631CE9A9FC`, `com.onlygoodth
 
 ## Publicado el 24 oct 2026, 17:40 ART
 
-`main` y el loopback `http://127.0.0.1:19081/release.json` están en `774e0e0e1dc045c33d68a0d9096963840744ede1` (`app-backend-crms`, `prelaunch`). Imagen `ogt-backend:774e0e0e1dc045c33d68a0d9096963840744ede1-20261024T204019Z`. No redeployar este SHA.
+Loopback `http://127.0.0.1:19081/release.json`: `774e0e0e1dc045c33d68a0d9096963840744ede1` (`app-backend-crms`, `prelaunch`). Imagen `ogt-backend:774e0e0e1dc045c33d68a0d9096963840744ede1-20261024T204019Z`. Ese SHA ya está desplegado. Un commit posterior que solo toque esta regla no se publica.
 
 La búsqueda de Publicaciones ya es incremental, sin Enter. `POST /api/v1/crm/platform/posts/search` lee `crm_publication_index` (migración `26_crm_publication_index.sql`, `pg_trgm`). Orígenes: `author` (nombre guardado), `label` («Alguien de la comunidad», solo si la consulta es un fragmento de ese rótulo de 4+ letras), `topic`, `body`, `photo` (`alt_text`), `id`. Solo filas `VISIBLE`. La respuesta trae `suggestions.authors` y `suggestions.posts` (`id`, `authorName`, `text`). Caché del CRM: `suggest-1`.
 
