@@ -46,7 +46,7 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   assert.match(runtime, /crm-ui\.js\?v=iconos-1/);
   assert.match(html, /crm\.js\?v=iconos-1/);
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
-  assert.match(html, /crm\.css\?v=iconos-1/);
+  assert.match(html, /crm\.css\?v=iconos-2/);
   assert.match(runtime, /icon: 'qs_trash\.png', label: 'Quitar selección'/);
   assert.match(runtime, /platform\/posts\/reassign/);
   assert.match(runtime, /platform\/users\/search/);
@@ -73,8 +73,10 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   assert.match(ui, /className = 'crm-actions'/);
   const actions = css.match(/\.crm-actions \{[^}]+\}/);
   assert.ok(actions);
+  assert.match(actions[0], /display: inline-flex/);
   assert.match(actions[0], /flex-wrap: nowrap/);
-  assert.match(actions[0], /width: max-content/);
+  assert.match(css, /td:has\(\.crm-actions\)/);
+  assert.match(css, /white-space: nowrap/);
   assert.match(css, /\.crm-actions \.crm-icon-btn \{ flex: none; \}/);
   assert.match(css, /\.crm-table-wrap \{ overflow-x: auto;/);
   assert.match(ui, /crm-photo-btn/);
