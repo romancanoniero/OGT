@@ -1,4 +1,4 @@
-import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn } from './crm-core.js?v=suggest-1';
+import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn } from './crm-core.js?v=suggest-2';
 import { createIdentity } from './crm-auth.js?v=tacho-1';
 
 const controlSections = [
@@ -130,7 +130,7 @@ export async function start() {
   fields.append(factorLabel, begin, recaptcha, codeLabel, verify, cancel);
   challenge.append(fields); login.insertAdjacentElement('afterend', challenge);
   // El shell viaja en paralelo con Firebase. El ingreso no lo espera para pintar.
-  const workspaceReady = import('./crm-ui.js?v=suggest-1');
+  const workspaceReady = import('./crm-ui.js?v=suggest-2');
   const [appSdk, sdk] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),
@@ -140,7 +140,15 @@ export async function start() {
   const auth = sdk.getAuth(app);
   await sdk.setPersistence(auth, sdk.browserSessionPersistence);
   const identity = createIdentity(sdk, auth, () => new sdk.RecaptchaVerifier(auth, 'crm-recaptcha', { size: 'normal' }));
-  function clearData() { gate.reset(); clearTimeout(expiry); expiry = null; root.replaceChildren(); access = null; }
+  function clearData() {
+    if (typeof desk?.dispose === 'function') desk.dispose();
+    desk = null;
+    gate.reset();
+    clearTimeout(expiry);
+    expiry = null;
+    root.replaceChildren();
+    access = null;
+  }
   function hideChallenge() { challenge.hidden = true; code.value = ''; code.removeAttribute('aria-invalid'); verify.disabled = true; identity.cancel(); }
   function setSignupMode(enabled) {
     signupMode = enabled;
@@ -467,6 +475,8 @@ export async function start() {
       const sections = (mode === 'control' ? controlSections : empresaSections).map(section =>
         section.view === 'listing' ? { ...section, listing: postListing } : section
       );
+      if (typeof desk?.dispose === 'function') desk.dispose();
+      desk = null;
       const mounted = mountWorkspace(root, {
         title: mode === 'control' ? 'Resumen operativo' : 'Empresa autorizada',
         brand, lede,

@@ -67,6 +67,62 @@ function emptyState() {
   return { box, title, detail };
 }
 
+/**
+ * La búsqueda incremental se cierra y no vuelve a abrirse hasta que cambie el texto.
+ * pick: eligió un autor o una publicación.
+ * enter: confirmó el texto con Enter.
+ * escape: cerró el panel; el texto queda.
+ * outside: el puntero cayó fuera del campo y del panel.
+ * blur: el foco salió del campo y del panel.
+ * empty: la consulta quedó vacía.
+ * none: la respuesta no trae autores ni publicaciones.
+ * error: la búsqueda falló.
+ * nav: cambió de sección.
+ * scroll: se movió el listado o la página, no el propio panel.
+ * dialog: se abrió la ficha, la quita o el cambio de autoría.
+ * more: pidió la página siguiente.
+ * session: volvió al ingreso.
+ * window: la ventana dejó de estar activa.
+ */
+export const SUGGEST_CLOSE = Object.freeze([
+  'pick', 'enter', 'escape', 'outside', 'blur', 'empty', 'none', 'error',
+  'nav', 'scroll', 'dialog', 'more', 'session', 'window',
+]);
+
+/** Estas salidas pueden volver a mostrar el mismo resultado si el campo recupera el foco. */
+export const SUGGEST_TRANSIENT = Object.freeze(['escape', 'outside', 'blur', 'scroll', 'window']);
+
+/**
+ * `hold` impide que la próxima respuesta vuelva a abrir el panel.
+ * Escribir un texto distinto lo suelta.
+ */
+export function reduceSuggestPanel(state, event) {
+  const current = {
+    open: Boolean(state?.open),
+    hold: Boolean(state?.hold),
+    query: typeof state?.query === 'string' ? state.query : '',
+  };
+  if (event?.type === 'type') {
+    const query = typeof event.query === 'string' ? event.query : '';
+    if (!query.trim()) return { open: false, hold: true, query };
+    const changed = query.trim() !== current.query.trim();
+    return {
+      open: current.open && !current.hold,
+      hold: changed ? false : current.hold,
+      query,
+    };
+  }
+  if (event?.type === 'result') {
+    const has = Boolean(event.hasSuggestions) && Boolean(current.query.trim());
+    if (current.hold || !has) return { ...current, open: false };
+    return { ...current, open: true };
+  }
+  if (event?.type === 'close' && SUGGEST_CLOSE.includes(event.reason)) {
+    return { ...current, open: false, hold: true };
+  }
+  return current;
+}
+
 /** El ítem del menú decide la vista. Un listado no cae en el tablero de Resumen. */
 export function workspaceView(section, listings = {}) {
   if (section?.view === 'listing' || section?.listing) return 'listing';
@@ -116,7 +172,9 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   suggestBox.setAttribute('role', 'listbox');
   suggestBox.setAttribute('aria-label', 'Sugerencias');
   search.setAttribute('aria-autocomplete', 'list');
+  search.setAttribute('aria-expanded', 'false');
   search.setAttribute('aria-controls', 'crm-suggest');
+  search.autocomplete = 'off';
   searchLabel.append(productIcon('qs_lupa.svg', 'crm-field-icon'), search, suggestBox);
   tools.append(searchLabel);
 
@@ -185,6 +243,13 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   let dialogPostId = null;
   let activeListing = null;
   let query = '';
+  let suggest = { open: false, hold: false, query: '' };
+  let suggestReason = '';
+  let suggestCache = null;
+  let suggestCacheQuery = '';
+  let suggestPointer = false;
+  let suggestOpenedAt = 0;
+  const suggestListeners = new AbortController();
   let listItems = [];
   let listCursor = null;
   let listTicket = 0;
@@ -396,18 +461,40 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     bulkBar.replaceChildren();
     bulkBar.hidden = true;
   }
-  function paintSuggestions(next) {
+  function hideSuggestBox() {
+    suggestBox.hidden = true;
     suggestBox.replaceChildren();
+    search.setAttribute('aria-expanded', 'false');
+  }
+  function closeSuggest(reason) {
+    suggestReason = reason;
+    suggest = reduceSuggestPanel({ ...suggest, query }, { type: 'close', reason });
+    hideSuggestBox();
+  }
+  function reopenTransient() {
+    if (!suggestBox.hidden || !SUGGEST_TRANSIENT.includes(suggestReason)) return;
+    if (!suggestCache || suggestCacheQuery !== query.trim()) return;
+    suggest = { ...suggest, hold: false };
+    suggestReason = '';
+    paintSuggestions(suggestCache);
+  }
+  function paintSuggestions(next) {
     const authors = Array.isArray(next?.authors)
       ? next.authors.filter(name => typeof name === 'string' && name.trim())
       : [];
     const posts = Array.isArray(next?.posts)
       ? next.posts.filter(post => post && typeof post.id === 'string' && post.id)
       : [];
-    if (!query.trim() || (!authors.length && !posts.length)) {
-      suggestBox.hidden = true;
+    const has = Boolean(query.trim()) && (authors.length > 0 || posts.length > 0);
+    suggest = reduceSuggestPanel({ ...suggest, query }, { type: 'result', hasSuggestions: has });
+    if (!suggest.open) {
+      if (!suggest.hold) {
+        if (!query.trim()) closeSuggest('empty');
+        else closeSuggest('none');
+      } else hideSuggestBox();
       return;
     }
+    suggestBox.replaceChildren();
     const group = (title, rows) => {
       const caption = node('p', title);
       caption.className = 'crm-suggest-label';
@@ -438,17 +525,22 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
         return button;
       }));
     }
+    suggestCache = { authors, posts };
+    suggestCacheQuery = query.trim();
     suggestBox.hidden = false;
+    search.setAttribute('aria-expanded', 'true');
+    suggestOpenedAt = performance.now();
   }
   function chooseSuggestion(value) {
     search.value = value;
     query = value;
+    closeSuggest('pick');
     window.clearTimeout(listTimer);
     const listing = listingOf(current);
     if (listing) void loadListing(listing, true);
   }
   function showMetricMode() {
-    paintSuggestions(null);
+    hideSuggestBox();
     clearBulk();
     entityWrap.hidden = true;
     more.hidden = true;
@@ -475,7 +567,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       if (ticket !== listTicket || error?.code === 'ABORTED') return;
       listError.textContent = 'No se pudo actualizar el listado.';
       listError.hidden = false;
-      if (reset) paintSuggestions(null);
+      if (reset) closeSuggest('error');
     } finally {
       if (ticket === listTicket) listLoading = false;
     }
@@ -687,6 +779,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     return img;
   }
   async function openReassign(listing, item) {
+    closeSuggest('dialog');
     if (typeof listing.searchUsers !== 'function' || typeof listing.reassign !== 'function') return;
     sheet.replaceChildren();
     const close = iconButton('qs_close.svg', 'Cerrar');
@@ -754,6 +847,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     field.focus();
   }
   async function openDialog(listing, item, view, reasonFocus) {
+    closeSuggest('dialog');
     const card = view.detail || {};
     dialogPostId = view.key;
     dialog.replaceChildren();
@@ -891,6 +985,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     }
   }
   function openBulk(listing) {
+    closeSuggest('dialog');
     const items = listItems.filter(item => picked.has(listing.present(item)?.key));
     if (!items.length) return;
     stopWatchingComments();
@@ -1119,22 +1214,79 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       if (typeof onNavigate === 'function') onNavigate(current);
       query = '';
       search.value = '';
+      closeSuggest('nav');
       paint();
     });
     buttons.push(button);
     nav.append(button);
   }
   more.addEventListener('click', () => {
+    closeSuggest('more');
     const listing = listingOf(current);
     if (listing && listCursor) void loadListing(listing, false);
   });
   search.addEventListener('input', () => {
-    query = search.value;
+    const next = search.value;
+    if (!next.trim()) {
+      query = next;
+      closeSuggest('empty');
+    } else {
+      suggest = reduceSuggestPanel(suggest, { type: 'type', query: next });
+      query = suggest.query;
+      if (!suggest.hold) suggestReason = '';
+      if (!suggest.open) hideSuggestBox();
+    }
     const listing = listingOf(current);
     if (!listing) { paint(); return; }
     window.clearTimeout(listTimer);
     listTimer = window.setTimeout(() => { void loadListing(listing, true); }, 280);
   });
+  search.addEventListener('focus', () => { reopenTransient(); });
+  search.addEventListener('pointerdown', () => { reopenTransient(); });
+  search.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' && event.key !== 'Enter') return;
+    if (event.key === 'Escape' && suggestBox.hidden) return;
+    event.preventDefault();
+    if (event.key === 'Escape') closeSuggest('escape');
+    else closeSuggest('enter');
+    if (event.key !== 'Enter') return;
+    const listing = listingOf(current);
+    if (!listing) return;
+    window.clearTimeout(listTimer);
+    void loadListing(listing, true);
+  });
+  suggestBox.addEventListener('pointerdown', event => {
+    suggestPointer = true;
+    event.preventDefault();
+  });
+  suggestBox.addEventListener('pointerup', () => { suggestPointer = false; });
+  suggestBox.addEventListener('pointercancel', () => { suggestPointer = false; });
+  searchLabel.addEventListener('focusout', event => {
+    if (suggestPointer || suggestBox.hidden) return;
+    const next = event.relatedTarget;
+    if (next && searchLabel.contains(next)) return;
+    closeSuggest('blur');
+  });
+  const dismiss = { signal: suggestListeners.signal };
+  document.addEventListener('pointerdown', event => {
+    if (suggestBox.hidden || searchLabel.contains(event.target)) return;
+    closeSuggest('outside');
+  }, dismiss);
+  window.addEventListener('scroll', event => {
+    if (suggestBox.hidden) return;
+    if (performance.now() - suggestOpenedAt < 150) return;
+    const target = event.target;
+    const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+    if (target === suggestBox || path.includes(suggestBox) || (target instanceof Node && suggestBox.contains(target))) return;
+    closeSuggest('scroll');
+  }, { ...dismiss, capture: true });
+  window.addEventListener('blur', () => {
+    if (!suggestBox.hidden) closeSuggest('window');
+  }, dismiss);
+  function dispose() {
+    closeSuggest('session');
+    suggestListeners.abort();
+  }
   paint();
-  return { applyLive, applyUser };
+  return { applyLive, applyUser, dispose };
 }

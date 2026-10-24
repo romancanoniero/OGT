@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApi } from '../web/app/crm/crm-core.js';
 import { existsSync, readFileSync } from 'node:fs';
-import { workspaceView, frameWheelZoom } from '../web/app/crm/crm-ui.js';
+import { workspaceView, frameWheelZoom, reduceSuggestPanel, SUGGEST_CLOSE } from '../web/app/crm/crm-ui.js';
 
 const response = (data, status = 200) => ({ ok: status < 400, status, json: async () => data });
 
@@ -43,12 +43,12 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   const html = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\.svg', view: 'listing'/);
   assert.doesNotMatch(runtime, /id: 'publicaciones'[^}]*keys:/);
-  assert.match(runtime, /crm-ui\.js\?v=suggest-1/);
-  assert.match(html, /crm\.js\?v=suggest-1/);
+  assert.match(runtime, /crm-ui\.js\?v=suggest-2/);
+  assert.match(html, /crm\.js\?v=suggest-2/);
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
   assert.match(runtime, /publicationImage\(post\.editorUrl\)/);
   assert.match(runtime, /imageUrl: saved\.imageUrl/);
-  assert.match(html, /crm\.css\?v=suggest-1/);
+  assert.match(html, /crm\.css\?v=suggest-2/);
   assert.match(runtime, /icon: 'qs_trash\.png', label: 'Quitar selección'/);
   assert.match(runtime, /platform\/posts\/reassign/);
   assert.match(runtime, /platform\/users\/search/);
@@ -119,7 +119,12 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   assert.match(runtime, /post\.authorName \|\| 'Alguien de la comunidad'/);
   assert.match(ui, /search\.addEventListener\('input'/);
   assert.match(ui, /setTimeout\(\(\) => \{ void loadListing\(listing, true\); \}, 280\)/);
-  assert.doesNotMatch(ui, /search\.addEventListener\('keydown'/);
+  assert.match(ui, /search\.addEventListener\('keydown'/);
+  for (const reason of ['pick', 'enter', 'escape', 'outside', 'blur', 'empty', 'none', 'error', 'nav', 'scroll', 'dialog', 'more', 'session', 'window']) {
+    assert.match(ui, new RegExp(`closeSuggest\\('${reason}'\\)`));
+  }
+  assert.match(ui, /suggest\.hold/);
+  assert.match(runtime, /desk\?\.dispose/);
   assert.match(ui, /function paintSuggestions/);
   assert.match(ui, /group\('Autores'/);
   assert.match(ui, /group\('Publicaciones'/);
@@ -165,8 +170,8 @@ test('la rueda del CRM web acerca arriba y aleja abajo', () => {
   assert.match(css, /\.crm-frame \{[^}]*overscroll-behavior: none/s);
   const empresas = readFileSync(new URL('../web/app/crm/empresas/index.html', import.meta.url), 'utf8');
   const control = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
-  assert.match(empresas, /crm\.js\?v=suggest-1/);
-  assert.match(control, /crm\.js\?v=suggest-1/);
+  assert.match(empresas, /crm\.js\?v=suggest-2/);
+  assert.match(control, /crm\.js\?v=suggest-2/);
   assert.doesNotMatch(css, /crm-frame-zoom/);
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_in.png', import.meta.url)));
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_out.png', import.meta.url)));
@@ -174,4 +179,38 @@ test('la rueda del CRM web acerca arriba y aleja abajo', () => {
   const empresaBlock = runtime.match(/const empresaSections = \[[\s\S]*?\];/);
   assert.ok(empresaBlock);
   assert.doesNotMatch(empresaBlock[0], /view: 'listing'/);
+});
+
+test('la búsqueda incremental no vuelve a abrirse después de cerrarse', () => {
+  assert.equal(SUGGEST_CLOSE.length, 14);
+  let state = reduceSuggestPanel({ open: false, hold: false, query: '' }, { type: 'type', query: 'romorio' });
+  assert.equal(state.hold, false);
+  assert.equal(state.open, false);
+  state = reduceSuggestPanel(state, { type: 'result', hasSuggestions: true });
+  assert.equal(state.open, true);
+  for (const reason of SUGGEST_CLOSE) {
+    const closed = reduceSuggestPanel(state, { type: 'close', reason });
+    assert.equal(closed.open, false, reason);
+    assert.equal(closed.hold, true, reason);
+    const again = reduceSuggestPanel(closed, { type: 'result', hasSuggestions: true });
+    assert.equal(again.open, false, reason);
+  }
+  const edited = reduceSuggestPanel(
+    reduceSuggestPanel(state, { type: 'close', reason: 'pick' }),
+    { type: 'type', query: 'romorio s' },
+  );
+  assert.equal(edited.hold, false);
+  assert.equal(reduceSuggestPanel(edited, { type: 'result', hasSuggestions: true }).open, true);
+  const empty = reduceSuggestPanel(state, { type: 'type', query: '  ' });
+  assert.equal(empty.open, false);
+  assert.equal(empty.hold, true);
+  const none = reduceSuggestPanel(state, { type: 'result', hasSuggestions: false });
+  assert.equal(none.open, false);
+  assert.equal(none.hold, false);
+  const same = reduceSuggestPanel(
+    reduceSuggestPanel(state, { type: 'close', reason: 'escape' }),
+    { type: 'type', query: 'romorio' },
+  );
+  assert.equal(same.hold, true);
+  assert.equal(reduceSuggestPanel(same, { type: 'result', hasSuggestions: true }).open, false);
 });
