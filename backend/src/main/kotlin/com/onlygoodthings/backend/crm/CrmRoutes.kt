@@ -7,6 +7,8 @@ import com.onlygoodthings.backend.http.optDouble
 import com.onlygoodthings.backend.http.optString
 import com.onlygoodthings.backend.http.reqString
 import com.onlygoodthings.backend.infra.Database
+import com.onlygoodthings.backend.media.FrameCrop
+import com.onlygoodthings.backend.media.MediaStore
 import com.onlygoodthings.backend.realtime.RealtimeHub
 import com.onlygoodthings.shared.domain.ApiResponse
 import com.onlygoodthings.shared.domain.SocialComment
@@ -60,6 +62,8 @@ data class CrmVisiblePost(
     val frameX: Double? = null,
     val frameY: Double? = null,
     val frameZoom: Double? = null,
+    /** Archivo original. Solo lo abre el editor. La fila muestra `imageUrl`. */
+    val editorUrl: String? = null,
 )
 
 @Serializable
@@ -134,6 +138,10 @@ data class CrmPostFramed(
     val frameZoom: Double,
     val commentCount: Int = 0,
     val impactCount: Int = 0,
+    /** JPEG 16:9 que muestran feed, perfil, web y la fila de Control. */
+    val imageUrl: String? = null,
+    /** Original. El diálogo vuelve a encuadrar esta foto, no el recorte. */
+    val editorUrl: String? = null,
 )
 
 @Serializable
@@ -329,7 +337,7 @@ private suspend fun crmContext(
     return CrmContext(principal.userId, grants.first, grants.second, verified.authTimeEpochSeconds!!)
 }
 
-fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: RealtimeHub) {
+fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: RealtimeHub, media: MediaStore) {
     post("/api/v1/crm/access") {
         val auth = crmContext(call, db, verifier) ?: return@post
         call.respond(ApiResponse.ok(CrmAccessResponse(
@@ -499,8 +507,9 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: Realtime
         call.respond(ApiResponse.ok(moved, "La publicación quedó a nombre de ${moved.authorName}"))
     }
     /**
-     * Encuadre de la primera foto al marco 16:9. No borra el archivo.
+     * Recorta la primera foto al marco 16:9 y avisa `ogt/social/posts/{id}` con la URL nueva.
      * Body: `{ "postId": "55555555-5555-5555-5555-555555555555", "frameX": 0.5, "frameY": 0.35, "frameZoom": 1.2 }`
+     * Respuesta: `imageUrl` es el JPEG que leen las pantallas. `editorUrl` es el original, solo para volver a encuadrar.
      */
     post("/api/v1/crm/platform/posts/frame") {
         val auth = crmContext(call, db, verifier) ?: return@post
@@ -515,9 +524,30 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: Realtime
         val frame = crmPostFrame(data.optDouble("frameX"), data.optDouble("frameY"), data.optDouble("frameZoom"))
             ?: return@post call.respond(HttpStatusCode.BadRequest,
                 ApiResponse.fail<Unit>("El encuadre no entra en el marco", "BAD_REQUEST"))
-        val saved = db.withConnection { conn -> frameVisiblePost(conn, auth.userId, postId, frame) }
+        val source = db.withConnection { conn -> frameEditorSource(conn, postId) }
             ?: return@post call.respond(HttpStatusCode.NotFound,
                 ApiResponse.fail<Unit>("Esa publicación ya no está visible", "NOT_FOUND"))
+        val original = media.readLocal(source.editorUrl)
+            ?: return@post call.respond(HttpStatusCode.NotFound,
+                ApiResponse.fail<Unit>("La foto original no está en el servidor", "NOT_FOUND"))
+        val cropped = runCatching { FrameCrop.jpeg(original, frame.frameX, frame.frameY, frame.frameZoom) }
+            .getOrElse {
+                return@post call.respond(HttpStatusCode.BadRequest,
+                    ApiResponse.fail<Unit>("El encuadre no entra en el marco", "BAD_REQUEST"))
+            }
+        val stored = runCatching { media.save(cropped, "encuadre.jpg", "image/jpeg") }.getOrElse {
+            return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("No se pudo guardar el recorte", "BAD_REQUEST"))
+        }
+        val saved = db.withConnection { conn ->
+            frameVisiblePost(conn, auth.userId, postId, frame, stored.url, source.editorUrl)
+        }
+        if (saved == null) {
+            media.deleteLocal(stored.url)
+            return@post call.respond(HttpStatusCode.NotFound,
+                ApiResponse.fail<Unit>("Esa publicación ya no está visible", "NOT_FOUND"))
+        }
+        if (source.displayUrl != source.editorUrl) media.deleteLocal(source.displayUrl)
         val counts = db.withConnection { conn -> postLiveCounts(conn, saved.id) }
         hub.projectSocialPost(
             saved.id,
@@ -530,6 +560,7 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: Realtime
                     frameX = saved.frameX,
                     frameY = saved.frameY,
                     frameZoom = saved.frameZoom,
+                    imageUrl = saved.imageUrl,
                 ),
             ),
         )
@@ -698,12 +729,13 @@ SELECT p.id::text, p.body, p.moderation_status::text, p.created_at,
        p.author_user_id::text AS author_user_id,
        u.photo_url AS author_photo,
        photo.url AS image_url,
+       photo.original_url AS editor_url,
        photo.frame_x, photo.frame_y, photo.frame_zoom
 FROM social_posts p
 LEFT JOIN users u ON u.id = p.author_user_id
 LEFT JOIN companies c ON c.id = p.author_company_id
 LEFT JOIN LATERAL (
-  SELECT m.url, m.frame_x, m.frame_y, m.frame_zoom
+  SELECT m.url, m.original_url, m.frame_x, m.frame_y, m.frame_zoom
   FROM post_media m
   WHERE m.post_id = p.id AND m.kind = 'IMAGE'
   ORDER BY m.sort_order
@@ -733,6 +765,7 @@ private fun ResultSet.toCrmVisiblePost(): CrmVisiblePost = CrmVisiblePost(
     frameX = frameUnit("frame_x"),
     frameY = frameUnit("frame_y"),
     frameZoom = frameUnit("frame_zoom"),
+    editorUrl = crmPostImageUrl(getString("editor_url")),
 )
 
 private fun ResultSet.frameUnit(column: String): Double? {
@@ -769,10 +802,15 @@ ORDER BY display_name
 LIMIT 12
 """
 
-/** Encuadre de la primera foto. No toca `url` ni borra el archivo. */
+/**
+ * `url` pasa a ser el JPEG recortado. `original_url` conserva el archivo del editor.
+ * No hay DELETE: el original sigue en disco.
+ */
 internal const val CRM_POST_FRAME = """
 UPDATE post_media AS m
-SET frame_x = ?, frame_y = ?, frame_zoom = ?
+SET frame_x = ?, frame_y = ?, frame_zoom = ?,
+    original_url = COALESCE(m.original_url, m.url),
+    url = ?
 WHERE m.id = (
   SELECT id FROM post_media
   WHERE post_id = ?::uuid AND kind = 'IMAGE'
@@ -783,6 +821,17 @@ AND EXISTS (
   SELECT 1 FROM social_posts p
   WHERE p.id = ?::uuid AND p.moderation_status = 'VISIBLE'
 )
+"""
+
+/** La copia denormalizada que todavía leen algunos clientes. El índice 1 es la primera foto. */
+internal const val CRM_POST_DISPLAY_URL = """
+UPDATE social_posts
+SET media_urls = CASE
+      WHEN cardinality(media_urls) < 1 THEN ARRAY[?::text]
+      ELSE ARRAY[?::text] || media_urls[2:cardinality(media_urls)]
+    END,
+    updated_at = now()
+WHERE id = ?::uuid AND moderation_status = 'VISIBLE'
 """
 
 /** Cambia el autor. La fila sigue. No es un DELETE. */
@@ -957,21 +1006,58 @@ private fun reassignVisiblePost(conn: Connection, actorId: String, postId: Strin
     }
 }
 
-/** Persiste el encuadre. La URL de `post_media` no cambia. */
-private fun frameVisiblePost(conn: Connection, actorId: String, postId: String, frame: CrmPostFramed): CrmPostFramed? {
+private data class FrameEditorSource(val displayUrl: String, val editorUrl: String)
+
+/** La foto que el editor vuelve a abrir. Si todavía no hay original, es la que está publicada. */
+private fun frameEditorSource(conn: Connection, postId: String): FrameEditorSource? =
+    conn.prepareStatement(
+        """
+        SELECT m.url, m.original_url
+        FROM post_media m
+        JOIN social_posts p ON p.id = m.post_id
+        WHERE m.post_id = ?::uuid AND m.kind = 'IMAGE' AND p.moderation_status = 'VISIBLE'
+        ORDER BY m.sort_order
+        LIMIT 1
+        """.trimIndent()
+    ).use { stmt ->
+        stmt.setString(1, postId)
+        stmt.executeQuery().use { rs ->
+            if (!rs.next()) return null
+            val display = rs.getString("url")?.trim().orEmpty()
+            val original = rs.getString("original_url")?.trim().orEmpty().ifEmpty { display }
+            if (display.isEmpty() || original.isEmpty()) null else FrameEditorSource(display, original)
+        }
+    }
+
+/** Guarda el recorte en `url` y deja el original en `original_url`. No borra ese original. */
+private fun frameVisiblePost(
+    conn: Connection,
+    actorId: String,
+    postId: String,
+    frame: CrmPostFramed,
+    displayUrl: String,
+    editorUrl: String,
+): CrmPostFramed? {
     conn.autoCommit = false
     try {
         val updated = conn.prepareStatement(CRM_POST_FRAME.trim()).use { stmt ->
             stmt.setDouble(1, frame.frameX)
             stmt.setDouble(2, frame.frameY)
             stmt.setDouble(3, frame.frameZoom)
-            stmt.setString(4, postId)
+            stmt.setString(4, displayUrl)
             stmt.setString(5, postId)
+            stmt.setString(6, postId)
             stmt.executeUpdate()
         }
         if (updated == 0) {
             conn.rollback()
             return null
+        }
+        conn.prepareStatement(CRM_POST_DISPLAY_URL.trim()).use { stmt ->
+            stmt.setString(1, displayUrl)
+            stmt.setString(2, displayUrl)
+            stmt.setString(3, postId)
+            stmt.executeUpdate()
         }
         val counts = conn.prepareStatement(
             "SELECT comment_count, impact_count FROM social_posts WHERE id = ?::uuid"
@@ -981,12 +1067,14 @@ private fun frameVisiblePost(conn: Connection, actorId: String, postId: String, 
                 if (!rs.next()) 0 to 0 else rs.getInt(1) to rs.getInt(2)
             }
         }
-        writeAudit(conn, actorId, "POST_FRAME", "social_post", postId, "Encuadre al marco 16:9")
+        writeAudit(conn, actorId, "POST_FRAME", "social_post", postId, "Recorte 16:9")
         conn.commit()
         return frame.copy(
             id = postId,
             commentCount = counts.first,
             impactCount = counts.second,
+            imageUrl = displayUrl,
+            editorUrl = editorUrl,
         )
     } catch (error: Exception) {
         conn.rollback()

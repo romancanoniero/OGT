@@ -156,7 +156,7 @@ fun Application.module() {
         dbGatewayRoutes(verifier, identity, hub)
         authenticate("firebase") {
             protectedAuthRoutes(identity)
-            crmRoutes(db, verifier, hub)
+            crmRoutes(db, verifier, hub, mediaStore)
             parkingRoutes(ParkingSqlRepository(db), redis, hub, FootRoutingService.fromEnv(), parkingProximity)
             socialRoutes(SocialSqlRepository(db), hub)
             mediaRoutes(mediaStore)

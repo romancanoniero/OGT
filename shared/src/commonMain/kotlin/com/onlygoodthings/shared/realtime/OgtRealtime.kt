@@ -190,6 +190,7 @@ fun socialLiveCountersFrom(raw: Map<String, Any?>, key: String?): SocialLiveCoun
         frameX = (raw["frameX"] as? Number)?.toDouble(),
         frameY = (raw["frameY"] as? Number)?.toDouble(),
         frameZoom = (raw["frameZoom"] as? Number)?.toDouble(),
+        imageUrl = (raw["imageUrl"] as? String)?.takeIf { it.isNotBlank() },
     )
 }
 
@@ -243,6 +244,7 @@ private fun SocialLiveCounters.toTreeMap(): Map<String, Any?> = buildMap {
     frameX?.let { put("frameX", it) }
     frameY?.let { put("frameY", it) }
     frameZoom?.let { put("frameZoom", it) }
+    imageUrl?.let { put("imageUrl", it) }
 }
 
 private fun SocialComment.toTreeMap(): Map<String, Any?> = mapOf(

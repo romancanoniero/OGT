@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import com.onlygoodthings.shared.domain.SocialLiveCounters
 import com.onlygoodthings.shared.realtime.OgtDbPaths
+import com.onlygoodthings.shared.realtime.socialLiveCountersFrom
 import org.junit.jupiter.api.Test
 import java.util.UUID
 
@@ -117,10 +118,25 @@ class CrmPostPolicyTest {
         assertNull(crmPostFrame(0.5, 0.5, 0.5))
         assertEquals(1.0, crmPostFrame(0.2, 0.8, null)?.frameZoom)
         assertFalse(CRM_POST_FRAME.contains("DELETE"))
-        assertFalse(CRM_POST_FRAME.contains("url"))
+        assertTrue(CRM_POST_FRAME.contains("original_url = COALESCE(m.original_url, m.url)"))
+        assertTrue(CRM_POST_FRAME.contains("url = ?"))
         assertTrue(CRM_POST_FRAME.contains("frame_x"))
         assertTrue(CRM_POST_FRAME.contains("moderation_status = 'VISIBLE'"))
+        assertFalse(CRM_POST_DISPLAY_URL.contains("DELETE"))
         assertTrue(CRM_VISIBLE_POST_SEARCH.contains("m.url"))
+        assertTrue(CRM_VISIBLE_POST_SEARCH.contains("original_url"))
         assertTrue(CRM_VISIBLE_POST_SEARCH.contains("frame_x"))
+        val parsed = socialLiveCountersFrom(
+            mapOf(
+                "id" to "p",
+                "imageUrl" to "https://onlygoodthings.lat/media/u/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.jpg",
+            ),
+            "p",
+        )
+        assertEquals(
+            "https://onlygoodthings.lat/media/u/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.jpg",
+            parsed?.imageUrl,
+        )
+        assertEquals("ogt/social/posts/p", OgtDbPaths.socialPost("p"))
     }
 }

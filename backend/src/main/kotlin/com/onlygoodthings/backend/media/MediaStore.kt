@@ -55,6 +55,31 @@ class MediaStore(
         return file.takeIf { Files.isRegularFile(it) }
     }
 
+    /** Nombre local de `/media/u/{uuid}.ext`. No descarga una URL remota. */
+    fun storedName(url: String): String? {
+        val raw = url.trim()
+        if (raw.isEmpty()) return null
+        val path = if (raw.startsWith("/")) raw.substringBefore('?').substringBefore('#')
+        else runCatching { java.net.URI(raw).path }.getOrNull() ?: return null
+        val marker = "/media/u/"
+        val at = path.lastIndexOf(marker)
+        if (at < 0) return null
+        val name = path.substring(at + marker.length)
+        if (name.isEmpty() || name.contains('/')) return null
+        return name.takeIf { isSafeName(it) }
+    }
+
+    fun readLocal(url: String): ByteArray? {
+        val file = storedName(url)?.let { resolvePublic(it) } ?: return null
+        return Files.readAllBytes(file)
+    }
+
+    /** Borra un archivo de este disco. No sigue una URL que no sea `/media/u/`. */
+    fun deleteLocal(url: String): Boolean {
+        val file = storedName(url)?.let { resolvePublic(it) } ?: return false
+        return Files.deleteIfExists(file)
+    }
+
     fun contentTypeOf(name: String): String = when (name.substringAfterLast('.', "").lowercase(Locale.ROOT)) {
         "jpg", "jpeg" -> "image/jpeg"
         "png" -> "image/png"

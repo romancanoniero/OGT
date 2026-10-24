@@ -33,4 +33,32 @@ class PostFrameTest {
         assertEquals(0.25f, placed.centerY)
         assertTrue(abs(placed.top - -35f) < 0.05f)
     }
+
+    @Test
+    fun elRecorteDelRetratoEsElMarco16a9() {
+        val rect = postFrameSourceRect(100f, 200f, 0.5f, 0.5f, 1f)
+        assertNotNull(rect)
+        assertTrue(abs(rect.x) < 0.05f)
+        assertTrue(abs(rect.y - 71.875f) < 0.05f)
+        assertTrue(abs(rect.width - 100f) < 0.05f)
+        assertTrue(abs(rect.height - 56.25f) < 0.05f)
+        assertTrue(abs((rect.width / rect.height) - (16f / 9f)) < 0.02f)
+    }
+
+    @Test
+    fun laLecturaNoReencuadraUnArchivoYaRecortado() {
+        val item = PostMediaItem(
+            id = "m",
+            kind = MediaKind.IMAGE,
+            url = "https://onlygoodthings.lat/media/u/crop.jpg",
+            frameX = 0.2,
+            frameY = 0.3,
+            frameZoom = 2.0,
+        )
+        assertEquals(item, item.forReading(null))
+        val shown = item.forReading("https://onlygoodthings.lat/media/u/original.jpg")
+        assertEquals(item.url, shown.url)
+        assertEquals(null, shown.frameX)
+        assertEquals(null, shown.frameZoom)
+    }
 }
