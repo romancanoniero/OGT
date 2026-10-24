@@ -49,6 +49,7 @@ import com.onlygoodthings.app.resources.feed_avatar_reply
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.ui.components.OgtBackButton
 import com.onlygoodthings.shared.data.local.OgtIds
+import com.onlygoodthings.shared.domain.POST_FRAME_RATIO
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
@@ -161,7 +162,7 @@ fun NeighborProfileScreen(
                     row.forEach { post ->
                         val media = remember(post.id, socialTick) { db.mediaOf(post.id).firstOrNull() }
                         Box(
-                            Modifier.weight(1f).aspectRatio(1f).padding(1.dp).clickable { onOpenPost(post.id) },
+                            Modifier.weight(1f).aspectRatio(POST_FRAME_RATIO).padding(1.dp).clickable { onOpenPost(post.id) },
                         ) {
                             if (media != null) {
                                 OgtPostImage(
@@ -169,19 +170,19 @@ fun NeighborProfileScreen(
                                     fallback = Res.drawable.feed_avatar_reply,
                                     contentDescription = post.tag,
                                     modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Fit,
+                                    contentScale = ContentScale.Crop,
                                 )
                             } else {
                                 Image(
                                     painterResource(Res.drawable.feed_avatar_reply),
                                     contentDescription = post.tag,
                                     modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Fit,
+                                    contentScale = ContentScale.Crop,
                                 )
                             }
                         }
                     }
-                    repeat(3 - row.size) { Spacer(Modifier.weight(1f).aspectRatio(1f)) }
+                    repeat(3 - row.size) { Spacer(Modifier.weight(1f).aspectRatio(POST_FRAME_RATIO)) }
                 }
             }
         }

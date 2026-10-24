@@ -1240,7 +1240,7 @@ private fun ListingPhotoStrip(
 ) {
     val pageCount = media.size.coerceAtLeast(1)
     val pager = rememberPagerState { pageCount }
-    // Marco 16:9. El JPEG ya es ese recorte: se muestra entero, sin un segundo corte.
+    // Marco 16:9 de la grilla. La foto lo cubre y se recorta.
     Box(
         Modifier
             .ogtBleedHorizontal(12.dp)
@@ -1258,14 +1258,14 @@ private fun ListingPhotoStrip(
                         fallback = fallback,
                         contentDescription = item.altText,
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit,
+                        contentScale = ContentScale.Crop,
                     )
                 } else {
                     Image(
                         painterResource(fallback),
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit,
+                        contentScale = ContentScale.Crop,
                     )
                 }
                 if (item?.kind == MediaKind.VIDEO) {
@@ -1532,7 +1532,7 @@ private fun PostMediaPager(
     val items = media.ifEmpty { emptyList() }
     val pageCount = items.size.coerceAtLeast(1)
     val pagerState = rememberPagerState { pageCount }
-    // Miniatura del feed: alto fijo 16:9. El archivo se ve entero.
+    // Miniatura del feed: la grilla es 16:9 y la foto se recorta a ese marco.
     Box(Modifier.fillMaxWidth().aspectRatio(POST_FRAME_RATIO)) {
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize(), key = { pageIndex ->
             val item = items.getOrNull(pageIndex)
@@ -1546,14 +1546,14 @@ private fun PostMediaPager(
                         fallback = fallback,
                         contentDescription = item.altText ?: tag,
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit,
+                        contentScale = ContentScale.Crop,
                     )
                 } else {
                     Image(
                         painterResource(fallback),
                         contentDescription = tag,
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit,
+                        contentScale = ContentScale.Crop,
                     )
                 }
                 if (item?.kind == MediaKind.VIDEO) {
