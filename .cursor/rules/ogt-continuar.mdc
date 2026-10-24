@@ -11,6 +11,8 @@ Después de cada cambio visible: commit y push a `origin/main`. Sin `--force`. S
 
 Simulador: iPhone 17 Pro `B8D6D203-C781-446E-B85B-07631CE9A9FC`, `com.onlygoodthings.app`. No publicar el sitio.
 
+El teléfono no siembra posts, vecinos ni plazas de prueba. Lo visible sale de Postgres. `OgtMockSeed` queda solo en los tests.
+
 ## Foto de quien está en sesión
 
 Una sola fuente: `OgtSessionAvatar` (`OgtPostImage.kt`). Lee `LocalOgtSession.current.me()` (`id` + `photoUrl`).

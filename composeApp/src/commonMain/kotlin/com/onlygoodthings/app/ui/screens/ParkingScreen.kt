@@ -134,10 +134,6 @@ fun ParkingScreen(
     LaunchedEffect(parked) {
         if (parked) searching = false
     }
-    LaunchedEffect(here?.latitude, here?.longitude) {
-        val fix = here ?: return@LaunchedEffect
-        db.placeRadarDemoSpots(fix)
-    }
     LaunchedEffect(epoch, radius, db.parkingEpoch, session.radarEnabled, here?.latitude, here?.longitude, parked, now / 2_000) {
         mine = repo.active()
         history = repo.history()

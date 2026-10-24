@@ -9,8 +9,8 @@ import com.onlygoodthings.shared.domain.UserRole
 import com.onlygoodthings.shared.realtime.currentEpochMs
 
 /**
- * Mezcla el seed SQL (`02_demo_seed.sql`) con los personajes de Stitch
- * para poder recorrer la app sin backend.
+ * Catálogo de prueba para los tests locales. La app no lo carga:
+ * el teléfono muestra solo lo que llega de Postgres.
  */
 object OgtMockSeed {
     fun populate(db: OgtLocalDatabase): OgtLocalDatabase {
@@ -639,3 +639,6 @@ object OgtMockSeed {
         longitude = lng,
     )
 }
+
+/** Base con el catálogo de prueba. Solo existe en los tests. */
+fun OgtLocalDatabase.Companion.seeded(): OgtLocalDatabase = OgtMockSeed.populate(OgtLocalDatabase())

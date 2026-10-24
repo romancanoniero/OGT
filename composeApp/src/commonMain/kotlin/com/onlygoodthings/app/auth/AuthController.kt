@@ -161,7 +161,7 @@ class AuthController(
         session.firebaseJwt = null
         pendingPhone = null
         _signedIn.value = false
-        preview.currentUserId = com.onlygoodthings.shared.data.local.OgtIds.Mariana
+        preview.currentUserId = ""
         preview.overlayUser = null
         ensureDevBearer()
     }

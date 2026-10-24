@@ -363,46 +363,6 @@ class OgtLocalDatabase {
         return applyUserLive(userId, fillName, fillPhoto)
     }
 
-    private var liveNeighborIssued = false
-
-    /** Simula un post remoto de otro vecino. Idempotente por sesión. */
-    fun publishLiveFromNeighbor(viewerId: String): LocalSocialPost? {
-        if (liveNeighborIssued) return null
-        val author = userOrNull(OgtIds.Sofia)?.takeIf { it.id != viewerId }
-            ?: users.firstOrNull { it.id != viewerId }
-            ?: return null
-        if (posts.any { it.id == "post-live-${author.id}" }) return null
-        liveNeighborIssued = true
-        val now = currentEpochMs()
-        val post = LocalSocialPost(
-            id = "post-live-${author.id}",
-            authorKind = AuthorKind.USER,
-            authorUserId = author.id,
-            authorCompanyId = null,
-            place = author.barrio,
-            timeLabel = "Ahora",
-            tag = "Huerta comunitaria",
-            body = "Dejé plantines de albahaca en la plaza. Si pasan, lleven frasco de vidrio.",
-            impactCount = 0,
-            commentCount = 0,
-            isStory = false,
-            storyLabel = null,
-            createdAtEpochMs = now,
-        )
-        posts += post
-        postMedia += LocalPostMedia(
-            id = "${post.id}-m0",
-            postId = post.id,
-            kind = MediaKind.IMAGE,
-            url = "asset://feed_photo_arboles",
-            sortOrder = 0,
-            assetKey = "feed_photo_arboles",
-            altText = post.tag,
-        )
-        bumpFeed()
-        return post
-    }
-
     val comments = mutableListOf<LocalComment>()
     val anecdotes = mutableListOf<LocalAnecdote>()
     val adoptRequests = mutableListOf<LocalAdoptRequest>()
@@ -781,10 +741,8 @@ class OgtLocalDatabase {
     }
 
     /** En producción no te mostramos el momento que vos misma compartiste. */
-    fun hidesOwnAnecdoteShare(viewerId: String, post: LocalSocialPost): Boolean {
-        if (post.id == OgtIds.PostAnecdoteShare) return false
-        return post.isAnecdoteShare() && isOwnPost(post, viewerAliases(viewerId))
-    }
+    fun hidesOwnAnecdoteShare(viewerId: String, post: LocalSocialPost): Boolean =
+        post.isAnecdoteShare() && isOwnPost(post, viewerAliases(viewerId))
 
     fun openFeedTarget(post: LocalSocialPost): String {
         val parent = post.anecdoteParentId()
@@ -792,62 +750,6 @@ class OgtLocalDatabase {
         return post.id
     }
 
-    /**
-     * Card de prueba: cómo se ve una anécdota puntual en el feed general.
-     * La escribe Sofía, no el viewer, para que no se confunda con un share propio.
-     */
-    fun ensureFeedAnecdotePreview(): LocalSocialPost {
-        posts.firstOrNull { it.id == OgtIds.PostAnecdoteShare }?.let { return it }
-        val parent = posts.firstOrNull { it.id == OgtIds.PostHomenaje }
-        val author = userOrNull(OgtIds.Sofia) ?: users.firstOrNull()
-        val now = currentEpochMs()
-        val honoree = parent?.honoreeName?.trim()?.takeIf { it.isNotEmpty() } ?: "Don Héctor"
-        val parentId = parent?.id ?: OgtIds.PostHomenaje
-        val post = LocalSocialPost(
-            id = OgtIds.PostAnecdoteShare,
-            authorKind = AuthorKind.USER,
-            authorUserId = author?.id ?: OgtIds.Sofia,
-            authorCompanyId = null,
-            place = author?.barrio ?: "Palermo Soho",
-            timeLabel = "Hace 12 min",
-            tag = "Anécdota",
-            body = "Un domingo le llevó sillas a la plaza para que las abuelas no se quedaran de pie. No avisó: las dejó y se fue a comprar facturas.",
-            impactCount = 8,
-            commentCount = 1,
-            isStory = false,
-            storyLabel = null,
-            createdAtEpochMs = now - 12 * 60_000L,
-            sourceUrl = postDeepLink(parentId),
-            honoreeName = honoree,
-            parentPostId = parentId,
-        )
-        posts += post
-        if (author != null &&
-            postPeople.none { it.postId == post.id && it.userId == author.id && it.role == PostPersonRole.AUTHOR }
-        ) {
-            postPeople += LocalPostPerson(post.id, author.id, PostPersonRole.AUTHOR)
-        }
-        if (postMedia.none { it.postId == post.id }) {
-            val inherited = parent?.let { mediaOf(it.id) }.orEmpty()
-            if (inherited.isNotEmpty()) {
-                postMedia += inherited.map { item ->
-                    item.copy(id = "${item.id}-anecdote", postId = post.id)
-                }
-            } else {
-                postMedia += LocalPostMedia(
-                    id = "${post.id}-m0",
-                    postId = post.id,
-                    kind = MediaKind.IMAGE,
-                    url = "asset://feed_story_donacion",
-                    sortOrder = 0,
-                    assetKey = "feed_story_donacion",
-                    altText = honoree,
-                )
-            }
-        }
-        bumpFeed()
-        return post
-    }
 
     fun claimPublishedAnimals(aliases: Set<String>, localUserId: String) {
         val known = aliases.filter { it.isNotBlank() }.toSet()
@@ -947,9 +849,7 @@ class OgtLocalDatabase {
                     shouldShowInFeed(viewerId, post, mode, family, nowEpochMs)
             }
             .sortedByDescending { it.createdAtEpochMs }
-        val preview = feedPosts().firstOrNull { it.id == OgtIds.PostAnecdoteShare }
-            ?.takeIf { shouldShowInFeed(viewerId, it, mode, family, nowEpochMs) }
-        return (pinned + listOfNotNull(preview) + ranked).distinctBy { it.id }
+        return (pinned + ranked).distinctBy { it.id }
     }
 
     fun shouldShowInFeed(
@@ -965,7 +865,6 @@ class OgtLocalDatabase {
             return false
         }
         if (family != null && feedTopicFamily(post.tag, post.sourceUrl) != family) return false
-        if (post.id == OgtIds.PostAnecdoteShare) return true
         if (isOwnPost(post, viewerAliases(viewerId))) return true
         if (mode == FeedMode.FOLLOWING) {
             val mine = setOfNotNull(post.authorUserId, protagonistOf(post))
@@ -1078,7 +977,7 @@ class OgtLocalDatabase {
     }
 
     /**
-     * Río inmediato: cache + seed + lo propio reciente.
+     * Río inmediato: lo que ya llegó de Postgres y lo propio reciente.
      * Si hay orden REST, se respeta y se pinnea lo publicado acá.
      */
     fun composeVisibleRiver(
@@ -1087,7 +986,6 @@ class OgtLocalDatabase {
         family: FeedTopicFamily? = null,
         remoteOrder: List<String>? = null,
     ): List<LocalSocialPost> {
-        val preview = ensureFeedAnecdotePreview()
         val aliases = viewerAliases(viewerId)
         val hideShare: (LocalSocialPost) -> Boolean = { hidesOwnAnecdoteShare(viewerId, it) }
         val hidden = hiddenPostIds(viewerId)
@@ -1106,8 +1004,7 @@ class OgtLocalDatabase {
                     shouldShowInFeed(viewerId, post, mode, family)
             }
             .sortedByDescending { it.createdAtEpochMs }
-        return (listOf(preview).filter(::allowed) + pinned + body.filter { it.id != preview.id })
-            .distinctBy { it.id }
+        return (pinned + body).distinctBy { it.id }
     }
 
     fun exportSocialFeed(viewerId: String): String {
@@ -1131,6 +1028,7 @@ class OgtLocalDatabase {
         if (raw.isBlank()) return
         val snap = runCatching { honorJson.decodeFromString<SocialFeedSnapshot>(raw) }.getOrNull() ?: return
         snap.posts.forEach { row ->
+            if (row.id in OgtIds.phoneFixturePostIds && posts.none { it.id == row.id }) return@forEach
             val idx = posts.indexOfFirst { it.id == row.id }
             if (idx >= 0) {
                 val current = posts[idx]
@@ -1145,14 +1043,19 @@ class OgtLocalDatabase {
                 posts += row
             }
         }
+        fun fixtureAusente(postId: String) =
+            postId in OgtIds.phoneFixturePostIds && posts.none { it.id == postId }
         snap.media.forEach { row ->
+            if (fixtureAusente(row.postId)) return@forEach
             val idx = postMedia.indexOfFirst { it.id == row.id }
             if (idx >= 0) postMedia[idx] = row else postMedia += row
         }
         snap.comments.forEach { row ->
+            if (fixtureAusente(row.postId)) return@forEach
             if (comments.none { it.id == row.id }) comments += row
         }
         snap.anecdotes.forEach { row ->
+            if (fixtureAusente(row.postId)) return@forEach
             val idx = anecdotes.indexOfFirst { it.id == row.id }
             if (idx >= 0) anecdotes[idx] = row else anecdotes += row
         }
@@ -2189,52 +2092,6 @@ class OgtLocalDatabase {
         completedAtEpochMs = handoff.completedAtEpochMs,
     )
 
-    /**
-     * Cuatro cesiones de demo alrededor del GPS de la persona, a distancias
-     * que cruzan los radios 400 / 500 / 1000 / 2000 m.
-     */
-    fun placeRadarDemoSpots(origin: GeoPoint) {
-        val specs = listOf(
-            RadarDemoSpec("spot-radar-220", 220.0, 40.0, OgtIds.ValeriaP, "Murillo al 800", "Fiat Cronos gris · AD 392 KL", "Media cuadra · sale ahora"),
-            RadarDemoSpec("spot-radar-450", 450.0, 130.0, OgtIds.Lucas, "Vera y Scalabrini Ortiz", "VW Gol blanco · AC 881 PQ", "Sombra de tilo · 8 min"),
-            RadarDemoSpec("spot-radar-850", 850.0, 220.0, OgtIds.Bruno, "Serrano y Córdoba", "Peugeot 208 rojo · AB 104 TR", "Frente a un kiosco"),
-            RadarDemoSpec("spot-radar-1600", 1_600.0, 310.0, OgtIds.Sofia, "Parque Centenario, Díaz Vélez", "Toyota Etios azul · AE 220 MN", "Cerca de la reja del parque"),
-        )
-        val stillGood = specs.all { spec ->
-            val row = parkingSpots.firstOrNull { it.id == spec.id } ?: return@all false
-            val meters = GeoMath.haversineMeters(origin, GeoPoint(row.latitude, row.longitude))
-            kotlin.math.abs(meters - spec.meters) < 50.0
-        }
-        if (stillGood) return
-        parkingSpots.removeAll { it.id.startsWith("spot-radar-") }
-        val now = currentEpochMs()
-        val ttl = now + 12 * 60_000L
-        specs.forEach { spec ->
-            val point = GeoMath.destination(origin, spec.meters, spec.bearing)
-            parkingSpots += LocalParkingSpot(
-                id = spec.id,
-                ownerUserId = spec.ownerUserId,
-                claimedByUserId = null,
-                latitude = point.latitude,
-                longitude = point.longitude,
-                status = ParkingStatus.AVAILABLE,
-                version = 0,
-                address = spec.address,
-                vehicleLabel = spec.vehicle,
-                etaSeconds = GeoMath.walkEtaSeconds(origin, point),
-                distanceMeters = spec.meters,
-                rewardPoints = ParkingRules.DEFAULT_REWARD_POINTS,
-                notes = spec.notes,
-                expiresAtEpochMs = ttl,
-                ownerLastLat = point.latitude,
-                ownerLastLng = point.longitude,
-                leftoverOpen = true,
-                matchingResolved = true,
-            )
-        }
-        bumpParking()
-    }
-
     /** Fichas propias publicadas (locales o ya grabadas en Postgres). */
     fun exportPublishedAnimals(): String {
         val listingIds = animals.filter { it.id.isPublishedAnimalId() }.map { it.id }.toSet()
@@ -2273,25 +2130,13 @@ class OgtLocalDatabase {
         }
     }
 
-    companion object {
-        fun seeded(): OgtLocalDatabase = OgtMockSeed.populate(OgtLocalDatabase())
-    }
+    companion object
 }
 
 private fun String.isPublishedAnimalId(): Boolean =
     startsWith("animal-pub-") || matches(Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"))
 
 private val honorJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
-
-private data class RadarDemoSpec(
-    val id: String,
-    val meters: Double,
-    val bearing: Double,
-    val ownerUserId: String,
-    val address: String,
-    val vehicle: String,
-    val notes: String,
-)
 
 internal fun SocialPost.asLocalPost(): LocalSocialPost = LocalSocialPost(
     id = id,

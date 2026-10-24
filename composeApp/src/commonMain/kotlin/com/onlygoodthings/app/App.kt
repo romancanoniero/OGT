@@ -139,7 +139,7 @@ fun App() {
             )
         }
         var gpsAwaiting by remember { mutableStateOf(false) }
-        var selectedPostId by remember { mutableStateOf(OgtIds.PostTaller) }
+        var selectedPostId by remember { mutableStateOf("") }
         var selectedMatchId by remember { mutableStateOf(OgtIds.MatchCamila) }
         var selectedNeighborId by remember { mutableStateOf(OgtIds.ValeriaP) }
         var selectedSpotId by remember { mutableStateOf(OgtIds.SpotCorrientes) }
@@ -360,7 +360,7 @@ fun App() {
         }
         LaunchedEffect(OgtIncomingLinks.latestPostId) {
             val postId = OgtIncomingLinks.latestPostId ?: return@LaunchedEffect
-            if (db.post(postId) != null) {
+            if (db.posts.any { it.id == postId }) {
                 selectedPostId = postId
                 OgtIncomingLinks.clearPost()
                 if (!authGate) route = OgtRoute.PostDetail

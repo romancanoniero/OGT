@@ -42,12 +42,10 @@ import com.onlygoodthings.app.ui.components.OgtPrimaryButton
 import com.onlygoodthings.app.ui.components.OgtSecondaryButton
 import com.onlygoodthings.app.ui.components.OgtSectionTitle
 import com.onlygoodthings.app.ui.components.OgtTopBar
-import com.onlygoodthings.shared.data.local.LocalPostMedia
 import com.onlygoodthings.shared.data.local.LocalPostPerson
 import com.onlygoodthings.shared.data.local.LocalSocialPost
 import com.onlygoodthings.shared.domain.AuthorKind
 import com.onlygoodthings.shared.domain.FeedEventKind
-import com.onlygoodthings.shared.domain.MediaKind
 import com.onlygoodthings.shared.domain.ParkingRules
 import com.onlygoodthings.shared.domain.PostPersonRole
 import com.onlygoodthings.shared.realtime.currentEpochMs
@@ -94,15 +92,6 @@ fun ParkingConfirmScreen(spotId: String, onDone: () -> Unit) {
             createdAtEpochMs = now,
         )
         db.postPeople += LocalPostPerson(postId, me.id, PostPersonRole.AUTHOR)
-        db.postMedia += LocalPostMedia(
-            id = "$postId-m0",
-            postId = postId,
-            kind = MediaKind.IMAGE,
-            url = "asset://feed_photo_arboles",
-            sortOrder = 0,
-            assetKey = "arboles",
-            altText = "Cesión de parking",
-        )
         db.recordFeedEvent(me.id, postId, FeedEventKind.SHARE)
         db.bumpFeed()
         scope.launch { announcePublishedPost(db, db.post(postId)) }

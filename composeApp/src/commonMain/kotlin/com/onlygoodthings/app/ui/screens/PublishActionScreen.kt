@@ -69,7 +69,6 @@ import com.onlygoodthings.app.resources.publish_map
 import com.onlygoodthings.shared.data.local.LocalPostMedia
 import com.onlygoodthings.shared.data.local.LocalPostPerson
 import com.onlygoodthings.shared.data.local.LocalSocialPost
-import com.onlygoodthings.shared.data.local.OgtIds
 import com.onlygoodthings.shared.domain.AuthorKind
 import com.onlygoodthings.shared.domain.FeedEventKind
 import com.onlygoodthings.shared.domain.MediaKind
@@ -88,11 +87,6 @@ import org.jetbrains.compose.resources.painterResource
 
 private data class ImpactCategory(val id: String, val label: String, val icon: String)
 private data class BarrioSpot(val title: String, val detail: String)
-
-private const val StoryByOther =
-    "Camila y otras personas del pasaje recuperaron los canteros abandonados de la esquina. Plantaron 4 tipas jóvenes y armaron un punto comunitario de compostaje domiciliario para reducir residuos húmedos."
-private const val StoryBySelf =
-    "Con otras personas del pasaje recuperamos los canteros abandonados de la esquina. Plantamos 4 tipas jóvenes y armamos un punto comunitario de compostaje domiciliario para reducir residuos húmedos."
 
 private val ImpactCategories = listOf(
     ImpactCategory("plantar", "Reforestación", "🌳"),
@@ -114,11 +108,6 @@ private val HomenajeCategories = listOf(
     ImpactCategory("postmortem", "Post mortem", ""),
 )
 
-private const val StoryTernura =
-    "Luna tiene ocho semanas. Duerme en un cesto y se despierta si escuchás el sobre de la comida."
-private const val StoryHomenaje =
-    "Don Héctor nos enseñó a no pasar de largo si un vecino necesita una mano. Se extraña su risa en el patio."
-
 private fun categoriesFor(kind: ComposePostKind) = when (kind) {
     ComposePostKind.TERNURA -> TernuraCategories
     ComposePostKind.HOMENAJE -> HomenajeCategories
@@ -127,12 +116,6 @@ private fun categoriesFor(kind: ComposePostKind) = when (kind) {
 
 private fun defaultCategory(kind: ComposePostKind) =
     if (kind == ComposePostKind.HOMENAJE) "" else categoriesFor(kind).first().id
-
-private fun defaultStory(kind: ComposePostKind, self: Boolean) = when (kind) {
-    ComposePostKind.TERNURA -> StoryTernura
-    ComposePostKind.HOMENAJE -> StoryHomenaje
-    else -> if (self) StoryBySelf else StoryByOther
-}
 
 private val BarrioSpots = listOf(
     BarrioSpot("Parque Centenario, CABA", "Sector Canteros del Lago Central"),
@@ -173,25 +156,14 @@ fun PublishActionScreen(
     }
     var categoryOpen by remember(kind) { mutableStateOf(false) }
     var story by remember(kind) {
-        mutableStateOf(existing?.body?.takeIf { it.isNotBlank() } ?: if (storyMode) "" else defaultStory(kind, false))
+        mutableStateOf(existing?.body?.takeIf { it.isNotBlank() }.orEmpty())
     }
-    val draftMedia = remember(kind) {
-        mutableStateListOf<OgtPickedMedia>().also { list ->
-            if (!storyMode) {
-                list += OgtPickedMedia("jardin", MediaKind.IMAGE, "jardin", fromDevice = false)
-            }
-        }
-    }
+    val draftMedia = remember(kind) { mutableStateListOf<OgtPickedMedia>() }
     var includePlace by remember { mutableStateOf(false) }
     var spotIndex by remember { mutableStateOf(0) }
     var toast by remember { mutableStateOf(false) }
     val mentionPool = remember(me.id, db.follows.size) { db.mentionPool(me.id) }
-    var protagonist by remember(kind) {
-        mutableStateOf(
-            if (storyMode) null
-            else db.userOrNull(OgtIds.Camila)?.let(db::toMention),
-        )
-    }
+    var protagonist by remember(kind) { mutableStateOf<MentionCandidate?>(null) }
     val neighbors = remember { mutableStateListOf<MentionCandidate>() }
     var inviteName by remember { mutableStateOf<String?>(null) }
     var inviteSlot by remember { mutableStateOf<HonorSlot?>(null) }
@@ -227,7 +199,6 @@ fun PublishActionScreen(
 
     fun chooseAuthor(self: Boolean) {
         authorIsSelf = self
-        if (!storyTouched) story = defaultStory(kind, self)
     }
 
     fun publish() {
@@ -235,10 +206,6 @@ fun PublishActionScreen(
             triedPublish = true
             return
         }
-        if (draftMedia.isEmpty() && !storyMode) {
-            draftMedia += OgtPickedMedia("jardin", MediaKind.IMAGE, "jardin", fromDevice = false)
-        }
-        if (draftMedia.isEmpty() && !editing) return
         val tag = when {
             ternuraForm -> "Ternura"
             else -> categories.firstOrNull { it.id == category }?.label ?: "Ayuda vecinal"
@@ -297,11 +264,7 @@ fun PublishActionScreen(
         draftMedia.take(PostMediaRules.MAX_ITEMS).forEachIndexed { order, item ->
             val video = item.kind == MediaKind.VIDEO
             val url = if (item.fromDevice) "file://${item.path}" else "asset://${item.path}"
-            val poster = when {
-                item.posterPath != null -> "file://${item.posterPath}"
-                video -> "asset://feed_story_playa"
-                else -> null
-            }
+            val poster = item.posterPath?.let { "file://$it" }
             db.postMedia += LocalPostMedia(
                 id = "$postId-m$order",
                 postId = postId,
@@ -309,7 +272,7 @@ fun PublishActionScreen(
                 url = url,
                 posterUrl = poster,
                 sortOrder = order,
-                assetKey = if (item.fromDevice) "" else if (video) "feed_story_playa" else item.path,
+                assetKey = if (item.fromDevice || video) "" else item.path,
                 altText = tag,
             )
             if (item.fromDevice) {
@@ -335,7 +298,7 @@ fun PublishActionScreen(
                             posterUrl = item.posterPath?.let { "file://$it" },
                             sortOrder = order,
                             altText = tag,
-                            assetKey = if (item.fromDevice) "" else if (video) "feed_story_playa" else item.path,
+                            assetKey = if (item.fromDevice || video) "" else item.path,
                         )
                     },
                     protagonistUserId = heroId,
