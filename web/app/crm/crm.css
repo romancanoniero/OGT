@@ -476,12 +476,16 @@ img { max-width: 100%; }
 .crm-subhead img { width: 20px; height: 20px; }
 .crm-table-wrap { overflow-x: auto; max-width: 100%; }
 .crm-table { width: 100%; border-collapse: collapse; text-align: left; }
-/* La última columna no parte los íconos. Si la fila no entra, este contenedor se desplaza. */
+/* La última columna mide lo que piden los íconos. Si no entra, el listado se desplaza. */
+.crm-table td:has(.crm-actions) {
+  width: 1%;
+  white-space: nowrap;
+}
 .crm-actions {
-  display: flex;
+  display: inline-flex;
   flex-wrap: nowrap;
   align-items: center;
-  width: max-content;
+  vertical-align: middle;
 }
 .crm-actions .crm-icon-btn { flex: none; }
 .crm-table th {
