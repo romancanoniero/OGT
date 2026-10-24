@@ -169,14 +169,14 @@ fun NeighborProfileScreen(
                                     fallback = Res.drawable.feed_avatar_reply,
                                     contentDescription = post.tag,
                                     modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop,
+                                    contentScale = ContentScale.Fit,
                                 )
                             } else {
                                 Image(
                                     painterResource(Res.drawable.feed_avatar_reply),
                                     contentDescription = post.tag,
                                     modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop,
+                                    contentScale = ContentScale.Fit,
                                 )
                             }
                         }

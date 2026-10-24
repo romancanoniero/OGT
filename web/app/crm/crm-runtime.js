@@ -326,7 +326,7 @@ export async function start() {
         return value;
       }
       const postListing = {
-            placeholder: 'Autor, texto o id',
+            placeholder: 'Autor, texto, tema o id',
             searchLabel: 'Buscar publicación',
             bulk: canPosts ? { icon: 'qs_trash.png', label: 'Quitar selección' } : null,
             columns: ['Foto', 'Autor', 'Texto', 'Fecha', 'Estado', 'Acción'],

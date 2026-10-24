@@ -61,6 +61,9 @@ import org.jetbrains.compose.resources.painterResource
 
 val LocalOgtChrome = staticCompositionLocalOf<OgtChromeHost?> { null }
 
+/** Misma acción que la foto de la barra en inicio. Si la pantalla no pasa otra, se usa esta. */
+val LocalOgtOpenProfile = staticCompositionLocalOf<() -> Unit> { {} }
+
 data class OgtChromeSpec(
     val title: String,
     val onBack: (() -> Unit)? = null,
