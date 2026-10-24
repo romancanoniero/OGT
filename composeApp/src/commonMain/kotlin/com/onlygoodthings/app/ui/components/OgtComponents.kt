@@ -206,7 +206,7 @@ fun OgtBackChevron(
 
 @Composable
 fun OgtTopBar(
-    title: String = "Only Good Things (OGT)",
+    title: String = "",
     onBack: (() -> Unit)? = null,
     onNotifications: () -> Unit = {},
     onProfile: (() -> Unit)? = null,

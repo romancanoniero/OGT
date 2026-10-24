@@ -18,7 +18,7 @@ object OgtSdk {
         persistenceDir: String? = null,
     ): DbDatabase = startZeroArg(
         gatewayEndpoint = gatewayEndpoint,
-        tokenProvider = { tokenProvider(false) },
+        tokenProvider = tokenProvider,
         persistenceDir = persistenceDir,
     )
 
@@ -27,11 +27,15 @@ object OgtSdk {
         gatewayEndpoint: String,
         tokenProvider: suspend () -> String?,
         persistenceDir: String? = null,
-    ): DbDatabase = startZeroArg(gatewayEndpoint, tokenProvider, persistenceDir)
+    ): DbDatabase = startZeroArg(
+        gatewayEndpoint,
+        tokenProvider = { _ -> tokenProvider() },
+        persistenceDir,
+    )
 
     private fun startZeroArg(
         gatewayEndpoint: String,
-        tokenProvider: suspend () -> String?,
+        tokenProvider: suspend (forceRefresh: Boolean) -> String?,
         persistenceDir: String?,
     ): DbDatabase {
         if (!DbApp.isInitialized()) {

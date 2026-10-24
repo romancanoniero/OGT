@@ -201,6 +201,17 @@ fun OgtHostedTopBar(host: OgtChromeHost) {
     }
 }
 
+/** «Only Good Things», «OnlyGoodThings» o «(OGT)» no se pintan en la barra. */
+internal fun isAppWordmark(title: String): Boolean {
+    val folded = title
+        .lowercase()
+        .replace("(ogt)", " ")
+        .replace("only good things", " ")
+        .replace("onlygoodthings", " ")
+        .replace("ogt", " ")
+    return folded.all { it.isWhitespace() || it == '·' || it == '-' || it == '—' }
+}
+
 @Composable
 internal fun OgtTopBarRow(spec: OgtChromeSpec, onBack: (() -> Unit)? = spec.onBack) {
     Row(
@@ -214,23 +225,28 @@ internal fun OgtTopBarRow(spec: OgtChromeSpec, onBack: (() -> Unit)? = spec.onBa
             OgtBackButton(onBack)
             Spacer(Modifier.size(10.dp))
         }
-        if (spec.branded) {
+        // Sin flecha: solo el logo. Con flecha: el título de la pantalla, nunca el wordmark.
+        val wordmark = isAppWordmark(spec.title)
+        if (onBack == null && (spec.branded || wordmark)) {
             Image(
                 painterResource(Res.drawable.feed_logo),
-                contentDescription = spec.title,
+                contentDescription = "Inicio",
                 modifier = Modifier.size(36.dp),
                 contentScale = ContentScale.Fit,
             )
-            Spacer(Modifier.size(8.dp))
+            Spacer(Modifier.weight(1f))
+        } else if (!wordmark) {
+            Text(
+                spec.title,
+                modifier = Modifier.weight(1f),
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = OgtColors.ink,
+                letterSpacing = (-0.3).sp,
+            )
+        } else {
+            Spacer(Modifier.weight(1f))
         }
-        Text(
-            spec.title,
-            modifier = Modifier.weight(1f),
-            fontWeight = FontWeight.Bold,
-            fontSize = if (spec.branded) 20.sp else 18.sp,
-            color = OgtColors.ink,
-            letterSpacing = (-0.3).sp,
-        )
         if (spec.onOverflow != null) {
             Text(
                 "⋯",
