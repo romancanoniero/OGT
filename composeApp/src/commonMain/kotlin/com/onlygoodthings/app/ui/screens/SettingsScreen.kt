@@ -107,7 +107,7 @@ fun SettingsScreen(
             .verticalScroll(rememberScrollState())
             .padding(bottom = 88.dp),
     ) {
-        if (showChrome) OgtTopBar(title = "Ajustes", onBack = onBack, showProfileAvatar = false)
+        if (showChrome) OgtTopBar(title = "Ajustes", onBack = onBack)
         ScreenColumn {
             ProfilePhotoEditor(me.photoUrl, me.id, me.displayName)
             Text(
