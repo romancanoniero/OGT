@@ -46,7 +46,7 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   assert.match(runtime, /crm-ui\.js\?v=iconos-1/);
   assert.match(html, /crm\.js\?v=iconos-1/);
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
-  assert.match(html, /crm\.css\?v=iconos-2/);
+  assert.match(html, /crm\.css\?v=card-1/);
   assert.match(runtime, /icon: 'qs_trash\.png', label: 'Quitar selección'/);
   assert.match(runtime, /platform\/posts\/reassign/);
   assert.match(runtime, /platform\/users\/search/);
@@ -78,7 +78,10 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   assert.match(css, /td:has\(\.crm-actions\)/);
   assert.match(css, /white-space: nowrap/);
   assert.match(css, /\.crm-actions \.crm-icon-btn \{ flex: none; \}/);
-  assert.match(css, /\.crm-table-wrap \{ overflow-x: auto;/);
+  assert.match(css, /\.crm-panel \{[^}]*min-width: 0/s);
+  assert.match(css, /\.crm-panel \{[^}]*max-width: 100%/s);
+  assert.match(css, /\.crm-table-wrap \{[^}]*overflow-x: auto/s);
+  assert.match(css, /\.crm-table-wrap \{[^}]*overscroll-behavior-x: contain/s);
   assert.match(ui, /crm-photo-btn/);
   assert.match(ui, /Quitar comentario/);
   assert.match(ui, /Quitar anécdota/);
