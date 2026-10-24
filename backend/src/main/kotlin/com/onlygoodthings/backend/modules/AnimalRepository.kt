@@ -340,7 +340,8 @@ class AnimalSqlRepository(private val db: Database) {
         val placeholders = postIds.joinToString(",") { "?::uuid" }
         return connection.prepareStatement(
             """
-            SELECT id, post_id, kind, url, poster_url, sort_order, duration_ms, alt_text
+            SELECT id, post_id, kind, url, poster_url, sort_order, duration_ms, alt_text,
+                   frame_x, frame_y, frame_zoom
             FROM post_media
             WHERE post_id IN ($placeholders)
             ORDER BY post_id, sort_order
@@ -359,6 +360,9 @@ class AnimalSqlRepository(private val db: Database) {
                             sortOrder = rs.getInt("sort_order"),
                             durationMs = (rs.getObject("duration_ms") as? Number)?.toInt(),
                             altText = rs.stringOrNull("alt_text"),
+                            frameX = (rs.getObject("frame_x") as? Number)?.toDouble(),
+                            frameY = (rs.getObject("frame_y") as? Number)?.toDouble(),
+                            frameZoom = (rs.getObject("frame_zoom") as? Number)?.toDouble(),
                         )
                     }
                 }

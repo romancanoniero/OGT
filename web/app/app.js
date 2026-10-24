@@ -345,6 +345,20 @@ function applyLive(live) {
     if (live.authorPhotoUrl) patch.authorPhotoUrl = live.authorPhotoUrl;
     rememberFace({ id: live.authorUserId, displayName: live.authorName, photoUrl: live.authorPhotoUrl });
   }
+  if (live.frameX != null && live.frameY != null) {
+    patch.frameX = Number(live.frameX);
+    patch.frameY = Number(live.frameY);
+    patch.frameZoom = live.frameZoom == null ? 1 : Number(live.frameZoom);
+    const media = Array.isArray(lastFeed[idx].media) ? lastFeed[idx].media.slice() : [];
+    if (media[0]) {
+      media[0] = Object.assign({}, media[0], {
+        frameX: patch.frameX,
+        frameY: patch.frameY,
+        frameZoom: patch.frameZoom,
+      });
+      patch.media = media;
+    }
+  }
   const merged = mergePost(patch);
   paintPost(merged);
   if (patch.authorName) paintAuthor(merged);
@@ -383,6 +397,13 @@ function paintPost(post) {
     const body = card.querySelector(":scope > .body");
     if (body) body.textContent = post.body;
   }
+  const frame = mediaFrameOf(post);
+  card.querySelectorAll(":scope > .media-slot img.media").forEach((img) => {
+    img.dataset.frameX = String(frame.x);
+    img.dataset.frameY = String(frame.y);
+    img.dataset.frameZoom = String(frame.zoom);
+    placeLiveFrame(img);
+  });
   paintAuthor(card, post);
 }
 
@@ -1658,9 +1679,54 @@ function storiesBlock(post, { preview = false, compose = false } = {}) {
   return `${head}${list}${form}`;
 }
 
+function mediaFrameOf(post) {
+  const row = Array.isArray(post.media) ? post.media[0] : null;
+  const number = (value, fallback) => (value == null || value === "" || !Number.isFinite(Number(value)) ? fallback : Number(value));
+  return {
+    x: number(row?.frameX ?? post.frameX, 0.5),
+    y: number(row?.frameY ?? post.frameY, 0.5),
+    zoom: number(row?.frameZoom ?? post.frameZoom, 1),
+  };
+}
+
+/** Misma cuenta que placePostFrame: el punto de la foto queda al centro del marco. */
+function placeLiveFrame(img) {
+  const box = img.closest(".media-slot");
+  if (!box) return;
+  const fw = box.clientWidth;
+  const fh = box.clientHeight;
+  const iw = img.naturalWidth;
+  const ih = img.naturalHeight;
+  if (!fw || !fh || !iw || !ih) return;
+  const zoom = Math.min(6, Math.max(1, Number(img.dataset.frameZoom) || 1));
+  const cover = Math.max(fw / iw, fh / ih) * zoom;
+  const dw = iw * cover;
+  const dh = ih * cover;
+  const minX = Math.min(0.5, fw / (2 * dw));
+  const maxX = 1 - minX;
+  const minY = Math.min(0.5, fh / (2 * dh));
+  const maxY = 1 - minY;
+  const x = Math.min(maxX, Math.max(minX, Number(img.dataset.frameX)));
+  const y = Math.min(maxY, Math.max(minY, Number(img.dataset.frameY)));
+  img.style.width = `${dw}px`;
+  img.style.height = `${dh}px`;
+  img.style.left = `${fw / 2 - x * dw}px`;
+  img.style.top = `${fh / 2 - y * dh}px`;
+  img.style.objectFit = "fill";
+}
+
+window.ogtPlaceFrame = placeLiveFrame;
+window.addEventListener("resize", () => {
+  document.querySelectorAll(".post.open .media-slot img.media").forEach(placeLiveFrame);
+});
+
 function postCard(post, { openable = true, previewStories = true, compose = false } = {}) {
   const photo = post.media?.[0]?.url || post.mediaUrls?.[0];
-  const img = photo ? `<img class="media" src="${escapeHtml(mediaUrl(photo))}" alt="">` : "";
+  const frame = mediaFrameOf(post);
+  const img = photo
+    ? `<img class="media" src="${escapeHtml(mediaUrl(photo))}" alt="" data-frame-x="${frame.x}" data-frame-y="${frame.y}" data-frame-zoom="${frame.zoom}"${openable ? ' onload="window.ogtPlaceFrame&&window.ogtPlaceFrame(this)"' : ""}>`
+    : "";
+  const shown = photo && openable ? `<div class="media-slot">${img}</div>` : img;
   const share = isAnecdoteShare(post);
   const homage = isHomenaje(post);
   const honoree = post.honoreeName;
@@ -1695,7 +1761,7 @@ function postCard(post, { openable = true, previewStories = true, compose = fals
     ${lostExtrasHtml(post)}
     ${truequeExtrasHtml(post)}
     ${truequeBodyHtml(post)}
-    ${img}
+    ${shown}
     ${lostMapHtml(post)}
     ${truequeActionsHtml(post)}
     <div class="actions">

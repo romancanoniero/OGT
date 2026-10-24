@@ -107,4 +107,20 @@ class CrmPostPolicyTest {
         assertFalse(CRM_USER_SEARCH.contains("firebase_uid"))
         assertEquals(userId, crmOneId(mapOf("userId" to userId), "userId"))
     }
+
+    @Test fun frameKeepsTheFileAndUsesTheSixteenByNineWindow() {
+        val frame = crmPostFrame(0.5, 0.32, 1.4)
+        assertEquals(0.32, frame?.frameY)
+        assertEquals(1.4, frame?.frameZoom)
+        assertNull(crmPostFrame(null, 0.5, 1.0))
+        assertNull(crmPostFrame(1.2, 0.5, 1.0))
+        assertNull(crmPostFrame(0.5, 0.5, 0.5))
+        assertEquals(1.0, crmPostFrame(0.2, 0.8, null)?.frameZoom)
+        assertFalse(CRM_POST_FRAME.contains("DELETE"))
+        assertFalse(CRM_POST_FRAME.contains("url"))
+        assertTrue(CRM_POST_FRAME.contains("frame_x"))
+        assertTrue(CRM_POST_FRAME.contains("moderation_status = 'VISIBLE'"))
+        assertTrue(CRM_VISIBLE_POST_SEARCH.contains("m.url"))
+        assertTrue(CRM_VISIBLE_POST_SEARCH.contains("frame_x"))
+    }
 }

@@ -159,6 +159,9 @@ data class LocalPostMedia(
     val assetKey: String,
     val altText: String? = null,
     val durationMs: Int? = null,
+    val frameX: Double? = null,
+    val frameY: Double? = null,
+    val frameZoom: Double? = null,
 )
 
 @Serializable

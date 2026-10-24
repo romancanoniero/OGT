@@ -104,6 +104,8 @@ class DeploymentContractTests(unittest.TestCase):
         source = (ROOT / 'scripts/activate-ogt-release.sh').read_text()
         self.assertIn('ON_ERROR_STOP=1 --single-transaction', source)
         self.assertIn('23_crm_foundations.sql', source)
+        self.assertIn('24_post_media_frame.sql', source)
+        self.assertLess(source.index('23_crm_foundations.sql'), source.index('24_post_media_frame.sql'))
         self.assertNotIn('1[7-9]', source)
         self.assertNotIn('down -v', source)
         self.assertLess(source.index('pg_dump'), source.index('ON_ERROR_STOP=1'))

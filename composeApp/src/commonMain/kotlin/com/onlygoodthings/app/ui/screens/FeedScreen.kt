@@ -121,6 +121,7 @@ import com.onlygoodthings.app.ui.components.PostShareSheet
 import com.onlygoodthings.shared.data.local.LocalAnimalListing
 import com.onlygoodthings.shared.data.local.LocalComment
 import com.onlygoodthings.shared.data.local.LocalPostMedia
+import com.onlygoodthings.shared.domain.POST_FRAME_RATIO
 import com.onlygoodthings.shared.domain.PostPlacement
 import com.onlygoodthings.shared.data.local.LocalSocialPost
 import com.onlygoodthings.shared.data.local.OgtIds
@@ -1242,7 +1243,7 @@ private fun ListingPhotoStrip(
     Box(
         Modifier
             .ogtBleedHorizontal(12.dp)
-            .aspectRatio(16f / 9f),
+            .aspectRatio(POST_FRAME_RATIO),
     ) {
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { media.getOrNull(it)?.id ?: it }) { page ->
             val item = media.getOrNull(page)
@@ -1528,7 +1529,7 @@ private fun PostMediaPager(
     val pageCount = items.size.coerceAtLeast(1)
     val pagerState = rememberPagerState { pageCount }
     // Miniatura del feed: alto fijo 16:9, recorte al centro, ancho de la tarjeta.
-    Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
+    Box(Modifier.fillMaxWidth().aspectRatio(POST_FRAME_RATIO)) {
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize(), key = { items.getOrNull(it)?.id ?: it }) { page ->
             val item = items.getOrNull(page)
             Box(Modifier.fillMaxSize().clickable(onClick = onOpen)) {

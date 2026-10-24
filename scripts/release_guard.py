@@ -18,6 +18,7 @@ REQUIRED = (
     "web-app/crm/crm-auth.js", "web-app/crm/crm-runtime.js",
     "web-app/app.js", "web-app/auth.js",
     "database/migrations/23_crm_foundations.sql",
+    "database/migrations/24_post_media_frame.sql",
 )
 
 

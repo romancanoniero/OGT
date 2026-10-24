@@ -1,4 +1,4 @@
-import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn } from './crm-core.js?v=tacho-1';
+import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn } from './crm-core.js?v=frame-1';
 import { createIdentity } from './crm-auth.js?v=tacho-1';
 
 const controlSections = [
@@ -130,7 +130,7 @@ export async function start() {
   fields.append(factorLabel, begin, recaptcha, codeLabel, verify, cancel);
   challenge.append(fields); login.insertAdjacentElement('afterend', challenge);
   // El shell viaja en paralelo con Firebase. El ingreso no lo espera para pintar.
-  const workspaceReady = import('./crm-ui.js?v=iconos-1');
+  const workspaceReady = import('./crm-ui.js?v=frame-1');
   const [appSdk, sdk] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),
@@ -350,10 +350,15 @@ export async function start() {
               if (!post || post.status !== 'VISIBLE') return { hidden: true };
               const when = formatWhen(post.createdAt);
               const image = publicationImage(post.imageUrl);
+              const frame = {
+                x: post.frameX == null || !Number.isFinite(Number(post.frameX)) ? 0.5 : Number(post.frameX),
+                y: post.frameY == null || !Number.isFinite(Number(post.frameY)) ? 0.5 : Number(post.frameY),
+                zoom: post.frameZoom == null || !Number.isFinite(Number(post.frameZoom)) ? 1 : Number(post.frameZoom),
+              };
               return {
                 key: post.id,
                 cells: [
-                  image ? { image } : { text: '' },
+                  image ? { image, frame } : { text: '' },
                   { text: post.authorName || 'Sin nombre' },
                   { text: post.body || '', clamp: true },
                   { text: when },
@@ -370,6 +375,7 @@ export async function start() {
                   meta: `${when} · Visible`,
                   body: post.body || '',
                   image,
+                  frame,
                   reasonLabel: 'Motivo',
                   confirmLabel: 'Confirmar quita',
                 },
@@ -407,6 +413,27 @@ export async function start() {
               });
             }
             return moved;
+          },
+          async saveFrame(post, frame) {
+            const saved = await api('platform/posts/frame', token, {
+              postId: post.id,
+              frameX: frame.x,
+              frameY: frame.y,
+              frameZoom: frame.zoom,
+            }, task.signal);
+            post.frameX = saved.frameX;
+            post.frameY = saved.frameY;
+            post.frameZoom = saved.frameZoom;
+            if (desk && typeof desk.applyLive === 'function') {
+              desk.applyLive({
+                id: post.id,
+                frameX: saved.frameX,
+                frameY: saved.frameY,
+                frameZoom: saved.frameZoom,
+                moderationStatus: 'VISIBLE',
+              });
+            }
+            return saved;
           },
         } : {}),
       };
