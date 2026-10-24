@@ -9,6 +9,7 @@ import com.onlygoodthings.shared.domain.FeedEventKind
 import com.onlygoodthings.shared.domain.FeedMode
 import com.onlygoodthings.shared.domain.MediaKind
 import com.onlygoodthings.shared.domain.PostMediaItem
+import com.onlygoodthings.shared.domain.forReading
 import com.onlygoodthings.shared.domain.PostPlacement
 import com.onlygoodthings.shared.domain.SocialAnecdote
 import com.onlygoodthings.shared.domain.SocialComment
@@ -1106,7 +1107,7 @@ class SocialSqlRepository(private val db: Database) {
         return connection.prepareStatement(
             """
             SELECT id, post_id, kind, url, poster_url, sort_order, duration_ms, alt_text,
-                   frame_x, frame_y, frame_zoom
+                   frame_x, frame_y, frame_zoom, original_url
             FROM post_media
             WHERE post_id IN ($placeholders)
             ORDER BY post_id, sort_order
@@ -1128,7 +1129,7 @@ class SocialSqlRepository(private val db: Database) {
                             frameX = (rs.getObject("frame_x") as? Number)?.toDouble(),
                             frameY = (rs.getObject("frame_y") as? Number)?.toDouble(),
                             frameZoom = (rs.getObject("frame_zoom") as? Number)?.toDouble(),
-                        )
+                        ).forReading(rs.stringOrNull("original_url"))
                         getOrPut(postId) { mutableListOf() } += item
                     }
                 }

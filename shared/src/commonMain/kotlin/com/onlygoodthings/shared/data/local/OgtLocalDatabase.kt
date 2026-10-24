@@ -204,7 +204,7 @@ class OgtLocalDatabase {
             }
             changed = true
         }
-        if (live.frameX != null && live.frameY != null && applyPostFrame(live)) changed = true
+        if (applyPostFrame(live)) changed = true
         if (next == current) {
             if (changed) bumpSocial()
             return changed
@@ -214,16 +214,24 @@ class OgtLocalDatabase {
         return true
     }
 
-    /** Guarda el encuadre en la primera foto. No toca el archivo. */
+    /**
+     * Si llega `imageUrl`, esa foto ya está recortada: reemplaza el archivo y no reencuadra.
+     * Sin esa URL, el encuadre sigue siendo el de una foto que el cliente todavía pinta cruda.
+     */
     private fun applyPostFrame(live: SocialLiveCounters): Boolean {
-        val x = live.frameX ?: return false
-        val y = live.frameY ?: return false
-        if (!x.isFinite() || !y.isFinite()) return false
-        val zoom = (live.frameZoom ?: 1.0).takeIf { it.isFinite() }?.coerceIn(1.0, 6.0) ?: 1.0
         val index = postMedia.indexOfFirst { it.postId == live.id && it.kind == MediaKind.IMAGE }
         if (index < 0) return false
         val current = postMedia[index]
-        val next = current.copy(frameX = x, frameY = y, frameZoom = zoom)
+        val cropped = live.imageUrl?.trim()?.takeIf { it.isNotEmpty() }
+        val next = if (cropped != null) {
+            current.copy(url = cropped, frameX = null, frameY = null, frameZoom = null)
+        } else {
+            val x = live.frameX ?: return false
+            val y = live.frameY ?: return false
+            if (!x.isFinite() || !y.isFinite()) return false
+            val zoom = (live.frameZoom ?: 1.0).takeIf { it.isFinite() }?.coerceIn(1.0, 6.0) ?: 1.0
+            current.copy(frameX = x, frameY = y, frameZoom = zoom)
+        }
         if (next == current) return false
         postMedia[index] = next
         return true

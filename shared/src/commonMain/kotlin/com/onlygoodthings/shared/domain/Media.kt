@@ -70,6 +70,46 @@ fun placePostFrame(
     )
 }
 
+/** Rectángulo del archivo original que entra en el marco 16:9, en píxeles de esa foto. */
+data class PostFrameSourceRect(
+    val x: Float,
+    val y: Float,
+    val width: Float,
+    val height: Float,
+)
+
+/**
+ * Recorte del archivo original. El marco de salida es 16:9; el tamaño en píxeles no cambia el rectángulo.
+ * Queda dentro de la foto para no inventar bandas.
+ */
+fun postFrameSourceRect(
+    imageWidth: Float,
+    imageHeight: Float,
+    frameX: Float,
+    frameY: Float,
+    frameZoom: Float,
+): PostFrameSourceRect? {
+    val placed = placePostFrame(16f, 9f, imageWidth, imageHeight, frameX, frameY, frameZoom) ?: return null
+    val cover = placed.displayWidth / imageWidth
+    if (cover <= 0f) return null
+    var x = -placed.left / cover
+    var y = -placed.top / cover
+    var width = 16f / cover
+    var height = 9f / cover
+    if (x < 0f) {
+        width += x
+        x = 0f
+    }
+    if (y < 0f) {
+        height += y
+        y = 0f
+    }
+    if (x + width > imageWidth) width = imageWidth - x
+    if (y + height > imageHeight) height = imageHeight - y
+    if (width <= 0f || height <= 0f) return null
+    return PostFrameSourceRect(x = x, y = y, width = width, height = height)
+}
+
 @Serializable
 data class PostMediaItem(
     val id: String,
@@ -86,6 +126,14 @@ data class PostMediaItem(
     /** Acercamiento sobre el recorte que ya cubre el marco. 1 no acerca. */
     val frameZoom: Double? = null,
 )
+
+/**
+ * Lo que pinta una pantalla de lectura. Si el original quedó guardado aparte,
+ * `url` ya es el JPEG 16:9 y no hay que volver a encuadrar encima.
+ */
+fun PostMediaItem.forReading(originalUrl: String?): PostMediaItem =
+    if (originalUrl.isNullOrBlank()) this
+    else copy(frameX = null, frameY = null, frameZoom = null)
 
 /** Respuesta de `POST /api/v1/media/upload`. El archivo ya está en disco de la API. */
 @Serializable

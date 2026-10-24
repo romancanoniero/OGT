@@ -329,6 +329,7 @@ function applyLive(live) {
     paintPulse();
     return;
   }
+  if (live.imageUrl) replaceShownPhoto(live.id, live.imageUrl);
   const idx = lastFeed.findIndex((p) => p.id === live.id);
   if (idx < 0) return;
   const patch = {
@@ -345,7 +346,27 @@ function applyLive(live) {
     if (live.authorPhotoUrl) patch.authorPhotoUrl = live.authorPhotoUrl;
     rememberFace({ id: live.authorUserId, displayName: live.authorName, photoUrl: live.authorPhotoUrl });
   }
-  if (live.frameX != null && live.frameY != null) {
+  if (live.imageUrl) {
+    const nextUrl = String(live.imageUrl);
+    const media = Array.isArray(lastFeed[idx].media) ? lastFeed[idx].media.slice() : [];
+    if (media[0]) {
+      media[0] = Object.assign({}, media[0], {
+        url: nextUrl,
+        frameX: null,
+        frameY: null,
+        frameZoom: null,
+      });
+      patch.media = media;
+    }
+    const urls = Array.isArray(lastFeed[idx].mediaUrls) ? lastFeed[idx].mediaUrls.slice() : [];
+    if (urls.length) urls[0] = nextUrl;
+    else urls.push(nextUrl);
+    patch.mediaUrls = urls;
+    patch.frameX = null;
+    patch.frameY = null;
+    patch.frameZoom = null;
+    replaceShownPhoto(live.id, nextUrl);
+  } else if (live.frameX != null && live.frameY != null) {
     patch.frameX = Number(live.frameX);
     patch.frameY = Number(live.frameY);
     patch.frameZoom = live.frameZoom == null ? 1 : Number(live.frameZoom);
@@ -398,7 +419,10 @@ function paintPost(post) {
     if (body) body.textContent = post.body;
   }
   const frame = mediaFrameOf(post);
-  card.querySelectorAll(":scope > .media-slot img.media").forEach((img) => {
+  const photo = post.media?.[0]?.url || post.mediaUrls?.[0];
+  const next = photo ? mediaUrl(photo) : "";
+  card.querySelectorAll(":scope > .media-slot img.media, :scope > img.media").forEach((img) => {
+    if (next && img.getAttribute("src") !== next) img.src = next;
     img.dataset.frameX = String(frame.x);
     img.dataset.frameY = String(frame.y);
     img.dataset.frameZoom = String(frame.zoom);
@@ -1677,6 +1701,19 @@ function storiesBlock(post, { preview = false, compose = false } = {}) {
   const list = shown.length ? `<div class="stories">${shown.map((s) => storyCard(s, post)).join("")}</div>` : "";
   const form = compose && homage ? composeAnecdote(post) : "";
   return `${head}${list}${form}`;
+}
+
+/** Cambia la foto que ya está en pantalla. La URL nueva no reutiliza la caché del archivo crudo. */
+function replaceShownPhoto(postId, imageUrl) {
+  const next = mediaUrl(imageUrl);
+  if (!next) return;
+  document.querySelectorAll(`[data-post="${cssAttr(postId)}"] img.media`).forEach((img) => {
+    if (img.getAttribute("src") !== next) img.src = next;
+    img.dataset.frameX = "0.5";
+    img.dataset.frameY = "0.5";
+    img.dataset.frameZoom = "1";
+    if (img.complete && img.naturalWidth) placeLiveFrame(img);
+  });
 }
 
 function mediaFrameOf(post) {

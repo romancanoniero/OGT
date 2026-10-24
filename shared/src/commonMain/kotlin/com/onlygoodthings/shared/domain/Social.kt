@@ -110,6 +110,11 @@ data class SocialLiveCounters(
     val frameX: Double? = null,
     val frameY: Double? = null,
     val frameZoom: Double? = null,
+    /**
+     * JPEG ya recortado al marco. La dirección cambia en cada guardado
+     * para que la caché no siga sirviendo la foto anterior.
+     */
+    val imageUrl: String? = null,
 ) {
     val canIngest: Boolean
         get() = !authorUserId.isNullOrBlank() && !body.isNullOrBlank()

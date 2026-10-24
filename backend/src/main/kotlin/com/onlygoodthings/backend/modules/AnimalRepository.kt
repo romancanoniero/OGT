@@ -6,6 +6,7 @@ import com.onlygoodthings.backend.infra.stringOrNull
 import com.onlygoodthings.shared.domain.AnimalListingDto
 import com.onlygoodthings.shared.domain.MediaKind
 import com.onlygoodthings.shared.domain.PostMediaItem
+import com.onlygoodthings.shared.domain.forReading
 import java.sql.Connection
 import java.sql.ResultSet
 import java.util.UUID
@@ -341,7 +342,7 @@ class AnimalSqlRepository(private val db: Database) {
         return connection.prepareStatement(
             """
             SELECT id, post_id, kind, url, poster_url, sort_order, duration_ms, alt_text,
-                   frame_x, frame_y, frame_zoom
+                   frame_x, frame_y, frame_zoom, original_url
             FROM post_media
             WHERE post_id IN ($placeholders)
             ORDER BY post_id, sort_order
@@ -363,7 +364,7 @@ class AnimalSqlRepository(private val db: Database) {
                             frameX = (rs.getObject("frame_x") as? Number)?.toDouble(),
                             frameY = (rs.getObject("frame_y") as? Number)?.toDouble(),
                             frameZoom = (rs.getObject("frame_zoom") as? Number)?.toDouble(),
-                        )
+                        ).forReading(rs.stringOrNull("original_url"))
                     }
                 }
             }

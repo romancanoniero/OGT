@@ -840,6 +840,15 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
         row.authorPhotoUrl = live.authorPhotoUrl;
         authorChanged = true;
       }
+      if (row && live.imageUrl && row.imageUrl !== live.imageUrl) {
+        if (!row.editorUrl && row.imageUrl) row.editorUrl = row.imageUrl;
+        row.imageUrl = live.imageUrl;
+        authorChanged = true;
+      }
+      if (row && live.editorUrl && row.editorUrl !== live.editorUrl) {
+        row.editorUrl = live.editorUrl;
+        authorChanged = true;
+      }
       if (row && live.frameX != null && live.frameY != null) {
         row.frameX = Number(live.frameX);
         row.frameY = Number(live.frameY);

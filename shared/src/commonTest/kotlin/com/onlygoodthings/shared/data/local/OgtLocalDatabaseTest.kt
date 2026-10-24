@@ -549,6 +549,28 @@ class OgtLocalDatabaseTest {
     }
 
     @Test
+    fun elRecorteReemplazaLaFotoSinVolverAEncuadrar() {
+        val db = OgtLocalDatabase.seeded()
+        val media = db.postMedia.first { it.kind == com.onlygoodthings.shared.domain.MediaKind.IMAGE }
+        val before = media.url
+        val live = SocialLiveCounters(
+            id = media.postId,
+            commentCount = db.post(media.postId).commentCount,
+            impactCount = db.post(media.postId).impactCount,
+            imageUrl = "https://onlygoodthings.lat/media/u/recorte.jpg",
+            frameX = 0.2,
+            frameY = 0.3,
+            frameZoom = 2.0,
+        )
+        assertTrue(db.applySocialLive(live))
+        val next = db.postMedia.first { it.id == media.id }
+        assertEquals("https://onlygoodthings.lat/media/u/recorte.jpg", next.url)
+        assertTrue(before != next.url)
+        assertEquals(null, next.frameX)
+        assertEquals(null, next.frameZoom)
+    }
+
+    @Test
     fun atribucionCambiaElAutorSinBorrarElPost() {
         val db = OgtLocalDatabase.seeded()
         val post = db.posts.first()
