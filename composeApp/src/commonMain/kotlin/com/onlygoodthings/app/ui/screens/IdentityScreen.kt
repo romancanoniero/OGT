@@ -8,8 +8,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.onlygoodthings.app.platform.rememberOgtDocumentPicker
+import com.onlygoodthings.app.platform.rememberOgtMediaPicker
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.ui.components.GhostLink
 import com.onlygoodthings.app.ui.components.OgtCaption
@@ -24,6 +30,11 @@ import com.onlygoodthings.app.ui.components.ScreenColumn
 
 @Composable
 fun IdentityScreen(onContinue: () -> Unit) {
+    var document by remember { mutableStateOf<String?>(null) }
+    val camera = rememberOgtMediaPicker { picked ->
+        document = picked.path.substringAfterLast('/')
+    }
+    val pickDocument = rememberOgtDocumentPicker { name -> document = name }
     Column(Modifier.fillMaxSize().background(OgtColors.canvas).verticalScroll(rememberScrollState())) {
         OgtTopBar(title = "Verificación")
         ScreenColumn {
@@ -71,8 +82,14 @@ fun IdentityScreen(onContinue: () -> Unit) {
                 )
             }
             OgtCaption("Los documentos se procesan cifrados y se borran al validar. No se venden ni se comparten.")
-            OgtPrimaryButton("Escanear documento") { onContinue() }
-            OgtSecondaryButton("Subir PDF o foto") { onContinue() }
+            if (document == null) {
+                OgtCaption("Todavía no hay documento. Escanear abre la cámara; subir abre un archivo.")
+            } else {
+                OgtCaption("Documento listo.")
+                OgtPrimaryButton("Continuar") { onContinue() }
+            }
+            OgtPrimaryButton("Escanear documento") { camera.takeCamera() }
+            OgtSecondaryButton("Subir PDF o foto") { pickDocument() }
             GhostLink("Continuar sin verificar") { onContinue() }
             Spacer(Modifier.height(24.dp))
         }

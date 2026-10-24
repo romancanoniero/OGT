@@ -8,6 +8,8 @@ data class OgtNotifyState(
     val token: String?,
     val platform: String,
     val requestPermission: () -> Unit,
+    /** Vuelve a pedir el diálogo. Si el sistema ya no lo muestra, abre los ajustes. */
+    val retryPermission: () -> Unit,
 )
 
 /** Permiso + token FCM. Las acciones abren el diálogo nativo. */

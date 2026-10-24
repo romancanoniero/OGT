@@ -156,6 +156,13 @@ class AuthController(
         }
     }
 
+    /** Borra la fila de OGT y el contenido de esta cuenta, y después cierra la sesión local. */
+    suspend fun deleteAccount(): Boolean = wrap {
+        if (session.firebaseJwt.isNullOrBlank()) error("Iniciá sesión para borrar la cuenta")
+        api.deleteAccount()
+        signOut()
+    }
+
     suspend fun signOut() {
         runCatching { platform.signOut() }
         session.firebaseJwt = null

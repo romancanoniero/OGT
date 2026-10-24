@@ -33,11 +33,16 @@ actual fun rememberOgtNotify(): OgtNotifyState {
             delay(800)
         }
     }
+    val ask: () -> Unit = {
+        OgtPushRuntime.host?.requestPermission()
+        Unit
+    }
     return OgtNotifyState(
         permissionGranted = granted,
         token = token,
         platform = "IOS",
-        requestPermission = { OgtPushRuntime.host?.requestPermission() },
+        requestPermission = ask,
+        retryPermission = ask,
     )
 }
 

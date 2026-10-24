@@ -5,6 +5,7 @@ import com.onlygoodthings.shared.domain.AuthorKind
 import com.onlygoodthings.shared.domain.FeedEventKind
 import com.onlygoodthings.shared.domain.OgtCrmDefaults
 import com.onlygoodthings.shared.domain.FeedMode
+import com.onlygoodthings.shared.domain.FeedTopicFamily
 import com.onlygoodthings.shared.domain.HonorChannel
 import com.onlygoodthings.shared.domain.HonorMentionView
 import com.onlygoodthings.shared.domain.HonorStatus
@@ -709,6 +710,13 @@ class OgtLocalDatabaseTest {
         assertFalse(db.shouldShowInFeed(OgtIds.Mariana, mine, nowEpochMs = mine.createdAtEpochMs))
         assertTrue(db.visibleFeed(OgtIds.Mariana, nowEpochMs = mine.createdAtEpochMs).none { it.id == mine.id })
         assertFalse(db.hidesOwnAnecdoteShare(OgtIds.Sofia, mine))
+        val pets = db.composeVisibleRiver(OgtIds.Mariana, family = FeedTopicFamily.PETS)
+        assertTrue(pets.none { it.id == OgtIds.PostAnecdoteShare })
+        val order = listOf(OgtIds.PostAnecdoteShare, OgtIds.PostOliver)
+        assertTrue(
+            db.composeVisibleRiver(OgtIds.Mariana, family = FeedTopicFamily.PETS, remoteOrder = order)
+                .none { it.id == OgtIds.PostAnecdoteShare },
+        )
     }
 
     @Test

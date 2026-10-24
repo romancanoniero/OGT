@@ -1018,6 +1018,8 @@ span.avatar svg { width: 18px; height: 18px; }
 .pref-switch small { display: block; color: var(--muted); font-size: 12px; font-weight: 400; margin-top: 2px; }
 .profile-edit .publish-cta { margin-top: 24px; }
 .profile-edit .save-ok { color: var(--secondary); font-size: 13px; font-weight: 600; margin: 12px 0 0; }
+.profile-edit .publish-cta.danger { background: var(--error); color: #fff; }
+.profile-edit .delete-err { color: var(--error); font-size: 13px; font-weight: 600; margin: 12px 0 0; }
 .wallet-pts { font-size: 40px; font-weight: 700; letter-spacing: -0.03em; margin: 0; color: var(--secondary); }
 .bar { height: 8px; border-radius: 999px; background: var(--sand); overflow: hidden; margin: 10px 0; }
 .bar i { display: block; height: 100%; background: var(--secondary); }

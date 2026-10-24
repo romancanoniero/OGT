@@ -208,7 +208,7 @@ fun OgtBackChevron(
 fun OgtTopBar(
     title: String = "",
     onBack: (() -> Unit)? = null,
-    onNotifications: () -> Unit = {},
+    onNotifications: (() -> Unit)? = null,
     onProfile: (() -> Unit)? = null,
     onOverflow: (() -> Unit)? = null,
     onMessages: (() -> Unit)? = null,
@@ -217,10 +217,11 @@ fun OgtTopBar(
     showProfileAvatar: Boolean = true,
 ) {
     val openProfile = onProfile ?: LocalOgtOpenProfile.current
+    val openNotifications = onNotifications ?: LocalOgtOpenNotifications.current
     val spec = OgtChromeSpec(
         title = title,
         onBack = onBack,
-        onNotifications = onNotifications,
+        onNotifications = openNotifications,
         onProfile = openProfile,
         onOverflow = onOverflow,
         onMessages = onMessages,

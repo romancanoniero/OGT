@@ -38,6 +38,7 @@ import com.onlygoodthings.shared.domain.feedCardKind
 import com.onlygoodthings.shared.domain.honorAppLink
 import com.onlygoodthings.shared.domain.isGatheringPost
 import com.onlygoodthings.app.ui.components.LocalOgtChrome
+import com.onlygoodthings.app.ui.components.LocalOgtOpenNotifications
 import com.onlygoodthings.app.ui.components.LocalOgtOpenProfile
 import com.onlygoodthings.app.ui.components.OgtChromePad
 import com.onlygoodthings.app.ui.components.OgtHostedTopBar
@@ -128,6 +129,8 @@ fun App() {
         var settingsResume by remember { mutableStateOf(false) }
         /** Pantalla desde la que se abrió Ajustes. La flecha vuelve ahí. */
         var settingsReturn by remember { mutableStateOf(OgtRoute.Feed) }
+        /** Pantalla desde la que se abrió la campana. */
+        var noticeBack by remember { mutableStateOf(OgtRoute.Feed) }
         var editVehicleId by remember { mutableStateOf<String?>(null) }
         var editPostId by remember { mutableStateOf<String?>(null) }
         var animalPublishKind by remember {
@@ -223,7 +226,8 @@ fun App() {
                 route == OgtRoute.ReportAnimal
             if (!session.gpsEnabled || !needsFix) return@LaunchedEffect
             when {
-                location.permission == LocationPermissionState.DENIED_FOREVER -> location.openSettings()
+                // No saltar a Ajustes solos: tapa el diálogo del sistema y Play lo toma como permiso sin aviso.
+                location.permission == LocationPermissionState.DENIED_FOREVER -> Unit
                 !location.permission.covers(session.locationScope) -> location.ensureScope(session.locationScope)
                 !location.servicesEnabled -> location.ensureServices()
                 else -> location.resync()
@@ -380,8 +384,11 @@ fun App() {
                 OgtRoute.Otp -> ({ route = otpBack })
                 OgtRoute.Recover, OgtRoute.SignUp -> ({ route = OgtRoute.Login })
                 OgtRoute.NeighborProfile, OgtRoute.PostDetail, OgtRoute.Publish,
-                OgtRoute.Notifications, OgtRoute.ClaimHonor,
+                OgtRoute.ClaimHonor,
                 -> ({ route = OgtRoute.Feed })
+                OgtRoute.Notifications -> ({
+                    route = noticeBack.takeUnless { it == OgtRoute.Notifications } ?: OgtRoute.Feed
+                })
                 OgtRoute.Invite, OgtRoute.Messages, OgtRoute.Milestone -> ({
                     route = if (settingsResume) OgtRoute.Settings else OgtRoute.Feed
                 })
@@ -438,6 +445,12 @@ fun App() {
             settingsResume = false
             route = OgtRoute.Settings
         }
+        val openNotifications: () -> Unit = {
+            if (route != OgtRoute.Notifications) {
+                noticeBack = route
+                route = OgtRoute.Notifications
+            }
+        }
         val openSettingsKey: (String) -> Unit = { key ->
             settingsResume = true
             route = when (key) {
@@ -470,6 +483,7 @@ fun App() {
             LocalOgtLocation provides location,
             LocalOgtChrome provides chrome,
             LocalOgtOpenProfile provides openProfile,
+            LocalOgtOpenNotifications provides openNotifications,
         ) {
         Scaffold(
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -561,6 +575,8 @@ fun App() {
                             }
                         },
                         onRequestNotify = notify.requestPermission,
+                        onRetryNotify = notify.retryPermission,
+                        notificationsGranted = notify.permissionGranted,
                         onBack = if (settingsResume) closeSettingsLeaf else null,
                     )
                     OgtRoute.Gps -> LocationScopeDialog(
@@ -602,7 +618,7 @@ fun App() {
                                 selectedPostId = id
                                 route = OgtRoute.PostDetail
                             },
-                            onNotifications = { route = OgtRoute.Notifications },
+                            onNotifications = openNotifications,
                             onProfile = openProfile,
                             onMessages = { route = OgtRoute.Messages },
                             onInvite = { route = OgtRoute.Invite },
@@ -689,6 +705,7 @@ fun App() {
                         },
                     )
                     OgtRoute.Animals -> AnimalsScreen(
+                        onBack = { route = OgtRoute.Feed },
                         onReportLost = {
                             animalPublishKind = ComposePostKind.LOST
                             reportBack = OgtRoute.Animals
@@ -761,10 +778,17 @@ fun App() {
                     OgtRoute.Wallet -> WalletScreen { route = OgtRoute.Settings }
                     OgtRoute.Ranking -> RankingScreen { route = OgtRoute.Settings }
                     OgtRoute.Notifications -> NotificationsScreen(
-                        onBack = { route = OgtRoute.Feed },
+                        onBack = {
+                            route = noticeBack.takeUnless { it == OgtRoute.Notifications } ?: OgtRoute.Feed
+                        },
                         onOpenPost = { postId ->
                             selectedPostId = postId
                             route = OgtRoute.PostDetail
+                        },
+                        onOpenPets = { route = OgtRoute.Animals },
+                        onOpenTrade = {
+                            settingsResume = false
+                            route = OgtRoute.Messages
                         },
                     )
                     OgtRoute.Invite -> InviteScreen {

@@ -990,9 +990,14 @@ class OgtLocalDatabase {
         val hideShare: (LocalSocialPost) -> Boolean = { hidesOwnAnecdoteShare(viewerId, it) }
         val hidden = hiddenPostIds(viewerId)
         fun allowed(post: LocalSocialPost) = post.id !in hidden && !hideShare(post)
+        fun matches(post: LocalSocialPost): Boolean {
+            if (!allowed(post)) return false
+            if (family == null) return true
+            return feedTopicFamily(post.tag, post.sourceUrl) == family
+        }
         val body = if (remoteOrder != null) {
             val byId = posts.associateBy { it.id }
-            remoteOrder.mapNotNull { byId[it] }.filter(::allowed)
+            remoteOrder.mapNotNull { byId[it] }.filter(::matches)
         } else {
             visibleFeed(viewerId, mode, family).filter(::allowed)
         }

@@ -51,6 +51,7 @@ fun AnimalsScreen(
     onPetsMap: () -> Unit,
     onOpenAdoption: (String) -> Unit = {},
     onEditAdoption: (String) -> Unit = {},
+    onBack: (() -> Unit)? = null,
 ) {
     val db = LocalOgtDb.current
     val session = LocalOgtSession.current
@@ -76,7 +77,7 @@ fun AnimalsScreen(
         )
     }
     Column(Modifier.fillMaxSize().background(OgtColors.canvas).verticalScroll(rememberScrollState())) {
-        OgtTopBar(title = copy.petsTitle)
+        OgtTopBar(title = copy.petsTitle, onBack = onBack)
         ScreenColumn {
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),

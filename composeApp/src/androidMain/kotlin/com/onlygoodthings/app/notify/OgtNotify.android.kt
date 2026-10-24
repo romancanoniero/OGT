@@ -1,13 +1,17 @@
 package com.onlygoodthings.app.notify
 
 import android.Manifest
+import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -17,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -33,6 +38,7 @@ actual fun rememberOgtNotify(): OgtNotifyState {
     val context = LocalContext.current
     var granted by remember { mutableStateOf(notifyGranted(context)) }
     var token by remember { mutableStateOf<String?>(null) }
+    var asked by remember { mutableStateOf(false) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         granted = notifyGranted(context)
     }
@@ -44,18 +50,58 @@ actual fun rememberOgtNotify(): OgtNotifyState {
             token = it
         }
     }
+    fun ask(insist: Boolean) {
+        if (Build.VERSION.SDK_INT < 33) {
+            granted = true
+            return
+        }
+        if (notifyGranted(context)) {
+            granted = true
+            return
+        }
+        val activity = context.findActivity()
+        val rationale = activity != null && ActivityCompat.shouldShowRequestPermissionRationale(
+            activity,
+            Manifest.permission.POST_NOTIFICATIONS,
+        )
+        if (asked && !rationale) {
+            if (insist) openNotificationSettings(context)
+            return
+        }
+        asked = true
+        launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
     return OgtNotifyState(
         permissionGranted = granted,
         token = token,
         platform = "ANDROID",
-        requestPermission = {
-            if (Build.VERSION.SDK_INT >= 33) {
-                launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            } else {
-                granted = true
-            }
-        },
+        requestPermission = { ask(insist = false) },
+        retryPermission = { ask(insist = true) },
     )
+}
+
+private fun Context.findActivity(): Activity? {
+    var current: Context = this
+    while (current is ContextWrapper) {
+        if (current is Activity) return current
+        current = current.baseContext
+    }
+    return null
+}
+
+private fun openNotificationSettings(context: Context) {
+    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    runCatching { context.startActivity(intent) }.onFailure {
+        context.startActivity(
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", context.packageName, null)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+        )
+    }
 }
 
 actual fun showSystemNotice(notice: LocalNotification) {

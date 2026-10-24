@@ -26,6 +26,8 @@ import com.onlygoodthings.app.ui.components.ScreenColumn
 fun PermissionsScreen(
     onContinue: () -> Unit,
     onRequestNotify: () -> Unit = {},
+    onRetryNotify: () -> Unit = onRequestNotify,
+    notificationsGranted: Boolean = false,
     onBack: (() -> Unit)? = null,
 ) {
     LaunchedEffect(Unit) { onRequestNotify() }
@@ -43,8 +45,9 @@ fun PermissionsScreen(
                 PrefDivider()
                 PrefLine(
                     title = "Notificaciones",
-                    body = "Plazas, matches y menciones. De 22 a 7 se silencia solo.",
-                    trailing = "Tiempo real",
+                    body = "Plazas, matches y menciones. De 22 a 7 se silencia solo. Si las negaste, tocá de nuevo.",
+                    trailing = if (notificationsGranted) "Activo" else "Pedir",
+                    onClick = onRetryNotify,
                 )
                 PrefDivider()
                 PrefLine(
