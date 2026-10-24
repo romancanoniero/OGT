@@ -262,7 +262,10 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     img.alt = 'Foto de la publicación';
     img.draggable = false;
     img.src = url;
-    box.append(img);
+    const grid = node('div');
+    grid.className = 'crm-frame-grid';
+    grid.setAttribute('aria-hidden', 'true');
+    box.append(img, grid);
     let current = readFrame(frame);
     let drag = null;
     box.addEventListener('pointerdown', event => {
