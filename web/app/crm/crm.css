@@ -689,18 +689,6 @@ body[data-crm-view="app"] .crm-password-wrap { width: min(280px, 100%); }
   user-select: none;
   -webkit-user-drag: none;
 }
-.crm-frame-zoom {
-  display: flex;
-  gap: 4px;
-  margin: 8px 20px 0;
-}
-.crm-frame-zoom .crm-icon-btn { flex: none; width: 44px; height: 44px; }
-.crm-frame-zoom .crm-icon-btn img {
-  width: 40px;
-  height: 40px;
-  max-width: none;
-  object-fit: contain;
-}
 .crm-frame-save {
   width: auto;
   margin: 12px 20px 0;
