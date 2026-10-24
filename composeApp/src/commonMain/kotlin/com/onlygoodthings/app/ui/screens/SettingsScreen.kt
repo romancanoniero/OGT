@@ -1,27 +1,51 @@
 package com.onlygoodthings.app.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.onlygoodthings.app.data.LocalOgtSession
+import com.onlygoodthings.app.platform.rememberOgtMediaPicker
+import com.onlygoodthings.app.ui.components.OgtBottomSheet
+import com.onlygoodthings.shared.domain.MediaKind
+import com.onlygoodthings.app.resources.Res
+import com.onlygoodthings.app.resources.publish_action_add
+import org.jetbrains.compose.resources.painterResource
 import com.onlygoodthings.app.i18n.LocalOgtCopy
 import com.onlygoodthings.app.i18n.OgtLang
 import com.onlygoodthings.app.map.LocalOgtLocation
@@ -81,13 +105,35 @@ fun SettingsScreen(
             .fillMaxSize()
             .background(OgtColors.canvas)
             .verticalScroll(rememberScrollState())
-            .padding(bottom = if (showChrome) 0.dp else 88.dp),
+            .padding(bottom = 88.dp),
     ) {
-        if (showChrome) OgtTopBar(title = "Ajustes", onBack = onBack)
+        if (showChrome) OgtTopBar(title = "Ajustes", onBack = onBack, showProfileAvatar = false)
         ScreenColumn {
-            Text(me.displayName, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = OgtColors.ink)
-            if (!me.email.isNullOrBlank()) OgtCaption(me.email.orEmpty())
-            OgtCaption("${me.levelLabel} · ${me.communityPoints} pts")
+            ProfilePhotoEditor(me.photoUrl, me.id, me.displayName)
+            Text(
+                me.displayName,
+                fontWeight = FontWeight.Bold,
+                fontSize = 22.sp,
+                color = OgtColors.ink,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (!me.email.isNullOrBlank()) {
+                Text(
+                    me.email.orEmpty(),
+                    color = OgtColors.muted,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                )
+            }
+            Text(
+                "${me.levelLabel} · ${me.communityPoints} pts",
+                color = OgtColors.muted,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+            )
 
             PrefCategory(copy.languageTitle)
             PrefGroup {
@@ -255,5 +301,128 @@ fun SettingsScreen(
             OgtCaption("Only Good Things (OGT) v2.8.4")
             Spacer(Modifier.height(80.dp))
         }
+    }
+}
+
+/** Foto centrada. El origen se elige en un sheet, después de cerrarlo. */
+@Composable
+private fun ProfilePhotoEditor(photoUrl: String?, userId: String, displayName: String) {
+    val session = LocalOgtSession.current
+    var sheet by remember { mutableStateOf(false) }
+    var afterClose by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var pendingPick by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var photoError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(sheet, pendingPick) {
+        val action = pendingPick ?: return@LaunchedEffect
+        if (sheet) return@LaunchedEffect
+        pendingPick = null
+        action()
+    }
+    val picker = rememberOgtMediaPicker(1) { picked ->
+        if (picked.kind != MediaKind.IMAGE) {
+            photoError = "Elegí una foto"
+            return@rememberOgtMediaPicker
+        }
+        photoError = null
+        session.applyProfilePhoto(picked.path)
+    }
+    Column(
+        Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        val press = remember { MutableInteractionSource() }
+        val pressed by press.collectIsPressedAsState()
+        val scale by animateFloatAsState(
+            targetValue = if (pressed) OgtMotion.pressScale else 1f,
+            animationSpec = OgtMotion.press,
+            label = "profile-photo-press",
+        )
+        Box(
+            Modifier
+                .size(112.dp)
+                .scale(scale)
+                .clickable(interactionSource = press, indication = null) { sheet = true },
+            contentAlignment = Alignment.Center,
+        ) {
+            OgtNeighborAvatar(
+                userId = userId,
+                photoUrl = photoUrl,
+                contentDescription = displayName,
+                modifier = Modifier
+                    .size(104.dp)
+                    .clip(CircleShape)
+                    .border(1.dp, OgtColors.hairline, CircleShape),
+            )
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(OgtColors.canvas)
+                    .border(1.dp, OgtColors.hairline, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Image(
+                    painterResource(Res.drawable.publish_action_add),
+                    contentDescription = "Cambiar foto",
+                    modifier = Modifier.size(18.dp),
+                    contentScale = ContentScale.Fit,
+                )
+            }
+        }
+        if (!photoError.isNullOrBlank()) {
+            Text(
+                photoError.orEmpty(),
+                color = OgtColors.error,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+    }
+    if (sheet) {
+        OgtBottomSheet(onDismiss = {
+            pendingPick = afterClose
+            afterClose = null
+            sheet = false
+        }, maxHeight = 280.dp) { closer ->
+            ProfilePhotoSheetRow("Tomar foto") {
+                afterClose = { picker.takeCamera() }
+                closer.close()
+            }
+            Box(Modifier.fillMaxWidth().height(1.dp).background(OgtColors.hairline))
+            ProfilePhotoSheetRow("Biblioteca de fotos") {
+                afterClose = { picker.pickPhoto() }
+                closer.close()
+            }
+            Box(Modifier.fillMaxWidth().height(1.dp).background(OgtColors.hairline))
+            ProfilePhotoSheetRow("Cancelar", muted = true) { closer.close() }
+        }
+    }
+}
+
+@Composable
+private fun ProfilePhotoSheetRow(label: String, muted: Boolean = false, onClick: () -> Unit) {
+    val press = remember { MutableInteractionSource() }
+    val pressed by press.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) OgtMotion.pressScale else 1f,
+        animationSpec = OgtMotion.press,
+        label = "profile-sheet-row",
+    )
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .scale(scale)
+            .clickable(interactionSource = press, indication = null, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            fontWeight = if (muted) FontWeight.SemiBold else FontWeight.Medium,
+            fontSize = 16.sp,
+            color = if (muted) OgtColors.muted else OgtColors.ink,
+        )
     }
 }

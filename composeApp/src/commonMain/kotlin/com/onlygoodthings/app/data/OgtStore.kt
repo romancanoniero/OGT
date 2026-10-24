@@ -139,6 +139,17 @@ class OgtPreviewSession(
         prefs.locationScope = scope.prefCode()
     }
     fun me(): LocalUser = overlayUser ?: db.user(currentUserId)
+
+    /** La foto elegida en Ajustes se ve enseguida, antes de subirla. */
+    fun applyProfilePhoto(path: String) {
+        if (path.isBlank()) return
+        val local = if (path.startsWith("file:") || path.startsWith("http")) path else "file://$path"
+        val me = overlayUser ?: db.users.firstOrNull { it.id == currentUserId } ?: return
+        db.users.forEachIndexed { index, user ->
+            if (user.id == me.id) db.users[index] = user.copy(photoUrl = local)
+        }
+        overlayUser = me.copy(photoUrl = local)
+    }
     fun here(): GeoPoint? = deviceLocation
     /** Lugar fijado al estacionar (ESTACIONE), no un pin residual ni el GPS del perfil. */
     fun hasParkedPlace(): Boolean {
