@@ -6,6 +6,36 @@ function node(tag, text) {
   return el;
 }
 
+const FRAME_ZOOM_MIN = 1;
+const FRAME_ZOOM_MAX = 6;
+const FRAME_ZOOM_STEP = 1.2;
+
+function clampFrameZoom(zoom, snapToMin) {
+  if (!Number.isFinite(zoom) || zoom <= FRAME_ZOOM_MIN) return FRAME_ZOOM_MIN;
+  if (snapToMin && zoom <= FRAME_ZOOM_MIN + 0.02) return FRAME_ZOOM_MIN;
+  return Math.min(FRAME_ZOOM_MAX, zoom);
+}
+
+/**
+ * Rueda arriba (deltaY negativo) acerca. Rueda abajo aleja.
+ * El trackpad manda el mismo evento wheel; no hace falta pinza.
+ * El mínimo cubre el marco. El máximo es 6, el tope que ya guarda la API.
+ */
+export function frameWheelZoom(zoom, deltaY, deltaMode = 0) {
+  const current = clampFrameZoom(Number(zoom));
+  if (!deltaY) return current;
+  const notches = deltaMode === 1 ? deltaY : deltaMode === 2 ? deltaY * 4 : deltaY / 100;
+  const steps = Math.sign(notches) * Math.min(2, Math.abs(notches));
+  const factor = Math.pow(FRAME_ZOOM_STEP, -steps);
+  return clampFrameZoom(current * factor, factor < 1);
+}
+
+/** Un golpe de los botones Acercar / Alejar. direction > 0 acerca. */
+export function frameStepZoom(zoom, direction) {
+  const factor = direction < 0 ? 1 / FRAME_ZOOM_STEP : FRAME_ZOOM_STEP;
+  return clampFrameZoom(clampFrameZoom(Number(zoom)) * factor, direction < 0);
+}
+
 /** Icono de producto ya existente en Quiet Studio. Alt vacío: el texto vecino nombra la acción. */
 export function productIcon(file, className = 'crm-icon') {
   const img = node('img');
@@ -212,7 +242,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     const iw = img.naturalWidth;
     const ih = img.naturalHeight;
     if (!fw || !fh || !iw || !ih) return frame;
-    const zoom = Math.min(6, Math.max(1, frame.zoom || 1));
+    const zoom = clampFrameZoom(frame.zoom || FRAME_ZOOM_MIN);
     const cover = Math.max(fw / iw, fh / ih) * zoom;
     const dw = iw * cover;
     const dh = ih * cover;
@@ -241,7 +271,6 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     box.append(img);
     let current = readFrame(frame);
     let drag = null;
-    img.addEventListener('load', () => { current = placeInFrame(box, img, current); });
     box.addEventListener('pointerdown', event => {
       if (event.button !== 0 || event.target.closest('button')) return;
       drag = { id: event.pointerId, x: event.clientX, y: event.clientY, frame: current };
@@ -265,11 +294,28 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     };
     box.addEventListener('pointerup', endDrag);
     box.addEventListener('pointercancel', endDrag);
+    const zoomOut = iconButton('qs_zoom_out.png', 'Alejar');
+    const zoomIn = iconButton('qs_zoom_in.png', 'Acercar');
+    const zoomBar = node('div');
+    zoomBar.className = 'crm-frame-zoom';
+    zoomBar.append(zoomOut, zoomIn);
+    function paint(next) {
+      current = placeInFrame(box, img, next);
+      zoomOut.disabled = current.zoom <= FRAME_ZOOM_MIN + 0.001;
+      zoomIn.disabled = current.zoom >= FRAME_ZOOM_MAX - 0.001;
+    }
+    zoomIn.addEventListener('click', () => paint({ x: current.x, y: current.y, zoom: frameStepZoom(current.zoom, 1) }));
+    zoomOut.addEventListener('click', () => paint({ x: current.x, y: current.y, zoom: frameStepZoom(current.zoom, -1) }));
+    // La rueda no desplaza la página: preventDefault en captura, sobre la foto.
     box.addEventListener('wheel', event => {
       event.preventDefault();
-      const factor = event.deltaY < 0 ? 1.08 : 1 / 1.08;
-      current = placeInFrame(box, img, { x: current.x, y: current.y, zoom: current.zoom * factor });
-    }, { passive: false });
+      event.stopPropagation();
+      const next = frameWheelZoom(current.zoom, event.deltaY, event.deltaMode);
+      paint({ x: current.x, y: current.y, zoom: next });
+    }, { capture: true, passive: false });
+    img.addEventListener('load', () => paint(current));
+    if (img.complete && img.naturalWidth) requestAnimationFrame(() => paint(current));
+    wrap.append(zoomBar);
     if (typeof onSave === 'function') {
       const save = node('button', 'Guardar encuadre');
       save.type = 'button';
@@ -289,6 +335,8 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       wrap.append(save);
     }
     wrap.prepend(box);
+    zoomOut.disabled = current.zoom <= FRAME_ZOOM_MIN + 0.001;
+    zoomIn.disabled = current.zoom >= FRAME_ZOOM_MAX - 0.001;
     return wrap;
   }
   function cellNode(cell, onOpen) {

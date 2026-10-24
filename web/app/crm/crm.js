@@ -1,4 +1,4 @@
-import { start } from './crm-runtime.js?v=frame-2';
+import { start } from './crm-runtime.js?v=zoom-1';
 
 start().catch(() => {
   document.body.dataset.crmView = 'auth';

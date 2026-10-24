@@ -15,6 +15,8 @@ Leyenda: **OK** cumple · **FONDO** es 3D pero el lienzo no es blanco · **2D** 
 | `parking_sign_plate` | Señal P de parking | Clay 3D | Blanco | OK |
 | `anecdote_action` | Anécdota / relato en homenaje | Clay 3D | Transparente (PNG alfa) | OK |
 | `qs_trash` | Quitar / tacho de basura | Clay 3D | Transparente (PNG alfa) | OK |
+| `qs_zoom_in` | Acercar el encuadre (lupa, cristal navy) | Clay 3D | Transparente (PNG alfa) | OK |
+| `qs_zoom_out` | Alejar el encuadre (lupa, cristal claro) | Clay 3D | Transparente (PNG alfa) | OK |
 | `avatar_anonymous` | Busto anónimo sin cara, cuando el usuario no tiene foto | Clay 3D | Transparente (PNG alfa) | OK |
 | `authorship_reassign` | Cambiar la autoría de una publicación | Clay 3D | Transparente (PNG alfa) | OK |
 | `publish_action_add` | Placeholder de media | Clay 3D | Transparente (PNG alfa) | OK |
