@@ -103,18 +103,13 @@ fun OgtPostImage(
         }
         Box(modifier.clipToBounds().background(OgtColors.sand), contentAlignment = Alignment.Center) {
             if (ready != null) {
-                // Sin frame, el archivo ya es el JPEG del marco: no se vuelve a cubrir.
-                val hasFrame = frameX != null && frameY != null && ready.width > 0 && ready.height > 0
+                // Grilla 16:9. Cubre y recorta. Sin encuadre, el centro. Con encuadre, ese punto.
                 Image(
                     bitmap = ready,
                     contentDescription = contentDescription,
-                    modifier = if (hasFrame) {
-                        Modifier.feedFrame(ready.width, ready.height, frameX, frameY, frameZoom)
-                    } else {
-                        Modifier.fillMaxSize()
-                    },
+                    modifier = Modifier.feedFrame(ready.width, ready.height, frameX, frameY, frameZoom),
                     alignment = Alignment.Center,
-                    contentScale = if (hasFrame) ContentScale.FillBounds else contentScale,
+                    contentScale = ContentScale.FillBounds,
                 )
             } else if (!loading) {
                 val painter = painterResource(if (assetKey.isBlank()) fallback else seedDrawable(assetKey))

@@ -689,6 +689,34 @@ body[data-crm-view="app"] .crm-password-wrap { width: min(280px, 100%); }
   user-select: none;
   -webkit-user-drag: none;
 }
+/* Líneas del marco 16:9. Quedan sobre la foto y no comen el arrastre ni la rueda. */
+.crm-frame-grid {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--ogt-on-primary) 90%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ogt-charcoal) 50%, transparent);
+  background-image:
+    linear-gradient(to right,
+      transparent calc(33.333% - 0.5px),
+      color-mix(in srgb, var(--ogt-charcoal) 55%, transparent) calc(33.333% - 0.5px),
+      color-mix(in srgb, var(--ogt-charcoal) 55%, transparent) calc(33.333% + 0.5px),
+      transparent calc(33.333% + 0.5px),
+      transparent calc(66.666% - 0.5px),
+      color-mix(in srgb, var(--ogt-charcoal) 55%, transparent) calc(66.666% - 0.5px),
+      color-mix(in srgb, var(--ogt-charcoal) 55%, transparent) calc(66.666% + 0.5px),
+      transparent calc(66.666% + 0.5px)),
+    linear-gradient(to bottom,
+      transparent calc(33.333% - 0.5px),
+      color-mix(in srgb, var(--ogt-on-primary) 88%, transparent) calc(33.333% - 0.5px),
+      color-mix(in srgb, var(--ogt-on-primary) 88%, transparent) calc(33.333% + 0.5px),
+      transparent calc(33.333% + 0.5px),
+      transparent calc(66.666% - 0.5px),
+      color-mix(in srgb, var(--ogt-on-primary) 88%, transparent) calc(66.666% - 0.5px),
+      color-mix(in srgb, var(--ogt-on-primary) 88%, transparent) calc(66.666% + 0.5px),
+      transparent calc(66.666% + 0.5px));
+}
 .crm-frame-save {
   width: auto;
   margin: 12px 20px 0;

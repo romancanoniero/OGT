@@ -119,6 +119,7 @@ import com.onlygoodthings.shared.data.local.OgtIds
 import com.onlygoodthings.shared.domain.FeedCardKind
 import com.onlygoodthings.shared.domain.FeedEventKind
 import com.onlygoodthings.shared.domain.MediaKind
+import com.onlygoodthings.shared.domain.POST_FRAME_RATIO
 import com.onlygoodthings.shared.domain.anecdoteShareText
 import com.onlygoodthings.shared.domain.canEditSocialPost
 import com.onlygoodthings.shared.domain.canRsvpToGathering
@@ -1304,18 +1305,11 @@ private fun DetailMedia(
         )
         return
     }
-    val ratios = remember { mutableStateMapOf<String, Float>() }
     val pager = rememberPagerState { media.size }
-    val known = media.getOrNull(pager.currentPage)?.id?.let { ratios[it] }
-    val frame by animateFloatAsState(
-        targetValue = known ?: 1f,
-        animationSpec = OgtMotion.layout,
-        label = "ficha-foto",
-    )
     Box(
         Modifier
             .ogtBleedHorizontal(OgtDimens.margin)
-            .aspectRatio(frame.coerceIn(0.25f, 3f)),
+            .aspectRatio(POST_FRAME_RATIO),
     ) {
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { media[it].let { item -> "${item.id}:${item.url}" } }) { page ->
             val item = media[page]
@@ -1329,8 +1323,7 @@ private fun DetailMedia(
                     fallback = Res.drawable.feed_story_donacion,
                     contentDescription = item.altText ?: tag,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit,
-                    onAspect = { ratio -> ratios[item.id] = ratio },
+                    contentScale = ContentScale.Crop,
                 )
                 if (item.kind == MediaKind.VIDEO) {
                     Box(
