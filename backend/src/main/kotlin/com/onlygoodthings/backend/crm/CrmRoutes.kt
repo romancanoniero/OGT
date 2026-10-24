@@ -67,9 +67,24 @@ data class CrmVisiblePost(
 )
 
 @Serializable
+data class CrmPostSuggestion(
+    val id: String,
+    val authorName: String,
+    val text: String,
+)
+
+@Serializable
+data class CrmSearchSuggestions(
+    val authors: List<String> = emptyList(),
+    val posts: List<CrmPostSuggestion> = emptyList(),
+)
+
+@Serializable
 data class CrmVisiblePostPage(
     val posts: List<CrmVisiblePost>,
     val nextCursor: String? = null,
+    /** Autores y publicaciones mientras se escribe. Null en la página siguiente. */
+    val suggestions: CrmSearchSuggestions? = null,
 )
 
 @Serializable
@@ -730,6 +745,13 @@ internal fun crmLikeContains(raw: String): String {
     return "%$escaped%"
 }
 
+/** Texto corto de una sugerencia de publicación. */
+internal fun crmSuggestText(body: String?): String {
+    val clean = body.orEmpty().replace(Regex("\\s+"), " ").trim()
+    if (clean.length <= 90) return clean
+    return clean.take(87).trimEnd() + "…"
+}
+
 internal fun crmPostCursor(createdAtEpochMilli: Long, id: String): String = "$createdAtEpochMilli|$id"
 
 internal fun parseCrmPostCursor(raw: String): Pair<Long, String>? {
@@ -876,40 +898,55 @@ WHERE id = ?::uuid AND moderation_status = 'VISIBLE'
 
 private const val CRM_POST_PAGE = 20
 
+/**
+ * La consulta sale de `crm_publication_index`.
+ * El rótulo de la app no abre el listado salvo que la búsqueda lo pida.
+ */
+internal const val CRM_INDEX_MATCH = """
+EXISTS (
+  SELECT 1 FROM crm_publication_index ix
+  WHERE ix.post_id = p.id
+    AND ix.origin <> 'label'
+    AND ix.value ILIKE ? ESCAPE '\'
+)
+"""
+
+/** Igual que [CRM_INDEX_MATCH], incluyendo el rótulo «Alguien de la comunidad». */
+internal const val CRM_INDEX_MATCH_WITH_LABEL = """
+EXISTS (
+  SELECT 1 FROM crm_publication_index ix
+  WHERE ix.post_id = p.id
+    AND ix.value ILIKE ? ESCAPE '\'
+)
+"""
+
+internal const val CRM_INDEX_SUGGEST = """
+SELECT DISTINCT value
+FROM crm_publication_index
+WHERE origin = ?
+  AND value ILIKE ? ESCAPE '\'
+ORDER BY value
+LIMIT 8
+"""
+
 private fun searchVisiblePosts(
     conn: Connection,
     query: String,
     cursor: Pair<Long, String>?,
 ): CrmVisiblePostPage {
+    val includeLabel = query.isNotEmpty() && crmQueryUsesAppLabel(query)
     val sql = buildString {
         append(CRM_VISIBLE_POST_SEARCH.trim())
-        if (query.isNotEmpty() && !crmQueryUsesAppLabel(query)) {
-            append(
-                """
-                 AND (
-                   p.body ILIKE ? ESCAPE '\'
-                   OR COALESCE(u.display_name, '') ILIKE ? ESCAPE '\'
-                   OR COALESCE(u.email::text, '') ILIKE ? ESCAPE '\'
-                   OR COALESCE(c.trade_name, '') ILIKE ? ESCAPE '\'
-                   OR COALESCE(c.legal_name, '') ILIKE ? ESCAPE '\'
-                   OR COALESCE(p.topic, '') ILIKE ? ESCAPE '\'
-                   OR COALESCE(photo.alt_text, '') ILIKE ? ESCAPE '\'
-                   OR p.id::text ILIKE ? ESCAPE '\'
-                   OR COALESCE(p.author_user_id::text, '') ILIKE ? ESCAPE '\'
-                   OR COALESCE(NULLIF(btrim(u.display_name), ''), NULLIF(btrim(c.trade_name), ''), NULLIF(btrim(c.legal_name), ''), 'Alguien de la comunidad') ILIKE ? ESCAPE '\'
-                 )
-                """.trimIndent()
-            )
+        if (query.isNotEmpty()) {
+            append(" AND ")
+            append(if (includeLabel) CRM_INDEX_MATCH_WITH_LABEL else CRM_INDEX_MATCH)
         }
         if (cursor != null) append(" AND (p.created_at, p.id) < (?::timestamptz, ?::uuid)")
         append(" ORDER BY p.created_at DESC, p.id DESC LIMIT ${CRM_POST_PAGE + 1}")
     }
-    val rows = conn.prepareStatement(sql).use { stmt ->
+    val rows = conn.prepareStatement(sql.trim()).use { stmt ->
         var index = 1
-        if (query.isNotEmpty() && !crmQueryUsesAppLabel(query)) {
-            val pattern = crmLikeContains(query)
-            repeat(10) { stmt.setString(index++, pattern) }
-        }
+        if (query.isNotEmpty()) stmt.setString(index++, crmLikeContains(query))
         if (cursor != null) {
             stmt.setTimestamp(index++, Timestamp.from(Instant.ofEpochMilli(cursor.first)))
             stmt.setString(index, cursor.second)
@@ -929,7 +966,34 @@ private fun searchVisiblePosts(
         val last = page.last()
         crmPostCursor(Instant.parse(last.createdAt).toEpochMilli(), last.id)
     } else null
-    return CrmVisiblePostPage(posts = page, nextCursor = next)
+    val suggestions = if (query.isEmpty() || cursor != null) null else CrmSearchSuggestions(
+        authors = suggestIndexedNames(conn, query, includeLabel),
+        posts = page.take(6).map { post ->
+            CrmPostSuggestion(id = post.id, authorName = post.authorName, text = crmSuggestText(post.body))
+        },
+    )
+    return CrmVisiblePostPage(posts = page, nextCursor = next, suggestions = suggestions)
+}
+
+/** Nombres distintos del índice. El rótulo solo si la consulta lo pide. */
+private fun suggestIndexedNames(conn: Connection, query: String, includeLabel: Boolean): List<String> {
+    val pattern = crmLikeContains(query)
+    val names = linkedSetOf<String>()
+    names.addAll(suggestOrigin(conn, "author", pattern))
+    if (includeLabel) names.addAll(suggestOrigin(conn, "label", pattern))
+    return names.filter { it.isNotBlank() }.sortedWith(String.CASE_INSENSITIVE_ORDER).take(8)
+}
+
+private fun suggestOrigin(conn: Connection, origin: String, pattern: String): List<String> {
+    return conn.prepareStatement(CRM_INDEX_SUGGEST.trim()).use { stmt ->
+        stmt.setString(1, origin)
+        stmt.setString(2, pattern)
+        stmt.executeQuery().use { rs ->
+            buildList {
+                while (rs.next()) add(rs.getString(1))
+            }
+        }
+    }
 }
 
 private fun searchActiveUsers(conn: Connection, query: String): List<CrmUserPick> {

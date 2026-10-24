@@ -1,4 +1,4 @@
-import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn } from './crm-core.js?v=frame-2';
+import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn } from './crm-core.js?v=suggest-1';
 import { createIdentity } from './crm-auth.js?v=tacho-1';
 
 const controlSections = [
@@ -130,7 +130,7 @@ export async function start() {
   fields.append(factorLabel, begin, recaptcha, codeLabel, verify, cancel);
   challenge.append(fields); login.insertAdjacentElement('afterend', challenge);
   // El shell viaja en paralelo con Firebase. El ingreso no lo espera para pintar.
-  const workspaceReady = import('./crm-ui.js?v=frame-2');
+  const workspaceReady = import('./crm-ui.js?v=suggest-1');
   const [appSdk, sdk] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),
@@ -325,6 +325,21 @@ export async function start() {
         } catch (_) { return ''; }
         return value;
       }
+      function publicationSuggestions(raw) {
+        const authors = Array.isArray(raw?.authors)
+          ? raw.authors.filter(name => typeof name === 'string' && name.trim())
+          : [];
+        const posts = Array.isArray(raw?.posts)
+          ? raw.posts.filter(post => post && typeof post.id === 'string' && post.id).map(post => ({
+              id: post.id,
+              authorName: typeof post.authorName === 'string' && post.authorName.trim()
+                ? post.authorName
+                : 'Alguien de la comunidad',
+              text: typeof post.text === 'string' ? post.text : '',
+            }))
+          : [];
+        return { authors, posts };
+      }
       const postListing = {
             placeholder: 'Autor, texto, tema o id',
             searchLabel: 'Buscar publicación',
@@ -336,7 +351,7 @@ export async function start() {
               ? 'Ninguna publicación visible coincide con la búsqueda.'
               : 'No tenés permiso para administrar publicaciones.',
             async load(query, cursor) {
-              if (!canPosts) return { items: [], nextCursor: null };
+              if (!canPosts) return { items: [], nextCursor: null, suggestions: null };
               const body = { query };
               if (cursor) body.cursor = cursor;
               const data = await api('platform/posts/search', token, body, task.signal);
@@ -344,6 +359,7 @@ export async function start() {
               return {
                 items: posts.filter(post => post && post.status === 'VISIBLE' && post.id),
                 nextCursor: data.nextCursor || null,
+                suggestions: cursor ? null : publicationSuggestions(data.suggestions),
               };
             },
             present(post) {

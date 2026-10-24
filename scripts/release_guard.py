@@ -20,6 +20,7 @@ REQUIRED = (
     "database/migrations/23_crm_foundations.sql",
     "database/migrations/24_post_media_frame.sql",
     "database/migrations/25_post_media_original.sql",
+    "database/migrations/26_crm_publication_index.sql",
 )
 
 

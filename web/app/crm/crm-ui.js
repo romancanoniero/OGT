@@ -109,7 +109,15 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   search.className = 'crm-input';
   search.placeholder = 'Buscar indicador';
   search.setAttribute('aria-label', 'Buscar indicador');
-  searchLabel.append(productIcon('qs_lupa.svg', 'crm-field-icon'), search);
+  const suggestBox = node('div');
+  suggestBox.id = 'crm-suggest';
+  suggestBox.className = 'crm-suggest-box';
+  suggestBox.hidden = true;
+  suggestBox.setAttribute('role', 'listbox');
+  suggestBox.setAttribute('aria-label', 'Sugerencias');
+  search.setAttribute('aria-autocomplete', 'list');
+  search.setAttribute('aria-controls', 'crm-suggest');
+  searchLabel.append(productIcon('qs_lupa.svg', 'crm-field-icon'), search, suggestBox);
   tools.append(searchLabel);
 
   const kpis = node('div');
@@ -388,7 +396,59 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     bulkBar.replaceChildren();
     bulkBar.hidden = true;
   }
+  function paintSuggestions(next) {
+    suggestBox.replaceChildren();
+    const authors = Array.isArray(next?.authors)
+      ? next.authors.filter(name => typeof name === 'string' && name.trim())
+      : [];
+    const posts = Array.isArray(next?.posts)
+      ? next.posts.filter(post => post && typeof post.id === 'string' && post.id)
+      : [];
+    if (!query.trim() || (!authors.length && !posts.length)) {
+      suggestBox.hidden = true;
+      return;
+    }
+    const group = (title, rows) => {
+      const caption = node('p', title);
+      caption.className = 'crm-suggest-label';
+      suggestBox.append(caption);
+      for (const row of rows) suggestBox.append(row);
+    };
+    if (authors.length) {
+      group('Autores', authors.map(name => {
+        const button = node('button', name);
+        button.type = 'button';
+        button.className = 'crm-suggest';
+        button.setAttribute('role', 'option');
+        button.addEventListener('click', () => chooseSuggestion(name));
+        return button;
+      }));
+    }
+    if (posts.length) {
+      group('Publicaciones', posts.map(post => {
+        const button = node('button');
+        button.type = 'button';
+        button.className = 'crm-suggest';
+        button.setAttribute('role', 'option');
+        button.append(
+          node('strong', post.authorName || 'Alguien de la comunidad'),
+          node('span', post.text || ''),
+        );
+        button.addEventListener('click', () => chooseSuggestion(post.id));
+        return button;
+      }));
+    }
+    suggestBox.hidden = false;
+  }
+  function chooseSuggestion(value) {
+    search.value = value;
+    query = value;
+    window.clearTimeout(listTimer);
+    const listing = listingOf(current);
+    if (listing) void loadListing(listing, true);
+  }
   function showMetricMode() {
+    paintSuggestions(null);
     clearBulk();
     entityWrap.hidden = true;
     more.hidden = true;
@@ -401,6 +461,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     const ticket = ++listTicket;
     listLoading = true;
     if (reset) { listItems = []; listCursor = null; selectedKey = null; }
+    if (reset && !query.trim()) paintSuggestions(null);
     renderListing(listing);
     try {
       const page = await listing.load(query.trim(), reset ? null : listCursor);
@@ -409,10 +470,12 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       listItems = reset ? incoming : listItems.concat(incoming);
       listCursor = page?.nextCursor || null;
       listError.hidden = true;
+      if (reset) paintSuggestions(page?.suggestions);
     } catch (error) {
       if (ticket !== listTicket || error?.code === 'ABORTED') return;
       listError.textContent = 'No se pudo actualizar el listado.';
       listError.hidden = false;
+      if (reset) paintSuggestions(null);
     } finally {
       if (ticket === listTicket) listLoading = false;
     }

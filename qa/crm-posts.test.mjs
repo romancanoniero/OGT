@@ -43,12 +43,12 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   const html = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\.svg', view: 'listing'/);
   assert.doesNotMatch(runtime, /id: 'publicaciones'[^}]*keys:/);
-  assert.match(runtime, /crm-ui\.js\?v=frame-2/);
-  assert.match(html, /crm\.js\?v=frame-2/);
+  assert.match(runtime, /crm-ui\.js\?v=suggest-1/);
+  assert.match(html, /crm\.js\?v=suggest-1/);
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
   assert.match(runtime, /publicationImage\(post\.editorUrl\)/);
   assert.match(runtime, /imageUrl: saved\.imageUrl/);
-  assert.match(html, /crm\.css\?v=frame-2/);
+  assert.match(html, /crm\.css\?v=suggest-1/);
   assert.match(runtime, /icon: 'qs_trash\.png', label: 'Quitar selección'/);
   assert.match(runtime, /platform\/posts\/reassign/);
   assert.match(runtime, /platform\/users\/search/);
@@ -120,6 +120,24 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   assert.match(ui, /search\.addEventListener\('input'/);
   assert.match(ui, /setTimeout\(\(\) => \{ void loadListing\(listing, true\); \}, 280\)/);
   assert.doesNotMatch(ui, /search\.addEventListener\('keydown'/);
+  assert.match(ui, /function paintSuggestions/);
+  assert.match(ui, /group\('Autores'/);
+  assert.match(ui, /group\('Publicaciones'/);
+  assert.match(ui, /crm-suggest/);
+  assert.match(runtime, /function publicationSuggestions/);
+  assert.match(runtime, /suggestions: cursor \? null : publicationSuggestions\(data\.suggestions\)/);
+  assert.match(css, /\.crm-suggest-box:not\(\[hidden\]\) \{ display: flex; \}/);
+  const routes = readFileSync(new URL('../backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmRoutes.kt', import.meta.url), 'utf8');
+  assert.match(routes, /crm_publication_index/);
+  assert.match(routes, /CRM_INDEX_MATCH/);
+  assert.doesNotMatch(routes, /repeat\(10\)/);
+  const indexSql = readFileSync(new URL('../database/migrations/26_crm_publication_index.sql', import.meta.url), 'utf8');
+  for (const origin of ['author', 'label', 'topic', 'body', 'photo', 'id']) {
+    assert.match(indexSql, new RegExp(`'${origin}'`));
+  }
+  assert.match(indexSql, /gin_trgm_ops/);
+  assert.match(indexSql, /status IS DISTINCT FROM 'VISIBLE'/);
+  assert.doesNotMatch(indexSql, /DELETE FROM social_posts/);
 });
 
 test('la rueda del CRM web acerca arriba y aleja abajo', () => {
@@ -147,8 +165,8 @@ test('la rueda del CRM web acerca arriba y aleja abajo', () => {
   assert.match(css, /\.crm-frame \{[^}]*overscroll-behavior: none/s);
   const empresas = readFileSync(new URL('../web/app/crm/empresas/index.html', import.meta.url), 'utf8');
   const control = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
-  assert.match(empresas, /crm\.js\?v=frame-2/);
-  assert.match(control, /crm\.js\?v=frame-2/);
+  assert.match(empresas, /crm\.js\?v=suggest-1/);
+  assert.match(control, /crm\.js\?v=suggest-1/);
   assert.doesNotMatch(css, /crm-frame-zoom/);
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_in.png', import.meta.url)));
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_out.png', import.meta.url)));

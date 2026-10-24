@@ -49,6 +49,20 @@ class CrmPostPolicyTest {
         assertNull(crmPostImageUrl("file:///tmp/foto.jpg"))
     }
 
+    @Test fun publicationSearchReadsTheIndex() {
+        assertTrue(CRM_INDEX_MATCH.contains("crm_publication_index"))
+        assertTrue(CRM_INDEX_MATCH.contains("origin <> 'label'"))
+        assertTrue(CRM_INDEX_MATCH_WITH_LABEL.contains("crm_publication_index"))
+        assertFalse(CRM_INDEX_MATCH_WITH_LABEL.contains("origin <> 'label'"))
+        assertTrue(CRM_INDEX_SUGGEST.contains("origin = ?"))
+        assertFalse(CRM_INDEX_MATCH.contains("REMOVED"))
+        assertFalse(CRM_INDEX_MATCH.contains("DELETE"))
+        assertEquals("Don Héctor", crmSuggestText("  Don   Héctor  "))
+        val long = "a".repeat(120)
+        assertEquals(88, crmSuggestText(long).length)
+        assertTrue(crmSuggestText(long).endsWith("…"))
+    }
+
     @Test fun likePatternDoesNotTreatOperatorTextAsWildcards() {
         assertEquals("%plaza%", crmLikeContains("plaza"))
         assertEquals("%100\\%\\_off%", crmLikeContains("100%_off"))

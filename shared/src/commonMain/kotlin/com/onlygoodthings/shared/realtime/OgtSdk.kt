@@ -18,7 +18,8 @@ object OgtSdk {
         persistenceDir: String? = null,
     ): DbDatabase = startZeroArg(
         gatewayEndpoint = gatewayEndpoint,
-        tokenProvider = tokenProvider,
+        // El SDK fijado pide el token sin bandera. El refresh queda en el proveedor de la app.
+        tokenProvider = { tokenProvider(false) },
         persistenceDir = persistenceDir,
     )
 
@@ -27,15 +28,11 @@ object OgtSdk {
         gatewayEndpoint: String,
         tokenProvider: suspend () -> String?,
         persistenceDir: String? = null,
-    ): DbDatabase = startZeroArg(
-        gatewayEndpoint,
-        tokenProvider = { _ -> tokenProvider() },
-        persistenceDir,
-    )
+    ): DbDatabase = startZeroArg(gatewayEndpoint, tokenProvider, persistenceDir)
 
     private fun startZeroArg(
         gatewayEndpoint: String,
-        tokenProvider: suspend (forceRefresh: Boolean) -> String?,
+        tokenProvider: suspend () -> String?,
         persistenceDir: String?,
     ): DbDatabase {
         if (!DbApp.isInitialized()) {
