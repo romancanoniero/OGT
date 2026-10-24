@@ -413,7 +413,12 @@ img { max-width: 100%; }
   font-weight: 700;
 }
 .crm-kpi-figure-text { font-size: 18px; letter-spacing: -0.02em; }
-.crm-panel { padding: 8px 8px 12px; }
+/* La card no estira la página: si la fila no entra, se desplaza adentro. */
+.crm-panel {
+  padding: 8px 8px 12px;
+  min-width: 0;
+  max-width: 100%;
+}
 .crm-panel h3, .crm-detail h3 {
   margin: 12px 12px 4px;
   font-size: 16px;
@@ -474,9 +479,14 @@ img { max-width: 100%; }
 .crm-assign-hit[aria-pressed="true"] { background: var(--ogt-sand); }
 .crm-subhead { justify-content: flex-start; margin-top: 16px; font-weight: 600; }
 .crm-subhead img { width: 20px; height: 20px; }
-.crm-table-wrap { overflow-x: auto; max-width: 100%; }
+.crm-table-wrap {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  max-width: 100%;
+  min-width: 0;
+}
 .crm-table { width: 100%; border-collapse: collapse; text-align: left; }
-/* La última columna mide lo que piden los íconos. Si no entra, el listado se desplaza. */
+/* La última columna mide lo que piden los íconos. Si no entra, se desplaza la card. */
 .crm-table td:has(.crm-actions) {
   width: 1%;
   white-space: nowrap;
