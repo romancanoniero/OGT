@@ -383,7 +383,25 @@ span.avatar svg { width: 18px; height: 18px; }
 .who { font-weight: 600; }
 .meta { color: var(--muted); font-size: 13px; }
 .body { font-size: 16px; line-height: 24px; margin: 0 0 12px; white-space: pre-wrap; }
-.media { width: 100%; border-radius: 4px; display: block; background: var(--sand); max-height: 720px; object-fit: cover; }
+/* Foto de la publicación: ancho de la tarjeta, sin margen lateral. En la ficha se ve entera. */
+.media {
+  display: block;
+  width: calc(100% + 40px);
+  max-width: none;
+  height: auto;
+  margin-left: -20px;
+  margin-right: -20px;
+  border-radius: 0;
+  object-fit: contain;
+  object-position: center center;
+  background: transparent;
+}
+.post.open .media {
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  object-position: center center;
+  background: var(--sand);
+}
 .actions { display: flex; gap: 8px; margin-top: 12px; }
 .act {
   width: 44px; height: 44px; border-radius: 999px; border: 1px solid var(--hairline);
@@ -659,6 +677,7 @@ span.avatar svg { width: 18px; height: 18px; }
   width: 96px;
   height: 96px;
   object-fit: cover;
+  object-position: center center;
   border-radius: 10px;
   background: var(--sand);
 }
@@ -853,6 +872,7 @@ span.avatar svg { width: 18px; height: 18px; }
   width: 72px;
   height: 72px;
   object-fit: cover;
+  object-position: center center;
   border-radius: 12px;
   background: var(--sand);
 }

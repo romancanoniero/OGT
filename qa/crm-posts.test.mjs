@@ -61,8 +61,15 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   assert.ok(photo);
   assert.match(photo[0], /width: 120px/);
   assert.match(photo[0], /height: 72px/);
-  assert.match(photo[0], /object-fit: contain/);
-  assert.doesNotMatch(photo[0], /cover/);
+  assert.match(photo[0], /object-fit: cover/);
+  assert.match(photo[0], /object-position: center center/);
+  const ficha = css.match(/\.crm-dialog-photo \{[^}]+\}/);
+  assert.ok(ficha);
+  assert.match(ficha[0], /width: calc\(100% \+ 40px\)/);
+  assert.match(ficha[0], /max-width: none/);
+  assert.match(ficha[0], /height: auto/);
+  assert.match(ficha[0], /object-fit: contain/);
+  assert.doesNotMatch(ficha[0], /max-height/);
   assert.match(ui, /className = 'crm-actions'/);
   const actions = css.match(/\.crm-actions \{[^}]+\}/);
   assert.ok(actions);

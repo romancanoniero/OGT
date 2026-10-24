@@ -1238,11 +1238,11 @@ private fun ListingPhotoStrip(
 ) {
     val pageCount = media.size.coerceAtLeast(1)
     val pager = rememberPagerState { pageCount }
+    // Marco fijo de la tarjeta: recorte al centro, de borde a borde.
     Box(
         Modifier
-            .fillMaxWidth()
-            .aspectRatio(16f / 9f)
-            .clip(RoundedCornerShape(12.dp)),
+            .ogtBleedHorizontal(12.dp)
+            .aspectRatio(16f / 9f),
     ) {
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { media.getOrNull(it)?.id ?: it }) { page ->
             val item = media.getOrNull(page)
@@ -1253,6 +1253,7 @@ private fun ListingPhotoStrip(
                         fallback = fallback,
                         contentDescription = item.altText,
                         modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
                     )
                 } else {
                     Image(
@@ -1526,6 +1527,7 @@ private fun PostMediaPager(
     val items = media.ifEmpty { emptyList() }
     val pageCount = items.size.coerceAtLeast(1)
     val pagerState = rememberPagerState { pageCount }
+    // Miniatura del feed: alto fijo 16:9, recorte al centro, ancho de la tarjeta.
     Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize(), key = { items.getOrNull(it)?.id ?: it }) { page ->
             val item = items.getOrNull(page)
@@ -1536,6 +1538,7 @@ private fun PostMediaPager(
                         fallback = fallback,
                         contentDescription = item.altText ?: tag,
                         modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
                     )
                 } else {
                     Image(
