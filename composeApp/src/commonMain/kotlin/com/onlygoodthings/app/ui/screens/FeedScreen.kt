@@ -345,11 +345,12 @@ fun FeedScreen(
                 val look = postLook(post, followed, db.authorName(post))
                 val listing = remember(post.id, lostTick) { post.listingId?.let { id -> db.animals.firstOrNull { it.id == id } } }
                 val comments = remember(post.id, socialTick) { db.commentsOf(post.id) }
+                val media = remember(post.id, socialTick) { db.mediaOf(post.id) }
                 val kind = feedCardKind(post.tag, listing?.kind, post.sourceUrl)
                 NeighborPostCard(
                     post = post.copy(commentCount = maxOf(post.commentCount, comments.size)),
                     profile = look,
-                    media = db.mediaOf(post.id),
+                    media = media,
                     listing = listing,
                     kind = kind,
                     discovery = db.isDiscovery(me.id, post),
@@ -1245,7 +1246,10 @@ private fun ListingPhotoStrip(
             .ogtBleedHorizontal(12.dp)
             .aspectRatio(POST_FRAME_RATIO),
     ) {
-        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { media.getOrNull(it)?.id ?: it }) { page ->
+        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { pageIndex ->
+            val item = media.getOrNull(pageIndex)
+            if (item == null) pageIndex else "${item.id}:${item.url}"
+        }) { page ->
             val item = media.getOrNull(page)
             Box(Modifier.fillMaxSize().clickable(onClick = onOpen)) {
                 if (item != null) {
@@ -1530,7 +1534,10 @@ private fun PostMediaPager(
     val pagerState = rememberPagerState { pageCount }
     // Miniatura del feed: alto fijo 16:9, recorte al centro, ancho de la tarjeta.
     Box(Modifier.fillMaxWidth().aspectRatio(POST_FRAME_RATIO)) {
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize(), key = { items.getOrNull(it)?.id ?: it }) { page ->
+        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize(), key = { pageIndex ->
+            val item = items.getOrNull(pageIndex)
+            if (item == null) pageIndex else "${item.id}:${item.url}"
+        }) { page ->
             val item = items.getOrNull(page)
             Box(Modifier.fillMaxSize().clickable(onClick = onOpen)) {
                 if (item != null) {

@@ -549,6 +549,7 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: Realtime
         }
         if (source.displayUrl != source.editorUrl) media.deleteLocal(source.displayUrl)
         val counts = db.withConnection { conn -> postLiveCounts(conn, saved.id) }
+        val photo = saved.imageUrl
         hub.projectSocialPost(
             saved.id,
             WsCodec.json.encodeToString(
@@ -560,7 +561,9 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: Realtime
                     frameX = saved.frameX,
                     frameY = saved.frameY,
                     frameZoom = saved.frameZoom,
-                    imageUrl = saved.imageUrl,
+                    url = photo,
+                    mediaUrls = listOfNotNull(photo),
+                    imageUrl = photo,
                 ),
             ),
         )

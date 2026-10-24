@@ -159,7 +159,7 @@ fun NeighborProfileScreen(
             posts.chunked(3).forEach { row ->
                 Row(Modifier.fillMaxWidth()) {
                     row.forEach { post ->
-                        val media = db.mediaOf(post.id).firstOrNull()
+                        val media = remember(post.id, socialTick) { db.mediaOf(post.id).firstOrNull() }
                         Box(
                             Modifier.weight(1f).aspectRatio(1f).padding(1.dp).clickable { onOpenPost(post.id) },
                         ) {

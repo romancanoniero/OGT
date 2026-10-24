@@ -111,9 +111,13 @@ data class SocialLiveCounters(
     val frameY: Double? = null,
     val frameZoom: Double? = null,
     /**
-     * JPEG ya recortado al marco. La dirección cambia en cada guardado
-     * para que la caché no siga sirviendo la foto anterior.
+     * JPEG ya recortado. Mismo nombre que `PostMediaItem.url`, que es lo que pinta la foto.
+     * Cambia en cada guardado para que la caché no sirva el archivo anterior.
      */
+    val url: String? = null,
+    /** Misma lista que la tarjeta. El primer elemento es el JPEG visible. */
+    val mediaUrls: List<String> = emptyList(),
+    /** Alias del mismo JPEG. Lo lee el cliente que ya conocía este nombre. */
     val imageUrl: String? = null,
 ) {
     val canIngest: Boolean

@@ -215,14 +215,16 @@ class OgtLocalDatabase {
     }
 
     /**
-     * Si llega `imageUrl`, esa foto ya está recortada: reemplaza el archivo y no reencuadra.
-     * Sin esa URL, el encuadre sigue siendo el de una foto que el cliente todavía pinta cruda.
+     * Si llega `url` o `mediaUrls`, esa foto ya está recortada: reemplaza el archivo que pinta
+     * la tarjeta y no vuelve a encuadrar. Sin esa URL, el encuadre sigue sobre el archivo crudo.
      */
     private fun applyPostFrame(live: SocialLiveCounters): Boolean {
         val index = postMedia.indexOfFirst { it.postId == live.id && it.kind == MediaKind.IMAGE }
         if (index < 0) return false
         val current = postMedia[index]
-        val cropped = live.imageUrl?.trim()?.takeIf { it.isNotEmpty() }
+        val cropped = live.url?.trim()?.takeIf { it.isNotEmpty() }
+            ?: live.mediaUrls.firstOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+            ?: live.imageUrl?.trim()?.takeIf { it.isNotEmpty() }
         val next = if (cropped != null) {
             current.copy(url = cropped, frameX = null, frameY = null, frameZoom = null)
         } else {
