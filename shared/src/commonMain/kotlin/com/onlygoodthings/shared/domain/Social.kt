@@ -106,6 +106,10 @@ data class SocialLiveCounters(
     val moderationStatus: String = "VISIBLE",
     /** Anécdota que sale del homenaje. Las pantallas ya escuchan este post, no un nodo nuevo. */
     val removedAnecdoteId: String? = null,
+    /** Encuadre de la primera foto. Mismo nodo que ya escuchan feed, ficha y Control. */
+    val frameX: Double? = null,
+    val frameY: Double? = null,
+    val frameZoom: Double? = null,
 ) {
     val canIngest: Boolean
         get() = !authorUserId.isNullOrBlank() && !body.isNullOrBlank()

@@ -13,10 +13,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.onlygoodthings.shared.domain.placePostFrame
 import com.onlygoodthings.app.map.decodeTileBitmap
 import com.onlygoodthings.app.media.OgtMediaCache
 import com.onlygoodthings.app.media.isRemoteMediaUrl
@@ -54,6 +57,9 @@ fun OgtPostImage(
     contentScale: ContentScale = ContentScale.Crop,
     posterUrl: String? = null,
     onAspect: ((Float) -> Unit)? = null,
+    frameX: Float? = null,
+    frameY: Float? = null,
+    frameZoom: Float? = null,
 ) {
     val fetchUrl = url.takeIf { canFetch(it) } ?: posterUrl.orEmpty().takeIf { canFetch(it) }
     if (fetchUrl == null) {
@@ -95,14 +101,19 @@ fun OgtPostImage(
         LaunchedEffect(aspect) {
             if (aspect != null && aspect.isFinite() && aspect > 0f) onAspect?.invoke(aspect)
         }
-        Box(modifier.background(OgtColors.sand), contentAlignment = Alignment.Center) {
+        Box(modifier.clipToBounds().background(OgtColors.sand), contentAlignment = Alignment.Center) {
             if (ready != null) {
+                val framed = contentScale == ContentScale.Crop && ready.width > 0 && ready.height > 0
                 Image(
                     bitmap = ready,
                     contentDescription = contentDescription,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = if (framed) {
+                        Modifier.feedFrame(ready.width, ready.height, frameX, frameY, frameZoom)
+                    } else {
+                        Modifier.fillMaxSize()
+                    },
                     alignment = Alignment.Center,
-                    contentScale = contentScale,
+                    contentScale = if (framed) ContentScale.FillBounds else contentScale,
                 )
             } else if (!loading) {
                 val painter = painterResource(if (assetKey.isBlank()) fallback else seedDrawable(assetKey))
@@ -145,7 +156,47 @@ fun OgtPostImage(
         contentScale = contentScale,
         posterUrl = item.posterUrl,
         onAspect = onAspect,
+        frameX = item.frameX?.toFloat(),
+        frameY = item.frameY?.toFloat(),
+        frameZoom = item.frameZoom?.toFloat(),
     )
+}
+
+/** Misma cuenta que la web y Control: el punto queda al centro del marco. */
+private fun Modifier.feedFrame(
+    imageWidth: Int,
+    imageHeight: Int,
+    frameX: Float?,
+    frameY: Float?,
+    frameZoom: Float?,
+): Modifier = layout { measurable, constraints ->
+    val frameWidth = constraints.maxWidth.toFloat()
+    val frameHeight = constraints.maxHeight.toFloat()
+    val placed = placePostFrame(
+        frameWidth = frameWidth,
+        frameHeight = frameHeight,
+        imageWidth = imageWidth.toFloat(),
+        imageHeight = imageHeight.toFloat(),
+        frameX = frameX ?: 0.5f,
+        frameY = frameY ?: 0.5f,
+        frameZoom = frameZoom ?: 1f,
+    )
+    if (placed == null) {
+        val fallback = measurable.measure(constraints)
+        layout(constraints.maxWidth.coerceAtLeast(0), constraints.maxHeight.coerceAtLeast(0)) {
+            fallback.place(0, 0)
+        }
+    } else {
+        val child = measurable.measure(
+            Constraints.fixed(
+                placed.displayWidth.toInt().coerceAtLeast(1),
+                placed.displayHeight.toInt().coerceAtLeast(1),
+            ),
+        )
+        layout(constraints.maxWidth.coerceAtLeast(0), constraints.maxHeight.coerceAtLeast(0)) {
+            child.place(placed.left.toInt(), placed.top.toInt())
+        }
+    }
 }
 
 internal fun posterAssetKey(item: LocalPostMedia): String {

@@ -182,13 +182,111 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       else button.removeAttribute('aria-current');
     }
   }
-  function photoNode(url, className) {
+  function photoNode(url, className, frame) {
     const img = node('img');
     img.className = className;
     img.src = url;
     img.alt = 'Foto de la publicación';
     img.addEventListener('error', () => img.remove());
+    if (frame && Number.isFinite(frame.x) && Number.isFinite(frame.y)) {
+      const pos = `${frame.x * 100}% ${frame.y * 100}%`;
+      img.style.objectPosition = pos;
+      if (frame.zoom > 1.001) {
+        img.style.transform = `scale(${frame.zoom})`;
+        img.style.transformOrigin = pos;
+      }
+    }
     return img;
+  }
+  function readFrame(source) {
+    const x = source?.frameX ?? source?.x;
+    const y = source?.frameY ?? source?.y;
+    const zoom = source?.frameZoom ?? source?.zoom;
+    const number = (value, fallback) => (value == null || value === '' || !Number.isFinite(Number(value)) ? fallback : Number(value));
+    return { x: number(x, 0.5), y: number(y, 0.5), zoom: number(zoom, 1) };
+  }
+  /** Misma cuenta que placePostFrame: el punto queda al centro del marco 16:9. */
+  function placeInFrame(box, img, frame) {
+    const fw = box.clientWidth;
+    const fh = box.clientHeight;
+    const iw = img.naturalWidth;
+    const ih = img.naturalHeight;
+    if (!fw || !fh || !iw || !ih) return frame;
+    const zoom = Math.min(6, Math.max(1, frame.zoom || 1));
+    const cover = Math.max(fw / iw, fh / ih) * zoom;
+    const dw = iw * cover;
+    const dh = ih * cover;
+    const minX = Math.min(0.5, fw / (2 * dw));
+    const maxX = 1 - minX;
+    const minY = Math.min(0.5, fh / (2 * dh));
+    const maxY = 1 - minY;
+    const x = Math.min(maxX, Math.max(minX, frame.x));
+    const y = Math.min(maxY, Math.max(minY, frame.y));
+    img.style.width = `${dw}px`;
+    img.style.height = `${dh}px`;
+    img.style.left = `${fw / 2 - x * dw}px`;
+    img.style.top = `${fh / 2 - y * dh}px`;
+    return { x, y, zoom };
+  }
+  function frameEditor(url, frame, onSave) {
+    const box = node('div');
+    box.className = 'crm-frame';
+    const img = node('img');
+    img.className = 'crm-frame-photo';
+    img.alt = 'Foto de la publicación';
+    img.draggable = false;
+    img.src = url;
+    box.append(img);
+    let current = readFrame(frame);
+    let drag = null;
+    img.addEventListener('load', () => { current = placeInFrame(box, img, current); });
+    box.addEventListener('pointerdown', event => {
+      if (event.button !== 0 || event.target.closest('button')) return;
+      drag = { id: event.pointerId, x: event.clientX, y: event.clientY, frame: current };
+      box.setPointerCapture(event.pointerId);
+      box.classList.add('is-dragging');
+    });
+    box.addEventListener('pointermove', event => {
+      if (!drag || event.pointerId !== drag.id) return;
+      const dw = img.offsetWidth || 1;
+      const dh = img.offsetHeight || 1;
+      current = placeInFrame(box, img, {
+        x: drag.frame.x - (event.clientX - drag.x) / dw,
+        y: drag.frame.y - (event.clientY - drag.y) / dh,
+        zoom: drag.frame.zoom,
+      });
+    });
+    const endDrag = event => {
+      if (!drag || event.pointerId !== drag.id) return;
+      drag = null;
+      box.classList.remove('is-dragging');
+    };
+    box.addEventListener('pointerup', endDrag);
+    box.addEventListener('pointercancel', endDrag);
+    box.addEventListener('wheel', event => {
+      event.preventDefault();
+      const factor = event.deltaY < 0 ? 1.08 : 1 / 1.08;
+      current = placeInFrame(box, img, { x: current.x, y: current.y, zoom: current.zoom * factor });
+    }, { passive: false });
+    if (typeof onSave === 'function') {
+      const save = node('button', 'Guardar encuadre');
+      save.type = 'button';
+      save.className = 'crm-btn crm-btn-secondary crm-frame-save';
+      save.prepend(productIcon('qs_feed.svg', 'crm-icon'));
+      save.addEventListener('click', async () => {
+        save.disabled = true;
+        try {
+          await onSave(current);
+          save.disabled = false;
+        } catch (error) {
+          save.disabled = false;
+          listError.textContent = error?.message || 'No se pudo guardar el encuadre.';
+          listError.hidden = false;
+        }
+      });
+      box.append(save);
+    }
+    return box;
   }
   function cellNode(cell, onOpen) {
     if (cell && cell.image) {
@@ -197,7 +295,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       button.className = 'crm-photo-btn';
       button.setAttribute('aria-label', 'Ver publicación');
       button.title = 'Ver publicación';
-      button.append(photoNode(cell.image, 'crm-post-photo'));
+      button.append(photoNode(cell.image, 'crm-post-photo', cell.frame));
       button.addEventListener('click', event => {
         event.stopPropagation();
         if (typeof onOpen === 'function') onOpen(false);
@@ -531,7 +629,11 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     meta.dataset.liveStatus = '1';
     const body = node('p', card.body || '');
     body.className = 'crm-detail-body';
-    const photo = card.image ? photoNode(card.image, 'crm-dialog-photo') : null;
+    const photo = card.image
+      ? frameEditor(card.image, card.frame, typeof listing.saveFrame === 'function'
+        ? next => listing.saveFrame(item, next)
+        : null)
+      : null;
     const impact = node('p', '…');
     impact.dataset.liveImpact = '1';
     const commentsHost = node('div');
@@ -703,6 +805,12 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       }
       if (row && live.authorPhotoUrl && row.authorPhotoUrl !== live.authorPhotoUrl) {
         row.authorPhotoUrl = live.authorPhotoUrl;
+        authorChanged = true;
+      }
+      if (row && live.frameX != null && live.frameY != null) {
+        row.frameX = Number(live.frameX);
+        row.frameY = Number(live.frameY);
+        row.frameZoom = live.frameZoom == null ? 1 : Number(live.frameZoom);
         authorChanged = true;
       }
       if (authorChanged && activeListing && workspaceView(sectionOf(current), listings) === 'listing') {

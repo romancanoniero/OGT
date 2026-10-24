@@ -204,12 +204,28 @@ class OgtLocalDatabase {
             }
             changed = true
         }
+        if (live.frameX != null && live.frameY != null && applyPostFrame(live)) changed = true
         if (next == current) {
             if (changed) bumpSocial()
             return changed
         }
         posts[idx] = next
         bumpSocial()
+        return true
+    }
+
+    /** Guarda el encuadre en la primera foto. No toca el archivo. */
+    private fun applyPostFrame(live: SocialLiveCounters): Boolean {
+        val x = live.frameX ?: return false
+        val y = live.frameY ?: return false
+        if (!x.isFinite() || !y.isFinite()) return false
+        val zoom = (live.frameZoom ?: 1.0).takeIf { it.isFinite() }?.coerceIn(1.0, 6.0) ?: 1.0
+        val index = postMedia.indexOfFirst { it.postId == live.id && it.kind == MediaKind.IMAGE }
+        if (index < 0) return false
+        val current = postMedia[index]
+        val next = current.copy(frameX = x, frameY = y, frameZoom = zoom)
+        if (next == current) return false
+        postMedia[index] = next
         return true
     }
 
@@ -464,6 +480,9 @@ class OgtLocalDatabase {
                     assetKey = "",
                     altText = item.altText,
                     durationMs = item.durationMs,
+                    frameX = item.frameX,
+                    frameY = item.frameY,
+                    frameZoom = item.frameZoom,
                 )
             }
         }
@@ -2077,6 +2096,9 @@ class OgtLocalDatabase {
                     durationMs = row.durationMs,
                     altText = row.altText,
                     assetKey = row.assetKey,
+                    frameX = row.frameX,
+                    frameY = row.frameY,
+                    frameZoom = row.frameZoom,
                 )
             },
             sourceUrl = post.sourceUrl,

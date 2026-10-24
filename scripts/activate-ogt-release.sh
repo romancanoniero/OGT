@@ -38,6 +38,7 @@ docker exec -i ogt-postgres pg_restore --list < "$BACKUP/database.dump" > "$BACK
 test -s "$BACKUP/database-toc.txt"
 # Only the additive CRM migration; never a wildcard over demo/seed SQL.
 docker exec -i ogt-postgres psql -X -v ON_ERROR_STOP=1 --single-transaction -U ogt -d onlygoodthings < "$RELEASE/database/migrations/23_crm_foundations.sql"
+docker exec -i ogt-postgres psql -X -v ON_ERROR_STOP=1 --single-transaction -U ogt -d onlygoodthings < "$RELEASE/database/migrations/24_post_media_frame.sql"
 rsync -a --delete "$RELEASE/backend-dist/" "$ROOT/backend-dist/"
 rsync -a --delete "$RELEASE/web-app/" "$ROOT/web-app/"
 cp "$RELEASE/docker-compose.yml" "$RELEASE/Dockerfile" "$RELEASE/web-nginx.conf" "$ROOT/"

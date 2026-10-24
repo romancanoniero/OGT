@@ -402,6 +402,27 @@ span.avatar svg { width: 18px; height: 18px; }
   object-position: center center;
   background: var(--sand);
 }
+/* Marco de la tarjeta: 16 / 9, el mismo de la app. El encuadre se coloca en píxeles. */
+.post.open .media-slot {
+  position: relative;
+  width: calc(100% + 40px);
+  margin-left: -20px;
+  margin-right: -20px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--sand);
+}
+.post.open .media-slot .media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  margin: 0;
+  aspect-ratio: auto;
+  object-fit: cover;
+  object-position: center center;
+}
 .actions { display: flex; gap: 8px; margin-top: 12px; }
 .act {
   width: 44px; height: 44px; border-radius: 999px; border: 1px solid var(--hairline);

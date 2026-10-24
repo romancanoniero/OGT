@@ -3,6 +3,7 @@ package com.onlygoodthings.backend.crm
 import com.onlygoodthings.backend.auth.AuthPrincipal
 import com.onlygoodthings.backend.auth.FirebaseTokenVerifier
 import com.onlygoodthings.backend.http.JsonBody
+import com.onlygoodthings.backend.http.optDouble
 import com.onlygoodthings.backend.http.optString
 import com.onlygoodthings.backend.http.reqString
 import com.onlygoodthings.backend.infra.Database
@@ -55,6 +56,10 @@ data class CrmVisiblePost(
     val authorUserId: String? = null,
     /** Foto viva del autor. No es una copia guardada en el post. */
     val authorPhotoUrl: String? = null,
+    /** Centro del encuadre en la foto, 0..1. Null es el centro del marco 16:9. */
+    val frameX: Double? = null,
+    val frameY: Double? = null,
+    val frameZoom: Double? = null,
 )
 
 @Serializable
@@ -120,6 +125,16 @@ data class CrmPostDetail(
 
 @Serializable
 data class CrmPostRemoved(val removed: Boolean = true, val ids: List<String> = emptyList())
+
+@Serializable
+data class CrmPostFramed(
+    val id: String,
+    val frameX: Double,
+    val frameY: Double,
+    val frameZoom: Double,
+    val commentCount: Int = 0,
+    val impactCount: Int = 0,
+)
 
 @Serializable
 data class CrmSubnodeRemoved(val removed: Boolean = true, val id: String, val postId: String)
@@ -483,6 +498,43 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: Realtime
         )
         call.respond(ApiResponse.ok(moved, "La publicación quedó a nombre de ${moved.authorName}"))
     }
+    /**
+     * Encuadre de la primera foto al marco 16:9. No borra el archivo.
+     * Body: `{ "postId": "55555555-5555-5555-5555-555555555555", "frameX": 0.5, "frameY": 0.35, "frameZoom": 1.2 }`
+     */
+    post("/api/v1/crm/platform/posts/frame") {
+        val auth = crmContext(call, db, verifier) ?: return@post
+        if (!crmCanManagePosts(auth.platformRole)) {
+            return@post call.respond(HttpStatusCode.Forbidden,
+                ApiResponse.fail<Unit>("Sin permiso para administrar publicaciones", "FORBIDDEN"))
+        }
+        val data = JsonBody.receiveMap(call)
+        val postId = runCatching { UUID.fromString(data.reqString("postId")).toString() }.getOrNull()
+            ?: return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Publicación inválida", "BAD_REQUEST"))
+        val frame = crmPostFrame(data.optDouble("frameX"), data.optDouble("frameY"), data.optDouble("frameZoom"))
+            ?: return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("El encuadre no entra en el marco", "BAD_REQUEST"))
+        val saved = db.withConnection { conn -> frameVisiblePost(conn, auth.userId, postId, frame) }
+            ?: return@post call.respond(HttpStatusCode.NotFound,
+                ApiResponse.fail<Unit>("Esa publicación ya no está visible", "NOT_FOUND"))
+        val counts = db.withConnection { conn -> postLiveCounts(conn, saved.id) }
+        hub.projectSocialPost(
+            saved.id,
+            WsCodec.json.encodeToString(
+                SocialLiveCounters.serializer(),
+                SocialLiveCounters(
+                    id = saved.id,
+                    commentCount = counts?.commentCount ?: saved.commentCount,
+                    impactCount = counts?.impactCount ?: saved.impactCount,
+                    frameX = saved.frameX,
+                    frameY = saved.frameY,
+                    frameZoom = saved.frameZoom,
+                ),
+            ),
+        )
+        call.respond(ApiResponse.ok(saved))
+    }
     post("/api/v1/crm/platform/posts/remove") {
         val auth = crmContext(call, db, verifier) ?: return@post
         if (!crmCanManagePosts(auth.platformRole)) {
@@ -645,12 +697,18 @@ SELECT p.id::text, p.body, p.moderation_status::text, p.created_at,
        COALESCE(NULLIF(u.display_name, ''), NULLIF(c.trade_name, ''), NULLIF(c.legal_name, ''), 'Sin nombre') AS author_name,
        p.author_user_id::text AS author_user_id,
        u.photo_url AS author_photo,
-       (SELECT m.url FROM post_media m
-         WHERE m.post_id = p.id AND m.kind = 'IMAGE'
-         ORDER BY m.sort_order LIMIT 1) AS image_url
+       photo.url AS image_url,
+       photo.frame_x, photo.frame_y, photo.frame_zoom
 FROM social_posts p
 LEFT JOIN users u ON u.id = p.author_user_id
 LEFT JOIN companies c ON c.id = p.author_company_id
+LEFT JOIN LATERAL (
+  SELECT m.url, m.frame_x, m.frame_y, m.frame_zoom
+  FROM post_media m
+  WHERE m.post_id = p.id AND m.kind = 'IMAGE'
+  ORDER BY m.sort_order
+  LIMIT 1
+) photo ON true
 WHERE p.moderation_status = 'VISIBLE'
 """
 
@@ -672,7 +730,24 @@ private fun ResultSet.toCrmVisiblePost(): CrmVisiblePost = CrmVisiblePost(
     imageUrl = crmPostImageUrl(getString("image_url")),
     authorUserId = getString("author_user_id"),
     authorPhotoUrl = getString("author_photo")?.trim()?.takeIf { it.isNotEmpty() },
+    frameX = frameUnit("frame_x"),
+    frameY = frameUnit("frame_y"),
+    frameZoom = frameUnit("frame_zoom"),
 )
+
+private fun ResultSet.frameUnit(column: String): Double? {
+    val value = (getObject(column) as? Number)?.toDouble() ?: return null
+    return value.takeIf { it.isFinite() }
+}
+
+/** El marco es 16:9. x/y son el punto de la foto que queda al centro. zoom 1 cubre. */
+internal fun crmPostFrame(x: Double?, y: Double?, zoom: Double?): CrmPostFramed? {
+    if (x == null || y == null) return null
+    val scale = zoom ?: 1.0
+    if (!x.isFinite() || !y.isFinite() || !scale.isFinite()) return null
+    if (x !in 0.0..1.0 || y !in 0.0..1.0 || scale !in 1.0..6.0) return null
+    return CrmPostFramed(id = "", frameX = x, frameY = y, frameZoom = scale)
+}
 
 internal const val CRM_POST_REMOVE = """
 UPDATE social_posts
@@ -692,6 +767,22 @@ WHERE status = 'ACTIVE'
   )
 ORDER BY display_name
 LIMIT 12
+"""
+
+/** Encuadre de la primera foto. No toca `url` ni borra el archivo. */
+internal const val CRM_POST_FRAME = """
+UPDATE post_media AS m
+SET frame_x = ?, frame_y = ?, frame_zoom = ?
+WHERE m.id = (
+  SELECT id FROM post_media
+  WHERE post_id = ?::uuid AND kind = 'IMAGE'
+  ORDER BY sort_order
+  LIMIT 1
+)
+AND EXISTS (
+  SELECT 1 FROM social_posts p
+  WHERE p.id = ?::uuid AND p.moderation_status = 'VISIBLE'
+)
 """
 
 /** Cambia el autor. La fila sigue. No es un DELETE. */
@@ -855,6 +946,45 @@ private fun reassignVisiblePost(conn: Connection, actorId: String, postId: Strin
             authorUserId = userId,
             authorName = target.first,
             authorPhotoUrl = target.second,
+            commentCount = counts.first,
+            impactCount = counts.second,
+        )
+    } catch (error: Exception) {
+        conn.rollback()
+        throw error
+    } finally {
+        conn.autoCommit = true
+    }
+}
+
+/** Persiste el encuadre. La URL de `post_media` no cambia. */
+private fun frameVisiblePost(conn: Connection, actorId: String, postId: String, frame: CrmPostFramed): CrmPostFramed? {
+    conn.autoCommit = false
+    try {
+        val updated = conn.prepareStatement(CRM_POST_FRAME.trim()).use { stmt ->
+            stmt.setDouble(1, frame.frameX)
+            stmt.setDouble(2, frame.frameY)
+            stmt.setDouble(3, frame.frameZoom)
+            stmt.setString(4, postId)
+            stmt.setString(5, postId)
+            stmt.executeUpdate()
+        }
+        if (updated == 0) {
+            conn.rollback()
+            return null
+        }
+        val counts = conn.prepareStatement(
+            "SELECT comment_count, impact_count FROM social_posts WHERE id = ?::uuid"
+        ).use { stmt ->
+            stmt.setString(1, postId)
+            stmt.executeQuery().use { rs ->
+                if (!rs.next()) 0 to 0 else rs.getInt(1) to rs.getInt(2)
+            }
+        }
+        writeAudit(conn, actorId, "POST_FRAME", "social_post", postId, "Encuadre al marco 16:9")
+        conn.commit()
+        return frame.copy(
+            id = postId,
             commentCount = counts.first,
             impactCount = counts.second,
         )
