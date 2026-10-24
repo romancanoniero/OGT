@@ -376,17 +376,7 @@ fun App() {
                 notify.requestPermission()
             }
         }
-        val stackBack: (() -> Unit)? = when {
-            profilePage -> ({ profilePage = false })
-            detectedManeuver != null -> ({ detectedManeuver = null })
-            session.askStaleParked -> ({ session.askStaleParked = false })
-            session.askLeaveWithoutYield -> ({ session.askLeaveWithoutYield = false })
-            session.askYieldApproach -> ({
-                session.askYieldApproach = false
-                session.willLeaveParked = false
-            })
-            session.askLocationScope && route != OgtRoute.Gps -> ({ session.askLocationScope = false })
-            else -> when (route) {
+        val routeBack: (() -> Unit)? = when (route) {
                 OgtRoute.Otp -> ({ route = otpBack })
                 OgtRoute.Recover, OgtRoute.SignUp -> ({ route = OgtRoute.Login })
                 OgtRoute.NeighborProfile, OgtRoute.PostDetail, OgtRoute.Publish,
@@ -417,11 +407,23 @@ fun App() {
                     route = gpsReturn
                 })
                 else -> null
-            }
+        }
+        val stackBack: (() -> Unit)? = when {
+            profilePage -> ({ profilePage = false })
+            detectedManeuver != null -> ({ detectedManeuver = null })
+            session.askStaleParked -> ({ session.askStaleParked = false })
+            session.askLeaveWithoutYield -> ({ session.askLeaveWithoutYield = false })
+            session.askYieldApproach -> ({
+                session.askYieldApproach = false
+                session.willLeaveParked = false
+            })
+            session.askLocationScope && route != OgtRoute.Gps -> ({ session.askLocationScope = false })
+            else -> routeBack
         }
         OgtBackHandler(enabled = stackBack != null) { stackBack?.invoke() }
         val chrome = rememberOgtChromeHost()
-        chrome.fallbackBack = stackBack
+        // Abrir Ajustes no suma una flecha: la barra de la pantalla queda como estaba.
+        chrome.fallbackBack = if (profilePage) routeBack else stackBack
         val chromeScroll = remember(chrome) { chrome.nestedScrollConnection() }
         LaunchedEffect(route) { chrome.revealNow() }
         val settingsLeaves = setOf(
@@ -790,6 +792,21 @@ fun App() {
                         },
                     )
                 }
+                if (profilePage) {
+                    SettingsScreen(
+                        onLogout = {
+                            scope.launch {
+                                profilePage = false
+                                settingsResume = false
+                                auth.signOut()
+                                route = OgtRoute.Login
+                            }
+                        },
+                        onBack = { profilePage = false },
+                        showChrome = false,
+                        onOpen = openSettingsKey,
+                    )
+                }
                 }
                 if (session.askLocationScope && route != OgtRoute.Gps) {
                     LocationScopeDialog(
@@ -920,21 +937,6 @@ fun App() {
                             route = OgtRoute.Parking
                         },
                         onDismiss = { detectedManeuver = null },
-                    )
-                }
-                if (profilePage) {
-                    SettingsScreen(
-                        onLogout = {
-                            scope.launch {
-                                profilePage = false
-                                settingsResume = false
-                                auth.signOut()
-                                route = OgtRoute.Login
-                            }
-                        },
-                        onBack = { profilePage = false },
-                        showChrome = false,
-                        onOpen = openSettingsKey,
                     )
                 }
                 OgtHostedTopBar(chrome)
