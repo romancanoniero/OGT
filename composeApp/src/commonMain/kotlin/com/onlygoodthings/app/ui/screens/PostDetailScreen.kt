@@ -115,7 +115,6 @@ import com.onlygoodthings.shared.data.local.LocalAnimalListing
 import com.onlygoodthings.shared.data.local.LocalSighting
 import com.onlygoodthings.shared.data.local.LocalPostMedia
 import com.onlygoodthings.shared.data.local.LocalSocialPost
-import com.onlygoodthings.shared.data.local.OgtIds
 import com.onlygoodthings.shared.domain.FeedCardKind
 import com.onlygoodthings.shared.domain.FeedEventKind
 import com.onlygoodthings.shared.domain.MediaKind
@@ -137,7 +136,7 @@ import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun PostDetailScreen(
-    postId: String = OgtIds.PostTaller,
+    postId: String = "",
     onBack: () -> Unit,
     onPetsMap: () -> Unit = {},
     onAdopt: () -> Unit = {},
@@ -152,7 +151,7 @@ fun PostDetailScreen(
     val me = session.me()
     val copy = LocalOgtCopy.current
     val socialTick by db.socialTick.collectAsState()
-    val post = remember(postId, socialTick) { db.post(postId) }
+    val post = remember(postId, socialTick) { db.posts.firstOrNull { it.id == postId } }
     if (post == null) {
         Column(Modifier.fillMaxSize().padding(24.dp)) {
             Text("Esta publicación ya no está visible.", color = OgtColors.ink)
@@ -228,11 +227,7 @@ fun PostDetailScreen(
                 add(PostExtraAction(Res.drawable.qs_map, copy.petsMapCta, onClick = onPetsMap))
             }
             FeedCardKind.ADOPTION -> Unit
-            FeedCardKind.COMMUNITY -> {
-                if (post.id == OgtIds.PostArboles) {
-                    add(PostExtraAction(Res.drawable.qs_invite, "Invitar", onClick = onInvite))
-                }
-            }
+            FeedCardKind.COMMUNITY -> Unit
             FeedCardKind.PET_STORY, FeedCardKind.NEWS, FeedCardKind.TERNURA -> Unit
             FeedCardKind.HOMENAJE -> {
                 if (db.creditPending(post)) {

@@ -93,20 +93,4 @@ class LocalParkingRepositoryTest {
         assertEquals(null, released.claimedByUserId)
     }
 
-    @Test
-    fun radarDemoCruzaLosCuatroRadios() = runBlocking {
-        val db = OgtLocalDatabase.seeded()
-        val origin = GeoPoint(-34.5990, -58.4410)
-        db.placeRadarDemoSpots(origin)
-        val mariana = LocalParkingRepository(db, OgtIds.Mariana)
-        val at400 = mariana.nearby(origin, 400).map { it.id }
-        val at500 = mariana.nearby(origin, 500).map { it.id }
-        val at1000 = mariana.nearby(origin, 1000).map { it.id }
-        val at2000 = mariana.nearby(origin, 2000).map { it.id }
-        assertTrue(at400.contains("spot-radar-220"))
-        assertTrue(at400.none { it.startsWith("spot-radar-") && it != "spot-radar-220" })
-        assertTrue(at500.containsAll(listOf("spot-radar-220", "spot-radar-450")))
-        assertTrue(at1000.containsAll(listOf("spot-radar-220", "spot-radar-450", "spot-radar-850")))
-        assertTrue(at2000.containsAll(listOf("spot-radar-220", "spot-radar-450", "spot-radar-850", "spot-radar-1600")))
-    }
 }

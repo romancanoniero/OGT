@@ -16,9 +16,9 @@ import com.onlygoodthings.app.i18n.OgtLang
 import com.onlygoodthings.app.i18n.ogtCopy
 import com.onlygoodthings.app.map.LocationPermissionState
 import com.onlygoodthings.shared.data.local.LocalUser
-import com.onlygoodthings.shared.data.local.OgtIds
 import com.onlygoodthings.shared.data.local.OgtLocalDatabase
 import com.onlygoodthings.shared.domain.GeoPoint
+import com.onlygoodthings.shared.domain.UserRole
 import com.onlygoodthings.shared.domain.LocationScope
 import com.onlygoodthings.shared.domain.ParkedCar
 import com.onlygoodthings.shared.domain.VehicleProfile
@@ -42,10 +42,10 @@ val LocalAuth = staticCompositionLocalOf<AuthController> {
     error("AuthController no fue provisto.")
 }
 
-/** Sesión de preview: Mariana recorre la app hasta que Firebase adjunta a la persona real. */
+/** Sesión local. Firebase adjunta a la persona real; sin sesión no hay un usuario inventado. */
 class OgtPreviewSession(
     val db: OgtLocalDatabase,
-    initialUserId: String = OgtIds.Mariana,
+    initialUserId: String = "",
     private val prefs: AuthPrefs = AuthPrefs(),
 ) {
     var currentUserId by mutableStateOf(initialUserId)
@@ -138,7 +138,7 @@ class OgtPreviewSession(
         locationScope = scope
         prefs.locationScope = scope.prefCode()
     }
-    fun me(): LocalUser = overlayUser ?: db.user(currentUserId)
+    fun me(): LocalUser = overlayUser ?: db.userOrNull(currentUserId) ?: guestSessionUser()
 
     /** La foto elegida en Ajustes se ve enseguida, antes de subirla. */
     fun applyProfilePhoto(path: String) {
@@ -256,7 +256,7 @@ class OgtPreviewSession(
 
 @Composable
 fun OgtPreviewStore(content: @Composable () -> Unit) {
-    val db = remember { OgtLocalDatabase.seeded() }
+    val db = remember { OgtLocalDatabase() }
     val session = remember(db) { OgtPreviewSession(db) }
     val auth = remember(db, session) { AuthController(db, session) }
     remember(auth) {
@@ -320,3 +320,20 @@ private fun loadParked(prefs: AuthPrefs): ParkedCar? {
         vehicle = vehicle,
     )
 }
+
+private fun guestSessionUser() = LocalUser(
+    id = "",
+    firebaseUid = "",
+    email = null,
+    phoneE164 = null,
+    displayName = "",
+    photoUrl = null,
+    role = UserRole.USER,
+    communityPoints = 0,
+    inviteCode = "",
+    barrio = "",
+    levelLabel = "",
+    honorTag = "",
+    latitude = 0.0,
+    longitude = 0.0,
+)

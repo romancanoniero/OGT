@@ -82,21 +82,10 @@ import com.onlygoodthings.app.data.optimisticReportPost
 import com.onlygoodthings.app.media.OgtMediaCache
 import com.onlygoodthings.app.resources.Res
 import com.onlygoodthings.app.resources.avatar_anonymous
-import com.onlygoodthings.app.resources.feed_avatar_carlos
-import com.onlygoodthings.app.resources.feed_avatar_mariana
 import com.onlygoodthings.app.resources.feed_avatar_me
-import com.onlygoodthings.app.resources.feed_avatar_reply
-import com.onlygoodthings.app.resources.feed_avatar_roberto
-import com.onlygoodthings.app.resources.feed_avatar_sofia
 import com.onlygoodthings.app.resources.feed_logo
-import com.onlygoodthings.app.resources.feed_photo_arboles
-import com.onlygoodthings.app.resources.feed_photo_bebederos
-import com.onlygoodthings.app.resources.feed_story_compost
 import com.onlygoodthings.app.resources.feed_story_donacion
 import com.onlygoodthings.app.resources.feed_story_me
-import com.onlygoodthings.app.resources.feed_story_patitas
-import com.onlygoodthings.app.resources.feed_story_playa
-import com.onlygoodthings.app.resources.feed_story_solar
 import com.onlygoodthings.app.resources.qs_feed
 import com.onlygoodthings.app.resources.qs_notifications
 import com.onlygoodthings.app.theme.OgtColors
@@ -125,7 +114,6 @@ import com.onlygoodthings.shared.data.local.LocalPostMedia
 import com.onlygoodthings.shared.domain.POST_FRAME_RATIO
 import com.onlygoodthings.shared.domain.PostPlacement
 import com.onlygoodthings.shared.data.local.LocalSocialPost
-import com.onlygoodthings.shared.data.local.OgtIds
 import com.onlygoodthings.shared.domain.AuthorKind
 import com.onlygoodthings.shared.domain.FeedCardKind
 import com.onlygoodthings.shared.domain.FeedEventKind
@@ -536,19 +524,8 @@ private data class FeedStoryItem(
     val userId: String? = null,
 )
 
-/** Riel de historias: solo el grafo. El listado vertical lo rankea HOME / FOLLOWING. */
-private fun followedNeighbors(): List<FollowedNeighbor> = listOf(
-    FollowedNeighbor("follow-valeria", OgtIds.PostPlaya, OgtIds.ValeriaP, "Valeria", "Valeria P.", Res.drawable.feed_avatar_reply, Res.drawable.feed_story_playa, "Hoy juntamos plásticos en la costa con el club de remo.", "Hace 20 min", listOf("#LimpiezaCostera", "#AccionComunitaria"), 95),
-    FollowedNeighbor("follow-carlosr", OgtIds.PostPatitas, OgtIds.CarlosR, "Carlos", "Carlos R.", Res.drawable.feed_avatar_carlos, Res.drawable.feed_story_patitas, "Milo y Rocco ya tienen patio nuevo en el refugio.", "Hace 1 h", listOf("#RescateAnimal", "#RefugioPatitas"), 90),
-    FollowedNeighbor("follow-camila", OgtIds.PostCompost, OgtIds.Camila, "Camila", "Camila T.", Res.drawable.feed_avatar_sofia, Res.drawable.feed_story_compost, "El punto comunitario de compost ya suma 45 kg.", "Hace 3 h", listOf("#Compost", "#HuertaComunitaria"), 80),
-    FollowedNeighbor("follow-mariana", OgtIds.PostArboles, OgtIds.Mariana, "Mariana", "Mariana Cordero", Res.drawable.feed_avatar_mariana, Res.drawable.feed_photo_arboles, "Plantamos 45 árboles nativos en el Parque Central.", "Hace 5 h", listOf("#ReforestacionUrbana", "#AccionComunitaria"), 70, verified = true),
-    FollowedNeighbor("follow-carlosg", OgtIds.PostBebederos, OgtIds.CarlosG, "Carlos G.", "Carlos Gutiérrez", Res.drawable.feed_avatar_carlos, Res.drawable.feed_photo_bebederos, "Los bebederos solares ya están dando agua fresca.", "Hace 8 h", listOf("#EnergiaSolar", "#ProteccionAnimal"), 60),
-    FollowedNeighbor("follow-sofia", OgtIds.PostTaller, OgtIds.Sofia, "Sofía", "Sofía M.", Res.drawable.feed_avatar_sofia, Res.drawable.feed_photo_arboles,         "Plantines de albahaca para quien se sume el sábado.", "Ayer", listOf("#HuertaComunitaria", "#PalermoVerde"), 50, verified = true),
-    FollowedNeighbor("follow-lucas", OgtIds.PostBebederoPlaza, OgtIds.Lucas, "Lucas", "Lucas V.", Res.drawable.feed_avatar_me, Res.drawable.feed_photo_bebederos, "Revisamos el filtro del bebedero de la plaza.", "Ayer", listOf("#CuidadoComunitario"), 40),
-    FollowedNeighbor("follow-mateo", OgtIds.PostTrueque, OgtIds.Mateo, "Mateo", "Mateo R.", Res.drawable.feed_avatar_roberto, Res.drawable.feed_story_donacion, "Cerámicas y un par de bicis listas para intercambiar.", "Hace 2 d", listOf("#Trueque", "#BancoDeTiempo"), 30),
-    FollowedNeighbor("follow-diego", OgtIds.PostRescate, OgtIds.DiegoF, "Diego", "Diego F.", Res.drawable.feed_avatar_carlos, Res.drawable.feed_story_patitas, "Dos gatitos en tránsito hasta el fin de semana.", "Hace 2 d", listOf("#RescateAnimal"), 20),
-    FollowedNeighbor("follow-lucia", OgtIds.PostMerienda, OgtIds.Lucia, "Lucía", "Lucía V.", Res.drawable.feed_avatar_mariana, Res.drawable.feed_story_donacion, "La merienda comunitaria salió con lo que sobró del domingo.", "Hace 3 d", listOf("#Merienda", "#Comedor"), 10),
-)
+/** El riel no inventa vecinos. Las historias ajenas llegan con el feed de Postgres. */
+private fun followedNeighbors(): List<FollowedNeighbor> = emptyList()
 
 private fun storiesFrom(followed: List<FollowedNeighbor>): List<FeedStoryItem> {
     val mine = FeedStoryItem(
@@ -1420,16 +1397,6 @@ private fun StoryFeedCard(
                         }
                     },
                 )
-            }
-        }
-        if (profile.postId == OgtIds.PostArboles) {
-            Row(
-                Modifier.fillMaxWidth().background(Color(0x66EAE7EB)).padding(horizontal = 16.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("¿Quieres convocar en tu zona?", color = OgtColors.muted, fontSize = 12.sp)
-                Text("Invitar amigos →", color = OgtColors.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.clickable(onClick = onInvite))
             }
         }
         Spacer(Modifier.height(8.dp))

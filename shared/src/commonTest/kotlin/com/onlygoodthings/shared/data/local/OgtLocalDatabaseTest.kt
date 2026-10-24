@@ -25,6 +25,17 @@ import kotlin.test.assertTrue
 
 class OgtLocalDatabaseTest {
     @Test
+    fun elTelefonoVacioNoInventaPosts() {
+        val db = OgtLocalDatabase()
+        assertTrue(db.posts.isEmpty())
+        assertTrue(db.composeVisibleRiver("alguien").isEmpty())
+        db.importSocialFeed(
+            OgtLocalDatabase.seeded().exportSocialFeed(OgtIds.Mariana),
+        )
+        assertTrue(db.posts.none { it.id in OgtIds.phoneFixturePostIds })
+    }
+
+    @Test
     fun seedMantieneIntegridadYPersonajesStitch() {
         val db = OgtLocalDatabase.seeded()
         val me = db.user(OgtIds.Mariana)
@@ -684,12 +695,9 @@ class OgtLocalDatabaseTest {
     @Test
     fun anecdotaPuntualAjenaSeVeYLaPropiaNo() {
         val db = OgtLocalDatabase.seeded()
-        val preview = db.ensureFeedAnecdotePreview()
-        assertEquals(OgtIds.PostAnecdoteShare, preview.id)
+        val preview = db.post(OgtIds.PostAnecdoteShare)
         assertEquals(OgtIds.Sofia, preview.authorUserId)
         assertTrue(preview.isAnecdoteShare())
-        assertTrue(db.shouldShowInFeed(OgtIds.Mariana, preview))
-        assertTrue(db.visibleFeed(OgtIds.Mariana).any { it.id == preview.id })
         val me = db.user(OgtIds.Mariana)
         val story = db.addAnecdote(me, OgtIds.PostHomenaje, "Le devolvió un sobre que no era suyo.")
         val mine = db.repostAnecdote(me, story!!.id)

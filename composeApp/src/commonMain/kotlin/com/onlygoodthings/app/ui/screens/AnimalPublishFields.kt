@@ -117,7 +117,7 @@ internal fun OgtLocalDatabase.attachAnimalMedia(
             url = url,
             posterUrl = poster,
             sortOrder = order,
-            assetKey = if (item.fromDevice) "" else if (video) "feed_story_playa" else item.path,
+            assetKey = if (item.fromDevice || video) "" else item.path,
             altText = tag,
         )
         if (item.fromDevice) {

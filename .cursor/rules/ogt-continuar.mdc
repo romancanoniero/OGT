@@ -29,6 +29,8 @@ Worktree limpio en `main`. `unset TMPDIR` / `env -u TMPDIR`. SDK `OGT_DB_KMP_SDK
 
 `bash scripts/deploy-ogt-vps.sh --check` y después `--deploy`. No saltear pruebas, respaldo, MFA ni prelaunch. El log va a `/Volumes/DEV_MAC/Caches/OGT/tmp/`. Leer `CHECK_EXIT` y `DEPLOY_EXIT` dentro del log. Confirmar el SHA con `ssh iankmp-vps 'curl -fsS http://127.0.0.1:19081/release.json'`. No abrir la URL pública que imprime el script. La migración 26 es idempotente y ya está aplicada.
 
+El teléfono no siembra posts, vecinos ni plazas de prueba. Lo visible sale de Postgres. `OgtMockSeed` queda solo en los tests.
+
 ## Foto de quien está en sesión
 
 Una sola fuente: `OgtSessionAvatar` (`OgtPostImage.kt`). Lee `LocalOgtSession.current.me()` (`id` + `photoUrl`).

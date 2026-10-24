@@ -297,13 +297,7 @@ fun OgtDraftMediaStrip(
 private fun DraftStill(item: OgtPickedMedia, description: String, modifier: Modifier) {
     OgtPostImage(
         url = if (item.fromDevice) "file://${item.path}" else "asset://${item.path}",
-        assetKey = if (item.fromDevice) {
-            ""
-        } else if (item.kind == MediaKind.VIDEO) {
-            "feed_story_playa"
-        } else {
-            item.path
-        },
+        assetKey = if (item.fromDevice || item.kind == MediaKind.VIDEO) "" else item.path,
         fallback = Res.drawable.publish_photo,
         contentDescription = description,
         modifier = modifier,

@@ -69,4 +69,31 @@ object OgtIds {
     const val TagMueble = "tag-mueble"
     const val TagTramite = "tag-tramite"
     const val HelpValeria = "help-valeria-plantas"
+
+    /** Posts del catálogo de prueba. No vuelven a entrar desde la caché del teléfono. */
+    val phoneFixturePostIds: Set<String> = setOf(
+        PostArboles,
+        PostBebederos,
+        PostTaller,
+        PostPlaya,
+        PostPatitas,
+        PostCompost,
+        PostBebederoPlaza,
+        PostTrueque,
+        PostRescate,
+        PostLuna,
+        PostOliver,
+        PostGrisu,
+        PostCoco,
+        PostNube,
+        PostPepe,
+        PostRita,
+        PostPancho,
+        PostMerienda,
+        PostAnaComedor,
+        PostAcmeRse,
+        PostTernura,
+        PostHomenaje,
+        PostAnecdoteShare,
+    )
 }
