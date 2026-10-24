@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { createApi } from '../web/app/crm/crm-core.js';
-import { workspaceView } from '../web/app/crm/crm-ui.js';
+import { existsSync, readFileSync } from 'node:fs';
+import { workspaceView, frameWheelZoom, frameStepZoom } from '../web/app/crm/crm-ui.js';
 
 const response = (data, status = 200) => ({ ok: status < 400, status, json: async () => data });
 
@@ -43,10 +43,10 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   const html = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\.svg', view: 'listing'/);
   assert.doesNotMatch(runtime, /id: 'publicaciones'[^}]*keys:/);
-  assert.match(runtime, /crm-ui\.js\?v=frame-2/);
-  assert.match(html, /crm\.js\?v=frame-2/);
+  assert.match(runtime, /crm-ui\.js\?v=zoom-1/);
+  assert.match(html, /crm\.js\?v=zoom-1/);
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
-  assert.match(html, /crm\.css\?v=frame-2/);
+  assert.match(html, /crm\.css\?v=zoom-1/);
   assert.match(runtime, /icon: 'qs_trash\.png', label: 'Quitar selección'/);
   assert.match(runtime, /platform\/posts\/reassign/);
   assert.match(runtime, /platform\/users\/search/);
@@ -114,4 +114,33 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   assert.match(runtime, /async function returnToSignIn/);
   assert.doesNotMatch(runtime, /limitada a 15 minutos/);
   assert.match(runtime, /platform\/posts\/detail/);
+});
+
+test('la rueda del CRM web acerca arriba y aleja abajo', () => {
+  assert.ok(frameWheelZoom(1, -100) > 1);
+  assert.equal(frameWheelZoom(1, 120), 1);
+  const closer = frameWheelZoom(1, -100);
+  assert.ok(frameWheelZoom(closer, 100) < closer);
+  assert.equal(frameWheelZoom(6, -300), 6);
+  assert.ok(frameStepZoom(2, 1) > 2);
+  assert.ok(frameStepZoom(2, -1) < 2);
+  assert.equal(frameStepZoom(1.05, -1), 1);
+  const ui = readFileSync(new URL('../web/app/crm/crm-ui.js', import.meta.url), 'utf8');
+  assert.match(ui, /qs_zoom_in\.png', 'Acercar'/);
+  assert.match(ui, /qs_zoom_out\.png', 'Alejar'/);
+  assert.match(ui, /preventDefault\(\)/);
+  assert.match(ui, /stopPropagation\(\)/);
+  assert.match(ui, /capture: true, passive: false/);
+  const css = readFileSync(new URL('../web/app/crm/crm.css', import.meta.url), 'utf8');
+  assert.match(css, /\.crm-frame \{[^}]*overscroll-behavior: none/s);
+  const empresas = readFileSync(new URL('../web/app/crm/empresas/index.html', import.meta.url), 'utf8');
+  const control = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
+  assert.match(empresas, /crm\.js\?v=zoom-1/);
+  assert.match(control, /crm\.js\?v=zoom-1/);
+  assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_in.png', import.meta.url)));
+  assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_out.png', import.meta.url)));
+  const runtime = readFileSync(new URL('../web/app/crm/crm-runtime.js', import.meta.url), 'utf8');
+  const empresaBlock = runtime.match(/const empresaSections = \[[\s\S]*?\];/);
+  assert.ok(empresaBlock);
+  assert.doesNotMatch(empresaBlock[0], /view: 'listing'/);
 });
