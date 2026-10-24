@@ -470,7 +470,7 @@ fun Route.timebankRoutes(db: Database) {
         val matches = db.withConnection { connection ->
             connection.prepareStatement(
                 """
-                SELECT u.id, u.display_name, t.slug
+                SELECT u.id, u.display_name, t.slug, u.photo_url
                 FROM user_skills offered
                 JOIN skill_tags t ON t.id = offered.tag_id
                 JOIN users u ON u.id = offered.user_id
@@ -493,6 +493,7 @@ fun Route.timebankRoutes(db: Database) {
                                     userId = rs.getString("id"),
                                     displayName = rs.getString("display_name"),
                                     tag = rs.getString("slug"),
+                                    photoUrl = rs.getString("photo_url"),
                                     chatEnabledHint = "El chat se habilita tras match mutuo, sin costo.",
                                 ),
                             )

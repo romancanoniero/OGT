@@ -62,6 +62,7 @@ data class TimebankMatchHit(
     val tag: String,
     val tagLabel: String = "",
     val chatEnabledHint: String = "",
+    val photoUrl: String? = null,
 )
 
 /** Vecino que apoya un pedido de trueque. */

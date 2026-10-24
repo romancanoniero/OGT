@@ -1224,7 +1224,7 @@ private fun loadSupportsByNeed(db: Database, ids: List<String>): Map<String, Lis
 private fun helpersForRequested(db: Database, userId: String): List<TimebankMatchHit> = db.withConnection { connection ->
     connection.prepareStatement(
         """
-        SELECT DISTINCT u.id::text, u.display_name, t.slug, t.label
+        SELECT DISTINCT u.id::text, u.display_name, t.slug, t.label, u.photo_url
         FROM user_skills req
         JOIN skill_tags t ON t.id = req.tag_id
         JOIN user_skills offered ON offered.tag_id = t.id
@@ -1245,6 +1245,7 @@ private fun helpersForRequested(db: Database, userId: String): List<TimebankMatc
                             displayName = rs.getString(2),
                             tag = rs.getString(3),
                             tagLabel = rs.getString(4),
+                            photoUrl = rs.getString(5),
                             chatEnabledHint = "El chat se habilita tras match mutuo, sin costo.",
                         ),
                     )
@@ -1257,7 +1258,7 @@ private fun helpersForRequested(db: Database, userId: String): List<TimebankMatc
 private fun seekersForMyOffers(db: Database, userId: String): List<TimebankMatchHit> = db.withConnection { connection ->
     connection.prepareStatement(
         """
-        SELECT DISTINCT u.id::text, u.display_name, t.slug, t.label
+        SELECT DISTINCT u.id::text, u.display_name, t.slug, t.label, u.photo_url
         FROM user_skills req
         JOIN skill_tags t ON t.id = req.tag_id
         JOIN user_skills mine ON mine.tag_id = req.tag_id
@@ -1278,6 +1279,7 @@ private fun seekersForMyOffers(db: Database, userId: String): List<TimebankMatch
                             displayName = rs.getString(2),
                             tag = rs.getString(3),
                             tagLabel = rs.getString(4),
+                            photoUrl = rs.getString(5),
                             chatEnabledHint = "El chat se habilita tras match mutuo, sin costo.",
                         ),
                     )
