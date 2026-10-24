@@ -655,10 +655,11 @@ body[data-crm-view="app"] .crm-password-wrap { width: min(280px, 100%); }
   .crm-workspace-main { padding: 20px 16px 32px; }
   .crm-kpis { grid-template-columns: 1fr 1fr; }
 }
-/* Miniatura del listado: marco fijo, recorte parejo al centro. */
+/* Miniatura del listado: el mismo marco 16:9 del JPEG recortado. */
 .crm-post-photo {
-  width: 120px;
+  width: 128px;
   height: 72px;
+  aspect-ratio: 16 / 9;
   object-fit: cover;
   object-position: center center;
   border-radius: 8px;

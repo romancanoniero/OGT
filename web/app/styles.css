@@ -402,7 +402,8 @@ span.avatar svg { width: 18px; height: 18px; }
   object-position: center center;
   background: var(--sand);
 }
-/* Marco de la tarjeta: 16 / 9, el mismo de la app. El encuadre se coloca en píxeles. */
+/* Marco del feed y de la ficha: 16 / 9, el mismo de la app. El encuadre se coloca en píxeles. */
+.post .media-slot,
 .post.open .media-slot {
   position: relative;
   width: calc(100% + 40px);
@@ -412,6 +413,7 @@ span.avatar svg { width: 18px; height: 18px; }
   overflow: hidden;
   background: var(--sand);
 }
+.post .media-slot .media,
 .post.open .media-slot .media {
   position: absolute;
   inset: 0;
