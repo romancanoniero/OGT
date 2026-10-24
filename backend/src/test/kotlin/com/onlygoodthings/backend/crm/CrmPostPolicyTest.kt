@@ -32,6 +32,13 @@ class CrmPostPolicyTest {
         assertFalse(CRM_POST_REMOVE.contains("DELETE"))
         assertTrue(CRM_VISIBLE_POST_SEARCH.contains("author_user_id"))
         assertTrue(CRM_VISIBLE_POST_SEARCH.contains("author_photo"))
+        assertTrue(CRM_VISIBLE_POST_SEARCH.contains("Alguien de la comunidad"))
+        assertTrue(CRM_VISIBLE_POST_SEARCH.contains("p.topic"))
+        assertTrue(CRM_VISIBLE_POST_SEARCH.contains("alt_text"))
+        assertTrue(crmQueryUsesAppLabel("alguien"))
+        assertTrue(crmQueryUsesAppLabel("Alguien de la comunidad"))
+        assertFalse(crmQueryUsesAppLabel("fauna"))
+        assertFalse(crmQueryUsesAppLabel("de"))
     }
 
     @Test fun imageUrlUsesTheStoredHttpAddressOnly() {

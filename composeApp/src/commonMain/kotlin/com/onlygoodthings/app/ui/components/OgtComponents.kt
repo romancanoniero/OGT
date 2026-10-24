@@ -209,17 +209,18 @@ fun OgtTopBar(
     title: String = "Only Good Things (OGT)",
     onBack: (() -> Unit)? = null,
     onNotifications: () -> Unit = {},
-    onProfile: () -> Unit = {},
+    onProfile: (() -> Unit)? = null,
     onOverflow: (() -> Unit)? = null,
     onMessages: (() -> Unit)? = null,
     hideOnScroll: Boolean = true,
     branded: Boolean = false,
 ) {
+    val openProfile = onProfile ?: LocalOgtOpenProfile.current
     val spec = OgtChromeSpec(
         title = title,
         onBack = onBack,
         onNotifications = onNotifications,
-        onProfile = onProfile,
+        onProfile = openProfile,
         onOverflow = onOverflow,
         onMessages = onMessages,
         hideOnScroll = hideOnScroll,

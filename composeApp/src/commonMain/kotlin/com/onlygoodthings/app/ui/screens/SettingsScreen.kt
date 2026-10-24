@@ -52,7 +52,12 @@ import com.onlygoodthings.shared.domain.LocationScope
  * Permisos del dispositivo viven acá. El garage se usa al ceder un lugar.
  */
 @Composable
-fun SettingsScreen(onLogout: () -> Unit = {}, onBack: () -> Unit = {}, onOpen: (String) -> Unit) {
+fun SettingsScreen(
+    onLogout: () -> Unit = {},
+    onBack: () -> Unit = {},
+    showChrome: Boolean = true,
+    onOpen: (String) -> Unit,
+) {
     val session = LocalOgtSession.current
     val copy = LocalOgtCopy.current
     val me = session.me()
@@ -71,8 +76,14 @@ fun SettingsScreen(onLogout: () -> Unit = {}, onBack: () -> Unit = {}, onOpen: (
         session.here() != null -> session.locationAccuracy?.let { "Señal ±${it.toInt()} m" } ?: "Con señal"
         else -> "Sin señal"
     }
-    Column(Modifier.fillMaxSize().background(OgtColors.canvas).verticalScroll(rememberScrollState())) {
-        OgtTopBar(title = "Ajustes", onBack = onBack)
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(OgtColors.canvas)
+            .verticalScroll(rememberScrollState())
+            .padding(bottom = if (showChrome) 0.dp else 88.dp),
+    ) {
+        if (showChrome) OgtTopBar(title = "Ajustes", onBack = onBack)
         ScreenColumn {
             Text(me.displayName, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = OgtColors.ink)
             if (!me.email.isNullOrBlank()) OgtCaption(me.email.orEmpty())

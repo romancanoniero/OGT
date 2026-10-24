@@ -706,6 +706,21 @@ internal val crmPostManagers = setOf("OWNER", "OPERATIONS", "TRUST_SAFETY", "SUP
 
 internal fun crmCanManagePosts(role: String?): Boolean = role != null && role in crmPostManagers
 
+/**
+ * Rótulo que pinta la app si no tiene el nombre del autor en memoria.
+ * No es una columna: el nombre guardado sigue en `users.display_name`.
+ */
+internal const val CRM_APP_AUTHOR_LABEL = "Alguien de la comunidad"
+
+/**
+ * «alguien» o «comunidad» piden ese rótulo. Un fragmento corto («de», «la») no abre todo el listado.
+ */
+internal fun crmQueryUsesAppLabel(query: String): Boolean {
+    val needle = query.trim()
+    if (needle.length < 4) return false
+    return CRM_APP_AUTHOR_LABEL.contains(needle, ignoreCase = true)
+}
+
 /** Patrón ILIKE acotado. El texto del operador no se concatena en el SQL. */
 internal fun crmLikeContains(raw: String): String {
     val escaped = raw.trim()
@@ -727,8 +742,8 @@ internal fun parseCrmPostCursor(raw: String): Pair<Long, String>? {
 }
 
 internal const val CRM_VISIBLE_POST_SEARCH = """
-SELECT p.id::text, p.body, p.moderation_status::text, p.created_at,
-       COALESCE(NULLIF(u.display_name, ''), NULLIF(c.trade_name, ''), NULLIF(c.legal_name, ''), 'Sin nombre') AS author_name,
+SELECT p.id::text, p.body, COALESCE(p.topic, '') AS topic, p.moderation_status::text, p.created_at,
+       COALESCE(NULLIF(btrim(u.display_name), ''), NULLIF(btrim(c.trade_name), ''), NULLIF(btrim(c.legal_name), ''), 'Alguien de la comunidad') AS author_name,
        p.author_user_id::text AS author_user_id,
        u.photo_url AS author_photo,
        photo.url AS image_url,
@@ -738,7 +753,7 @@ FROM social_posts p
 LEFT JOIN users u ON u.id = p.author_user_id
 LEFT JOIN companies c ON c.id = p.author_company_id
 LEFT JOIN LATERAL (
-  SELECT m.url, m.original_url, m.frame_x, m.frame_y, m.frame_zoom
+  SELECT m.url, m.original_url, m.alt_text, m.frame_x, m.frame_y, m.frame_zoom
   FROM post_media m
   WHERE m.post_id = p.id AND m.kind = 'IMAGE'
   ORDER BY m.sort_order
@@ -868,7 +883,7 @@ private fun searchVisiblePosts(
 ): CrmVisiblePostPage {
     val sql = buildString {
         append(CRM_VISIBLE_POST_SEARCH.trim())
-        if (query.isNotEmpty()) {
+        if (query.isNotEmpty() && !crmQueryUsesAppLabel(query)) {
             append(
                 """
                  AND (
@@ -877,7 +892,11 @@ private fun searchVisiblePosts(
                    OR COALESCE(u.email::text, '') ILIKE ? ESCAPE '\'
                    OR COALESCE(c.trade_name, '') ILIKE ? ESCAPE '\'
                    OR COALESCE(c.legal_name, '') ILIKE ? ESCAPE '\'
-                   OR p.id::text = ?
+                   OR COALESCE(p.topic, '') ILIKE ? ESCAPE '\'
+                   OR COALESCE(photo.alt_text, '') ILIKE ? ESCAPE '\'
+                   OR p.id::text ILIKE ? ESCAPE '\'
+                   OR COALESCE(p.author_user_id::text, '') ILIKE ? ESCAPE '\'
+                   OR COALESCE(NULLIF(btrim(u.display_name), ''), NULLIF(btrim(c.trade_name), ''), NULLIF(btrim(c.legal_name), ''), 'Alguien de la comunidad') ILIKE ? ESCAPE '\'
                  )
                 """.trimIndent()
             )
@@ -887,10 +906,9 @@ private fun searchVisiblePosts(
     }
     val rows = conn.prepareStatement(sql).use { stmt ->
         var index = 1
-        if (query.isNotEmpty()) {
+        if (query.isNotEmpty() && !crmQueryUsesAppLabel(query)) {
             val pattern = crmLikeContains(query)
-            repeat(5) { stmt.setString(index++, pattern) }
-            stmt.setString(index++, query)
+            repeat(10) { stmt.setString(index++, pattern) }
         }
         if (cursor != null) {
             stmt.setTimestamp(index++, Timestamp.from(Instant.ofEpochMilli(cursor.first)))

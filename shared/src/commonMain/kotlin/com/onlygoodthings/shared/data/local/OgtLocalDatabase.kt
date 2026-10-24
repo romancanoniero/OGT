@@ -460,6 +460,9 @@ class OgtLocalDatabase {
 
     /** Fusiona un post del servidor sin pisar media local de dispositivo. */
     fun upsertRemoteSocial(remote: SocialPost, silent: Boolean = false) {
+        if (remote.authorKind == AuthorKind.USER) {
+            applyUserLive(remote.authorId, remote.authorName, remote.authorPhotoUrl)
+        }
         val incoming = remote.asLocalPost()
         val index = posts.indexOfFirst { it.id == incoming.id }
         if (index >= 0) {

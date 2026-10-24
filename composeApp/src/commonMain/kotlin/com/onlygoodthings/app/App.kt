@@ -38,6 +38,7 @@ import com.onlygoodthings.shared.domain.feedCardKind
 import com.onlygoodthings.shared.domain.honorAppLink
 import com.onlygoodthings.shared.domain.isGatheringPost
 import com.onlygoodthings.app.ui.components.LocalOgtChrome
+import com.onlygoodthings.app.ui.components.LocalOgtOpenProfile
 import com.onlygoodthings.app.ui.components.OgtChromePad
 import com.onlygoodthings.app.ui.components.OgtHostedTopBar
 import com.onlygoodthings.app.ui.components.ogtDismissImeOnScroll
@@ -125,6 +126,8 @@ fun App() {
         var rulesBack by remember { mutableStateOf(OgtRoute.Settings) }
         /** Ajustes sigue debajo de sus hojas: atrás vuelve al mismo scroll. */
         var settingsResume by remember { mutableStateOf(false) }
+        /** La foto abre Ajustes sobre la página. La barra y el pie de esa pantalla quedan. */
+        var profilePage by remember { mutableStateOf(false) }
         var editVehicleId by remember { mutableStateOf<String?>(null) }
         var editPostId by remember { mutableStateOf<String?>(null) }
         var animalPublishKind by remember {
@@ -373,16 +376,7 @@ fun App() {
                 notify.requestPermission()
             }
         }
-        val stackBack: (() -> Unit)? = when {
-            detectedManeuver != null -> ({ detectedManeuver = null })
-            session.askStaleParked -> ({ session.askStaleParked = false })
-            session.askLeaveWithoutYield -> ({ session.askLeaveWithoutYield = false })
-            session.askYieldApproach -> ({
-                session.askYieldApproach = false
-                session.willLeaveParked = false
-            })
-            session.askLocationScope && route != OgtRoute.Gps -> ({ session.askLocationScope = false })
-            else -> when (route) {
+        val routeBack: (() -> Unit)? = when (route) {
                 OgtRoute.Otp -> ({ route = otpBack })
                 OgtRoute.Recover, OgtRoute.SignUp -> ({ route = OgtRoute.Login })
                 OgtRoute.NeighborProfile, OgtRoute.PostDetail, OgtRoute.Publish,
@@ -413,11 +407,23 @@ fun App() {
                     route = gpsReturn
                 })
                 else -> null
-            }
+        }
+        val stackBack: (() -> Unit)? = when {
+            profilePage -> ({ profilePage = false })
+            detectedManeuver != null -> ({ detectedManeuver = null })
+            session.askStaleParked -> ({ session.askStaleParked = false })
+            session.askLeaveWithoutYield -> ({ session.askLeaveWithoutYield = false })
+            session.askYieldApproach -> ({
+                session.askYieldApproach = false
+                session.willLeaveParked = false
+            })
+            session.askLocationScope && route != OgtRoute.Gps -> ({ session.askLocationScope = false })
+            else -> routeBack
         }
         OgtBackHandler(enabled = stackBack != null) { stackBack?.invoke() }
         val chrome = rememberOgtChromeHost()
-        chrome.fallbackBack = stackBack
+        // Abrir Ajustes no suma una flecha: la barra de la pantalla queda como estaba.
+        chrome.fallbackBack = if (profilePage) routeBack else stackBack
         val chromeScroll = remember(chrome) { chrome.nestedScrollConnection() }
         LaunchedEffect(route) { chrome.revealNow() }
         val settingsLeaves = setOf(
@@ -429,9 +435,40 @@ fun App() {
         )
         val keepSettings = route == OgtRoute.Settings || (settingsResume && route in settingsLeaves)
         val closeSettingsLeaf: () -> Unit = { route = OgtRoute.Settings }
+        val openProfile: () -> Unit = { profilePage = true }
+        val openSettingsKey: (String) -> Unit = { key ->
+            profilePage = false
+            settingsResume = true
+            route = when (key) {
+                "language" -> OgtRoute.Language
+                "rules" -> {
+                    rulesBack = OgtRoute.Settings
+                    OgtRoute.CommunityRules
+                }
+                "wallet" -> OgtRoute.Wallet
+                "ranking" -> OgtRoute.Ranking
+                "invite" -> OgtRoute.Invite
+                "messages" -> OgtRoute.Messages
+                "sponsors" -> OgtRoute.Sponsors
+                "milestone" -> OgtRoute.Milestone
+                "splashSponsors" -> OgtRoute.SplashSponsors
+                "animatedSvg" -> OgtRoute.AnimatedSvg
+                "car" -> {
+                    editVehicleId = null
+                    OgtRoute.Vehicle
+                }
+                else -> if (key.startsWith("car:")) {
+                    editVehicleId = key.removePrefix("car:")
+                    OgtRoute.Vehicle
+                } else {
+                    OgtRoute.Settings
+                }
+            }
+        }
         CompositionLocalProvider(
             LocalOgtLocation provides location,
             LocalOgtChrome provides chrome,
+            LocalOgtOpenProfile provides openProfile,
         ) {
         Scaffold(
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -451,34 +488,8 @@ fun App() {
                             settingsResume = false
                             route = OgtRoute.Feed
                         },
-                    ) { key ->
-                        settingsResume = true
-                        route = when (key) {
-                            "language" -> OgtRoute.Language
-                            "rules" -> {
-                                rulesBack = OgtRoute.Settings
-                                OgtRoute.CommunityRules
-                            }
-                            "wallet" -> OgtRoute.Wallet
-                            "ranking" -> OgtRoute.Ranking
-                            "invite" -> OgtRoute.Invite
-                            "messages" -> OgtRoute.Messages
-                            "sponsors" -> OgtRoute.Sponsors
-                            "milestone" -> OgtRoute.Milestone
-                            "splashSponsors" -> OgtRoute.SplashSponsors
-                            "animatedSvg" -> OgtRoute.AnimatedSvg
-                            "car" -> {
-                                editVehicleId = null
-                                OgtRoute.Vehicle
-                            }
-                            else -> if (key.startsWith("car:")) {
-                                editVehicleId = key.removePrefix("car:")
-                                OgtRoute.Vehicle
-                            } else {
-                                OgtRoute.Settings
-                            }
-                        }
-                    }
+                        onOpen = openSettingsKey,
+                    )
                 }
                 when (route) {
                     OgtRoute.Splash -> SplashScreen {
@@ -591,10 +602,7 @@ fun App() {
                                 route = OgtRoute.PostDetail
                             },
                             onNotifications = { route = OgtRoute.Notifications },
-                            onProfile = {
-                                settingsResume = false
-                                route = OgtRoute.Settings
-                            },
+                            onProfile = openProfile,
                             onMessages = { route = OgtRoute.Messages },
                             onInvite = { route = OgtRoute.Invite },
                             onOpenNeighbor = { userId ->
@@ -784,6 +792,21 @@ fun App() {
                         },
                     )
                 }
+                if (profilePage) {
+                    SettingsScreen(
+                        onLogout = {
+                            scope.launch {
+                                profilePage = false
+                                settingsResume = false
+                                auth.signOut()
+                                route = OgtRoute.Login
+                            }
+                        },
+                        onBack = { profilePage = false },
+                        showChrome = false,
+                        onOpen = openSettingsKey,
+                    )
+                }
                 }
                 if (session.askLocationScope && route != OgtRoute.Gps) {
                     LocationScopeDialog(
@@ -920,8 +943,12 @@ fun App() {
                 if (showBar) {
                     OgtBottomBar(
                         current = route,
-                        onSelect = { route = it },
+                        onSelect = {
+                            profilePage = false
+                            route = it
+                        },
                             onCompose = { kind ->
+                            profilePage = false
                             when (kind) {
                                 ComposePostKind.ACTION, ComposePostKind.GATHERING,
                                 ComposePostKind.TERNURA, ComposePostKind.HOMENAJE -> {

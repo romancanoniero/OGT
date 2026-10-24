@@ -326,7 +326,7 @@ export async function start() {
         return value;
       }
       const postListing = {
-            placeholder: 'Autor, texto o id',
+            placeholder: 'Autor, texto, tema o id',
             searchLabel: 'Buscar publicación',
             bulk: canPosts ? { icon: 'qs_trash.png', label: 'Quitar selección' } : null,
             columns: ['Foto', 'Autor', 'Texto', 'Fecha', 'Estado', 'Acción'],
@@ -361,7 +361,7 @@ export async function start() {
                 key: post.id,
                 cells: [
                   image ? (cropped ? { image } : { image, frame }) : { text: '' },
-                  { text: post.authorName || 'Sin nombre' },
+                  { text: post.authorName || 'Alguien de la comunidad' },
                   { text: post.body || '', clamp: true },
                   { text: when },
                   { badge: 'Visible', tone: 'calm' },
@@ -373,7 +373,7 @@ export async function start() {
                   { icon: 'qs_trash.png', label: 'Quitar', name: 'remove' },
                 ] : [{ icon: 'qs_anecdote.svg', label: 'Ver publicación', name: 'open' }],
                 detail: {
-                  title: post.authorName || 'Sin nombre',
+                  title: post.authorName || 'Alguien de la comunidad',
                   meta: `${when} · Visible`,
                   body: post.body || '',
                   image: editor,

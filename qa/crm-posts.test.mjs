@@ -115,7 +115,10 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   assert.match(runtime, /limitada a 12 horas/);
   assert.match(runtime, /async function returnToSignIn/);
   assert.doesNotMatch(runtime, /limitada a 15 minutos/);
-  assert.match(runtime, /platform\/posts\/detail/);
+  assert.match(runtime, /post\.authorName \|\| 'Alguien de la comunidad'/);
+  assert.match(ui, /search\.addEventListener\('input'/);
+  assert.match(ui, /setTimeout\(\(\) => \{ void loadListing\(listing, true\); \}, 280\)/);
+  assert.doesNotMatch(ui, /search\.addEventListener\('keydown'/);
 });
 
 test('la rueda del CRM web acerca arriba y aleja abajo', () => {
