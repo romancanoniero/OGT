@@ -214,6 +214,7 @@ fun OgtTopBar(
     onMessages: (() -> Unit)? = null,
     hideOnScroll: Boolean = true,
     branded: Boolean = false,
+    showProfileAvatar: Boolean = true,
 ) {
     val openProfile = onProfile ?: LocalOgtOpenProfile.current
     val spec = OgtChromeSpec(
@@ -225,6 +226,7 @@ fun OgtTopBar(
         onMessages = onMessages,
         hideOnScroll = hideOnScroll,
         branded = branded,
+        showProfileAvatar = showProfileAvatar,
     )
     val host = LocalOgtChrome.current
     if (host != null) {
@@ -409,7 +411,7 @@ private val DockComposeBlock =
 
 @Composable
 fun OgtBottomBar(
-    current: OgtRoute,
+    current: OgtRoute?,
     onSelect: (OgtRoute) -> Unit,
     onCompose: (ComposePostKind) -> Unit,
     modifier: Modifier = Modifier,

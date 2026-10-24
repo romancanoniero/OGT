@@ -73,6 +73,7 @@ data class OgtChromeSpec(
     val onMessages: (() -> Unit)? = null,
     val hideOnScroll: Boolean = true,
     val branded: Boolean = false,
+    val showProfileAvatar: Boolean = true,
 )
 
 /**
@@ -263,17 +264,19 @@ internal fun OgtTopBarRow(spec: OgtChromeSpec, onBack: (() -> Unit)? = spec.onBa
             Spacer(Modifier.size(6.dp))
             CircleIconButton(Res.drawable.qs_feed, "Mensajes", spec.onMessages)
         }
-        Spacer(Modifier.size(8.dp))
-        Image(
-            painterResource(Res.drawable.feed_avatar_me),
-            contentDescription = "Perfil",
-            modifier = Modifier
-                .size(OgtDimens.iconButton)
-                .clip(CircleShape)
-                .border(1.dp, OgtColors.hairline, CircleShape)
-                .clickable(onClick = spec.onProfile),
-            contentScale = ContentScale.Crop,
-        )
+        if (spec.showProfileAvatar) {
+            Spacer(Modifier.size(8.dp))
+            Image(
+                painterResource(Res.drawable.feed_avatar_me),
+                contentDescription = "Perfil",
+                modifier = Modifier
+                    .size(OgtDimens.iconButton)
+                    .clip(CircleShape)
+                    .border(1.dp, OgtColors.hairline, CircleShape)
+                    .clickable(onClick = spec.onProfile),
+                contentScale = ContentScale.Crop,
+            )
+        }
     }
 }
 

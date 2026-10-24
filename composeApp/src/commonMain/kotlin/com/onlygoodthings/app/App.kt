@@ -126,8 +126,8 @@ fun App() {
         var rulesBack by remember { mutableStateOf(OgtRoute.Settings) }
         /** Ajustes sigue debajo de sus hojas: atrás vuelve al mismo scroll. */
         var settingsResume by remember { mutableStateOf(false) }
-        /** La foto abre Ajustes sobre la página. La barra y el pie de esa pantalla quedan. */
-        var profilePage by remember { mutableStateOf(false) }
+        /** Pantalla desde la que se abrió Ajustes. La flecha vuelve ahí. */
+        var settingsReturn by remember { mutableStateOf(OgtRoute.Feed) }
         var editVehicleId by remember { mutableStateOf<String?>(null) }
         var editPostId by remember { mutableStateOf<String?>(null) }
         var animalPublishKind by remember {
@@ -304,7 +304,7 @@ fun App() {
                 ParkedPresenceAction.NONE -> Unit
             }
         }
-        val showBar = route in OgtBottomTabs &&
+        val showBar = (route in OgtBottomTabs || route == OgtRoute.Settings) &&
             !session.askLocationScope &&
             detectedManeuver == null &&
             !session.askYieldApproach &&
@@ -393,7 +393,7 @@ fun App() {
                 OgtRoute.Chat -> ({ route = chatBack })
                 OgtRoute.Settings -> ({
                     settingsResume = false
-                    route = OgtRoute.Feed
+                    route = settingsReturn.takeUnless { it == OgtRoute.Settings } ?: OgtRoute.Feed
                 })
                 OgtRoute.Language, OgtRoute.Wallet, OgtRoute.Ranking, OgtRoute.Sponsors,
                 OgtRoute.SplashSponsors, OgtRoute.Vehicle,
@@ -409,7 +409,6 @@ fun App() {
                 else -> null
         }
         val stackBack: (() -> Unit)? = when {
-            profilePage -> ({ profilePage = false })
             detectedManeuver != null -> ({ detectedManeuver = null })
             session.askStaleParked -> ({ session.askStaleParked = false })
             session.askLeaveWithoutYield -> ({ session.askLeaveWithoutYield = false })
@@ -422,8 +421,7 @@ fun App() {
         }
         OgtBackHandler(enabled = stackBack != null) { stackBack?.invoke() }
         val chrome = rememberOgtChromeHost()
-        // Abrir Ajustes no suma una flecha: la barra de la pantalla queda como estaba.
-        chrome.fallbackBack = if (profilePage) routeBack else stackBack
+        chrome.fallbackBack = stackBack
         val chromeScroll = remember(chrome) { chrome.nestedScrollConnection() }
         LaunchedEffect(route) { chrome.revealNow() }
         val settingsLeaves = setOf(
@@ -435,9 +433,12 @@ fun App() {
         )
         val keepSettings = route == OgtRoute.Settings || (settingsResume && route in settingsLeaves)
         val closeSettingsLeaf: () -> Unit = { route = OgtRoute.Settings }
-        val openProfile: () -> Unit = { profilePage = true }
+        val openProfile: () -> Unit = {
+            if (route != OgtRoute.Settings) settingsReturn = route
+            settingsResume = false
+            route = OgtRoute.Settings
+        }
         val openSettingsKey: (String) -> Unit = { key ->
-            profilePage = false
             settingsResume = true
             route = when (key) {
                 "language" -> OgtRoute.Language
@@ -486,7 +487,7 @@ fun App() {
                         },
                         onBack = {
                             settingsResume = false
-                            route = OgtRoute.Feed
+                            route = settingsReturn.takeUnless { it == OgtRoute.Settings } ?: OgtRoute.Feed
                         },
                         onOpen = openSettingsKey,
                     )
@@ -792,21 +793,6 @@ fun App() {
                         },
                     )
                 }
-                if (profilePage) {
-                    SettingsScreen(
-                        onLogout = {
-                            scope.launch {
-                                profilePage = false
-                                settingsResume = false
-                                auth.signOut()
-                                route = OgtRoute.Login
-                            }
-                        },
-                        onBack = { profilePage = false },
-                        showChrome = false,
-                        onOpen = openSettingsKey,
-                    )
-                }
                 }
                 if (session.askLocationScope && route != OgtRoute.Gps) {
                     LocationScopeDialog(
@@ -942,13 +928,9 @@ fun App() {
                 OgtHostedTopBar(chrome)
                 if (showBar) {
                     OgtBottomBar(
-                        current = route,
-                        onSelect = {
-                            profilePage = false
-                            route = it
-                        },
+                        current = route.takeIf { it in OgtBottomTabs },
+                        onSelect = { route = it },
                             onCompose = { kind ->
-                            profilePage = false
                             when (kind) {
                                 ComposePostKind.ACTION, ComposePostKind.GATHERING,
                                 ComposePostKind.TERNURA, ComposePostKind.HOMENAJE -> {
