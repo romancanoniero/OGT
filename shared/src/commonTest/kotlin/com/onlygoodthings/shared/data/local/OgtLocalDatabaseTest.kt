@@ -553,11 +553,13 @@ class OgtLocalDatabaseTest {
         val db = OgtLocalDatabase.seeded()
         val media = db.postMedia.first { it.kind == com.onlygoodthings.shared.domain.MediaKind.IMAGE }
         val before = media.url
+        val tick = db.socialTick.value
         val live = SocialLiveCounters(
             id = media.postId,
             commentCount = db.post(media.postId).commentCount,
             impactCount = db.post(media.postId).impactCount,
-            imageUrl = "https://onlygoodthings.lat/media/u/recorte.jpg",
+            url = "https://onlygoodthings.lat/media/u/recorte.jpg",
+            mediaUrls = listOf("https://onlygoodthings.lat/media/u/recorte.jpg"),
             frameX = 0.2,
             frameY = 0.3,
             frameZoom = 2.0,
@@ -568,6 +570,16 @@ class OgtLocalDatabaseTest {
         assertTrue(before != next.url)
         assertEquals(null, next.frameX)
         assertEquals(null, next.frameZoom)
+        assertEquals(tick + 1, db.socialTick.value)
+        val alias = SocialLiveCounters(
+            id = media.postId,
+            commentCount = db.post(media.postId).commentCount,
+            impactCount = db.post(media.postId).impactCount,
+            imageUrl = "https://onlygoodthings.lat/media/u/alias.jpg",
+        )
+        assertTrue(db.applySocialLive(alias))
+        assertEquals("https://onlygoodthings.lat/media/u/alias.jpg", db.postMedia.first { it.id == media.id }.url)
+        assertEquals(null, db.postMedia.first { it.id == media.id }.frameZoom)
     }
 
     @Test

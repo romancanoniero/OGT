@@ -840,9 +840,12 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
         row.authorPhotoUrl = live.authorPhotoUrl;
         authorChanged = true;
       }
-      if (row && live.imageUrl && row.imageUrl !== live.imageUrl) {
+      const nextPhoto = (typeof live.url === 'string' && live.url)
+        || (Array.isArray(live.mediaUrls) && live.mediaUrls.find(item => typeof item === 'string' && item))
+        || live.imageUrl;
+      if (row && nextPhoto && row.imageUrl !== nextPhoto) {
         if (!row.editorUrl && row.imageUrl) row.editorUrl = row.imageUrl;
-        row.imageUrl = live.imageUrl;
+        row.imageUrl = nextPhoto;
         authorChanged = true;
       }
       if (row && live.editorUrl && row.editorUrl !== live.editorUrl) {

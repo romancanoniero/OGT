@@ -437,6 +437,8 @@ export async function start() {
                 frameX: saved.frameX,
                 frameY: saved.frameY,
                 frameZoom: saved.frameZoom,
+                url: saved.imageUrl,
+                mediaUrls: saved.imageUrl ? [saved.imageUrl] : [],
                 imageUrl: saved.imageUrl,
                 editorUrl: saved.editorUrl || post.editorUrl,
                 moderationStatus: 'VISIBLE',

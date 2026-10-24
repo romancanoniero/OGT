@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import com.onlygoodthings.shared.domain.SocialLiveCounters
+import com.onlygoodthings.shared.protocol.WsCodec
 import com.onlygoodthings.shared.realtime.OgtDbPaths
 import com.onlygoodthings.shared.realtime.socialLiveCountersFrom
 import org.junit.jupiter.api.Test
@@ -126,17 +127,34 @@ class CrmPostPolicyTest {
         assertTrue(CRM_VISIBLE_POST_SEARCH.contains("m.url"))
         assertTrue(CRM_VISIBLE_POST_SEARCH.contains("original_url"))
         assertTrue(CRM_VISIBLE_POST_SEARCH.contains("frame_x"))
+        val photo = "https://onlygoodthings.lat/media/u/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.jpg"
         val parsed = socialLiveCountersFrom(
             mapOf(
                 "id" to "p",
-                "imageUrl" to "https://onlygoodthings.lat/media/u/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.jpg",
+                "url" to photo,
+                "mediaUrls" to listOf(photo),
             ),
             "p",
         )
-        assertEquals(
-            "https://onlygoodthings.lat/media/u/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.jpg",
-            parsed?.imageUrl,
-        )
+        assertEquals(photo, parsed?.url)
+        assertEquals(listOf(photo), parsed?.mediaUrls)
         assertEquals("ogt/social/posts/p", OgtDbPaths.socialPost("p"))
+        val encoded = WsCodec.json.encodeToString(
+            SocialLiveCounters.serializer(),
+            SocialLiveCounters(
+                id = "p",
+                commentCount = 1,
+                impactCount = 1,
+                url = photo,
+                mediaUrls = listOf(photo),
+                imageUrl = photo,
+            ),
+        )
+        val roundTrip = WsCodec.json.decodeFromString(SocialLiveCounters.serializer(), encoded)
+        assertEquals(photo, roundTrip.url)
+        assertEquals(listOf(photo), roundTrip.mediaUrls)
+        assertEquals(photo, roundTrip.imageUrl)
+        assertTrue(encoded.contains("\"url\":"))
+        assertTrue(encoded.contains("\"mediaUrls\":"))
     }
 }

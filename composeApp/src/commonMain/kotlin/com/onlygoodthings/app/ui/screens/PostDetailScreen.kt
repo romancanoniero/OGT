@@ -174,7 +174,7 @@ fun PostDetailScreen(
         mutableStateOf("Creo que lo vi cerca. Collar rojo, oreja caída.")
     }
     val kind = feedCardKind(post.tag, listing?.kind, post.sourceUrl)
-    val media = db.mediaOf(post.id)
+    val media = remember(post.id, socialTick) { db.mediaOf(post.id) }
     var comment by remember { mutableStateOf("") }
     var commentRev by remember { mutableStateOf(0) }
     var clapRev by remember { mutableStateOf(0) }
@@ -1317,7 +1317,7 @@ private fun DetailMedia(
             .ogtBleedHorizontal(OgtDimens.margin)
             .aspectRatio(frame.coerceIn(0.25f, 3f)),
     ) {
-        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { media[it].id }) { page ->
+        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { media[it].let { item -> "${item.id}:${item.url}" } }) { page ->
             val item = media[page]
             Box(
                 Modifier

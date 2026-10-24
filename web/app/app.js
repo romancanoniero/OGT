@@ -329,7 +329,8 @@ function applyLive(live) {
     paintPulse();
     return;
   }
-  if (live.imageUrl) replaceShownPhoto(live.id, live.imageUrl);
+  const photoUrl = livePhotoUrl(live);
+  if (photoUrl) replaceShownPhoto(live.id, photoUrl);
   const idx = lastFeed.findIndex((p) => p.id === live.id);
   if (idx < 0) return;
   const patch = {
@@ -346,12 +347,11 @@ function applyLive(live) {
     if (live.authorPhotoUrl) patch.authorPhotoUrl = live.authorPhotoUrl;
     rememberFace({ id: live.authorUserId, displayName: live.authorName, photoUrl: live.authorPhotoUrl });
   }
-  if (live.imageUrl) {
-    const nextUrl = String(live.imageUrl);
+  if (photoUrl) {
     const media = Array.isArray(lastFeed[idx].media) ? lastFeed[idx].media.slice() : [];
     if (media[0]) {
       media[0] = Object.assign({}, media[0], {
-        url: nextUrl,
+        url: photoUrl,
         frameX: null,
         frameY: null,
         frameZoom: null,
@@ -359,13 +359,13 @@ function applyLive(live) {
       patch.media = media;
     }
     const urls = Array.isArray(lastFeed[idx].mediaUrls) ? lastFeed[idx].mediaUrls.slice() : [];
-    if (urls.length) urls[0] = nextUrl;
-    else urls.push(nextUrl);
+    if (urls.length) urls[0] = photoUrl;
+    else urls.push(photoUrl);
     patch.mediaUrls = urls;
     patch.frameX = null;
     patch.frameY = null;
     patch.frameZoom = null;
-    replaceShownPhoto(live.id, nextUrl);
+    replaceShownPhoto(live.id, photoUrl);
   } else if (live.frameX != null && live.frameY != null) {
     patch.frameX = Number(live.frameX);
     patch.frameY = Number(live.frameY);
@@ -422,11 +422,18 @@ function paintPost(post) {
   const photo = post.media?.[0]?.url || post.mediaUrls?.[0];
   const next = photo ? mediaUrl(photo) : "";
   card.querySelectorAll(":scope > .media-slot img.media, :scope > img.media").forEach((img) => {
-    if (next && img.getAttribute("src") !== next) img.src = next;
+    const srcChanged = Boolean(next) && img.getAttribute("src") !== next;
+    if (srcChanged) {
+      img.style.left = "";
+      img.style.top = "";
+      img.style.width = "";
+      img.style.height = "";
+      img.src = next;
+    }
     img.dataset.frameX = String(frame.x);
     img.dataset.frameY = String(frame.y);
     img.dataset.frameZoom = String(frame.zoom);
-    placeLiveFrame(img);
+    if (!srcChanged && img.complete && img.naturalWidth) placeLiveFrame(img);
   });
   paintAuthor(card, post);
 }
@@ -1703,15 +1710,30 @@ function storiesBlock(post, { preview = false, compose = false } = {}) {
   return `${head}${list}${form}`;
 }
 
-/** Cambia la foto que ya está en pantalla. La URL nueva no reutiliza la caché del archivo crudo. */
+/** La foto que ya pintan la tarjeta y la ficha: `url`, si no el primer `mediaUrls`. */
+function livePhotoUrl(live) {
+  const direct = typeof live?.url === "string" ? live.url.trim() : "";
+  if (direct) return direct;
+  const listed = Array.isArray(live?.mediaUrls)
+    ? live.mediaUrls.find((item) => typeof item === "string" && item.trim())
+    : "";
+  if (listed) return String(listed).trim();
+  return typeof live?.imageUrl === "string" ? live.imageUrl.trim() : "";
+}
+
+/** Cambia la foto del feed y de la ficha abierta. La URL nueva no reutiliza la caché del archivo crudo. */
 function replaceShownPhoto(postId, imageUrl) {
   const next = mediaUrl(imageUrl);
   if (!next) return;
   document.querySelectorAll(`[data-post="${cssAttr(postId)}"] img.media`).forEach((img) => {
-    if (img.getAttribute("src") !== next) img.src = next;
     img.dataset.frameX = "0.5";
     img.dataset.frameY = "0.5";
     img.dataset.frameZoom = "1";
+    img.style.left = "";
+    img.style.top = "";
+    img.style.width = "";
+    img.style.height = "";
+    if (img.getAttribute("src") !== next) img.src = next;
     if (img.complete && img.naturalWidth) placeLiveFrame(img);
   });
 }
