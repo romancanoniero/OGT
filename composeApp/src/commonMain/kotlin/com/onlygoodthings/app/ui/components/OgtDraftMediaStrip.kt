@@ -34,6 +34,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,7 +55,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.onlygoodthings.app.data.LocalAuth
 import com.onlygoodthings.app.platform.OgtPickedMedia
+import com.onlygoodthings.app.platform.previewUrl
 import com.onlygoodthings.app.platform.rememberOgtMediaPicker
 import com.onlygoodthings.app.resources.Res
 import com.onlygoodthings.app.resources.publish_action_add
@@ -66,6 +69,9 @@ import com.onlygoodthings.app.theme.OgtMotion
 import com.onlygoodthings.app.ui.screens.OgtPostImage
 import com.onlygoodthings.shared.domain.MediaKind
 import com.onlygoodthings.shared.domain.PostMediaRules
+import androidx.compose.runtime.mutableStateListOf
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.roundToInt
@@ -86,10 +92,19 @@ fun OgtDraftMediaStrip(
     missing: Boolean,
     heroDescription: String,
 ) {
-    val remaining = (PostMediaRules.MAX_ITEMS - items.size).coerceAtLeast(0)
+    val auth = LocalAuth.current
+    val scope = rememberCoroutineScope()
+    val queue = remember { mutableStateListOf<OgtPickedMedia>() }
+    var uploadError by remember { mutableStateOf<String?>(null) }
+    var framing by remember { mutableStateOf<OgtPickedMedia?>(null) }
+    val remaining = (PostMediaRules.MAX_ITEMS - items.size - queue.size - (if (framing != null) 1 else 0)).coerceAtLeast(0)
     val picker = rememberOgtMediaPicker(remaining) { picked ->
-        if (items.size >= PostMediaRules.MAX_ITEMS) return@rememberOgtMediaPicker
-        items += picked
+        val used = items.size + queue.size + (if (framing != null) 1 else 0)
+        if (used >= PostMediaRules.MAX_ITEMS) return@rememberOgtMediaPicker
+        if (picked.kind == MediaKind.IMAGE) queue += picked else items += picked
+    }
+    LaunchedEffect(queue.size, framing) {
+        if (framing == null && queue.isNotEmpty()) framing = queue.removeAt(0)
     }
     var sourceOpen by remember { mutableStateOf(false) }
     var heroBounds by remember { mutableStateOf(Rect.Zero) }
@@ -273,6 +288,13 @@ fun OgtDraftMediaStrip(
                     MediaAction("Cámara", Modifier.weight(1f)) { pickAndClose(picker.takeCamera) }
                 }
             }
+            if (!uploadError.isNullOrBlank()) {
+                Text(
+                    uploadError.orEmpty(),
+                    color = OgtColors.error,
+                    fontSize = 13.sp,
+                )
+            }
         }
         if (dragging != null) {
             val local = dragWindow - rootBounds.topLeft
@@ -289,13 +311,47 @@ fun OgtDraftMediaStrip(
                 DraftStill(dragging, "Arrastrando", Modifier.fillMaxSize())
             }
         }
+        val pending = framing
+        if (pending != null) {
+            OgtPostFrameSheet(
+                source = pending,
+                onCancel = {
+                    framing = null
+                    queue.clear()
+                },
+                onConfirm = { framedPath ->
+                    val next = pending.copy(path = framedPath, fromDevice = true)
+                    items += next
+                    framing = null
+                    uploadError = null
+                    val task = auth.enqueueFramedUpload(next.id, framedPath)
+                    scope.launch {
+                        val url = try {
+                            task.await()
+                        } catch (cancel: CancellationException) {
+                            throw cancel
+                        } catch (_: Throwable) {
+                            null
+                        }
+                        val index = items.indexOfFirst { it.id == next.id }
+                        if (index < 0) return@launch
+                        if (url == null) {
+                            items.removeAt(index)
+                            uploadError = "No se pudo subir la foto. Volvé a elegirla."
+                        } else {
+                            items[index] = items[index].copy(uploadedUrl = url)
+                        }
+                    }
+                },
+            )
+        }
     }
 }
 
 @Composable
 private fun DraftStill(item: OgtPickedMedia, description: String, modifier: Modifier) {
     OgtPostImage(
-        url = if (item.fromDevice) "file://${item.path}" else "asset://${item.path}",
+        url = item.previewUrl(),
         assetKey = if (item.fromDevice) {
             ""
         } else if (item.kind == MediaKind.VIDEO) {

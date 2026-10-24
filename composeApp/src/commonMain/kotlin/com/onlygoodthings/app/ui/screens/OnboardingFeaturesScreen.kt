@@ -4,6 +4,6 @@ import androidx.compose.runtime.Composable
 
 /** El onboarding oficial es el carrusel de una función por página. */
 @Composable
-fun OnboardingFeaturesScreen(onContinue: () -> Unit, onLogin: () -> Unit) {
-    OnboardingScreen(onDone = onContinue, onLogin = onLogin)
+fun OnboardingFeaturesScreen(onContinue: () -> Unit) {
+    OnboardingScreen(onContinue = onContinue)
 }

@@ -2,6 +2,8 @@
 
 Proyecto `11995265718269939633`.
 
+Los `onboard_*.png` son el clay Quiet Studio del onboarding: auto con pin, intercambio, mascotas, comillas, personajes notorios, héroes anónimos y puntos. Fondo transparente.
+
 | Pantalla | ID | Archivos | Compose |
 |---|---|---|---|
 | Puntos Solidarios (slide) | `baa93928f36a4f96bfaf71ad963a5fc1` | `slide-puntos.png/.html` | slide 5 de `OnboardingScreen.kt` |

@@ -59,11 +59,11 @@ fun SightingReportDialog(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Image(
-                    painter = painterResource(neighborAvatarArt(sighting.userId)),
+                com.onlygoodthings.app.ui.components.OgtProfilePhoto(
+                    userId = sighting.userId,
+                    fallback = neighborAvatarArt(sighting.userId),
                     contentDescription = name,
                     modifier = Modifier.size(48.dp).clip(CircleShape).border(1.dp, OgtColors.hairline, CircleShape),
-                    contentScale = ContentScale.Crop,
                 )
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(name, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = OgtColors.ink)

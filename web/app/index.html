@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css?v=trueque-invite">
+  <script src="ogt-media-cache.js?v=cache3"></script>
 </head>
 <body>
   <div id="auth-root" hidden></div>
@@ -73,11 +74,16 @@
       document.getElementById("icons").innerHTML = svg;
     }).then(() => {
       const db = document.createElement("script");
-      db.src = "ogt-sdk.js?v=chat-live";
+      db.src = "ogt-sdk.js?v=profiles";
       db.onload = function () {
-        const s = document.createElement("script");
-        s.src = "app.js?v=trueque-invite";
-        document.body.appendChild(s);
+        const frame = document.createElement("script");
+        frame.src = "ogt-frame.js?v=optimistic1";
+        frame.onload = function () {
+          const s = document.createElement("script");
+          s.src = "app.js?v=optimistic1";
+          document.body.appendChild(s);
+        };
+        document.body.appendChild(frame);
       };
       document.body.appendChild(db);
     });

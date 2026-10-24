@@ -24,11 +24,11 @@ import androidx.compose.ui.window.DialogProperties
 import com.onlygoodthings.app.media.OgtMediaCache
 import com.onlygoodthings.app.platform.OgtPostedVideo
 import com.onlygoodthings.app.resources.Res
-import com.onlygoodthings.app.resources.feed_story_donacion
 import com.onlygoodthings.app.resources.qs_close
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.ui.components.CircleIconButton
 import com.onlygoodthings.app.ui.components.MediaPagerIndicator
+import com.onlygoodthings.app.ui.components.OgtLoader
 import com.onlygoodthings.shared.data.local.LocalPostMedia
 import com.onlygoodthings.shared.domain.MediaKind
 
@@ -54,16 +54,24 @@ fun PostMediaViewer(
                 )
                 if (playable) {
                     var playUrl by remember(item.url) {
-                        mutableStateOf(OgtMediaCache.cachedFileUrl(item.url) ?: item.url)
+                        mutableStateOf(OgtMediaCache.cachedFileUrl(item.url).orEmpty())
                     }
                     LaunchedEffect(item.url) {
-                        playUrl = OgtMediaCache.cachedPlayableUrl(item.url)
+                        val local = OgtMediaCache.cachedPlayableUrl(item.url)
+                        if (local.isNotBlank()) playUrl = local
                     }
-                    OgtPostedVideo(playUrl, Modifier.fillMaxSize())
+                    val onDisk = playUrl.startsWith("file://") || playUrl.startsWith("/")
+                    if (onDisk) {
+                        OgtPostedVideo(playUrl, Modifier.fillMaxSize())
+                    } else {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            OgtLoader(size = 28.dp)
+                        }
+                    }
                 } else {
                     OgtPostImage(
                         item = item,
-                        fallback = Res.drawable.feed_story_donacion,
+                        fallback = null,
                         contentDescription = item.altText ?: tag,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit,

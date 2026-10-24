@@ -68,11 +68,11 @@ fun CommentReactionSheet(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Image(
-                                painter = painterResource(reactionAvatar(who.id)),
+                            com.onlygoodthings.app.ui.components.OgtProfilePhoto(
+                                userId = who.id,
+                                fallback = reactionAvatar(who.id),
                                 contentDescription = who.displayName,
                                 modifier = Modifier.size(44.dp).clip(CircleShape).border(1.dp, OgtColors.hairline, CircleShape),
-                                contentScale = ContentScale.Crop,
                             )
                             Column(Modifier.weight(1f)) {
                                 Text(who.displayName, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = OgtColors.ink)

@@ -114,6 +114,12 @@ function startRealtime() {
     const live = typeof raw === "string" ? JSON.parse(raw) : raw;
     applyLive(live);
   });
+  if (typeof realtime.observeProfiles === "function") {
+    realtime.observeProfiles(function (raw) {
+      const live = typeof raw === "string" ? JSON.parse(raw) : raw;
+      applyProfilePhoto(live);
+    });
+  }
   if (typeof realtime.observeUserProfiles === "function") {
     realtime.observeUserProfiles(function (raw) {
       const live = typeof raw === "string" ? JSON.parse(raw) : raw;
@@ -205,8 +211,97 @@ function mergePost(next) {
   return lastFeed.find((p) => p.id === clean.id) || clean;
 }
 
+function ownsProfile(userId) {
+  if (!userId || !me) return false;
+  return userId === me.userId || userId === me.firebaseUid || userId === me.id;
+}
+
+function applyProfilePhoto(frame) {
+  if (!frame) return;
+  const userId = String(frame.userId || frame.id || "");
+  const photoUrl = frame.photoUrl;
+  if (!userId || !photoUrl) return;
+  const src = mediaUrl(photoUrl);
+  if (!src) return;
+  const mine = ownsProfile(userId);
+  const ids = new Set([userId]);
+  if (mine) {
+    [me.userId, me.firebaseUid, me.id].forEach((id) => { if (id) ids.add(String(id)); });
+    me.photoUrl = photoUrl;
+  }
+  lastFeed.forEach((post) => {
+    if (ids.has(post.authorId) || (mine && ownsProfile(post.authorId))) post.authorPhotoUrl = photoUrl;
+  });
+  lastRanking.forEach((row) => {
+    if (ids.has(row.userId) || (mine && ownsProfile(row.userId))) row.photoUrl = photoUrl;
+  });
+  lastInbox.forEach((row) => {
+    if (ids.has(row.peerUserId) || (mine && ownsProfile(row.peerUserId))) row.photoUrl = photoUrl;
+  });
+  ids.forEach((id) => {
+    const sel = window.CSS && CSS.escape ? CSS.escape(id) : id.replace(/"/g, "");
+    document.querySelectorAll(`[data-user-id="${sel}"]`).forEach((img) => {
+      if (img.tagName === "IMG" && img.getAttribute("src") !== src) img.src = src;
+    });
+  });
+  if (mine) {
+    const av = document.querySelector(".section-avatar .avatar");
+    if (av && av.getAttribute("src") !== src) av.src = src;
+  }
+}
+
+let profilePhotoTask = null;
+
+function beginProfilePhoto(file) {
+  const previous = profilePhotoTask && !profilePhotoTask.settled
+    ? profilePhotoTask.previous
+    : (me.photoUrl || "");
+  const blob = URL.createObjectURL(file);
+  applyProfilePhoto({ userId: me.userId, photoUrl: blob });
+  const task = { previous, blob, settled: false, remote: null, failed: false, file };
+  profilePhotoTask = task;
+  task.promise = (async () => {
+    try {
+      const ready = window.OgtFrame ? await window.OgtFrame.compress(file) : file;
+      const uploaded = await api("/api/v1/media/upload", {
+        filename: ready.name || "avatar.jpg",
+        contentType: ready.type || "image/jpeg",
+        bytesBase64: await fileToBase64(ready),
+      });
+      if (profilePhotoTask !== task) return null;
+      task.remote = uploaded.url;
+      applyProfilePhoto({ userId: me.userId, photoUrl: uploaded.url });
+      const form = document.getElementById("profile-form");
+      const typed = form ? String(new FormData(form).get("displayName") || "").trim() : "";
+      const displayName = typed.length >= 2 ? typed : (me.displayName || "");
+      if (displayName.length >= 2) {
+        await api("/api/v1/users/profile/update", {
+          displayName,
+          photoUrl: uploaded.url,
+          barrio: (me.settings && me.settings.barrio) || "",
+          language: (me.settings && me.settings.language) || "es",
+        });
+      }
+      task.settled = true;
+      URL.revokeObjectURL(blob);
+      return uploaded.url;
+    } catch (e) {
+      if (profilePhotoTask !== task) return null;
+      task.failed = true;
+      task.settled = true;
+      applyProfilePhoto({ userId: me.userId, photoUrl: previous });
+      URL.revokeObjectURL(blob);
+      toast((e && e.message) || "No se pudo guardar la foto. Volvé a elegirla.");
+      throw e;
+    }
+  })();
+  return task;
+}
+
 function applyProfileLive(live) {
-  if (!live || !live.id) return;
+  if (!live || !(live.id || live.userId)) return;
+  if (live.photoUrl) applyProfilePhoto(live);
+  if (!live.id) return;
   const mine = live.id === me.userId;
   if (mine) {
     me.displayName = live.displayName || me.displayName;
@@ -232,8 +327,6 @@ function applyProfileLive(live) {
     }
     const strong = document.querySelector(".profile-head strong");
     if (strong) strong.textContent = me.displayName;
-    const av = document.querySelector(".profile-head .avatar, .profile-edit .avatar.lg");
-    if (av && me.photoUrl) av.src = mediaUrl(me.photoUrl);
   }
   lastFeed.forEach((post) => {
     if (post.authorId === live.id) {
@@ -251,13 +344,6 @@ function applyProfileLive(live) {
   document.querySelectorAll(`a[href="#/perfil/${live.id}"]`).forEach((a) => {
     a.textContent = live.displayName;
   });
-  if (live.photoUrl) {
-    document.querySelectorAll(`img.avatar[alt]`).forEach((img) => {
-      const card = img.closest("[data-post], .profile-head, .me");
-      const link = card && card.querySelector(`a[href="#/perfil/${live.id}"]`);
-      if (link) img.src = mediaUrl(live.photoUrl);
-    });
-  }
 }
 
 function applyLive(live) {
@@ -703,7 +789,8 @@ function avatarSrc(userId, photoUrl) {
 function avatarHtml(userId, name, extra, photoUrl) {
   const cls = extra ? `avatar ${extra}` : "avatar";
   const src = avatarSrc(userId, photoUrl);
-  return `<img class="${cls}" src="${escapeHtml(src)}" alt="${escapeHtml(name || "")}">`;
+  const id = escapeHtml(userId || "");
+  return `<img class="${cls}" data-user-id="${id}" src="${escapeHtml(src)}" alt="${escapeHtml(name || "")}">`;
 }
 
 const NAME_PARTICLES = new Set([
@@ -770,8 +857,9 @@ function ago(ms) {
 function mediaUrl(url) {
   if (!url) return "";
   const raw = String(url).trim();
-  // Atributos HTML: sin comillas, ángulos ni controles. Solo http(s) o /media.
+  // Atributos HTML: sin comillas, ángulos ni controles. Solo http(s), /media o un blob local.
   if (/[\u0000-\u001f"'<>\\]/.test(raw)) return "";
+  if (raw.startsWith("blob:") || raw.startsWith("data:image/")) return raw;
   try {
     const u = new URL(raw, location.origin);
     if (u.protocol !== "http:" && u.protocol !== "https:") return "";
@@ -1162,17 +1250,31 @@ async function runAction(id, post, onDetail) {
       await api("/api/v1/social/feed-event", { postId: post.id, kind: "SHARE" }).catch(() => {});
       await copyText(shareText(post), "Texto copiado");
       return;
-    case "follow":
-      await api("/api/v1/social/follow", { userId: post.authorId });
+    case "follow": {
+      if (following.has(post.authorId)) return;
       following.add(post.authorId);
       toast(`Ahora seguís a ${post.authorName || "esa persona"}`);
+      try {
+        await api("/api/v1/social/follow", { userId: post.authorId });
+      } catch (e) {
+        following.delete(post.authorId);
+        toast((e && e.message) || "No se pudo seguir. Probá de nuevo.");
+      }
       return;
+    }
     case "hide":
-      await api("/api/v1/social/feed-event", { postId: post.id, kind: "HIDE" });
       hiddenIds.add(post.id);
       persistHidden();
-      toast("Oculta de tu inicio");
       removePostCard(post.id);
+      toast("Oculta de tu inicio");
+      try {
+        await api("/api/v1/social/feed-event", { postId: post.id, kind: "HIDE" });
+      } catch (e) {
+        hiddenIds.delete(post.id);
+        persistHidden();
+        paintFeedList();
+        toast((e && e.message) || "No se pudo ocultar. Probá de nuevo.");
+      }
       return;
     case "report":
       renderReport(post);
@@ -1668,22 +1770,44 @@ function bindSocial(root, { onDetail = false } = {}) {
   root.querySelectorAll("[data-clap]").forEach((btn) => {
     btn.addEventListener("click", async (ev) => {
       ev.stopPropagation();
+      const post = lastFeed.find((p) => p.id === btn.dataset.clap);
+      if (!post || post.viewerHasImpacted) return;
+      const before = { impactCount: post.impactCount || 0, viewerHasImpacted: Boolean(post.viewerHasImpacted) };
+      post.viewerHasImpacted = true;
+      post.impactCount = before.impactCount + 1;
+      paintPost(post);
       try {
         const updated = await api("/api/v1/social/impact", { postId: btn.dataset.clap });
         paintPost(mergePost(updated));
       } catch (e) {
-        alert(e.message);
+        post.viewerHasImpacted = before.viewerHasImpacted;
+        post.impactCount = before.impactCount;
+        paintPost(post);
+        toast((e && e.message) || "No se pudo aplaudir. Probá de nuevo.");
       }
     });
   });
   root.querySelectorAll("[data-story-clap]").forEach((btn) => {
     btn.addEventListener("click", async (ev) => {
       ev.stopPropagation();
+      let story = null;
+      lastFeed.forEach((post) => {
+        if (story) return;
+        story = (post.anecdotes || []).find((row) => row.id === btn.dataset.storyClap) || null;
+      });
+      if (!story || story.viewerHasImpacted) return;
+      const before = { impactCount: story.impactCount || 0, viewerHasImpacted: Boolean(story.viewerHasImpacted) };
+      story.viewerHasImpacted = true;
+      story.impactCount = before.impactCount + 1;
+      paintStory(story);
       try {
-        const story = await api("/api/v1/social/anecdote/impact", { anecdoteId: btn.dataset.storyClap });
-        paintStory(story);
+        const saved = await api("/api/v1/social/anecdote/impact", { anecdoteId: btn.dataset.storyClap });
+        paintStory(saved);
       } catch (e) {
-        alert(e.message);
+        story.viewerHasImpacted = before.viewerHasImpacted;
+        story.impactCount = before.impactCount;
+        paintStory(story);
+        toast((e && e.message) || "No se pudo aplaudir. Probá de nuevo.");
       }
     });
   });
@@ -1691,10 +1815,19 @@ function bindSocial(root, { onDetail = false } = {}) {
     btn.addEventListener("click", async (ev) => {
       ev.stopPropagation();
       ev.preventDefault();
+      const join = btn.dataset.on !== "0";
+      const previousLabel = btn.textContent;
+      const previousOn = btn.classList.contains("on");
+      btn.classList.toggle("on", join);
+      btn.dataset.on = join ? "0" : "1";
+      btn.textContent = join ? "Dejar de apoyar" : "Apoyar";
       try {
-        await toggleNeedSupport(btn.dataset.needSupport, btn.dataset.on !== "0");
+        await toggleNeedSupport(btn.dataset.needSupport, join);
       } catch (e) {
-        toast(e.message);
+        btn.classList.toggle("on", previousOn);
+        btn.dataset.on = previousOn ? "0" : "1";
+        btn.textContent = previousLabel;
+        toast((e && e.message) || "No se pudo actualizar. Probá de nuevo.");
       }
     });
   });
@@ -1757,26 +1890,46 @@ function bindSocial(root, { onDetail = false } = {}) {
       ev.stopPropagation();
       const body = String(new FormData(form).get("body") || "").trim();
       if (!body) return;
+      const post = lastFeed.find((p) => p.id === form.dataset.anecdotePost);
+      if (!post) return;
+      const tempId = `local-story-${Date.now()}`;
+      const local = {
+        id: tempId,
+        body,
+        authorUserId: me.userId,
+        authorName: me.displayName || "Vos",
+        impactCount: 0,
+        commentCount: 0,
+        viewerHasImpacted: false,
+      };
+      post.anecdotes = (post.anecdotes || []).concat([local]);
+      const card = document.querySelector(`[data-post="${post.id}"]`);
+      let box = card?.querySelector(".stories");
+      if (!box && card) {
+        box = document.createElement("div");
+        box.className = "stories";
+        card.appendChild(box);
+      }
+      if (box) {
+        box.insertAdjacentHTML("beforeend", storyCard(local, post));
+        bindSocial(box.lastElementChild, { onDetail: true });
+      }
+      form.reset();
       try {
         const story = await api("/api/v1/social/anecdote", { postId: form.dataset.anecdotePost, body });
-        const post = lastFeed.find((p) => p.id === form.dataset.anecdotePost);
-        if (post) {
-          post.anecdotes = (post.anecdotes || []).concat([story]);
-          const card = document.querySelector(`[data-post="${post.id}"]`);
-          let box = card?.querySelector(".stories");
-          if (!box && card) {
-            box = document.createElement("div");
-            box.className = "stories";
-            card.appendChild(box);
-          }
-          if (box) {
-            box.insertAdjacentHTML("beforeend", storyCard(story, post));
-            bindSocial(box.lastElementChild, { onDetail: true });
-          }
-          form.reset();
+        post.anecdotes = (post.anecdotes || []).map((row) => (row.id === tempId ? story : row));
+        const node = document.querySelector(`[data-story="${tempId}"]`);
+        if (node) {
+          node.outerHTML = storyCard(story, post);
+          const saved = document.querySelector(`[data-story="${story.id}"]`);
+          if (saved) bindSocial(saved, { onDetail: true });
         }
       } catch (e) {
-        alert(e.message);
+        post.anecdotes = (post.anecdotes || []).filter((row) => row.id !== tempId);
+        document.querySelector(`[data-story="${tempId}"]`)?.remove();
+        const field = form.querySelector("[name=body]");
+        if (field) field.value = body;
+        toast((e && e.message) || "No se pudo publicar la anécdota. Probá de nuevo.");
       }
     });
   });
@@ -2127,6 +2280,8 @@ function bindChipGroup(form, name, onPick) {
 
 function bindPublishMedia(form) {
   const thumbs = form.querySelector("[data-thumbs]");
+  const frameQueue = [];
+  let framing = false;
   function paintMedia() {
     if (!thumbs) return;
     thumbs.innerHTML = publishFiles.map((row) => (
@@ -2135,6 +2290,50 @@ function bindPublishMedia(form) {
         : `<img src="${row.url}" alt="">`
     )).join("");
   }
+  function pumpFrame() {
+    if (framing) return;
+    const file = frameQueue.shift();
+    if (!file) return;
+    if (!window.OgtFrame) {
+      toast("No se pudo abrir el encuadre");
+      return;
+    }
+    framing = true;
+    window.OgtFrame.open({
+      file,
+      onCancel() {
+        frameQueue.length = 0;
+        framing = false;
+      },
+      onConfirm(cropped) {
+        if (publishFiles.length >= PUBLISH_MAX_FILES) return;
+        const row = { file: cropped, url: URL.createObjectURL(cropped), remote: null };
+        publishFiles.push(row);
+        paintMedia();
+        row.task = (async () => {
+          try {
+            const uploaded = await api("/api/v1/media/upload", {
+              filename: cropped.name || "foto.jpg",
+              contentType: "image/jpeg",
+              bytesBase64: await fileToBase64(cropped),
+            });
+            row.remote = uploaded;
+            return uploaded;
+          } catch (e) {
+            publishFiles = publishFiles.filter((item) => item !== row);
+            URL.revokeObjectURL(row.url);
+            paintMedia();
+            toast((e && e.message) || "No se pudo subir la foto. Volvé a elegirla.");
+            throw e;
+          }
+        })();
+      },
+      onQueued() {
+        framing = false;
+        pumpFrame();
+      },
+    });
+  }
   form.querySelector("[data-add-media]")?.addEventListener("click", () => {
     form.querySelector("[data-file]")?.click();
   });
@@ -2142,14 +2341,19 @@ function bindPublishMedia(form) {
     const picked = [...(ev.target.files || [])];
     ev.target.value = "";
     picked.forEach((file) => {
-      if (publishFiles.length >= PUBLISH_MAX_FILES) return;
+      if (publishFiles.length + frameQueue.length >= PUBLISH_MAX_FILES) return;
       if (file.size > PUBLISH_MAX_BYTES) {
         toast("Cada archivo puede pesar hasta 8 MB");
         return;
       }
-      publishFiles.push({ file, url: URL.createObjectURL(file) });
+      if (String(file.type || "").startsWith("video/")) {
+        publishFiles.push({ file, url: URL.createObjectURL(file) });
+        paintMedia();
+        return;
+      }
+      frameQueue.push(file);
     });
-    paintMedia();
+    pumpFrame();
   });
   paintMedia();
 }
@@ -2157,11 +2361,11 @@ function bindPublishMedia(form) {
 async function uploadPublishMedia(altText) {
   const media = [];
   for (const row of publishFiles) {
-    const uploaded = await api("/api/v1/media/upload", {
+    const uploaded = row.remote || (row.task ? await row.task : await api("/api/v1/media/upload", {
       filename: row.file.name || "foto.jpg",
       contentType: row.file.type || "image/jpeg",
       bytesBase64: await fileToBase64(row.file),
-    });
+    }));
     media.push({
       kind: uploaded.kind || (row.file.type.startsWith("video/") ? "VIDEO" : "IMAGE"),
       url: uploaded.url,
@@ -3820,7 +4024,7 @@ async function renderAjustes() {
     const file = ev.target.files && ev.target.files[0];
     if (!file) return;
     pendingPhoto = file;
-    preview.src = URL.createObjectURL(file);
+    beginProfilePhoto(file);
   });
   document.getElementById("profile-form")?.addEventListener("submit", async (ev) => {
     ev.preventDefault();
@@ -3833,14 +4037,10 @@ async function renderAjustes() {
     ok.hidden = true;
     try {
       let photoUrl = me.photoUrl || "";
-      if (pendingPhoto) {
-        const uploaded = await api("/api/v1/media/upload", {
-          filename: pendingPhoto.name || "avatar.jpg",
-          contentType: pendingPhoto.type || "image/jpeg",
-          bytesBase64: await fileToBase64(pendingPhoto),
-        });
-        photoUrl = uploaded.url;
+      if (profilePhotoTask && !profilePhotoTask.settled) {
+        try { await profilePhotoTask.promise; } catch (_) { /* ya volvió a la foto anterior */ }
       }
+      if (profilePhotoTask && profilePhotoTask.remote) photoUrl = profilePhotoTask.remote;
       const payload = {
         displayName: String(data.get("displayName") || "").trim(),
         barrio: String(data.get("barrio") || "").trim(),

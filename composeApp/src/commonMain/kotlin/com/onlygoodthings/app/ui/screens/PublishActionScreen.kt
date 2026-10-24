@@ -54,6 +54,7 @@ import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.theme.OgtDimens
 import com.onlygoodthings.app.theme.ogtOutlinedFieldColors
 import com.onlygoodthings.app.platform.OgtPickedMedia
+import com.onlygoodthings.app.platform.publishUrl
 import com.onlygoodthings.app.platform.rememberHonorInviteActions
 import com.onlygoodthings.app.ui.components.OgtDraftMediaStrip
 import com.onlygoodthings.app.platform.sharePlainText
@@ -296,7 +297,7 @@ fun PublishActionScreen(
         }
         draftMedia.take(PostMediaRules.MAX_ITEMS).forEachIndexed { order, item ->
             val video = item.kind == MediaKind.VIDEO
-            val url = if (item.fromDevice) "file://${item.path}" else "asset://${item.path}"
+            val url = item.publishUrl()
             val poster = when {
                 item.posterPath != null -> "file://${item.posterPath}"
                 video -> "asset://feed_story_playa"
@@ -320,18 +321,25 @@ fun PublishActionScreen(
         db.recordFeedEvent(me.id, postId, FeedEventKind.SHARE)
         db.bumpFeed()
         val published = db.post(postId)
+        val pendingMedia = draftMedia.take(PostMediaRules.MAX_ITEMS).toList()
         scope.launch {
             auth.ensureDevBearer()
             val remote = runCatching {
                 auth.feed.publishPost(
                     body = story,
                     topic = tag,
-                    media = draftMedia.take(PostMediaRules.MAX_ITEMS).mapIndexed { order, item ->
+                    media = pendingMedia.mapIndexed { order, item ->
                         val video = item.kind == MediaKind.VIDEO
+                        val remoteUrl = when {
+                            !item.uploadedUrl.isNullOrBlank() -> item.uploadedUrl
+                            item.fromDevice && !video ->
+                                runCatching { auth.awaitFramedUpload(item.id, item.path) }.getOrNull()
+                            else -> null
+                        } ?: item.publishUrl()
                         PostMediaItem(
                             id = "$postId-m$order",
                             kind = item.kind,
-                            url = if (item.fromDevice) "file://${item.path}" else "asset://${item.path}",
+                            url = remoteUrl,
                             posterUrl = item.posterPath?.let { "file://$it" },
                             sortOrder = order,
                             altText = tag,
@@ -822,11 +830,10 @@ private fun ProtagonistRow(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(OgtColors.sand).padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Image(
-            painterResource(photo),
-            contentDescription = null,
+        com.onlygoodthings.app.ui.components.OgtProfilePhoto(
+            userId = com.onlygoodthings.app.data.LocalOgtSession.current.me().id,
+            fallback = photo,
             modifier = Modifier.size(40.dp).clip(CircleShape).border(2.dp, OgtColors.secondary.copy(alpha = 0.25f), CircleShape),
-            contentScale = ContentScale.Crop,
         )
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {

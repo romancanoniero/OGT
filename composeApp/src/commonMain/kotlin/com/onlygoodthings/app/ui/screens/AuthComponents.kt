@@ -1,6 +1,5 @@
 package com.onlygoodthings.app.ui.screens
 
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,20 +13,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.autofill.ContentType
-import androidx.compose.ui.semantics.contentType
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.onlygoodthings.app.theme.OgtColors
+import com.onlygoodthings.app.theme.ogtOutlinedFieldColors
 import com.onlygoodthings.app.ui.components.OgtBackButton
 import com.onlygoodthings.app.ui.components.ogtDismissImeOnScroll
 import androidx.compose.ui.graphics.Color
@@ -58,7 +53,6 @@ internal fun AuthField(
     hint: String,
     value: String,
     secret: Boolean = false,
-    otp: Boolean = false,
     onChange: (String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -66,20 +60,13 @@ internal fun AuthField(
         OutlinedTextField(
             value = value,
             onValueChange = onChange,
-            modifier = Modifier.fillMaxWidth().then(
-                if (otp) Modifier.semantics { contentType = ContentType.SmsOtpCode } else Modifier,
-            ),
+            modifier = Modifier.fillMaxWidth(),
             placeholder = { Text(hint) },
             visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
-            keyboardOptions = if (otp) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
             singleLine = true,
             maxLines = 1,
             shape = AuthCorner,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = OgtColors.primary,
-                unfocusedContainerColor = OgtColors.sand,
-                focusedContainerColor = OgtColors.surface,
-            ),
+            colors = ogtOutlinedFieldColors(),
         )
     }
 }

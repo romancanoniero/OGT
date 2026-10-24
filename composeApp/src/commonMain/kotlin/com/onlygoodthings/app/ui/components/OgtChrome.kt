@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -44,6 +45,7 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.onlygoodthings.app.data.LocalOgtSession
 import com.onlygoodthings.app.resources.Res
 import com.onlygoodthings.app.resources.feed_avatar_me
 import com.onlygoodthings.app.resources.feed_logo
@@ -61,6 +63,9 @@ import org.jetbrains.compose.resources.painterResource
 
 val LocalOgtChrome = staticCompositionLocalOf<OgtChromeHost?> { null }
 
+/** Toque de la foto propia en la barra. La foto de otra persona no usa este gesto. */
+val LocalOpenOwnProfile = staticCompositionLocalOf<() -> Unit> { {} }
+
 data class OgtChromeSpec(
     val title: String,
     val onBack: (() -> Unit)? = null,
@@ -70,6 +75,8 @@ data class OgtChromeSpec(
     val onMessages: (() -> Unit)? = null,
     val hideOnScroll: Boolean = true,
     val branded: Boolean = false,
+    /** La foto circular al lado de la campana. Ajustes la apaga: la foto vive en el cuerpo. */
+    val showProfileAvatar: Boolean = true,
 )
 
 /**
@@ -211,23 +218,25 @@ internal fun OgtTopBarRow(spec: OgtChromeSpec, onBack: (() -> Unit)? = spec.onBa
             OgtBackButton(onBack)
             Spacer(Modifier.size(10.dp))
         }
-        if (spec.branded) {
+        // El logo es de la pantalla principal. Con flecha atrás, la barra lleva el título.
+        if (spec.branded && onBack == null) {
             Image(
                 painterResource(Res.drawable.feed_logo),
                 contentDescription = spec.title,
                 modifier = Modifier.size(36.dp),
                 contentScale = ContentScale.Fit,
             )
-            Spacer(Modifier.size(8.dp))
+            Spacer(Modifier.weight(1f))
+        } else {
+            Text(
+                spec.title,
+                modifier = Modifier.weight(1f),
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = OgtColors.ink,
+                letterSpacing = (-0.3).sp,
+            )
         }
-        Text(
-            spec.title,
-            modifier = Modifier.weight(1f),
-            fontWeight = FontWeight.Bold,
-            fontSize = if (spec.branded) 20.sp else 18.sp,
-            color = OgtColors.ink,
-            letterSpacing = (-0.3).sp,
-        )
         if (spec.onOverflow != null) {
             Text(
                 "⋯",
@@ -244,16 +253,29 @@ internal fun OgtTopBarRow(spec: OgtChromeSpec, onBack: (() -> Unit)? = spec.onBa
             Spacer(Modifier.size(6.dp))
             CircleIconButton(Res.drawable.qs_feed, "Mensajes", spec.onMessages)
         }
-        Spacer(Modifier.size(8.dp))
-        Image(
-            painterResource(Res.drawable.feed_avatar_me),
+        if (spec.showProfileAvatar) {
+            Spacer(Modifier.size(8.dp))
+            BarProfileAvatar(spec.onProfile)
+        }
+    }
+}
+
+/** Misma foto que Ajustes, en las pantallas que usan esta barra. */
+@Composable
+private fun BarProfileAvatar(onClick: () -> Unit) {
+    val me = LocalOgtSession.current.me()
+    Box(
+        Modifier
+            .size(OgtDimens.iconButton)
+            .clip(CircleShape)
+            .border(1.dp, OgtColors.hairline, CircleShape)
+            .clickable(onClick = onClick),
+    ) {
+        OgtProfilePhoto(
+            userId = me.id,
+            fallback = Res.drawable.feed_avatar_me,
             contentDescription = "Perfil",
-            modifier = Modifier
-                .size(OgtDimens.iconButton)
-                .clip(CircleShape)
-                .border(1.dp, OgtColors.hairline, CircleShape)
-                .clickable(onClick = spec.onProfile),
-            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
         )
     }
 }

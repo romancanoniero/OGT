@@ -44,3 +44,6 @@ internal actual fun writeMediaCacheFile(name: String, bytes: ByteArray) {
 }
 
 internal actual fun mediaCacheFilePath(name: String): String = "${cacheDir()}/$name"
+
+internal actual fun mediaCacheExists(name: String): Boolean =
+    NSFileManager.defaultManager.fileExistsAtPath("${cacheDir()}/$name")

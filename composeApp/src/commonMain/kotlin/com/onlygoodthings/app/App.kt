@@ -38,6 +38,7 @@ import com.onlygoodthings.shared.domain.feedCardKind
 import com.onlygoodthings.shared.domain.honorAppLink
 import com.onlygoodthings.shared.domain.isGatheringPost
 import com.onlygoodthings.app.ui.components.LocalOgtChrome
+import com.onlygoodthings.app.ui.components.LocalOpenOwnProfile
 import com.onlygoodthings.app.ui.components.OgtChromePad
 import com.onlygoodthings.app.ui.components.OgtHostedTopBar
 import com.onlygoodthings.app.ui.components.ogtDismissImeOnScroll
@@ -67,7 +68,9 @@ import com.onlygoodthings.app.nav.OgtBottomTabs
 import com.onlygoodthings.app.nav.OgtRoute
 import com.onlygoodthings.app.theme.LushImpactTheme
 import com.onlygoodthings.shared.data.local.OgtIds
+import com.onlygoodthings.app.ui.components.LocalOgtOverlay
 import com.onlygoodthings.app.ui.components.OgtBottomBar
+import com.onlygoodthings.app.ui.components.OgtOverlayHost
 import com.onlygoodthings.app.ui.screens.AnimatedSvgScreen
 import com.onlygoodthings.app.ui.screens.AdoptApplicationScreen
 import com.onlygoodthings.app.ui.screens.AnimalsScreen
@@ -377,6 +380,7 @@ fun App() {
                 OgtRoute.Recover, OgtRoute.SignUp -> ({ route = OgtRoute.Login })
                 OgtRoute.NeighborProfile, OgtRoute.PostDetail, OgtRoute.Publish,
                 OgtRoute.Notifications, OgtRoute.ClaimHonor,
+                OgtRoute.Parking, OgtRoute.Skills,
                 -> ({ route = OgtRoute.Feed })
                 OgtRoute.Invite, OgtRoute.Messages, OgtRoute.Milestone -> ({
                     route = if (settingsResume) OgtRoute.Settings else OgtRoute.Feed
@@ -407,6 +411,7 @@ fun App() {
         }
         OgtBackHandler(enabled = stackBack != null) { stackBack?.invoke() }
         val chrome = rememberOgtChromeHost()
+        val frameOverlay = remember { OgtOverlayHost() }
         chrome.fallbackBack = stackBack
         val chromeScroll = remember(chrome) { chrome.nestedScrollConnection() }
         LaunchedEffect(route) { chrome.revealNow() }
@@ -419,9 +424,15 @@ fun App() {
         )
         val keepSettings = route == OgtRoute.Settings || (settingsResume && route in settingsLeaves)
         val closeSettingsLeaf: () -> Unit = { route = OgtRoute.Settings }
+        val openOwnProfile: () -> Unit = {
+            settingsResume = false
+            route = OgtRoute.Settings
+        }
         CompositionLocalProvider(
             LocalOgtLocation provides location,
             LocalOgtChrome provides chrome,
+            LocalOgtOverlay provides frameOverlay,
+            LocalOpenOwnProfile provides openOwnProfile,
         ) {
         Scaffold(
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -474,7 +485,8 @@ fun App() {
                     OgtRoute.Splash -> SplashScreen {
                         scope.launch {
                             route = when (auth.restore()) {
-                                AuthRestore.LoggedOut -> OgtRoute.Onboarding
+                                AuthRestore.LoggedOut ->
+                                    if (auth.hasFinishedOnboarding()) OgtRoute.Login else OgtRoute.Onboarding
                                 AuthRestore.NeedsBiometric -> OgtRoute.Login
                                 AuthRestore.FirstRun -> OgtRoute.Permissions
                                 AuthRestore.Home -> applyHonorRoute(OgtRoute.Feed)
@@ -493,12 +505,10 @@ fun App() {
                         onBack = if (settingsResume) closeSettingsLeaf else null,
                     )
                     OgtRoute.OnboardingFeatures -> OnboardingScreen(
-                        onDone = { route = OgtRoute.SignUp },
-                        onLogin = { route = OgtRoute.Login },
+                        onContinue = { route = OgtRoute.Login },
                     )
                     OgtRoute.Onboarding -> OnboardingScreen(
-                        onDone = { route = OgtRoute.SignUp },
-                        onLogin = { route = OgtRoute.Login },
+                        onContinue = { route = OgtRoute.Login },
                     )
                     OgtRoute.SignUp -> SignUpScreen(
                         onOtp = {
@@ -931,6 +941,8 @@ fun App() {
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
+                val framePanel = frameOverlay.content
+                if (framePanel != null) framePanel()
             }
         }
         }

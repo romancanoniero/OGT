@@ -104,11 +104,11 @@ fun NeighborProfileScreen(
         }
         Column(Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 20.dp, vertical = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(
-                    painterResource(avatar),
+                com.onlygoodthings.app.ui.components.OgtProfilePhoto(
+                    userId = userId,
+                    fallback = avatar,
                     contentDescription = user.displayName,
                     modifier = Modifier.size(86.dp).clip(CircleShape).border(2.dp, OgtColors.primary, CircleShape),
-                    contentScale = ContentScale.Crop,
                 )
                 Spacer(Modifier.width(20.dp))
                 ProfileStat("${posts.size}", "acciones")

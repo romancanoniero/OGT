@@ -1,6 +1,8 @@
 package com.onlygoodthings.app.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -57,6 +59,8 @@ class OgtSheetCloser(
 fun OgtBottomSheet(
     onDismiss: () -> Unit,
     maxHeight: Dp = 520.dp,
+    enter: EnterTransition = OgtMotion.sheetEnter,
+    exit: ExitTransition = OgtMotion.sheetExit,
     content: @Composable ColumnScope.(OgtSheetCloser) -> Unit,
 ) {
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
@@ -110,8 +114,8 @@ fun OgtBottomSheet(
             }
             AnimatedVisibility(
                 visibleState = visibility,
-                enter = OgtMotion.sheetEnter,
-                exit = OgtMotion.sheetExit,
+                enter = enter,
+                exit = exit,
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
             ) {
                 Column(

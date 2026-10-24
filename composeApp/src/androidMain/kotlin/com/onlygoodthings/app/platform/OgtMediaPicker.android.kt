@@ -135,7 +135,7 @@ private fun videoPoster(context: Context, path: String): String? = runCatching {
     retriever.release()
     val dest = newCacheFile(context, "jpg")
     dest.outputStream().use { out ->
-        frame?.compress(Bitmap.CompressFormat.JPEG, 86, out) ?: return null
+        frame?.compress(Bitmap.CompressFormat.JPEG, 92, out) ?: return null
     }
     dest.absolutePath
 }.getOrNull()

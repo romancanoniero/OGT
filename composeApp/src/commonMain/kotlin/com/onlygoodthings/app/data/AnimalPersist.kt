@@ -2,6 +2,7 @@ package com.onlygoodthings.app.data
 
 import com.onlygoodthings.app.media.OgtMediaCache
 import com.onlygoodthings.app.platform.OgtPickedMedia
+import com.onlygoodthings.app.platform.publishUrl
 import com.onlygoodthings.shared.data.local.LocalAnimalListing
 import com.onlygoodthings.shared.data.local.LocalPostMedia
 import com.onlygoodthings.shared.data.local.LocalSocialPost
@@ -122,7 +123,7 @@ private fun List<OgtPickedMedia>.toStored(postId: String, tag: String): List<Loc
             id = "$postId-m$order",
             postId = postId,
             kind = item.kind,
-            url = if (item.fromDevice) "file://${item.path}" else "asset://${item.path}",
+            url = item.publishUrl(),
             posterUrl = item.posterPath?.let { "file://$it" },
             sortOrder = order,
             assetKey = if (item.fromDevice) "" else item.path,

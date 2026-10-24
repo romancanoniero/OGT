@@ -18,7 +18,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -29,7 +28,6 @@ import com.onlygoodthings.app.data.LocalOgtDb
 import com.onlygoodthings.app.data.LocalOgtSession
 import com.onlygoodthings.app.data.announcePublishedPost
 import com.onlygoodthings.app.data.persistAnimalOnServer
-import kotlinx.coroutines.launch
 import com.onlygoodthings.app.i18n.LocalOgtCopy
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.theme.OgtDimens
@@ -57,7 +55,6 @@ fun PublishAdoptionScreen(
     val me = session.me()
     val auth = LocalAuth.current
     val copy = LocalOgtCopy.current
-    val scope = rememberCoroutineScope()
     val editing = !editPostId.isNullOrBlank()
     val existing = remember(editPostId) { editPostId?.let { db.post(it) } }
     val listing = remember(editPostId) {
@@ -220,16 +217,17 @@ fun PublishAdoptionScreen(
                 }
                 session.persistPublishedAnimals()
                 auth.ensureDevBearer()
-                scope.launch {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                        val live = runCatching {
-                            persistAnimalOnServer(db, auth.animals, me, post, draftMedia, session.here())
-                        }.getOrDefault(post)
-                        session.persistPublishedAnimals()
-                        if (!editing) announcePublishedPost(db, live)
-                    }
-                    onPublished()
+                val mediaNow = draftMedia.toList()
+                val here = session.here()
+                auth.enqueue {
+                    val ready = auth.readyDraft(mediaNow)
+                    val live = runCatching {
+                        persistAnimalOnServer(db, auth.animals, me, post, ready, here)
+                    }.getOrDefault(post)
+                    session.persistPublishedAnimals()
+                    if (!editing) announcePublishedPost(db, live)
                 }
+                onPublished()
             }
             Spacer(Modifier.height(24.dp))
         }

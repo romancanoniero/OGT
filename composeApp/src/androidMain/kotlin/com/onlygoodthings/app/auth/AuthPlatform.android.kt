@@ -15,12 +15,19 @@ import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.FirebaseException
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthMultiFactorException
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.auth.MultiFactorResolver
+import com.google.firebase.auth.MultiFactorSession
 import com.google.firebase.auth.OAuthProvider
 import com.google.firebase.auth.PhoneAuthCredential
 import com.google.firebase.auth.PhoneAuthOptions
 import com.google.firebase.auth.PhoneAuthProvider
+import com.google.firebase.auth.PhoneMultiFactorGenerator
+import com.google.firebase.auth.PhoneMultiFactorInfo
+import com.google.firebase.auth.TotpMultiFactorGenerator
+import com.google.firebase.auth.TotpMultiFactorInfo
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.onlygoodthings.app.AndroidAuthHost
 import com.onlygoodthings.app.OgtApplication
@@ -36,6 +43,13 @@ private const val GOOGLE_WEB_CLIENT_ID =
 
 actual class AuthPlatform actual constructor() {
     private val auth: FirebaseAuth get() = FirebaseAuth.getInstance()
+    private var pendingResolver: MultiFactorResolver? = null
+    private var pendingVerificationId: String? = null
+    private var pendingEnrollmentId: String? = null
+    private var pendingKind: String? = null
+    private var pendingInstantCredential: PhoneAuthCredential? = null
+    private var phoneResendToken: PhoneAuthProvider.ForceResendingToken? = null
+    private var mfaResendToken: PhoneAuthProvider.ForceResendingToken? = null
 
     actual suspend fun currentUser(): AuthUser? = auth.currentUser?.toAuthUser()
 
@@ -45,6 +59,40 @@ actual class AuthPlatform actual constructor() {
     actual suspend fun signInEmail(email: String, password: String): AuthUser = runAuth {
         auth.signInWithEmailAndPassword(email, password).await().user
             ?: error("Firebase no devolvió usuario")
+    }
+
+    actual suspend fun confirmSecondFactor(code: String): AuthUser {
+        val resolver = pendingResolver
+            ?: throw AuthException("El paso extra venció. Volvé a ingresar la contraseña.")
+        val assertion = when (pendingKind) {
+            "totp" -> {
+                val enrollmentId = pendingEnrollmentId
+                    ?: throw AuthException("El paso extra venció. Volvé a ingresar la contraseña.")
+                TotpMultiFactorGenerator.getAssertionForSignIn(enrollmentId, code)
+            }
+            else -> {
+                val instant = pendingInstantCredential
+                val credential = instant ?: PhoneAuthProvider.getCredential(
+                    pendingVerificationId
+                        ?: throw AuthException("El paso extra venció. Volvé a ingresar la contraseña."),
+                    code,
+                )
+                PhoneMultiFactorGenerator.getAssertion(credential)
+            }
+        }
+        return runAuth {
+            val user = resolver.resolveSignIn(assertion).await().user ?: error("Código inválido")
+            clearSecondFactor()
+            user
+        }
+    }
+
+    actual suspend fun resendSecondFactor() {
+        val resolver = pendingResolver
+            ?: throw AuthException("El paso extra venció. Volvé a ingresar la contraseña.")
+        val phone = resolver.hints.filterIsInstance<PhoneMultiFactorInfo>().firstOrNull()
+            ?: throw AuthException("Este código sale de tu app de autenticación.")
+        pendingVerificationId = sendSecondFactorSms(phone, resolver.session, resend = true)
     }
 
     actual suspend fun signUpEmail(email: String, password: String, displayName: String): AuthUser = runAuth {
@@ -60,7 +108,7 @@ actual class AuthPlatform actual constructor() {
             .getOrElse { throw mapFirebase(it) }
     }
 
-    actual suspend fun startPhoneAuth(phoneE164: String): PendingPhoneAuth {
+    actual suspend fun startPhoneAuth(phoneE164: String, resend: Boolean): PendingPhoneAuth {
         val activity = AndroidAuthHost.requireActivity()
         return suspendCancellableCoroutine { cont ->
             val callbacks = object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
@@ -80,16 +128,21 @@ actual class AuthPlatform actual constructor() {
                 }
 
                 override fun onCodeSent(verificationId: String, token: PhoneAuthProvider.ForceResendingToken) {
+                    phoneResendToken = token
                     if (cont.isActive) {
                         cont.resume(PendingPhoneAuth(verificationId = verificationId, phoneE164 = phoneE164))
                     }
                 }
             }
+            if (!resend) phoneResendToken = null
             val options = PhoneAuthOptions.newBuilder(auth)
                 .setPhoneNumber(phoneE164)
                 .setTimeout(60L, TimeUnit.SECONDS)
                 .setActivity(activity)
                 .setCallbacks(callbacks)
+                .apply {
+                    if (resend) phoneResendToken?.let { setForceResendingToken(it) }
+                }
                 .build()
             PhoneAuthProvider.verifyPhoneNumber(options)
         }
@@ -187,7 +240,87 @@ actual class AuthPlatform actual constructor() {
     }
 
     actual suspend fun signOut() {
+        clearSecondFactor()
         auth.signOut()
+    }
+
+    private fun clearSecondFactor() {
+        pendingResolver = null
+        pendingVerificationId = null
+        pendingEnrollmentId = null
+        pendingKind = null
+        pendingInstantCredential = null
+        mfaResendToken = null
+    }
+
+    /** Arma el reto solo si Firebase ya lo exigió. No inscribe un factor nuevo. */
+    private suspend fun prepareSecondFactor(error: FirebaseAuthMultiFactorException): FirebaseUser? {
+        val resolver = error.resolver
+        val phone = resolver.hints.filterIsInstance<PhoneMultiFactorInfo>().firstOrNull()
+        val totp = resolver.hints.filterIsInstance<TotpMultiFactorInfo>().firstOrNull()
+        clearSecondFactor()
+        pendingResolver = resolver
+        when {
+            phone != null -> {
+                pendingKind = "sms"
+                val verificationId = sendSecondFactorSms(phone, resolver.session, resend = false)
+                if (verificationId == "auto-mfa") {
+                    val credential = pendingInstantCredential
+                        ?: throw AuthException("No se pudo completar el paso extra")
+                    val user = resolver.resolveSignIn(PhoneMultiFactorGenerator.getAssertion(credential))
+                        .await().user ?: error("No se pudo completar el paso extra")
+                    clearSecondFactor()
+                    return user
+                }
+                pendingVerificationId = verificationId
+                throw NeedsSecondFactor(PendingSecondFactor(phone.phoneNumber.orEmpty(), SecondFactorKind.Sms))
+            }
+            totp != null -> {
+                pendingKind = "totp"
+                pendingEnrollmentId = totp.uid
+                throw NeedsSecondFactor(PendingSecondFactor(totp.displayName.orEmpty(), SecondFactorKind.Totp))
+            }
+            else -> throw AuthException("Este segundo factor no está soportado en la app.")
+        }
+    }
+
+    private suspend fun sendSecondFactorSms(
+        phone: PhoneMultiFactorInfo,
+        session: MultiFactorSession,
+        resend: Boolean,
+    ): String {
+        val activity = AndroidAuthHost.requireActivity()
+        if (pendingResolver == null) {
+            throw AuthException("El paso extra venció. Volvé a ingresar la contraseña.")
+        }
+        if (!resend) mfaResendToken = null
+        val token = if (resend) mfaResendToken else null
+        return suspendCancellableCoroutine { cont ->
+            val callbacks = object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
+                override fun onVerificationCompleted(credential: PhoneAuthCredential) {
+                    pendingInstantCredential = credential
+                    if (cont.isActive) cont.resume("auto-mfa")
+                }
+
+                override fun onVerificationFailed(e: FirebaseException) {
+                    if (cont.isActive) cont.resumeWithException(mapFirebase(e))
+                }
+
+                override fun onCodeSent(verificationId: String, forceToken: PhoneAuthProvider.ForceResendingToken) {
+                    mfaResendToken = forceToken
+                    if (cont.isActive) cont.resume(verificationId)
+                }
+            }
+            val options = PhoneAuthOptions.newBuilder(auth)
+                .setActivity(activity)
+                .setTimeout(60L, TimeUnit.SECONDS)
+                .setMultiFactorSession(session)
+                .setMultiFactorHint(phone)
+                .setCallbacks(callbacks)
+                .apply { if (token != null) setForceResendingToken(token) }
+                .build()
+            PhoneAuthProvider.verifyPhoneNumber(options)
+        }
     }
 
     private suspend fun signInOAuth(providerId: String, scopes: List<String>): AuthUser {
@@ -200,7 +333,18 @@ actual class AuthPlatform actual constructor() {
     }
 
     private suspend fun runAuth(block: suspend () -> FirebaseUser): AuthUser =
-        runCatching { block().toAuthUser() }.getOrElse { throw mapFirebase(it) }
+        try {
+            block().toAuthUser()
+        } catch (e: NeedsSecondFactor) {
+            throw e
+        } catch (t: Throwable) {
+            val mfa = generateSequence(t) { it.cause }.filterIsInstance<FirebaseAuthMultiFactorException>().firstOrNull()
+            if (mfa != null) {
+                prepareSecondFactor(mfa)?.toAuthUser() ?: throw AuthException("No se pudo completar el paso extra")
+            } else {
+                throw mapFirebase(t)
+            }
+        }
 }
 
 private fun FirebaseUser.toAuthUser() = AuthUser(
@@ -231,11 +375,20 @@ private fun mapFirebase(error: Throwable?): AuthException {
         "ERROR_EMAIL_ALREADY_IN_USE" -> "Ese correo ya está registrado"
         "ERROR_WEAK_PASSWORD" -> "La contraseña es demasiado débil"
         "ERROR_TOO_MANY_REQUESTS" -> "Demasiados intentos. Probá más tarde"
-        "ERROR_INVALID_VERIFICATION_CODE" -> "El código SMS no es válido"
+        "ERROR_INVALID_VERIFICATION_CODE" -> "El código no es válido"
         "ERROR_SESSION_EXPIRED" -> "El código SMS venció. Pedí uno nuevo"
         "ERROR_QUOTA_EXCEEDED" -> "Se agotó la cuota de SMS de Firebase"
         "ERROR_OPERATION_NOT_ALLOWED" -> "Este método de ingreso no está habilitado en Firebase"
-        else -> error?.message ?: "No se pudo autenticar"
+        "ERROR_SECOND_FACTOR_REQUIRED" ->
+            "No pudimos abrir el paso extra de esta cuenta. Volvé a intentar."
+        else -> {
+            val raw = error?.message.orEmpty()
+            if (raw.contains("second factor", ignoreCase = true)) {
+                "No pudimos abrir el paso extra de esta cuenta. Volvé a intentar."
+            } else {
+                raw.ifBlank { "No se pudo autenticar" }
+            }
+        }
     }
     return AuthException(message, error)
 }

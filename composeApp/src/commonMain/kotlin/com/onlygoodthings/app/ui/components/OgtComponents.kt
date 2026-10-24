@@ -186,7 +186,7 @@ fun OgtBackButton(
     }
 }
 
-/** Compat: onboarding usa el chevron hacia adelante. */
+/** Chevron de navegación, sin el botón circular. */
 @Composable
 fun OgtBackChevron(
     modifier: Modifier = Modifier,
@@ -209,21 +209,23 @@ fun OgtTopBar(
     title: String = "OnlyGoodThings",
     onBack: (() -> Unit)? = null,
     onNotifications: () -> Unit = {},
-    onProfile: () -> Unit = {},
+    onProfile: (() -> Unit)? = null,
     onOverflow: (() -> Unit)? = null,
     onMessages: (() -> Unit)? = null,
     hideOnScroll: Boolean = true,
     branded: Boolean = false,
+    showProfileAvatar: Boolean = true,
 ) {
     val spec = OgtChromeSpec(
         title = title,
         onBack = onBack,
         onNotifications = onNotifications,
-        onProfile = onProfile,
+        onProfile = onProfile ?: LocalOpenOwnProfile.current,
         onOverflow = onOverflow,
         onMessages = onMessages,
         hideOnScroll = hideOnScroll,
         branded = branded,
+        showProfileAvatar = showProfileAvatar,
     )
     val host = LocalOgtChrome.current
     if (host != null) {

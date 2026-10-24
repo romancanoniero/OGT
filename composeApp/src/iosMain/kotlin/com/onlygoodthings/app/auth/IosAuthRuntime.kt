@@ -8,6 +8,8 @@ interface IosAuthHost {
     fun currentUser(): AuthUser?
     fun idToken(forceRefresh: Boolean, onResult: (String?, String?) -> Unit)
     fun signInEmail(email: String, password: String, onResult: (AuthUser?, String?) -> Unit)
+    fun confirmSecondFactor(code: String, onResult: (AuthUser?, String?) -> Unit)
+    fun resendSecondFactor(onResult: (String?) -> Unit)
     fun signUpEmail(email: String, password: String, displayName: String, onResult: (AuthUser?, String?) -> Unit)
     fun sendPasswordReset(email: String, onResult: (String?) -> Unit)
     fun startPhoneAuth(phoneE164: String, onResult: (String?, String?) -> Unit)

@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.onlygoodthings.app.media.OgtMediaCache
 import com.onlygoodthings.app.platform.OgtPickedMedia
+import com.onlygoodthings.app.platform.previewUrl
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.ui.components.OgtDraftMediaStrip
 import com.onlygoodthings.app.ui.components.OgtPill
@@ -108,7 +109,7 @@ internal fun OgtLocalDatabase.attachAnimalMedia(
 ) {
     draftMedia.take(PostMediaRules.MAX_ITEMS).forEachIndexed { order, item ->
         val video = item.kind == MediaKind.VIDEO
-        val url = if (item.fromDevice) "file://${item.path}" else "asset://${item.path}"
+        val url = item.previewUrl()
         val poster = item.posterPath?.let { "file://$it" }
         postMedia += LocalPostMedia(
             id = "$postId-m$order",

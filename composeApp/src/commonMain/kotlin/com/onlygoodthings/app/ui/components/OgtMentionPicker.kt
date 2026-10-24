@@ -211,11 +211,10 @@ private fun MentionChip(hit: MentionCandidate, onRemove: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Image(
-            painterResource(neighborAvatarArt(hit.userId.orEmpty())),
-            contentDescription = null,
+        OgtProfilePhoto(
+            userId = hit.userId,
+            fallback = neighborAvatarArt(hit.userId.orEmpty()),
             modifier = Modifier.size(40.dp).clip(CircleShape),
-            contentScale = ContentScale.Crop,
         )
         Column(Modifier.weight(1f)) {
             Text(hit.displayName, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -241,11 +240,10 @@ private fun MentionRow(hit: MentionCandidate, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Image(
-            painterResource(neighborAvatarArt(hit.userId.orEmpty())),
-            contentDescription = null,
+        OgtProfilePhoto(
+            userId = hit.userId,
+            fallback = neighborAvatarArt(hit.userId.orEmpty()),
             modifier = Modifier.size(44.dp).clip(CircleShape),
-            contentScale = ContentScale.Crop,
         )
         Column(Modifier.weight(1f)) {
             Text(hit.displayName, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = OgtColors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)

@@ -9,6 +9,8 @@ object OgtDbPaths {
     const val PARKING_TICKS = "ogt/parking/ticks"
     const val IMPACT_ALERTS = "ogt/alerts"
     const val SOCIAL_FEED = "ogt/social/posts"
+    /** Fotos de perfil. Público: el feed y la ficha escuchan el mismo árbol. */
+    const val PROFILES = "ogt/profiles"
     const val PRESENCE = "ogt/presence"
 
     fun parkingSpot(spotId: String): String = "$PARKING_SPOTS/$spotId"
@@ -18,6 +20,7 @@ object OgtDbPaths {
     fun socialComments(postId: String): String = "${socialPost(postId)}/comments"
     fun socialComment(postId: String, commentId: String): String = "${socialComments(postId)}/$commentId"
     fun presence(userId: String): String = "$PRESENCE/$userId"
+    fun profile(userId: String): String = "$PROFILES/$userId"
 }
 
 /** REST `http(s)://host` → socket `ws(s)://host/db` de db-kmp-sdk. */

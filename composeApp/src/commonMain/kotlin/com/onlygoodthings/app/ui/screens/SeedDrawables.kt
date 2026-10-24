@@ -81,8 +81,11 @@ import com.onlygoodthings.app.resources.seed_pet_tabby
 import com.onlygoodthings.app.resources.seed_pet_turtle
 import org.jetbrains.compose.resources.DrawableResource
 
-/** Mapea el assetKey del seed a un drawable de composeResources. */
-internal fun seedDrawable(key: String): DrawableResource = when (key) {
+/**
+ * Mapea el assetKey del seed a un drawable de composeResources.
+ * Una clave desconocida no tiene foto: no se reemplaza por otra nota.
+ */
+internal fun seedDrawable(key: String): DrawableResource? = when (key) {
     "seed_n01" -> Res.drawable.seed_n01
     "seed_n01b" -> Res.drawable.seed_n01b
     "seed_n02" -> Res.drawable.seed_n02
@@ -162,5 +165,5 @@ internal fun seedDrawable(key: String): DrawableResource = when (key) {
     "feed_story_solar" -> Res.drawable.feed_story_solar
     "jardin", "publish_photo" -> Res.drawable.publish_photo
     "arboles" -> Res.drawable.feed_photo_arboles
-    else -> Res.drawable.feed_story_donacion
+    else -> null
 }

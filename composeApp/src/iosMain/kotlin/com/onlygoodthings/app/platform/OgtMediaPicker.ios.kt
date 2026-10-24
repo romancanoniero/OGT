@@ -204,7 +204,7 @@ private fun ensureCacheDir(): String {
 
 private fun writeJpeg(image: UIImage): String? {
     val path = "${ensureCacheDir()}/${NSUUID.UUID().UUIDString}.jpg"
-    val data: NSData = UIImageJPEGRepresentation(image, 0.86) ?: return null
+    val data: NSData = UIImageJPEGRepresentation(image, 0.92) ?: return null
     val ok = data.writeToFile(path, atomically = true)
     return path.takeIf { ok }
 }

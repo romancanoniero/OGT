@@ -5,9 +5,13 @@ expect class AuthPlatform() {
     suspend fun currentUser(): AuthUser?
     suspend fun idToken(forceRefresh: Boolean = false): String?
     suspend fun signInEmail(email: String, password: String): AuthUser
+    /** Completa el código SMS o de la app de autenticación que Firebase ya pidió. */
+    suspend fun confirmSecondFactor(code: String): AuthUser
+    /** Reenvía el SMS del segundo factor. No aplica a la app de autenticación. */
+    suspend fun resendSecondFactor()
     suspend fun signUpEmail(email: String, password: String, displayName: String): AuthUser
     suspend fun sendPasswordReset(email: String)
-    suspend fun startPhoneAuth(phoneE164: String): PendingPhoneAuth
+    suspend fun startPhoneAuth(phoneE164: String, resend: Boolean = false): PendingPhoneAuth
     suspend fun confirmPhone(pending: PendingPhoneAuth, code: String): AuthUser
     suspend fun signInGoogle(): AuthUser
     suspend fun unlockBiometric(): Boolean

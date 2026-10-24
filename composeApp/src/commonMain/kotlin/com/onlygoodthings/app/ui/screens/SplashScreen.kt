@@ -66,8 +66,6 @@ fun SplashScreen(onContinue: () -> Unit) {
         Text("RED SOLIDARIA DE COMUNIDAD", color = OgtColors.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
         Text("OnlyGoodThings", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = OgtColors.ink)
         OgtCaption("Las buenas noticias, la ayuda mutua y los actos solidarios de tu comunidad.")
-        Spacer(Modifier.height(16.dp))
-        AuthFeatureReel()
         Spacer(Modifier.weight(1f))
         Text(status, color = OgtColors.muted, fontSize = 13.sp)
         Box(

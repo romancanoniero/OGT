@@ -14,12 +14,15 @@ Leyenda: **OK** cumple · **FONDO** es 3D pero el lienzo no es blanco · **2D** 
 | `parking_action_find` | Encontrar el auto | Clay 3D | Blanco (unificado) | OK |
 | `parking_sign_plate` | Señal P de parking | Clay 3D | Blanco | OK |
 | `anecdote_action` | Anécdota / relato en homenaje | Clay 3D | Transparente (PNG alfa) | OK |
+| `media_viewholder` | Marco vacío mientras carga la foto del feed | Clay 3D | Transparente (PNG alfa) | OK |
 | `publish_action_add` | Placeholder de media | Clay 3D | Transparente (PNG alfa) | OK |
-| `onboard_feed` | Onboarding | Flat pastel | Transparente | 2D |
-| `onboard_parking` | Onboarding | Flat pastel | Transparente | 2D |
-| `onboard_pets` | Onboarding | Flat pastel | Transparente | 2D |
-| `onboard_puntos` | Onboarding | Flat pastel | Transparente | 2D |
-| `onboard_skills` | Onboarding | Flat pastel | Transparente | 2D |
+| `onboard_feed` | Onboarding, relato | Clay 3D | Transparente (PNG alfa) | OK |
+| `onboard_homenaje` | Onboarding, personajes notorios | Clay 3D | Transparente (PNG alfa) | OK |
+| `onboard_anonimos` | Onboarding, héroes anónimos | Clay 3D | Transparente (PNG alfa) | OK |
+| `onboard_parking` | Onboarding, auto y pin | Clay 3D | Transparente (PNG alfa) | OK |
+| `onboard_pets` | Onboarding, mascotas | Clay 3D | Transparente (PNG alfa) | OK |
+| `onboard_puntos` | Onboarding, puntos | Clay 3D | Transparente (PNG alfa) | OK |
+| `onboard_skills` | Onboarding, intercambio | Clay 3D | Transparente (PNG alfa) | OK |
 | `gps_scope_allegory` | Diálogo de alcance GPS | Flat menta | Cream | 2D |
 | `parking_maneuver_allegory` | Maniobra | Ilustración / foto | Color | 2D |
 | `ogt_logo` / `feed_logo` | Marca | Logo 2D | Transparente | marca, no tile |

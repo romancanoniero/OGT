@@ -38,7 +38,7 @@ import org.jetbrains.compose.resources.painterResource
 
 /**
  * Icono de producto Stitch Quiet Studio (SVG → vector).
- * Los tiles 3D (parking_action_*, onboard_*) siguen para héroes grandes.
+ * Los tiles 3D (parking_action_*, anecdote_action, onboard_*) siguen para héroes grandes.
  */
 @Composable
 fun OgtStitchIcon(

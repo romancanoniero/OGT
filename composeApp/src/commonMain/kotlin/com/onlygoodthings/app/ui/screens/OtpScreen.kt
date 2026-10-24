@@ -8,8 +8,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -17,14 +20,25 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalClipboardManager
-import com.onlygoodthings.app.auth.OtpArrivalEffect
-import com.onlygoodthings.app.auth.otpDigits
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.onlygoodthings.app.auth.AuthLab
+import com.onlygoodthings.app.auth.OtpArrivalEffect
+import com.onlygoodthings.app.auth.SecondFactorKind
+import com.onlygoodthings.app.auth.otpDigits
 import com.onlygoodthings.app.data.LocalAuth
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.theme.OgtLogo
@@ -41,34 +55,49 @@ fun OtpScreen(onConfirm: () -> Unit, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     var code by remember { mutableStateOf("") }
     var pasteNote by remember { mutableStateOf<String?>(null) }
+    var submitting by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
+    val factor = auth.pendingSecondFactor
+    val sms = factor?.kind != SecondFactorKind.Totp
     val phone = auth.pendingPhone?.phoneE164 ?: "tu número"
-    OtpArrivalEffect { received ->
-        code = received
-        pasteNote = null
+    val title = if (factor != null) "Código extra" else "Verifica tu número"
+    val caption = when (factor?.kind) {
+        SecondFactorKind.Totp ->
+            "Esta cuenta ya tiene un paso extra. Ingresá el código de 6 dígitos de tu app de autenticación."
+        SecondFactorKind.Sms ->
+            "Esta cuenta ya tiene un paso extra. Enviamos un código de 6 dígitos a ${factor?.hint?.ifBlank { null } ?: "tu teléfono"}."
+        null ->
+            "Enviamos un código de 6 dígitos a $phone. Si llega por SMS, el teclado lo ofrece arriba."
+    }
+    fun submit() {
+        if (submitting || auth.busy || code.length != 6) return
+        submitting = true
+        val typed = code
+        scope.launch {
+            val ok = auth.confirmOtp(typed)
+            submitting = false
+            if (ok) onConfirm() else code = ""
+        }
+    }
+    if (sms) {
+        OtpArrivalEffect { received ->
+            code = received
+            pasteNote = null
+        }
+    }
+    LaunchedEffect(code) {
+        if (code.length == 6) submit()
     }
     AuthScaffold(onBack = onBack) {
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             OgtLogo(size = 80.dp)
-            OgtSectionTitle("Verifica tu número")
-            OgtCaption("Enviamos un código de 6 dígitos a $phone. Si llega por SMS o por correo, el teclado te lo ofrece para pegarlo. En Android, el SMS también puede completarse al aceptarlo.")
-            GhostLink("¿Número incorrecto? Editar") { onBack() }
+            OgtSectionTitle(title)
+            OgtCaption(caption)
+            GhostLink(if (factor == null) "¿Número incorrecto? Editar" else "Volver") { onBack() }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
-            repeat(6) { i ->
-                val ch = code.getOrNull(i)?.toString() ?: "•"
-                Box(
-                    Modifier.size(48.dp, 56.dp).clip(AuthCorner)
-                        .background(OgtColors.surface)
-                        .border(1.dp, if (i == code.length) OgtColors.secondary else OgtColors.sand, AuthCorner),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(ch, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = OgtColors.primary)
-                }
-            }
-        }
-        AuthField("Código", "Emulador: ${AuthLab.TEST_OTP}", code, otp = true) {
-            if (it.length <= 6) code = it.filter { c -> c.isDigit() }
+        OtpCells(code, smsAutofill = sms) { next ->
+            code = next
+            pasteNote = null
         }
         GhostLink("Pegar código") {
             val digits = otpDigits(clipboard.getText()?.text.orEmpty())
@@ -80,14 +109,71 @@ fun OtpScreen(onConfirm: () -> Unit, onBack: () -> Unit) {
             }
         }
         if (pasteNote != null) OgtCaption(pasteNote!!)
-        GhostLink("Reenviar código") { scope.launch { auth.resendOtp() } }
+        if (sms) {
+            GhostLink("Reenviar código") { scope.launch { auth.resendOtp() } }
+        }
         AuthError(auth.error)
         OgtPrimaryButton(
-            if (auth.busy) "Confirmando…" else "Confirmar y activar cuenta",
-            enabled = !auth.busy,
-        ) {
-            scope.launch { if (auth.confirmOtp(code)) onConfirm() }
-        }
+            if (auth.busy || submitting) "Confirmando…" else if (factor != null) "Confirmar" else "Confirmar y activar cuenta",
+            enabled = !auth.busy && !submitting && code.length == 6,
+        ) { submit() }
         OgtPill("Comunidad segura: verificamos a cada persona")
     }
+}
+
+/** Un solo campo. Las seis casillas son el ingreso, no un adorno encima de otro. */
+@Composable
+private fun OtpCells(code: String, smsAutofill: Boolean, onCode: (String) -> Unit) {
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    val active = if (code.length >= 6) 5 else code.length
+    BasicTextField(
+        value = code,
+        onValueChange = { raw -> onCode(raw.filter { it.isDigit() }.take(6)) },
+        modifier = Modifier
+            .focusRequester(focus)
+            .fillMaxWidth()
+            .semantics {
+                contentDescription = "Código de 6 dígitos"
+                if (smsAutofill) contentType = ContentType.SmsOtpCode
+            },
+        textStyle = TextStyle(color = OgtColors.canvas, fontSize = 1.sp),
+        cursorBrush = SolidColor(OgtColors.canvas),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Done,
+        ),
+        singleLine = true,
+        decorationBox = { inner ->
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                ) {
+                    repeat(6) { i ->
+                        Box(
+                            Modifier
+                                .size(48.dp, 56.dp)
+                                .clip(AuthCorner)
+                                .background(OgtColors.surface)
+                                .border(
+                                    1.dp,
+                                    if (i == active) OgtColors.secondary else OgtColors.sand,
+                                    AuthCorner,
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                code.getOrNull(i)?.toString().orEmpty(),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 22.sp,
+                                color = OgtColors.primary,
+                            )
+                        }
+                    }
+                }
+                Box(Modifier.matchParentSize().alpha(0.01f)) { inner() }
+            }
+        },
+    )
 }

@@ -24,6 +24,7 @@ import com.onlygoodthings.shared.domain.ParkedCar
 import com.onlygoodthings.shared.domain.VehicleProfile
 import com.onlygoodthings.shared.domain.locationScopeFromPref
 import com.onlygoodthings.shared.domain.prefCode
+import com.onlygoodthings.shared.realtime.OgtRealtime
 import com.onlygoodthings.shared.realtime.OgtSdk
 import com.onlygoodthings.shared.realtime.currentEpochMs
 import com.onlygoodthings.shared.realtime.gatewayEndpointFromApiBase
@@ -50,6 +51,10 @@ class OgtPreviewSession(
 ) {
     var currentUserId by mutableStateOf(initialUserId)
     var overlayUser by mutableStateOf<LocalUser?>(null)
+    /** Id de Postgres de la sesión, para cruzar el nodo `ogt/profiles/{id}`. */
+    var serverUserId: String? = null
+    /** URL viva por cada alias (id local, firebase y id de servidor). */
+    var livePhotos by mutableStateOf<Map<String, String>>(emptyMap())
     var radarEnabled by mutableStateOf(true)
     var gpsEnabled by mutableStateOf(prefs.gpsEnabled)
     var locationScope by mutableStateOf(locationScopeFromPref(prefs.locationScope))
@@ -139,6 +144,51 @@ class OgtPreviewSession(
         prefs.locationScope = scope.prefCode()
     }
     fun me(): LocalUser = overlayUser ?: db.user(currentUserId)
+
+    /**
+     * Llega del árbol `ogt/profiles` o del POST que acaba de guardar la foto.
+     * Todas las pantallas leen [livePhotos] y se pintan sin recargar.
+     */
+    fun applyRemoteProfilePhoto(userId: String, photoUrl: String) {
+        if (userId.isBlank() || photoUrl.isBlank()) return
+        val me = overlayUser ?: db.users.firstOrNull { it.id == currentUserId }
+        val mine = me != null && (userId == serverUserId || me.owns(userId) || userId == me.firebaseUid)
+        val keys = linkedSetOf(userId)
+        db.users.forEachIndexed { index, user ->
+            val samePerson = mine && user.id == me.id
+            val hit = user.id == userId || user.firebaseUid == userId || samePerson
+            if (!hit) return@forEachIndexed
+            keys += user.id
+            if (user.firebaseUid.isNotBlank()) keys += user.firebaseUid
+            db.users[index] = user.copy(photoUrl = photoUrl)
+        }
+        if (me != null && mine) {
+            keys += me.aliases()
+            serverUserId?.let { keys += it }
+            overlayUser = me.copy(photoUrl = photoUrl)
+        }
+        livePhotos = livePhotos + keys.filter { it.isNotBlank() }.associateWith { photoUrl }
+    }
+
+    /** Vuelve la foto de esta sesión al valor anterior. Vacío borra la optimista. */
+    fun restoreProfilePhoto(previous: String?) {
+        val me = overlayUser ?: db.users.firstOrNull { it.id == currentUserId } ?: return
+        if (!previous.isNullOrBlank()) {
+            applyRemoteProfilePhoto(me.id, previous)
+            return
+        }
+        val keys = buildSet {
+            add(me.id)
+            if (me.firebaseUid.isNotBlank()) add(me.firebaseUid)
+            serverUserId?.let { add(it) }
+            addAll(me.aliases())
+        }.filter { it.isNotBlank() }.toSet()
+        db.users.forEachIndexed { index, user ->
+            if (user.id == me.id) db.users[index] = user.copy(photoUrl = null)
+        }
+        overlayUser = me.copy(photoUrl = null)
+        livePhotos = livePhotos - keys
+    }
     fun here(): GeoPoint? = deviceLocation
     /** Lugar fijado al estacionar (ESTACIONE), no un pin residual ni el GPS del perfil. */
     fun hasParkedPlace(): Boolean {
@@ -263,6 +313,12 @@ fun OgtPreviewStore(content: @Composable () -> Unit) {
     LaunchedEffect(Unit) {
         auth.hydratePublishedAnimals(db)
         session.persistPublishedAnimals()
+        if (!OgtSdk.isStarted()) return@LaunchedEffect
+        runCatching {
+            OgtRealtime().observeProfiles().collect { frame ->
+                session.applyRemoteProfilePhoto(frame.userId, frame.photoUrl)
+            }
+        }
     }
     CompositionLocalProvider(
         LocalOgtDb provides db,

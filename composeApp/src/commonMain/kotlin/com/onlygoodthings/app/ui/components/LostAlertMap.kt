@@ -152,8 +152,9 @@ fun LostAlertMap(
         if (!fill && sightings.isNotEmpty()) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 sightings.take(6).forEach { row ->
-                    Image(
-                        painter = painterResource(neighborAvatarArt(row.userId)),
+                    OgtProfilePhoto(
+                        userId = row.userId,
+                        fallback = neighborAvatarArt(row.userId),
                         contentDescription = db.userOrNull(row.userId)?.displayName,
                         modifier = Modifier
                             .size(32.dp)
@@ -163,7 +164,6 @@ fun LostAlertMap(
                                 selectedId = row.id
                                 onSelectSighting(row)
                             },
-                        contentScale = ContentScale.Crop,
                     )
                 }
                 OgtCaption("${sightings.size} lo vieron cerca")

@@ -11,7 +11,18 @@ data class OgtPickedMedia(
     val path: String,
     val fromDevice: Boolean,
     val posterPath: String? = null,
+    /** URL ya subida. La vista puede seguir usando el archivo local. */
+    val uploadedUrl: String? = null,
 )
+
+/** Lo que se muestra en la tira: el archivo local, si todavía está. */
+fun OgtPickedMedia.previewUrl(): String =
+    if (fromDevice) "file://$path" else uploadedUrl?.takeIf { it.isNotBlank() } ?: "asset://$path"
+
+/** Lo que se publica: la foto ya subida, encuadrada. */
+fun OgtPickedMedia.publishUrl(): String =
+    uploadedUrl?.takeIf { it.isNotBlank() }
+        ?: if (fromDevice) "file://$path" else "asset://$path"
 
 class OgtMediaPicker(
     val pickPhoto: () -> Unit,

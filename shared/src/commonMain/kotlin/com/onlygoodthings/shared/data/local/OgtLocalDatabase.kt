@@ -695,20 +695,11 @@ class OgtLocalDatabase {
         }
         if (postMedia.none { it.postId == post.id }) {
             val inherited = parent?.let { mediaOf(it.id) }.orEmpty()
+                .filterNot { it.assetKey == "feed_story_donacion" }
             if (inherited.isNotEmpty()) {
                 postMedia += inherited.map { item ->
                     item.copy(id = "${item.id}-anecdote", postId = post.id)
                 }
-            } else {
-                postMedia += LocalPostMedia(
-                    id = "${post.id}-m0",
-                    postId = post.id,
-                    kind = MediaKind.IMAGE,
-                    url = "asset://feed_story_donacion",
-                    sortOrder = 0,
-                    assetKey = "feed_story_donacion",
-                    altText = honoree,
-                )
             }
         }
         bumpFeed()
@@ -954,6 +945,7 @@ class OgtLocalDatabase {
         remoteOrder: List<String>? = null,
     ): List<LocalSocialPost> {
         val preview = ensureFeedAnecdotePreview()
+        dropDonationStandIn()
         val aliases = viewerAliases(viewerId)
         val hideShare: (LocalSocialPost) -> Boolean = { hidesOwnAnecdoteShare(viewerId, it) }
         val hidden = hiddenPostIds(viewerId)
@@ -974,6 +966,16 @@ class OgtLocalDatabase {
             .sortedByDescending { it.createdAtEpochMs }
         return (listOf(preview).filter(::allowed) + pinned + body.filter { it.id != preview.id })
             .distinctBy { it.id }
+    }
+
+    /**
+     * `feed_story_donacion` se usó como foto genérica cuando una nota no tenía imagen.
+     * No es la foto de esa nota: se saca del río, también si quedó en el cache.
+     */
+    private fun dropDonationStandIn() {
+        postMedia.removeAll { row ->
+            row.assetKey == "feed_story_donacion" || row.url == "asset://feed_story_donacion"
+        }
     }
 
     fun exportSocialFeed(viewerId: String): String {
@@ -1012,8 +1014,9 @@ class OgtLocalDatabase {
             }
         }
         snap.media.forEach { row ->
-            val idx = postMedia.indexOfFirst { it.id == row.id }
-            if (idx >= 0) postMedia[idx] = row else postMedia += row
+            val fixed = row.copy(url = OgtMediaSources.currentUrl(row.url))
+            val idx = postMedia.indexOfFirst { it.id == fixed.id }
+            if (idx >= 0) postMedia[idx] = fixed else postMedia += fixed
         }
         snap.comments.forEach { row ->
             if (comments.none { it.id == row.id }) comments += row

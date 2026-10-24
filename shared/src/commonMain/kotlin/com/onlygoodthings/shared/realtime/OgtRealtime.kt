@@ -7,6 +7,7 @@ import com.iyr.db.database.DbDatabase
 import com.onlygoodthings.shared.domain.GeoPoint
 import com.onlygoodthings.shared.domain.ParkingSpot
 import com.onlygoodthings.shared.domain.ParkingStatus
+import com.onlygoodthings.shared.domain.ProfilePhotoFrame
 import com.onlygoodthings.shared.domain.SocialComment
 import com.onlygoodthings.shared.domain.SocialLiveCounters
 import com.onlygoodthings.shared.protocol.frames.ImpactAlertFrame
@@ -34,6 +35,11 @@ class OgtRealtime(
 
     fun observeSocialPosts(): Flow<SocialLiveCounters> = observeChildren(OgtDbPaths.SOCIAL_FEED) { snap ->
         snap.toSocialLiveCounters()
+    }
+
+    /** Cada cambio de `photo_url` llega como hijo de [OgtDbPaths.PROFILES]. */
+    fun observeProfiles(): Flow<ProfilePhotoFrame> = observeChildren(OgtDbPaths.PROFILES) { snap ->
+        snap.toProfilePhoto()
     }
 
     fun observePostComments(postId: String): Flow<SocialComment> =
@@ -143,6 +149,14 @@ private fun DataSnapshot.toImpactAlert(): ImpactAlertFrame? {
         urgency = raw["urgency"] as? String ?: "MEDIUM",
         deepLink = raw["deepLink"] as? String,
     )
+}
+
+@Suppress("UNCHECKED_CAST")
+private fun DataSnapshot.toProfilePhoto(): ProfilePhotoFrame? {
+    val raw = getValue() as? Map<String, Any?> ?: return null
+    val id = raw["userId"] as? String ?: key() ?: return null
+    val url = (raw["photoUrl"] as? String)?.takeIf { it.isNotBlank() } ?: return null
+    return ProfilePhotoFrame(userId = id, photoUrl = url)
 }
 
 @Suppress("UNCHECKED_CAST")

@@ -240,7 +240,12 @@ struct iOSApp: App {
     }
 }
 
-final class OgtFirebaseHost: NSObject, IosAuthHost {
+final class OgtFirebaseHost: NSObject, IosAuthHost, AuthUIDelegate {
+    private var pendingResolver: MultiFactorResolver?
+    private var pendingVerificationId: String?
+    private var pendingEnrollmentId: String?
+    private var pendingKind: String?
+
     func currentUser() -> AuthUser? {
         guard let user = Auth.auth().currentUser else { return nil }
         return Self.map(user)
@@ -258,7 +263,7 @@ final class OgtFirebaseHost: NSObject, IosAuthHost {
 
     func signInEmail(email: String, password: String, onResult: @escaping (AuthUser?, String?) -> Void) {
         Auth.auth().signIn(withEmail: email, password: password) { result, error in
-            Self.finish(result?.user, error, onResult)
+            self.finish(result?.user, error, onResult)
         }
     }
 
@@ -272,7 +277,7 @@ final class OgtFirebaseHost: NSObject, IosAuthHost {
             change.displayName = displayName
             change.commitChanges { _ in
                 user.reload { _ in
-                    Self.finish(Auth.auth().currentUser, nil, onResult)
+                    self.finish(Auth.auth().currentUser, nil, onResult)
                 }
             }
         }
@@ -293,7 +298,61 @@ final class OgtFirebaseHost: NSObject, IosAuthHost {
     func confirmPhone(verificationId: String, code: String, onResult: @escaping (AuthUser?, String?) -> Void) {
         let credential = PhoneAuthProvider.provider().credential(withVerificationID: verificationId, verificationCode: code)
         Auth.auth().signIn(with: credential) { result, error in
-            Self.finish(result?.user, error, onResult)
+            self.finish(result?.user, error, onResult)
+        }
+    }
+
+    func confirmSecondFactor(code: String, onResult: @escaping (AuthUser?, String?) -> Void) {
+        guard let resolver = pendingResolver else {
+            onResult(nil, "El paso extra venció. Volvé a ingresar la contraseña.")
+            return
+        }
+        let assertion: MultiFactorAssertion
+        if pendingKind == "totp", let enrollmentId = pendingEnrollmentId {
+            assertion = TOTPMultiFactorGenerator.assertionForSignIn(
+                withEnrollmentID: enrollmentId,
+                oneTimePassword: code
+            )
+        } else if let verificationId = pendingVerificationId {
+            let credential = PhoneAuthProvider.provider().credential(
+                withVerificationID: verificationId,
+                verificationCode: code
+            )
+            assertion = PhoneMultiFactorGenerator.assertion(with: credential)
+        } else {
+            onResult(nil, "El paso extra venció. Volvé a ingresar la contraseña.")
+            return
+        }
+        resolver.resolveSignIn(with: assertion) { result, error in
+            if error == nil {
+                self.clearSecondFactor()
+            }
+            self.finish(result?.user, error, onResult)
+        }
+    }
+
+    func resendSecondFactor(onResult: @escaping (String?) -> Void) {
+        guard pendingKind == "sms",
+              let resolver = pendingResolver,
+              let phone = resolver.hints.compactMap({ $0 as? PhoneMultiFactorInfo }).first else {
+            onResult("Este código sale de tu app de autenticación.")
+            return
+        }
+        PhoneAuthProvider.provider().verifyPhoneNumber(
+            with: phone,
+            uiDelegate: self,
+            multiFactorSession: resolver.session
+        ) { verificationId, error in
+            if let error {
+                onResult(Self.mensaje(error))
+                return
+            }
+            guard let verificationId else {
+                onResult("No se pudo enviar el código")
+                return
+            }
+            self.pendingVerificationId = verificationId
+            onResult(nil)
         }
     }
 
@@ -322,7 +381,7 @@ final class OgtFirebaseHost: NSObject, IosAuthHost {
             let accessToken = result?.user.accessToken.tokenString ?? ""
             let credential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: accessToken)
             Auth.auth().signIn(with: credential) { authResult, authError in
-                Self.finish(authResult?.user, authError, onResult)
+                self.finish(authResult?.user, authError, onResult)
             }
         }
     }
@@ -345,18 +404,75 @@ final class OgtFirebaseHost: NSObject, IosAuthHost {
     }
 
     func signOut() {
+        clearSecondFactor()
         try? Auth.auth().signOut()
         GIDSignIn.sharedInstance.signOut()
     }
 
-    private static func finish(_ user: User?, _ error: Error?, _ onResult: (AuthUser?, String?) -> Void) {
+    private func clearSecondFactor() {
+        pendingResolver = nil
+        pendingVerificationId = nil
+        pendingEnrollmentId = nil
+        pendingKind = nil
+    }
+
+    /// Si la cuenta ya tenía segundo factor, manda el SMS o deja listo el código de la app.
+    private func startSecondFactor(_ error: Error, _ onResult: @escaping (AuthUser?, String?) -> Void) {
+        let ns = error as NSError
+        guard let resolver = ns.userInfo[AuthErrorUserInfoMultiFactorResolverKey] as? MultiFactorResolver else {
+            onResult(nil, "No pudimos abrir el paso extra de esta cuenta. Volvé a intentar.")
+            return
+        }
+        clearSecondFactor()
+        pendingResolver = resolver
+        if let phone = resolver.hints.compactMap({ $0 as? PhoneMultiFactorInfo }).first {
+            pendingKind = "sms"
+            PhoneAuthProvider.provider().verifyPhoneNumber(
+                with: phone,
+                uiDelegate: self,
+                multiFactorSession: resolver.session
+            ) { verificationId, sendError in
+                if let sendError {
+                    onResult(nil, Self.mensaje(sendError))
+                    return
+                }
+                guard let verificationId else {
+                    onResult(nil, "No se pudo enviar el código")
+                    return
+                }
+                self.pendingVerificationId = verificationId
+                onResult(nil, "ogt-mfa:sms:\(phone.phoneNumber)")
+            }
+            return
+        }
+        if let totp = resolver.hints.first(where: { $0.factorID == TOTPMultiFactorID }) {
+            pendingKind = "totp"
+            pendingEnrollmentId = totp.uid
+            let hint = totp.displayName ?? ""
+            onResult(nil, "ogt-mfa:totp:\(hint)")
+            return
+        }
+        onResult(nil, "Este segundo factor no está soportado en la app.")
+    }
+
+    private func finish(_ user: User?, _ error: Error?, _ onResult: @escaping (AuthUser?, String?) -> Void) {
         if let error {
-            onResult(nil, mensaje(error))
+            if Self.isSecondFactor(error) {
+                startSecondFactor(error, onResult)
+            } else {
+                onResult(nil, Self.mensaje(error))
+            }
         } else if let user {
-            onResult(map(user), nil)
+            onResult(Self.map(user), nil)
         } else {
             onResult(nil, "No se pudo autenticar")
         }
+    }
+
+    private static func isSecondFactor(_ error: Error) -> Bool {
+        let ns = error as NSError
+        if AuthErrorCode(rawValue: ns.code) == .secondFactorRequired { return true }
+        return ns.localizedDescription.localizedCaseInsensitiveContains("second factor")
     }
 
     private static func map(_ user: User) -> AuthUser {
@@ -378,12 +494,26 @@ final class OgtFirebaseHost: NSObject, IosAuthHost {
         case .emailAlreadyInUse: return "Ese correo ya está registrado"
         case .weakPassword: return "La contraseña es demasiado débil"
         case .tooManyRequests: return "Demasiados intentos. Probá más tarde"
-        case .invalidVerificationCode: return "El código SMS no es válido"
+        case .invalidVerificationCode: return "El código no es válido"
         case .sessionExpired: return "El código SMS venció. Pedí uno nuevo"
         case .quotaExceeded: return "Se agotó la cuota de SMS de Firebase"
         case .operationNotAllowed: return "Este método de ingreso no está habilitado en Firebase"
-        default: return ns.localizedDescription
+        case .secondFactorRequired:
+            return "No pudimos abrir el paso extra de esta cuenta. Volvé a intentar."
+        default:
+            if ns.localizedDescription.localizedCaseInsensitiveContains("second factor") {
+                return "No pudimos abrir el paso extra de esta cuenta. Volvé a intentar."
+            }
+            return ns.localizedDescription
         }
+    }
+
+    func present(_ viewControllerToPresent: UIViewController, animated flag: Bool, completion: (() -> Void)? = nil) {
+        Self.topController()?.present(viewControllerToPresent, animated: flag, completion: completion)
+    }
+
+    func dismiss(animated flag: Bool, completion: (() -> Void)? = nil) {
+        Self.topController()?.dismiss(animated: flag, completion: completion)
     }
 
     private static func topController() -> UIViewController? {

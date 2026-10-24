@@ -13,6 +13,7 @@ import com.onlygoodthings.shared.domain.FeedMode
 import com.onlygoodthings.shared.domain.MediaKind
 import com.onlygoodthings.shared.domain.MoneyLedgerKind
 import com.onlygoodthings.shared.domain.PostMediaItem
+import com.onlygoodthings.shared.domain.ProfilePhotoFrame
 import com.onlygoodthings.shared.domain.SocialComment
 import com.onlygoodthings.shared.domain.SocialLiveCounters
 import com.onlygoodthings.shared.protocol.WsCodec
@@ -174,6 +175,16 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
         repository.updateOwnProfile(principal.userId, dataMap)
         val card = repository.neighborCard(principal.userId, principal.userId)
             ?: return@post call.respond(HttpStatusCode.NotFound, ApiResponse.fail<Unit>("Vecino inexistente", "NOT_FOUND"))
+        val photo = card.photoUrl?.takeIf { it.isNotBlank() }
+        if (photo != null) {
+            hub.projectProfile(
+                principal.userId,
+                WsCodec.json.encodeToString(
+                    ProfilePhotoFrame.serializer(),
+                    ProfilePhotoFrame(userId = principal.userId, photoUrl = photo),
+                ),
+            )
+        }
         call.respond(ApiResponse.ok(card, "Perfil actualizado"))
     }
 

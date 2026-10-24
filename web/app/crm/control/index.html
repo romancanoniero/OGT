@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es" data-crm="control">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>OGT Control — Acceso protegido</title>
+  <link rel="stylesheet" href="../crm.css?v=fullbleed-1">
+  <script src="/ogt-media-cache.js?v=cache3"></script>
+</head>
+<body data-crm-view="pending">
+  <div id="crm-auth" class="crm-auth">
+    <main class="crm-card crm-auth-card">
+      <header class="crm-auth-head">
+        <img class="crm-logo" src="../icons/ogt-logo.png" alt="" width="48" height="48">
+        <div>
+          <h1>OGT Control</h1>
+          <p class="crm-lede">Administración central · Acceso restringido</p>
+        </div>
+      </header>
+      <p id="crm-status" class="crm-status" role="status"></p>
+      <form id="crm-login" class="crm-stack">
+        <label class="crm-field" for="email">
+          <span class="crm-field-label">Correo</span>
+          <input id="email" class="crm-input" type="email" placeholder="Correo" aria-label="Correo" required autocomplete="username">
+        </label>
+        <label class="crm-field" for="password">
+          <span class="crm-field-label">Contraseña</span>
+          <input id="password" class="crm-input" type="password" placeholder="Contraseña" aria-label="Contraseña" required autocomplete="current-password">
+        </label>
+        <button class="crm-btn crm-btn-primary" type="submit">Ingresar</button>
+      </form>
+      <button id="crm-refresh" class="crm-btn crm-btn-ghost" type="button">Verificar nuevamente</button>
+      <p class="crm-footnote">Para ingresar necesitás una cuenta autorizada, correo verificado y verificación de dos pasos reciente. <img src="/google-logo.svg" width="17" height="17" class="crm-google-mark" alt="">Google y contraseña pueden vincularse a una misma cuenta.</p>
+    </main>
+  </div>
+  <section id="crm-root"></section>
+  <script src="/ogt-sdk.js?v=profiles"></script>
+  <script src="/ogt-frame.js?v=optimistic1"></script>
+  <script type="module" src="../crm.js?v=optimistic1"></script>
+</body>
+</html>

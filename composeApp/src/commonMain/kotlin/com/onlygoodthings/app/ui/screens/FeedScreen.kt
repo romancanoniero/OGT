@@ -4,7 +4,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -268,9 +272,10 @@ fun FeedScreen(
     }
     fun forceRefresh() {
         if (refreshing) return
+        refreshing = true
+        OgtMediaCache.retryMisses()
         scope.launch {
             suppressIncomingToast = true
-            refreshing = true
             delay(380)
             page = 1
             refreshTick += 1
@@ -280,9 +285,14 @@ fun FeedScreen(
             suppressIncomingToast = false
         }
     }
+    fun settlePull() {
+        if (refreshing) return
+        if (pullPx > 72f) forceRefresh() else pullPx = 0f
+    }
     val pull = remember(listState) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (source != NestedScrollSource.UserInput) return Offset.Zero
                 val atTop = listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
                 if (atTop && available.y > 0f && !refreshing) {
                     pullPx = (pullPx + available.y * 0.42f).coerceAtMost(140f)
@@ -296,7 +306,12 @@ fun FeedScreen(
             }
 
             override suspend fun onPreFling(available: Velocity): Velocity {
-                if (pullPx > 72f) forceRefresh() else pullPx = 0f
+                settlePull()
+                return Velocity.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                if (pullPx > 0f) settlePull()
                 return Velocity.Zero
             }
         }
@@ -307,7 +322,7 @@ fun FeedScreen(
     var reportPostId by remember { mutableStateOf<String?>(null) }
     val seenStoryIds = remember { mutableStateListOf<String>() }
     OgtTopBar(
-        title = "OnlyGoodThings",
+        title = "Only Good Things",
         onNotifications = onNotifications,
         onProfile = onProfile,
         onMessages = onMessages,
@@ -316,7 +331,16 @@ fun FeedScreen(
     Box(Modifier.fillMaxSize().background(OgtColors.canvas)) {
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize().nestedScroll(pull),
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(pull)
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        awaitFirstDown(pass = PointerEventPass.Final, requireUnconsumed = false)
+                        waitForUpOrCancellation(pass = PointerEventPass.Final)
+                        settlePull()
+                    }
+                },
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             item(key = "chrome-stories") {
@@ -579,7 +603,7 @@ private data class PostLook(
     val postId: String,
     val fullName: String,
     val avatar: DrawableResource,
-    val photo: DrawableResource,
+    val photo: DrawableResource?,
     val hashtags: List<String>,
     val verified: Boolean,
 )
@@ -591,13 +615,14 @@ private fun postLook(
 ): PostLook {
     val row = followed.firstOrNull { it.postId == post.id }
     if (row != null) {
-        return PostLook(row.postId, row.fullName, row.avatar, row.photo, row.hashtags, row.verified)
+        val cardPhoto = if (row.photo == Res.drawable.feed_story_donacion) null else row.photo
+        return PostLook(row.postId, row.fullName, row.avatar, cardPhoto, row.hashtags, row.verified)
     }
     return PostLook(
         postId = post.id,
         fullName = authorName,
         avatar = commentAvatar(post.authorUserId ?: ""),
-        photo = Res.drawable.feed_story_donacion,
+        photo = null,
         hashtags = listOf("#${post.tag.replace(" ", "")}"),
         verified = post.authorKind == AuthorKind.COMPANY,
     )
@@ -691,7 +716,7 @@ private fun StoryCircle(item: FeedStoryItem, seen: Boolean, onOpen: () -> Unit) 
         Box(contentAlignment = Alignment.Center) {
             if (item.mine) {
                 Box(Modifier.size(64.dp).clip(CircleShape).background(OgtColors.sand), contentAlignment = Alignment.Center) {
-                    CirclePhoto(item.avatar, 60.dp)
+                    CirclePhoto(item.avatar, 60.dp, if (item.mine) LocalOgtSession.current.me().id else item.userId)
                 }
                 Box(
                     Modifier.align(Alignment.BottomEnd).offset(x = 2.dp, y = 2.dp)
@@ -711,7 +736,7 @@ private fun StoryCircle(item: FeedStoryItem, seen: Boolean, onOpen: () -> Unit) 
                     contentAlignment = Alignment.Center,
                 ) {
                     Box(Modifier.size(58.dp).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
-                        CirclePhoto(item.avatar, 54.dp)
+                        CirclePhoto(item.avatar, 54.dp, item.userId)
                     }
                 }
             }
@@ -797,7 +822,7 @@ private fun StoryViewer(
                         Modifier.zIndex(3f).clickable { onOpenAuthor(item.userId) },
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        CirclePhoto(item.avatar, 36.dp)
+                        CirclePhoto(item.avatar, 36.dp, if (item.mine) LocalOgtSession.current.me().id else item.userId)
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
                             Text(item.author, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
@@ -940,6 +965,7 @@ private fun LostPetFeedCard(
             time = post.timeLabel,
             createdAtEpochMs = post.createdAtEpochMs,
             avatar = profile.avatar,
+            authorUserId = post.authorUserId,
             verified = profile.verified,
             onOpenAuthor = onOpenAuthor,
             onOverflow = onOverflow,
@@ -1016,6 +1042,7 @@ private fun AdoptionFeedCard(
             time = post.timeLabel,
             createdAtEpochMs = post.createdAtEpochMs,
             avatar = profile.avatar,
+            authorUserId = post.authorUserId,
             verified = profile.verified,
             onOpenAuthor = onOpenAuthor,
             onOverflow = onOverflow,
@@ -1094,6 +1121,7 @@ private fun TernuraFeedCard(
             time = post.timeLabel,
             createdAtEpochMs = post.createdAtEpochMs,
             avatar = profile.avatar,
+            authorUserId = post.authorUserId,
             verified = profile.verified,
             onOpenAuthor = onOpen,
             onOverflow = onOverflow,
@@ -1157,6 +1185,7 @@ private fun HomenajeFeedCard(
             time = post.timeLabel,
             createdAtEpochMs = post.createdAtEpochMs,
             avatar = profile.avatar,
+            authorUserId = post.authorUserId,
             verified = profile.verified,
             onOpenAuthor = onOpen,
             onOverflow = onOverflow,
@@ -1226,11 +1255,27 @@ private fun HomenajeFeedCard(
 }
 
 @Composable
+private fun MissingPostArt(fallback: DrawableResource?, description: String? = null) {
+    val art = fallback
+    if (art == null) {
+        Box(Modifier.fillMaxSize().background(OgtColors.sand))
+        return
+    }
+    Image(
+        painterResource(art),
+        contentDescription = description,
+        modifier = Modifier.fillMaxSize(),
+        contentScale = ContentScale.Crop,
+    )
+}
+
+@Composable
 private fun ListingPhotoStrip(
     media: List<LocalPostMedia>,
-    fallback: DrawableResource,
+    fallback: DrawableResource?,
     onOpen: () -> Unit,
 ) {
+    if (media.isEmpty() && fallback == null) return
     val pageCount = media.size.coerceAtLeast(1)
     val pager = rememberPagerState { pageCount }
     Box(
@@ -1250,12 +1295,7 @@ private fun ListingPhotoStrip(
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
-                    Image(
-                        painterResource(fallback),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                    )
+                    MissingPostArt(fallback)
                 }
                 if (item?.kind == MediaKind.VIDEO) {
                     Box(
@@ -1299,6 +1339,7 @@ private fun StoryFeedCard(
             time = post.timeLabel,
             createdAtEpochMs = post.createdAtEpochMs,
             avatar = profile.avatar,
+            authorUserId = post.authorUserId,
             verified = profile.verified,
             onOpenAuthor = onOpenAuthor,
             onOverflow = onOverflow,
@@ -1444,6 +1485,7 @@ private fun PostHeader(
     time: String,
     createdAtEpochMs: Long,
     avatar: DrawableResource,
+    authorUserId: String? = null,
     verified: Boolean,
     star: Boolean = false,
     onOpenAuthor: () -> Unit = {},
@@ -1454,7 +1496,7 @@ private fun PostHeader(
         Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).clickable(onClick = onOpenAuthor),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CirclePhoto(avatar, 36.dp)
+        CirclePhoto(avatar, 36.dp, authorUserId)
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -1495,12 +1537,13 @@ private fun ImpactTruthPills(post: LocalSocialPost) {
 @Composable
 private fun PostMediaPager(
     media: List<LocalPostMedia>,
-    fallback: DrawableResource,
+    fallback: DrawableResource?,
     tag: String,
     discovery: Boolean,
     petStory: Boolean = false,
     onOpen: () -> Unit,
 ) {
+    if (media.isEmpty() && fallback == null) return
     val items = media.ifEmpty { emptyList() }
     val pageCount = items.size.coerceAtLeast(1)
     val pagerState = rememberPagerState { pageCount }
@@ -1516,12 +1559,7 @@ private fun PostMediaPager(
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
-                    Image(
-                        painterResource(fallback),
-                        contentDescription = tag,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                    )
+                    MissingPostArt(fallback, tag)
                 }
                 if (item?.kind == MediaKind.VIDEO) {
                     Box(
@@ -1565,11 +1603,10 @@ private fun OverlayChip(
 }
 
 @Composable
-private fun CirclePhoto(image: DrawableResource, size: androidx.compose.ui.unit.Dp) {
-    androidx.compose.foundation.Image(
-        painterResource(image),
-        contentDescription = null,
+private fun CirclePhoto(image: DrawableResource, size: androidx.compose.ui.unit.Dp, userId: String? = null) {
+    com.onlygoodthings.app.ui.components.OgtProfilePhoto(
+        userId = userId,
+        fallback = image,
         modifier = Modifier.size(size).clip(CircleShape),
-        contentScale = ContentScale.Crop,
     )
 }

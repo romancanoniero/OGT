@@ -19,6 +19,7 @@ fun dbListenAllowed(rawPath: String, userId: String): Boolean {
         OgtDbPaths.PARKING_TICKS,
         OgtDbPaths.IMPACT_ALERTS,
         OgtDbPaths.SOCIAL_FEED,
+        OgtDbPaths.PROFILES,
     )
     if (publicRoots.any { path == it || path.startsWith("$it/") }) return true
     val ownPresence = OgtDbPaths.presence(userId)

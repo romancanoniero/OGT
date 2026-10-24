@@ -46,6 +46,11 @@ object OgtMotion {
      */
     const val chromeIdleMs = 260L
     const val chromeHidePx = 8f
-    /** Pausa de un cuadro del reel de producto (login). No es chrome. */
-    const val reelHoldMs = 2800L
+    /**
+     * Lectura de un slide de onboarding antes de pasar de página solo.
+     * Alcanza para un título y una frase; no es un loader.
+     */
+    const val onboardHoldMs = 3600L
+    /** Cambio de página del onboarding: mismo tempo que [slide]. */
+    val pagerScroll = tween<Float>(durationMillis = 280, easing = FastOutSlowInEasing)
 }

@@ -17,6 +17,9 @@ class DbListenPolicyTest {
             OgtDbPaths.IMPACT_ALERTS,
             OgtDbPaths.SOCIAL_FEED,
             "${OgtDbPaths.SOCIAL_FEED}/post-1/comments",
+            OgtDbPaths.PROFILES,
+            OgtDbPaths.profile(userA),
+            OgtDbPaths.profile(userB),
             OgtDbPaths.presence(userA),
             "${OgtDbPaths.presence(userA)}/meta",
         )) {

@@ -2,7 +2,7 @@ package com.onlygoodthings.app.auth
 
 import com.onlygoodthings.shared.domain.UserProfile
 
-class AuthException(message: String, cause: Throwable? = null) : Exception(message, cause)
+open class AuthException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 data class AuthUser(
     val firebaseUid: String,
@@ -20,6 +20,31 @@ data class PendingPhoneAuth(
     val barrio: String? = null,
     val isNewUser: Boolean = false,
 )
+
+/** La cuenta ya tenía segundo factor. No se inscribe desde la app: solo se completa el código. */
+enum class SecondFactorKind { Sms, Totp }
+
+data class PendingSecondFactor(
+    val hint: String,
+    val kind: SecondFactorKind,
+)
+
+/** Señal interna entre el puente nativo y el controlador. No se muestra tal cual. */
+const val SECOND_FACTOR_SIGNAL = "ogt-mfa:"
+
+class NeedsSecondFactor(val pending: PendingSecondFactor) : AuthException(
+    "Esta cuenta tiene un paso extra. Ingresá el código.",
+)
+
+fun parseSecondFactorSignal(raw: String): PendingSecondFactor {
+    val body = raw.removePrefix(SECOND_FACTOR_SIGNAL)
+    val kind = body.substringBefore(':')
+    val hint = body.substringAfter(':', "")
+    return PendingSecondFactor(
+        hint = hint,
+        kind = if (kind == "totp") SecondFactorKind.Totp else SecondFactorKind.Sms,
+    )
+}
 
 enum class AuthRestore {
     LoggedOut,

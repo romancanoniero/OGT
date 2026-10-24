@@ -1,7 +1,9 @@
 package com.onlygoodthings.app.ui.screens
 
 import com.onlygoodthings.app.resources.Res
+import com.onlygoodthings.app.resources.onboard_anonimos
 import com.onlygoodthings.app.resources.onboard_feed
+import com.onlygoodthings.app.resources.onboard_homenaje
 import com.onlygoodthings.app.resources.onboard_parking
 import com.onlygoodthings.app.resources.onboard_pets
 import com.onlygoodthings.app.resources.onboard_puntos
@@ -40,6 +42,18 @@ internal val OnboardPages = listOf(
         kicker = "COMUNIDAD ACTIVA",
         title = "Feed de buenas acciones",
         body = "Sumá karma ecológico por cada acto solidario y canjealo en comercios de cercanía de tu comunidad.",
+    ),
+    OnboardPage(
+        image = Res.drawable.onboard_homenaje,
+        kicker = "PERSONAJES NOTORIOS",
+        title = "Recordemos aquellos personajes que dejaron su marca positiva en el mundo.",
+        body = "",
+    ),
+    OnboardPage(
+        image = Res.drawable.onboard_anonimos,
+        kicker = "HÉROES ANÓNIMOS",
+        title = "Contá la historia de esas personas que destacaron en su paso por la vida.",
+        body = "",
     ),
     OnboardPage(
         image = Res.drawable.onboard_puntos,

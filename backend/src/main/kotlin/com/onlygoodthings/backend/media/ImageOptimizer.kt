@@ -60,7 +60,8 @@ object ImageOptimizer {
                     // PNG stays lossless; JPEG stays photographic. WebP may already be smaller.
                     val target = if (extension == "png" || resized.colorModel.hasAlpha()) "png" else "jpg"
                     val encoded = encode(resized, target)
-                    return if (encoded.size < bytes.size) Result(encoded, target) else Result(bytes, extension)
+                    val changed = scale < 0.999 || orientation != 1 || target != extension
+                    return if (changed || encoded.size < bytes.size) Result(encoded, target) else Result(bytes, extension)
                 } finally { reader.dispose() }
             }
         } catch (e: IllegalArgumentException) {
@@ -79,7 +80,8 @@ object ImageOptimizer {
                 val params = writer.defaultWriteParam
                 if (extension == "jpg") {
                     params.compressionMode = ImageWriteParam.MODE_EXPLICIT
-                    params.compressionQuality = 0.84f
+                    // 0.92 conserva el detalle. Más abajo se nota en bordes y piel.
+                    params.compressionQuality = 0.92f
                 }
                 writer.write(null, IIOImage(image, null, null), params)
             }

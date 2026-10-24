@@ -65,6 +65,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.launch
@@ -97,7 +98,6 @@ import com.onlygoodthings.app.resources.qs_map
 import com.onlygoodthings.app.resources.qs_paw
 import com.onlygoodthings.app.resources.qs_pets
 import com.onlygoodthings.app.resources.qs_send
-import com.onlygoodthings.app.resources.feed_story_donacion
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.theme.OgtDimens
 import com.onlygoodthings.app.theme.OgtMotion
@@ -1306,28 +1306,30 @@ private fun DetailMedia(
             ) {
                 OgtPostImage(
                     item = item,
-                    fallback = Res.drawable.feed_story_donacion,
+                    fallback = null,
                     contentDescription = item.altText ?: tag,
                     modifier = Modifier.fillMaxSize(),
                 )
-                if (item.kind == MediaKind.VIDEO) {
-                    Box(
-                        Modifier
-                            .align(Alignment.Center)
-                            .size(52.dp)
-                            .clip(CircleShape)
-                            .background(OgtColors.ink.copy(alpha = 0.55f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        OgtStitchIcon(Res.drawable.qs_expand, "Reproducir", tint = OgtColors.onPrimary)
-                    }
-                }
             }
         }
         MediaPagerIndicator(
             pageIndex = pager.currentPage,
             pageCount = media.size,
         )
+        if (media.getOrNull(pager.currentPage)?.kind == MediaKind.VIDEO) {
+            Box(
+                Modifier
+                    .align(Alignment.Center)
+                    .zIndex(4f)
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(OgtColors.ink.copy(alpha = 0.55f))
+                    .clickable { onOpen(pager.currentPage) },
+                contentAlignment = Alignment.Center,
+            ) {
+                OgtStitchIcon(Res.drawable.qs_expand, "Reproducir", tint = OgtColors.onPrimary)
+            }
+        }
     }
 }
 
@@ -1395,11 +1397,11 @@ private fun CommentCard(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.Top,
     ) {
-        Image(
-            painter = painterResource(commentAuthorAvatar(authorUserId)),
+        com.onlygoodthings.app.ui.components.OgtProfilePhoto(
+            userId = authorUserId,
+            fallback = commentAuthorAvatar(authorUserId),
             contentDescription = author,
             modifier = Modifier.size(36.dp).clip(CircleShape).border(1.dp, OgtColors.hairline, CircleShape),
-            contentScale = ContentScale.Crop,
         )
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(

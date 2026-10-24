@@ -22,6 +22,13 @@ data class AuthMe(
     val levelLabel: String = "",
 )
 
+/** Proyección en vivo de `users.photo_url` en el árbol `ogt/profiles`. */
+@Serializable
+data class ProfilePhotoFrame(
+    val userId: String,
+    val photoUrl: String,
+)
+
 @Serializable
 data class UserProfile(
     val id: String,

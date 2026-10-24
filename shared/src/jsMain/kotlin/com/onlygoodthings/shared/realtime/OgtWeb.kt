@@ -2,6 +2,7 @@
 
 package com.onlygoodthings.shared.realtime
 
+import com.onlygoodthings.shared.domain.ProfilePhotoFrame
 import com.onlygoodthings.shared.domain.SocialLiveCounters
 import kotlinx.browser.window
 import kotlinx.coroutines.CoroutineScope
@@ -31,6 +32,7 @@ private fun defaultGateway(): String {
 class OgtWebRealtime {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var listenJob: Job? = null
+    private var profileJob: Job? = null
 
     fun start(token: String, endpoint: String? = null) {
         val url = endpoint?.takeIf { it.isNotBlank() } ?: defaultGateway()
@@ -49,9 +51,23 @@ class OgtWebRealtime {
         return { job.cancel() }
     }
 
+    /** Cada `photo_url` nuevo en `ogt/profiles`. La página pinta esa URL sin recargar. */
+    fun observeProfiles(onLive: (String) -> Unit): () -> Unit {
+        profileJob?.cancel()
+        val job = scope.launch {
+            OgtRealtime().observeProfiles().collect { live ->
+                onLive(liveJson.encodeToString(ProfilePhotoFrame.serializer(), live))
+            }
+        }
+        profileJob = job
+        return { job.cancel() }
+    }
+
     fun shutdown() {
         listenJob?.cancel()
         listenJob = null
+        profileJob?.cancel()
+        profileJob = null
         OgtSdk.shutdown()
     }
 }

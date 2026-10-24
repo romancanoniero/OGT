@@ -15,7 +15,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -26,7 +25,6 @@ import com.onlygoodthings.app.data.LocalOgtDb
 import com.onlygoodthings.app.data.LocalOgtSession
 import com.onlygoodthings.app.data.announcePublishedPost
 import com.onlygoodthings.app.data.persistAnimalOnServer
-import kotlinx.coroutines.launch
 import com.onlygoodthings.app.i18n.LocalOgtCopy
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.theme.OgtDimens
@@ -55,7 +53,6 @@ fun ReportAnimalScreen(
     val me = session.me()
     val auth = LocalAuth.current
     val copy = LocalOgtCopy.current
-    val scope = rememberCoroutineScope()
     val editing = !editPostId.isNullOrBlank()
     val existing = remember(editPostId) { editPostId?.let { db.post(it) } }
     val listing = remember(editPostId) {
@@ -202,21 +199,21 @@ fun ReportAnimalScreen(
                 }
                 session.persistPublishedAnimals()
                 auth.ensureDevBearer()
-                scope.launch {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                        val live = runCatching {
-                            persistAnimalOnServer(db, auth.animals, me, post, draftMedia, place)
-                        }.getOrDefault(post)
-                        if (editing) {
-                            runCatching { auth.feed.editPost(live.id, story, "Mascota perdida") }
-                                .onSuccess { db.upsertRemoteSocial(it) }
-                        }
-                        session.persistPublishedAnimals()
-                        session.persistSocialFeed()
-                        if (!editing) announcePublishedPost(db, live)
+                val mediaNow = draftMedia.toList()
+                auth.enqueue {
+                    val ready = auth.readyDraft(mediaNow)
+                    val live = runCatching {
+                        persistAnimalOnServer(db, auth.animals, me, post, ready, place)
+                    }.getOrDefault(post)
+                    if (editing) {
+                        runCatching { auth.feed.editPost(live.id, story, "Mascota perdida") }
+                            .onSuccess { db.upsertRemoteSocial(it) }
                     }
-                    onDone()
+                    session.persistPublishedAnimals()
+                    session.persistSocialFeed()
+                    if (!editing) announcePublishedPost(db, live)
                 }
+                onDone()
             }
             Spacer(Modifier.height(24.dp))
         }

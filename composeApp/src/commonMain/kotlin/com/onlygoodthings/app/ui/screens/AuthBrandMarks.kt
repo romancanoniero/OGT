@@ -1,6 +1,6 @@
 package com.onlygoodthings.app.ui.screens
 
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9,27 +9,53 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.onlygoodthings.app.resources.Res
+import com.onlygoodthings.app.resources.google_logo
 import com.onlygoodthings.app.theme.OgtColors
+import com.onlygoodthings.app.theme.OgtDimens
+import org.jetbrains.compose.resources.painterResource
 
 /** Fila de proveedores. Google; el mismo proveedor que en la web. */
 @Composable
 fun AuthProviderRow(onPick: (String) -> Unit = {}) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         AuthProviderChip("Google", Modifier.weight(1f), onClick = { onPick("google") }) { GoogleMark() }
+    }
+}
+
+/** Google en una sola fila, debajo del formulario. */
+@Composable
+fun AuthGoogleButton(onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(OgtDimens.iconButton)
+            .clip(RoundedCornerShape(OgtDimens.buttonRadius))
+            .border(1.dp, OgtColors.hairline, RoundedCornerShape(OgtDimens.buttonRadius))
+            .clickable(onClick = onClick),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        GoogleMark()
+        Text(
+            "Continuar con Google",
+            modifier = Modifier.padding(start = 10.dp),
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 14.sp,
+            color = OgtColors.ink,
+        )
     }
 }
 
@@ -57,20 +83,10 @@ private fun AuthProviderChip(
 
 @Composable
 private fun GoogleMark() {
-    Canvas(Modifier.size(20.dp)) {
-        val s = size.minDimension
-        val stroke = s * 0.18f
-        val pad = s * 0.08f
-        val arc = Size(s - pad * 2, s - pad * 2)
-        val topLeft = Offset(pad, pad)
-        drawArc(Color(0xFFEA4335), -40f, 100f, false, topLeft, arc, style = Stroke(stroke, cap = StrokeCap.Butt))
-        drawArc(Color(0xFFFBBC05), 60f, 70f, false, topLeft, arc, style = Stroke(stroke, cap = StrokeCap.Butt))
-        drawArc(Color(0xFF34A853), 130f, 80f, false, topLeft, arc, style = Stroke(stroke, cap = StrokeCap.Butt))
-        drawArc(Color(0xFF4285F4), 210f, 110f, false, topLeft, arc, style = Stroke(stroke, cap = StrokeCap.Butt))
-        drawRect(
-            Color(0xFF4285F4),
-            topLeft = Offset(s * 0.50f, s * 0.44f),
-            size = Size(s * 0.42f, stroke),
-        )
-    }
+    Image(
+        painter = painterResource(Res.drawable.google_logo),
+        contentDescription = "Google",
+        modifier = Modifier.size(18.dp),
+        contentScale = ContentScale.Fit,
+    )
 }

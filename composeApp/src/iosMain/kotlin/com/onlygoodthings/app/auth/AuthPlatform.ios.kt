@@ -22,6 +22,16 @@ actual class AuthPlatform actual constructor() {
     actual suspend fun signInEmail(email: String, password: String): AuthUser =
         awaitUser { host().signInEmail(email, password, it) }
 
+    actual suspend fun confirmSecondFactor(code: String): AuthUser =
+        awaitUser { host().confirmSecondFactor(code, it) }
+
+    actual suspend fun resendSecondFactor() = suspendCancellableCoroutine { cont ->
+        host().resendSecondFactor { err ->
+            if (err != null) cont.resumeWithException(AuthException(err))
+            else cont.resume(Unit)
+        }
+    }
+
     actual suspend fun signUpEmail(email: String, password: String, displayName: String): AuthUser =
         awaitUser { host().signUpEmail(email, password, displayName, it) }
 
@@ -32,8 +42,13 @@ actual class AuthPlatform actual constructor() {
         }
     }
 
-    actual suspend fun startPhoneAuth(phoneE164: String): PendingPhoneAuth =
+    actual suspend fun startPhoneAuth(phoneE164: String, resend: Boolean): PendingPhoneAuth =
         suspendCancellableCoroutine { cont ->
+            // iOS vuelve a pedir el SMS. El token de reenvío es solo de Android.
+            if (resend && phoneE164.isBlank()) {
+                cont.resumeWithException(AuthException("Ingresá un teléfono"))
+                return@suspendCancellableCoroutine
+            }
             host().startPhoneAuth(phoneE164) { verificationId, err ->
                 when {
                     err != null -> cont.resumeWithException(AuthException(err))
@@ -67,6 +82,8 @@ actual class AuthPlatform actual constructor() {
         suspendCancellableCoroutine { cont ->
             block { user, err ->
                 when {
+                    err != null && err.startsWith(SECOND_FACTOR_SIGNAL) ->
+                        cont.resumeWithException(NeedsSecondFactor(parseSecondFactorSignal(err)))
                     err != null -> cont.resumeWithException(AuthException(err))
                     user != null -> cont.resume(user)
                     else -> cont.resumeWithException(AuthException("No se pudo autenticar"))
