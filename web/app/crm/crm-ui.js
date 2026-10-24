@@ -309,6 +309,8 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       });
       tr.dataset.post = view.key;
       const actionCell = node('td');
+      const actions = node('div');
+      actions.className = 'crm-actions';
       for (const spec of view.actions || []) {
         const action = iconButton(spec.icon, spec.label);
         action.addEventListener('click', event => {
@@ -319,8 +321,9 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
           }
           open(spec.name === 'remove');
         });
-        actionCell.append(action);
+        actions.append(action);
       }
+      actionCell.append(actions);
       tr.append(actionCell);
       entityBody.append(tr);
       if (view.key === selectedKey) selected = { item, view };

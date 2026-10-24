@@ -472,8 +472,16 @@ img { max-width: 100%; }
 .crm-assign-hit[aria-pressed="true"] { background: var(--ogt-sand); }
 .crm-subhead { justify-content: flex-start; margin-top: 16px; font-weight: 600; }
 .crm-subhead img { width: 20px; height: 20px; }
-.crm-table-wrap { overflow-x: auto; }
+.crm-table-wrap { overflow-x: auto; max-width: 100%; }
 .crm-table { width: 100%; border-collapse: collapse; text-align: left; }
+/* La última columna no parte los íconos. Si la fila no entra, este contenedor se desplaza. */
+.crm-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  width: max-content;
+}
+.crm-actions .crm-icon-btn { flex: none; }
 .crm-table th {
   padding: 12px 14px;
   border-bottom: 1px solid var(--ogt-hairline);
