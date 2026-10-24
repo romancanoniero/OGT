@@ -666,10 +666,13 @@ body[data-crm-view="app"] .crm-password-wrap { width: min(280px, 100%); }
   background: var(--ogt-sand);
 }
 /* Diálogo: el mismo marco 16:9 de la tarjeta que ve el vecino. */
-.crm-frame {
-  position: relative;
+.crm-frame-wrap {
   width: calc(100% + 40px);
   margin: 12px -20px 0;
+}
+.crm-frame {
+  position: relative;
+  width: 100%;
   aspect-ratio: 16 / 9;
   overflow: hidden;
   background: var(--ogt-sand);
@@ -686,12 +689,15 @@ body[data-crm-view="app"] .crm-password-wrap { width: min(280px, 100%); }
   -webkit-user-drag: none;
 }
 .crm-frame-save {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  z-index: 2;
   width: auto;
-  background: var(--ogt-canvas);
+  margin: 12px 20px 0;
+  white-space: nowrap;
+}
+.crm-frame-save img {
+  width: 20px;
+  height: 20px;
+  max-width: none;
+  flex: none;
 }
 /* Ficha embebida: la foto entera, de borde a borde. El alto sigue la proporción. */
 .crm-dialog-photo {

@@ -43,10 +43,10 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   const html = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\.svg', view: 'listing'/);
   assert.doesNotMatch(runtime, /id: 'publicaciones'[^}]*keys:/);
-  assert.match(runtime, /crm-ui\.js\?v=frame-1/);
-  assert.match(html, /crm\.js\?v=frame-1/);
+  assert.match(runtime, /crm-ui\.js\?v=frame-2/);
+  assert.match(html, /crm\.js\?v=frame-2/);
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
-  assert.match(html, /crm\.css\?v=frame-1/);
+  assert.match(html, /crm\.css\?v=frame-2/);
   assert.match(runtime, /icon: 'qs_trash\.png', label: 'Quitar selección'/);
   assert.match(runtime, /platform\/posts\/reassign/);
   assert.match(runtime, /platform\/users\/search/);
@@ -95,6 +95,10 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   assert.match(core, /platform\/posts\/frame/);
   assert.match(css, /\.crm-frame \{[^}]*aspect-ratio: 16 \/ 9/s);
   assert.match(css, /\.crm-frame \{[^}]*overflow: hidden/s);
+  assert.match(ui, /crm-frame-wrap/);
+  assert.match(css, /\.crm-frame-save \{[^}]*white-space: nowrap/s);
+  assert.match(css, /\.crm-frame-save img \{[^}]*width: 20px/s);
+  assert.doesNotMatch(css, /\.crm-frame-save \{[^}]*position: absolute/s);
   const webCss = readFileSync(new URL('../web/app/styles.css', import.meta.url), 'utf8');
   assert.match(webCss, /aspect-ratio: 16 \/ 9/);
   const app = readFileSync(new URL('../web/app/app.js', import.meta.url), 'utf8');

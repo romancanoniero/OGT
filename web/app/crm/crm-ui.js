@@ -229,6 +229,8 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     return { x, y, zoom };
   }
   function frameEditor(url, frame, onSave) {
+    const wrap = node('div');
+    wrap.className = 'crm-frame-wrap';
     const box = node('div');
     box.className = 'crm-frame';
     const img = node('img');
@@ -284,9 +286,10 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
           listError.hidden = false;
         }
       });
-      box.append(save);
+      wrap.append(save);
     }
-    return box;
+    wrap.prepend(box);
+    return wrap;
   }
   function cellNode(cell, onOpen) {
     if (cell && cell.image) {
