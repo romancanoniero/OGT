@@ -1,0 +1,24 @@
+---
+description: Dónde seguir el trabajo mobile y la foto de la sesión
+alwaysApply: true
+---
+
+# Continuar en este árbol
+
+El código que corre en el simulador es este repo, rama `main` (`/Volumes/DEV_MAC/ogt-deploy-main`). No editar otros checkouts de Only Good Things: los cambios se cruzan.
+
+Después de cada cambio visible: commit y push a `origin/main`. Sin `--force`. Si `origin/main` avanzó, `git fetch` y rebase antes de push.
+
+Simulador: iPhone 17 Pro `B8D6D203-C781-446E-B85B-07631CE9A9FC`, `com.onlygoodthings.app`. No publicar el sitio.
+
+## Foto de quien está en sesión
+
+Una sola fuente: `OgtSessionAvatar` (`OgtPostImage.kt`). Lee `LocalOgtSession.current.me()` (`id` + `photoUrl`).
+
+La usan la barra (`OgtChrome`), Ajustes (`ProfilePhotoEditor`), «Tu historia» y su visor, los posteos propios (`PostHeader` si `me.owns`) y «Vos» al publicar.
+
+Sin foto propia, el fallback es `neighborAvatarArt(userId)`. Mariana usa `feed_avatar_mariana`. `feed_avatar_me` es Lucas, no la sesión. No hardcodearlo como «yo». `commentAvatar` delega en `neighborAvatarArt`.
+
+Ajustes es `OgtRoute.Settings`, no un overlay. La flecha vuelve a `settingsReturn`. El dock no marca la pestaña anterior. En el feed, sin flecha, la barra es solo el logo (`isAppWordmark`).
+
+Elegir foto abre un sheet: «Tomar foto», «Biblioteca de fotos», «Cancelar». `applyProfilePhoto` la pinta en la sesión al toque. Este árbol no sube esa foto al servidor.
