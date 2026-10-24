@@ -43,12 +43,12 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   const html = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\.svg', view: 'listing'/);
   assert.doesNotMatch(runtime, /id: 'publicaciones'[^}]*keys:/);
-  assert.match(runtime, /crm-ui\.js\?v=grid-1/);
-  assert.match(html, /crm\.js\?v=grid-1/);
+  assert.match(runtime, /crm-ui\.js\?v=frame-2/);
+  assert.match(html, /crm\.js\?v=frame-2/);
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
   assert.match(runtime, /publicationImage\(post\.editorUrl\)/);
   assert.match(runtime, /imageUrl: saved\.imageUrl/);
-  assert.match(html, /crm\.css\?v=grid-1/);
+  assert.match(html, /crm\.css\?v=frame-2/);
   assert.match(runtime, /icon: 'qs_trash\.png', label: 'Quitar selección'/);
   assert.match(runtime, /platform\/posts\/reassign/);
   assert.match(runtime, /platform\/users\/search/);
@@ -61,8 +61,9 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   const css = readFileSync(new URL('../web/app/crm/crm.css', import.meta.url), 'utf8');
   const photo = css.match(/\.crm-post-photo \{[^}]+\}/);
   assert.ok(photo);
-  assert.match(photo[0], /width: 120px/);
+  assert.match(photo[0], /width: 128px/);
   assert.match(photo[0], /height: 72px/);
+  assert.match(photo[0], /aspect-ratio: 16 \/ 9/);
   assert.match(photo[0], /object-fit: cover/);
   assert.match(photo[0], /object-position: center center/);
   const ficha = css.match(/\.crm-dialog-photo \{[^}]+\}/);
@@ -134,6 +135,10 @@ test('la rueda del CRM web acerca arriba y aleja abajo', () => {
   assert.match(ui, /preventDefault\(\)/);
   assert.match(ui, /stopPropagation\(\)/);
   assert.match(ui, /capture: true, passive: false/);
+  assert.match(ui, /function showCrop/);
+  assert.match(ui, /wrap\.showCrop = showCrop/);
+  assert.match(ui, /editor\.showCrop\(nextPhoto\)/);
+  assert.match(ui, /saved\.imageUrl \|\| saved\.url/);
   assert.match(ui, /crm-frame-grid/);
   assert.match(ui, /aria-hidden', 'true'/);
   const css = readFileSync(new URL('../web/app/crm/crm.css', import.meta.url), 'utf8');
@@ -142,8 +147,8 @@ test('la rueda del CRM web acerca arriba y aleja abajo', () => {
   assert.match(css, /\.crm-frame \{[^}]*overscroll-behavior: none/s);
   const empresas = readFileSync(new URL('../web/app/crm/empresas/index.html', import.meta.url), 'utf8');
   const control = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
-  assert.match(empresas, /crm\.js\?v=grid-1/);
-  assert.match(control, /crm\.js\?v=grid-1/);
+  assert.match(empresas, /crm\.js\?v=frame-2/);
+  assert.match(control, /crm\.js\?v=frame-2/);
   assert.doesNotMatch(css, /crm-frame-zoom/);
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_in.png', import.meta.url)));
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_out.png', import.meta.url)));

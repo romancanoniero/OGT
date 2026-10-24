@@ -268,8 +268,43 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     box.append(img, grid);
     let current = readFrame(frame);
     let drag = null;
+    let baked = false;
+    const editorSrc = url;
+    function framePhotoUrl(raw) {
+      if (typeof raw !== 'string') return '';
+      const value = raw.trim();
+      if (!value) return '';
+      try {
+        const parsed = new URL(value, window.location.href);
+        if (parsed.pathname.startsWith('/media/')) return `${parsed.pathname}${parsed.search}`;
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.href;
+      } catch (_) { /* una ruta relativa sigue valiendo */ }
+      return value.startsWith('/') ? value : '';
+    }
+    function fitBaked() {
+      img.style.width = '100%';
+      img.style.height = '100%';
+      img.style.left = '0px';
+      img.style.top = '0px';
+    }
+    function showCrop(nextUrl) {
+      const next = framePhotoUrl(nextUrl);
+      if (!next) return;
+      baked = true;
+      if (img.getAttribute('src') !== next) img.src = next;
+      else if (img.complete && img.naturalWidth) fitBaked();
+    }
+    function resumeEditor() {
+      if (!baked) return false;
+      baked = false;
+      if (img.getAttribute('src') !== editorSrc) img.src = editorSrc;
+      else paint(current);
+      return true;
+    }
+    wrap.showCrop = showCrop;
     box.addEventListener('pointerdown', event => {
       if (event.button !== 0 || event.target.closest('button')) return;
+      if (resumeEditor()) return;
       drag = { id: event.pointerId, x: event.clientX, y: event.clientY, frame: current };
       box.setPointerCapture(event.pointerId);
       box.classList.add('is-dragging');
@@ -298,10 +333,14 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     box.addEventListener('wheel', event => {
       event.preventDefault();
       event.stopPropagation();
+      if (resumeEditor()) return;
       const next = frameWheelZoom(current.zoom, event.deltaY, event.deltaMode);
       paint({ x: current.x, y: current.y, zoom: next });
     }, { capture: true, passive: false });
-    img.addEventListener('load', () => paint(current));
+    img.addEventListener('load', () => {
+      if (baked) fitBaked();
+      else paint(current);
+    });
     if (img.complete && img.naturalWidth) requestAnimationFrame(() => paint(current));
     if (typeof onSave === 'function') {
       const save = node('button', 'Guardar encuadre');
@@ -311,7 +350,9 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       save.addEventListener('click', async () => {
         save.disabled = true;
         try {
-          await onSave(current);
+          const saved = await onSave(current);
+          const next = saved && (saved.imageUrl || saved.url);
+          if (next) showCrop(next);
           save.disabled = false;
         } catch (error) {
           save.disabled = false;
@@ -869,6 +910,10 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
         if (impact && live.impactCount != null) impact.textContent = String(live.impactCount);
         const title = dialog.querySelector('.crm-dialog-head h3');
         if (title && live.authorName) title.textContent = live.authorName;
+        if (nextPhoto) {
+          const editor = dialog.querySelector('.crm-frame-wrap');
+          if (editor && typeof editor.showCrop === 'function') editor.showCrop(nextPhoto);
+        }
       }
       return;
     }

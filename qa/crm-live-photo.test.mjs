@@ -20,12 +20,18 @@ test('el aviso usa url y mediaUrls, los nombres que ya pinta la web', () => {
   assert.match(app, /function replaceShownPhoto\(postId, imageUrl\)/);
   assert.match(app, /\[data-post="\$\{cssAttr\(postId\)\}"\] img\.media/);
   assert.match(app, /:scope > \.media-slot img\.media, :scope > img\.media/);
+  assert.match(app, /function ensureLiveSlot\(img\)/);
+  assert.match(app, /className = "media-slot"/);
+  assert.match(app, /const shown = photo \? `<div class="media-slot">\$\{img\}<\/div>` : ""/);
+  const css = readFileSync(new URL('web/app/styles.css', root), 'utf8');
+  assert.match(css, /\.post \.media-slot/);
+  assert.match(css, /aspect-ratio: 16 \/ 9/);
 });
 
 test('el feed publico no reutiliza el JavaScript del encuadre anterior', () => {
-  assert.match(bootstrap, /\/ogt-sdk\.js\?v=crop-live/);
-  assert.match(bootstrap, /\/app\.js\?v=crop-live/);
-  assert.match(html, /\/bootstrap\.js\?v=crop-live/);
+  assert.match(bootstrap, /\/ogt-sdk\.js\?v=frame-size/);
+  assert.match(bootstrap, /\/app\.js\?v=frame-size/);
+  assert.match(html, /\/bootstrap\.js\?v=frame-size/);
   assert.match(nginx, /location = \/index\.html[\s\S]*no-store/);
   assert.match(nginx, /location ~\*\s*\\\.\(css\|js\|mjs[\s\S]*?no-store/);
 });

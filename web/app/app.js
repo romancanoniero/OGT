@@ -422,12 +422,14 @@ function paintPost(post) {
   const photo = post.media?.[0]?.url || post.mediaUrls?.[0];
   const next = photo ? mediaUrl(photo) : "";
   card.querySelectorAll(":scope > .media-slot img.media, :scope > img.media").forEach((img) => {
+    ensureLiveSlot(img);
     const srcChanged = Boolean(next) && img.getAttribute("src") !== next;
     if (srcChanged) {
       img.style.left = "";
       img.style.top = "";
       img.style.width = "";
       img.style.height = "";
+      img.addEventListener("load", () => placeLiveFrame(img), { once: true });
       img.src = next;
     }
     img.dataset.frameX = String(frame.x);
@@ -1721,11 +1723,21 @@ function livePhotoUrl(live) {
   return typeof live?.imageUrl === "string" ? live.imageUrl.trim() : "";
 }
 
+/** Mete la foto en el marco 16:9 si la ficha la pintó suelta. El alto pasa a ser el del recorte. */
+function ensureLiveSlot(img) {
+  if (!img || img.closest(".media-slot")) return;
+  const slot = document.createElement("div");
+  slot.className = "media-slot";
+  img.replaceWith(slot);
+  slot.append(img);
+}
+
 /** Cambia la foto del feed y de la ficha abierta. La URL nueva no reutiliza la caché del archivo crudo. */
 function replaceShownPhoto(postId, imageUrl) {
   const next = mediaUrl(imageUrl);
   if (!next) return;
   document.querySelectorAll(`[data-post="${cssAttr(postId)}"] img.media`).forEach((img) => {
+    ensureLiveSlot(img);
     img.dataset.frameX = "0.5";
     img.dataset.frameY = "0.5";
     img.dataset.frameZoom = "1";
@@ -1733,8 +1745,10 @@ function replaceShownPhoto(postId, imageUrl) {
     img.style.top = "";
     img.style.width = "";
     img.style.height = "";
+    const place = () => placeLiveFrame(img);
+    img.addEventListener("load", place, { once: true });
     if (img.getAttribute("src") !== next) img.src = next;
-    if (img.complete && img.naturalWidth) placeLiveFrame(img);
+    else if (img.complete && img.naturalWidth) place();
   });
 }
 
@@ -1776,16 +1790,16 @@ function placeLiveFrame(img) {
 
 window.ogtPlaceFrame = placeLiveFrame;
 window.addEventListener("resize", () => {
-  document.querySelectorAll(".post.open .media-slot img.media").forEach(placeLiveFrame);
+  document.querySelectorAll(".post .media-slot img.media").forEach(placeLiveFrame);
 });
 
 function postCard(post, { openable = true, previewStories = true, compose = false } = {}) {
   const photo = post.media?.[0]?.url || post.mediaUrls?.[0];
   const frame = mediaFrameOf(post);
   const img = photo
-    ? `<img class="media" src="${escapeHtml(mediaUrl(photo))}" alt="" data-frame-x="${frame.x}" data-frame-y="${frame.y}" data-frame-zoom="${frame.zoom}"${openable ? ' onload="window.ogtPlaceFrame&&window.ogtPlaceFrame(this)"' : ""}>`
+    ? `<img class="media" src="${escapeHtml(mediaUrl(photo))}" alt="" data-frame-x="${frame.x}" data-frame-y="${frame.y}" data-frame-zoom="${frame.zoom}" onload="window.ogtPlaceFrame&&window.ogtPlaceFrame(this)">`
     : "";
-  const shown = photo && openable ? `<div class="media-slot">${img}</div>` : img;
+  const shown = photo ? `<div class="media-slot">${img}</div>` : "";
   const share = isAnecdoteShare(post);
   const homage = isHomenaje(post);
   const honoree = post.honoreeName;
