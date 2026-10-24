@@ -43,10 +43,10 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   const html = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\.svg', view: 'listing'/);
   assert.doesNotMatch(runtime, /id: 'publicaciones'[^}]*keys:/);
-  assert.match(runtime, /crm-ui\.js\?v=tacho-1/);
-  assert.match(html, /crm\.js\?v=tacho-1/);
+  assert.match(runtime, /crm-ui\.js\?v=iconos-1/);
+  assert.match(html, /crm\.js\?v=iconos-1/);
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
-  assert.match(html, /crm\.css\?v=horizontal-1/);
+  assert.match(html, /crm\.css\?v=iconos-1/);
   assert.match(runtime, /icon: 'qs_trash\.png', label: 'Quitar selección'/);
   assert.match(runtime, /platform\/posts\/reassign/);
   assert.match(runtime, /platform\/users\/search/);
@@ -63,6 +63,13 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   assert.match(photo[0], /height: 72px/);
   assert.match(photo[0], /object-fit: contain/);
   assert.doesNotMatch(photo[0], /cover/);
+  assert.match(ui, /className = 'crm-actions'/);
+  const actions = css.match(/\.crm-actions \{[^}]+\}/);
+  assert.ok(actions);
+  assert.match(actions[0], /flex-wrap: nowrap/);
+  assert.match(actions[0], /width: max-content/);
+  assert.match(css, /\.crm-actions \.crm-icon-btn \{ flex: none; \}/);
+  assert.match(css, /\.crm-table-wrap \{ overflow-x: auto;/);
   assert.match(ui, /crm-photo-btn/);
   assert.match(ui, /Quitar comentario/);
   assert.match(ui, /Quitar anécdota/);
