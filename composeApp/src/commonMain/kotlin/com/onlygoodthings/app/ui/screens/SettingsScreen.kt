@@ -109,7 +109,7 @@ fun SettingsScreen(
     ) {
         if (showChrome) OgtTopBar(title = "Ajustes", onBack = onBack)
         ScreenColumn {
-            ProfilePhotoEditor(me.photoUrl, me.id, me.displayName)
+            ProfilePhotoEditor()
             Text(
                 me.displayName,
                 fontWeight = FontWeight.Bold,
@@ -306,7 +306,7 @@ fun SettingsScreen(
 
 /** Foto centrada. El origen se elige en un sheet, después de cerrarlo. */
 @Composable
-private fun ProfilePhotoEditor(photoUrl: String?, userId: String, displayName: String) {
+private fun ProfilePhotoEditor() {
     val session = LocalOgtSession.current
     var sheet by remember { mutableStateOf(false) }
     var afterClose by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -344,10 +344,8 @@ private fun ProfilePhotoEditor(photoUrl: String?, userId: String, displayName: S
                 .clickable(interactionSource = press, indication = null) { sheet = true },
             contentAlignment = Alignment.Center,
         ) {
-            OgtNeighborAvatar(
-                userId = userId,
-                photoUrl = photoUrl,
-                contentDescription = displayName,
+            OgtSessionAvatar(
+                contentDescription = "Foto de perfil",
                 modifier = Modifier
                     .size(104.dp)
                     .clip(CircleShape)

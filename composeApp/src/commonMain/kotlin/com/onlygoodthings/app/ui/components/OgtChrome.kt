@@ -44,9 +44,8 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import com.onlygoodthings.app.data.LocalOgtSession
 import com.onlygoodthings.app.resources.Res
-import com.onlygoodthings.app.ui.screens.OgtNeighborAvatar
+import com.onlygoodthings.app.ui.screens.OgtSessionAvatar
 import com.onlygoodthings.app.resources.feed_logo
 import com.onlygoodthings.app.resources.qs_feed
 import com.onlygoodthings.app.resources.qs_notifications
@@ -266,12 +265,9 @@ internal fun OgtTopBarRow(spec: OgtChromeSpec, onBack: (() -> Unit)? = spec.onBa
             CircleIconButton(Res.drawable.qs_feed, "Mensajes", spec.onMessages)
         }
         if (spec.showProfileAvatar) {
-            val me = LocalOgtSession.current.me()
             Spacer(Modifier.size(8.dp))
-            OgtNeighborAvatar(
-                userId = me.id,
-                photoUrl = me.photoUrl,
-                contentDescription = me.displayName,
+            OgtSessionAvatar(
+                contentDescription = "Perfil",
                 modifier = Modifier
                     .size(OgtDimens.iconButton)
                     .clip(CircleShape)

@@ -436,6 +436,7 @@ fun PublishActionScreen(
                             if (authorIsSelf) {
                                 ProtagonistRow(
                                     photo = Res.drawable.feed_avatar_me,
+                                    sessionFace = true,
                                     title = "Vos",
                                     subtitle = "Estás contando algo que hiciste.",
                                     actionLabel = null,
@@ -817,17 +818,23 @@ private fun ProtagonistRow(
     subtitle: String,
     actionLabel: String?,
     onAction: (() -> Unit)?,
+    sessionFace: Boolean = false,
 ) {
+    val face = Modifier.size(40.dp).clip(CircleShape).border(2.dp, OgtColors.secondary.copy(alpha = 0.25f), CircleShape)
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(OgtColors.sand).padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Image(
-            painterResource(photo),
-            contentDescription = null,
-            modifier = Modifier.size(40.dp).clip(CircleShape).border(2.dp, OgtColors.secondary.copy(alpha = 0.25f), CircleShape),
-            contentScale = ContentScale.Crop,
-        )
+        if (sessionFace) {
+            OgtSessionAvatar(contentDescription = title, modifier = face)
+        } else {
+            Image(
+                painterResource(photo),
+                contentDescription = null,
+                modifier = face,
+                contentScale = ContentScale.Crop,
+            )
+        }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)

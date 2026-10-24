@@ -114,6 +114,7 @@ import com.onlygoodthings.app.ui.components.OgtPill
 import com.onlygoodthings.app.ui.components.LostAlertMap
 import com.onlygoodthings.app.ui.components.OgtPrimaryButton
 import com.onlygoodthings.app.ui.components.OgtStitchIcon
+import com.onlygoodthings.app.ui.components.neighborAvatarArt
 import com.onlygoodthings.app.ui.components.PostActionRow
 import com.onlygoodthings.app.ui.components.PostOverflowSheet
 import com.onlygoodthings.app.ui.components.PostReportSheet
@@ -694,7 +695,10 @@ private fun StoryCircle(item: FeedStoryItem, seen: Boolean, onOpen: () -> Unit) 
         Box(contentAlignment = Alignment.Center) {
             if (item.mine) {
                 Box(Modifier.size(64.dp).clip(CircleShape).background(OgtColors.sand), contentAlignment = Alignment.Center) {
-                    CirclePhoto(item.avatar, 60.dp)
+                    OgtSessionAvatar(
+                        contentDescription = "Tu historia",
+                        modifier = Modifier.size(60.dp).clip(CircleShape),
+                    )
                 }
                 Box(
                     Modifier.align(Alignment.BottomEnd).offset(x = 2.dp, y = 2.dp)
@@ -800,7 +804,14 @@ private fun StoryViewer(
                         Modifier.zIndex(3f).clickable { onOpenAuthor(item.userId) },
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        CirclePhoto(item.avatar, 36.dp)
+                        if (item.mine) {
+                            OgtSessionAvatar(
+                                contentDescription = item.author,
+                                modifier = Modifier.size(36.dp).clip(CircleShape),
+                            )
+                        } else {
+                            CirclePhoto(item.avatar, 36.dp)
+                        }
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
                             Text(item.author, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
@@ -1425,14 +1436,7 @@ private fun StoryFeedCard(
     }
 }
 
-private fun commentAvatar(userId: String): DrawableResource = when (userId) {
-    OgtIds.Roberto -> Res.drawable.feed_avatar_roberto
-    OgtIds.Sofia, OgtIds.Camila -> Res.drawable.feed_avatar_sofia
-    OgtIds.CarlosG, OgtIds.CarlosR, OgtIds.DiegoF -> Res.drawable.feed_avatar_carlos
-    OgtIds.Mariana, OgtIds.Lucia, OgtIds.MarianaD -> Res.drawable.feed_avatar_mariana
-    OgtIds.Lucas -> Res.drawable.feed_avatar_me
-    else -> Res.drawable.avatar_anonymous
-}
+private fun commentAvatar(userId: String): DrawableResource = neighborAvatarArt(userId)
 
 @Composable
 private fun FeedArticle(
@@ -1463,8 +1467,10 @@ private fun PostHeader(
     onOverflow: () -> Unit = {},
 ) {
     val db = LocalOgtDb.current
+    val me = LocalOgtSession.current.me()
+    val mine = authorUserId != null && me.owns(authorUserId)
     val socialTick by db.socialTick.collectAsState()
-    // La foto vive en el usuario. El drawable solo cubre el hueco (seed con nombre o busto anónimo).
+    // La foto vive en el usuario. Quien está en sesión no usa un drawable aparte.
     val face = remember(authorUserId, socialTick) {
         authorUserId?.let { db.userOrNull(it)?.photoUrl }?.trim().orEmpty()
     }
@@ -1473,7 +1479,12 @@ private fun PostHeader(
         Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).clickable(onClick = onOpenAuthor),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (face.isNotBlank()) {
+        if (mine) {
+            OgtSessionAvatar(
+                contentDescription = name,
+                modifier = Modifier.size(36.dp).clip(CircleShape),
+            )
+        } else if (face.isNotBlank()) {
             OgtNeighborAvatar(
                 userId = authorUserId.orEmpty(),
                 photoUrl = face,

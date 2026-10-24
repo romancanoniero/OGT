@@ -26,6 +26,7 @@ import com.onlygoodthings.app.media.isRemoteMediaUrl
 import com.onlygoodthings.app.platform.localFilePath
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.ui.components.OgtLoader
+import com.onlygoodthings.app.data.LocalOgtSession
 import com.onlygoodthings.app.ui.components.neighborAvatarArt
 import com.onlygoodthings.shared.data.local.LocalPostMedia
 import org.jetbrains.compose.resources.DrawableResource
@@ -226,6 +227,21 @@ fun OgtNeighborAvatar(
         contentDescription = contentDescription,
         modifier = modifier,
         contentScale = ContentScale.Crop,
+    )
+}
+
+/** La cara de quien está en sesión. Barra, Ajustes, Tu historia y publicar leen esto. */
+@Composable
+fun OgtSessionAvatar(
+    modifier: Modifier = Modifier,
+    contentDescription: String? = null,
+) {
+    val me = LocalOgtSession.current.me()
+    OgtNeighborAvatar(
+        userId = me.id,
+        photoUrl = me.photoUrl,
+        contentDescription = contentDescription ?: me.displayName,
+        modifier = modifier,
     )
 }
 
