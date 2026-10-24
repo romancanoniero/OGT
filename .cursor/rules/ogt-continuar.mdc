@@ -1,15 +1,31 @@
 ---
-description: Dónde seguir el trabajo mobile y la foto de la sesión
+description: Dónde seguir en main, la foto de la sesión y la búsqueda ya publicada
 alwaysApply: true
 ---
 
 # Continuar en este árbol
 
-El código que corre en el simulador es este repo, rama `main` (`/Volumes/DEV_MAC/ogt-deploy-main`). No editar otros checkouts de Only Good Things: los cambios se cruzan.
+El código que corre es este repo, rama `main` (`/Volumes/DEV_MAC/ogt-deploy-main`). No editar `/Volumes/DEV_MAC/OGT` ni otro checkout: los cambios se cruzan. No abrir ramas nuevas ni otro PR. Commit y push a `origin/main`, sin `--force`. Si `origin/main` avanzó, `git fetch` y rebase antes de push.
 
-Después de cada cambio visible: commit y push a `origin/main`. Sin `--force`. Si `origin/main` avanzó, `git fetch` y rebase antes de push.
+Simulador: iPhone 17 Pro `B8D6D203-C781-446E-B85B-07631CE9A9FC`, `com.onlygoodthings.app`. No usar IAN Test. No abrir el sitio público.
 
-Simulador: iPhone 17 Pro `B8D6D203-C781-446E-B85B-07631CE9A9FC`, `com.onlygoodthings.app`. No publicar el sitio.
+## Publicado el 24 oct 2026, 17:40 ART
+
+`main` y el loopback `http://127.0.0.1:19081/release.json` están en `774e0e0e1dc045c33d68a0d9096963840744ede1` (`app-backend-crms`, `prelaunch`). Imagen `ogt-backend:774e0e0e1dc045c33d68a0d9096963840744ede1-20261024T204019Z`. No redeployar este SHA.
+
+La búsqueda de Publicaciones ya es incremental, sin Enter. `POST /api/v1/crm/platform/posts/search` lee `crm_publication_index` (migración `26_crm_publication_index.sql`, `pg_trgm`). Orígenes: `author` (nombre guardado), `label` («Alguien de la comunidad», solo si la consulta es un fragmento de ese rótulo de 4+ letras), `topic`, `body`, `photo` (`alt_text`), `id`. Solo filas `VISIBLE`. La respuesta trae `suggestions.authors` y `suggestions.posts` (`id`, `authorName`, `text`). Caché del CRM: `suggest-1`.
+
+En Postgres hay 23 visibles indexadas. Romorio tiene 13. Mariana Cordero tiene cero: el único rastro es una fila `REMOVED` de la cuenta de desarrollo. La tarjeta «Don Héctor / Post mortem / Palermo Soho / Hace 2 h» es seed local `post-homenaje-roberto` / `user-mariana` en `OgtMockSeed`, no una publicación del servidor. No inventar sugerencias para ella.
+
+Captura ya hecha: `crm-search-suggest.png` (73.505 bytes, sha256 `2d5bbb43c50508f995ded7578b4e39ce45362f56760fd703abcaa7a60ca5272f`) en el store `bc-a9aff955-9519-4301-a3af-94cfab0e4a04/files/media/`. Muestra `romorio` en el diálogo real. No es una sesión MFA de staff.
+
+Encuadre, grilla, clic de la foto y búsqueda por autor ya estaban en `main` antes de `774e0e0`. No rehacerlos.
+
+## Deploy, si hay que publicar de nuevo
+
+Worktree limpio en `main`. `unset TMPDIR` / `env -u TMPDIR`. SDK `OGT_DB_KMP_SDK_PATH=/Volumes/DEV_MAC/ogt-sdk-committed-6a02167` (HEAD `6a02167`, limpio). `OGT_RELEASE_GRADLE_HOME=/Volumes/DEV_MAC/Caches/OGT/gradle`. `OGT_VPS_HOST=iankmp-vps`. Ese SDK pide `tokenProvider: suspend () -> String?`. `OgtSdk` adapta el proveedor con bandera llamando `tokenProvider(false)`. No pasar la lambda de un argumento al `DbOptions` de este SDK.
+
+`bash scripts/deploy-ogt-vps.sh --check` y después `--deploy`. No saltear pruebas, respaldo, MFA ni prelaunch. El log va a `/Volumes/DEV_MAC/Caches/OGT/tmp/`. Leer `CHECK_EXIT` y `DEPLOY_EXIT` dentro del log. Confirmar el SHA con `ssh iankmp-vps 'curl -fsS http://127.0.0.1:19081/release.json'`. No abrir la URL pública que imprime el script. La migración 26 es idempotente y ya está aplicada.
 
 ## Foto de quien está en sesión
 
