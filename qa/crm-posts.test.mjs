@@ -43,8 +43,8 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   const html = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\.svg', view: 'listing'/);
   assert.doesNotMatch(runtime, /id: 'publicaciones'[^}]*keys:/);
-  assert.match(runtime, /crm-ui\.js\?v=usersview-1/);
-  assert.match(html, /crm\.js\?v=usersview-1/);
+  assert.match(runtime, /crm-ui\.js\?v=feedparity-1/);
+  assert.match(html, /crm\.js\?v=feedparity-1/);
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
   assert.match(runtime, /publicationImage\(post\.editorUrl\)/);
   assert.match(runtime, /imageUrl: saved\.imageUrl/);
@@ -171,7 +171,7 @@ test('la rueda del CRM web acerca arriba y aleja abajo', () => {
   const empresas = readFileSync(new URL('../web/app/crm/empresas/index.html', import.meta.url), 'utf8');
   const control = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(empresas, /crm\.js\?v=totp-timeout-1/);
-  assert.match(control, /crm\.js\?v=usersview-1/);
+  assert.match(control, /crm\.js\?v=feedparity-1/);
   assert.doesNotMatch(css, /crm-frame-zoom/);
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_in.png', import.meta.url)));
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_out.png', import.meta.url)));
@@ -284,4 +284,28 @@ test('users section follows the mandatory data-view standard without destructive
   for (const standard of ['búsqueda', 'filtros', 'orden', 'paginación', 'actualización parcial', 'seguridad', 'Contabo']) {
     assert.ok(guide.toLocaleLowerCase('es').includes(standard.toLocaleLowerCase('es')));
   }
+});
+
+test('animal post titles are indexed, searchable and visible in CRM across platforms', () => {
+  const migration = readFileSync(new URL('../database/migrations/27_crm_animal_search_parity.sql', import.meta.url), 'utf8');
+  const backend = readFileSync(new URL('../backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmRoutes.kt', import.meta.url), 'utf8');
+  const animals = readFileSync(new URL('../backend/src/main/kotlin/com/onlygoodthings/backend/modules/AnimalRepository.kt', import.meta.url), 'utf8');
+  const runtime = readFileSync(new URL('../web/app/crm/crm-runtime.js', import.meta.url), 'utf8');
+  const publicApp = readFileSync(new URL('../web/app/app.js', import.meta.url), 'utf8');
+  const mobile = readFileSync(new URL('../shared/src/commonMain/kotlin/com/onlygoodthings/shared/data/remote/RestFeedRepository.kt', import.meta.url), 'utf8');
+  assert.match(migration, /'pet_name'/);
+  assert.match(migration, /'animal_title'/);
+  assert.match(migration, /JOIN animal_listings a/);
+  assert.match(migration, /CREATE TRIGGER trg_crm_publication_index_animal/);
+  assert.match(migration, /SELECT crm_refresh_publication_index\(p\.id\)/);
+  assert.match(backend, /LEFT JOIN animal_listings a ON a\.id = p\.listing_id/);
+  assert.match(backend, /AS animal_title/);
+  assert.match(backend, /animalTitle = getString\("animal_title"\)/);
+  assert.match(runtime, /post\.animalTitle/);
+  assert.match(publicApp, /\/api\/v1\/social\/feed/);
+  assert.match(mobile, /\/api\/v1\/social\/feed/);
+  const openMethod = animals.split('fun open(): List<AnimalListingDto>')[1].split('fun homeLocation')[0];
+  assert.match(openMethod, /JOIN social_posts p ON p\.listing_id = a\.id/);
+  assert.match(openMethod, /p\.moderation_status = 'VISIBLE'/);
+  assert.doesNotMatch(openMethod, /LEFT JOIN social_posts p/);
 });
