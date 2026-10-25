@@ -1,4 +1,4 @@
-import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn, isExpiredMfaChallenge } from './crm-core.js?v=userprofile-1';
+import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn, isExpiredMfaChallenge } from './crm-core.js?v=user-moderation-20261025';
 import { createIdentity } from './crm-auth.js?v=tacho-1';
 
 const controlSections = [
@@ -130,7 +130,7 @@ export async function start() {
   fields.append(factorLabel, begin, recaptcha, codeLabel, verify, cancel);
   challenge.append(fields); login.insertAdjacentElement('afterend', challenge);
   // El shell viaja en paralelo con Firebase. El ingreso no lo espera para pintar.
-  const workspaceReady = import('./crm-ui.js?v=userprofile-1');
+  const workspaceReady = import('./crm-ui.js?v=user-moderation-20261025');
   const [appSdk, sdk] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),
@@ -481,6 +481,15 @@ export async function start() {
         readOnly: true,
         userProfile: true,
         bulkReview: { icon: 'qs_eye.svg', label: 'Revisar seleccionados' },
+        userActions: {
+          block: mode === 'control' && ['OWNER', 'TRUST_SAFETY'].includes(permission.platformRole),
+          delete: mode === 'control' && permission.platformRole === 'OWNER',
+        },
+        async bulkModerate(action, users, reason, confirm = '') {
+          return api('platform/users/moderate', token, {
+            action, userIds: users.map(user => user.id), reason, confirm,
+          }, task.signal);
+        },
         noun: 'usuarios',
         filterType: 'users',
         defaultFilters: { statuses: [], roles: [], from: '', to: '' },
@@ -520,7 +529,7 @@ export async function start() {
             mark: true,
             cells: [
               { text: user.displayName || 'Sin nombre' },
-              { badge: state, tone: user.status === 'ACTIVE' ? 'calm' : 'neutral' },
+              { badge: user.canPublish === false ? 'Solo lectura' : state, tone: user.canPublish === false ? 'attention' : user.status === 'ACTIVE' ? 'calm' : 'neutral' },
               { text: role },
               { text: created },
               { text: last },
@@ -528,7 +537,7 @@ export async function start() {
             actions: [{ icon: 'qs_eye.svg', label: 'Ver usuario', name: 'view' }],
             detail: {
               title: user.displayName || 'Sin nombre',
-              meta: state + ' · ' + role,
+              meta: state + (user.canPublish === false ? ' · Solo lectura' : '') + ' · ' + role,
               body: 'Alta: ' + created + ' · Última actividad: ' + last,
             },
           };

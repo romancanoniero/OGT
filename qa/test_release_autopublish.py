@@ -53,9 +53,14 @@ class AutomaticPublicationTests(unittest.TestCase):
                 self.assertEqual(allowed(event, ref, repo, confirm, success), expected)
 
     def test_validation_environment_and_serialization_remain(self):
-        self.assertIn('needs: [checks, browser]', PUBLISH)
+        self.assertIn('needs: [checks, browser, backend, database]', PUBLISH)
+        self.assertIn('  backend:\n', SOURCE)
+        self.assertIn(':backend:test', SOURCE)
+        self.assertIn('  database:\n', SOURCE)
+        self.assertIn('qa/crm-user-moderation-db-smoke.sql', SOURCE)
         self.assertIn('environment:\n      name: ogt-launch', PUBLISH)
-        self.assertIn('cancel-in-progress: false', SOURCE)
+        self.assertIn("cancel-in-progress: ${{ github.event_name == 'pull_request' }}", SOURCE)
+        self.assertIn("group: ogt-release-${{ github.ref }}", SOURCE)
         self.assertIn("branches: [main, 'release/**']", SOURCE)
         self.assertNotIn('head_commit.message', EXPRESSION)
         self.assertNotIn('continue-on-error', SOURCE)

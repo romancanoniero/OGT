@@ -8,4 +8,5 @@ data class AuthPrincipal(
     val firebaseUid: String,
     val role: UserRole,
     val email: String?,
+    val canPublish: Boolean = true,
 ) : Principal

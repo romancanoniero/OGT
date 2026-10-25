@@ -41,6 +41,7 @@ docker exec -i ogt-postgres psql -X -v ON_ERROR_STOP=1 --single-transaction -U o
 docker exec -i ogt-postgres psql -X -v ON_ERROR_STOP=1 --single-transaction -U ogt -d onlygoodthings < "$RELEASE/database/migrations/24_post_media_frame.sql"
 docker exec -i ogt-postgres psql -X -v ON_ERROR_STOP=1 --single-transaction -U ogt -d onlygoodthings < "$RELEASE/database/migrations/25_post_media_original.sql"
 docker exec -i ogt-postgres psql -X -v ON_ERROR_STOP=1 --single-transaction -U ogt -d onlygoodthings < "$RELEASE/database/migrations/26_crm_publication_index.sql"
+docker exec -i ogt-postgres psql -X -v ON_ERROR_STOP=1 --single-transaction -U ogt -d onlygoodthings < "$RELEASE/database/migrations/28_crm_user_moderation.sql"
 rsync -a --delete "$RELEASE/backend-dist/" "$ROOT/backend-dist/"
 rsync -a --delete "$RELEASE/web-app/" "$ROOT/web-app/"
 cp "$RELEASE/docker-compose.yml" "$RELEASE/Dockerfile" "$RELEASE/web-nginx.conf" "$ROOT/"

@@ -1,4 +1,4 @@
-import { start } from './crm-runtime.js?v=userprofile-1';
+import { start } from './crm-runtime.js?v=user-moderation-20261025';
 
 start().catch(() => {
   document.body.dataset.crmView = 'auth';

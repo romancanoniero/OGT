@@ -566,6 +566,67 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: Realtime
         }))
     }
     /**
+     * Acciones de moderación de OGT Control. Un solo permiso y transacción por lote.
+     * DELETE es irreversible y requiere confirmación; ninguna cuenta propia o
+     * administrativa puede quedar dentro del lote.
+     */
+    post("/api/v1/crm/platform/users/moderate") {
+        val auth = crmContext(call, db, verifier) ?: return@post
+        val data = JsonBody.receiveMap(call)
+        val action = data.optString("action")?.uppercase().orEmpty()
+        if (!crmCanModerateUsers(auth.platformRole, action)) {
+            return@post call.respond(HttpStatusCode.Forbidden,
+                ApiResponse.fail<Unit>("Sin permiso para esta acción", "FORBIDDEN"))
+        }
+        val ids = crmModerationIds(data["userIds"])
+            ?: return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Seleccioná entre 1 y 25 usuarios distintos", "BAD_REQUEST"))
+        val reason = crmModerationReason(data["reason"])
+            ?: return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Escribí un motivo de 10 a 500 caracteres", "BAD_REQUEST"))
+        if (action == "DELETE" && data.optString("confirm") != "ELIMINAR") {
+            return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Confirmación ELIMINAR requerida", "CONFIRM_REQUIRED"))
+        }
+        val result = try {
+            crmModerateUsers(db, auth.userId, ids, action, reason)
+        } catch (invalid: IllegalArgumentException) {
+            return@post call.respond(HttpStatusCode.Conflict,
+                ApiResponse.fail<Unit>(invalid.message ?: "Usuarios no disponibles", "CONFLICT"))
+        } catch (failure: java.sql.SQLException) {
+            return@post call.respond(HttpStatusCode.Conflict,
+                ApiResponse.fail<Unit>("No fue posible completar toda la selección. No se modificó ninguna cuenta.", "CONFLICT"))
+        }
+        // La base de datos ya hizo commit. Avisar al feed y a las fichas abiertas.
+        if (action == "DELETE") {
+            result.removedPosts.forEach { postId ->
+                hub.projectSocialPost(postId, WsCodec.json.encodeToString(
+                    SocialLiveCounters.serializer(), crmRemovedPostLive(postId)))
+            }
+            val removed = result.removedPosts.toSet()
+            result.removedComments.filterNot { it.postId in removed }.forEach { item ->
+                hub.projectSocialComment(item.postId, item.id, WsCodec.json.encodeToString(
+                    SocialComment.serializer(),
+                    crmRemovedCommentLive(item.postId, item.id, item.authorId, "")))
+            }
+            result.removedAnecdotes.filterNot { it.postId in removed }.forEach { item ->
+                db.withConnection { conn -> postLiveCounts(conn, item.postId) }?.let { counts ->
+                    hub.projectSocialPost(item.postId, WsCodec.json.encodeToString(
+                        SocialLiveCounters.serializer(),
+                        crmRemovedAnecdoteLive(item.postId, item.id, counts.commentCount, counts.impactCount)))
+                }
+            }
+            result.recountPosts.filterNot { it in removed }.forEach { postId ->
+                db.withConnection { conn -> postLiveCounts(conn, postId) }?.let { counts ->
+                    hub.projectSocialPost(postId, WsCodec.json.encodeToString(
+                        SocialLiveCounters.serializer(), counts))
+                }
+            }
+        }
+        if (action == "DELETE") crmPurgeErasedMedia(db, media)
+        call.respond(ApiResponse.ok(result.response))
+    }
+    /**
      * Busca un usuario activo para atribuirle una publicación.
      * Body: `{ "query": "Ana" }`
      */

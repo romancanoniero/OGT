@@ -33,6 +33,25 @@ test('visible post search and removal use the CRM routes', async () => {
   ]);
 });
 
+test('moderation route is explicitly allowed and carries selected IDs to the server', async () => {
+  const recorded = [];
+  const api = createApi(async (path, request) => {
+    recorded.push([path, JSON.parse(request.body)]);
+    return response({ success: true, data: { action: 'BLOCK', ids: ['11111111-1111-4111-8111-111111111111'] } });
+  });
+  const body = {
+    action: 'BLOCK',
+    userIds: ['11111111-1111-4111-8111-111111111111'],
+    reason: 'Moderación comprobada',
+    confirm: '',
+  };
+  const result = await api('platform/users/moderate', 'jwt', body);
+  assert.deepEqual(result.ids, body.userIds);
+  assert.deepEqual(recorded, [['/api/v1/crm/platform/users/moderate', body]]);
+  await assert.rejects(() => api('platform/users/forbidden', 'jwt', body),
+    error => error.code === 'INVALID_ROUTE');
+});
+
 test('publicaciones abre el listado y no el tablero de resumen', () => {
   const publicaciones = { id: 'publicaciones', label: 'Publicaciones', view: 'listing' };
   const resumen = { id: 'resumen', label: 'Resumen', keys: null };
@@ -43,12 +62,12 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   const html = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\.svg', view: 'listing'/);
   assert.doesNotMatch(runtime, /id: 'publicaciones'[^}]*keys:/);
-  assert.match(runtime, /crm-ui\.js\?v=userprofile-1/);
-  assert.match(html, /crm\.js\?v=userprofile-1/);
+  assert.match(runtime, /crm-ui\.js\?v=user-moderation-20261025/);
+  assert.match(html, /crm\.js\?v=user-moderation-20261025/);
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
   assert.match(runtime, /publicationImage\(post\.editorUrl\)/);
   assert.match(runtime, /imageUrl: saved\.imageUrl/);
-  assert.match(html, /crm\.css\?v=userprofile-1/);
+  assert.match(html, /crm\.css\?v=user-moderation-20261025/);
   assert.match(runtime, /icon: 'qs_trash\.png', label: 'Quitar selección'/);
   assert.match(runtime, /platform\/posts\/reassign/);
   assert.match(runtime, /platform\/users\/search/);
@@ -171,7 +190,7 @@ test('la rueda del CRM web acerca arriba y aleja abajo', () => {
   const empresas = readFileSync(new URL('../web/app/crm/empresas/index.html', import.meta.url), 'utf8');
   const control = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(empresas, /crm\.js\?v=totp-timeout-1/);
-  assert.match(control, /crm\.js\?v=userprofile-1/);
+  assert.match(control, /crm\.js\?v=user-moderation-20261025/);
   assert.doesNotMatch(css, /crm-frame-zoom/);
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_in.png', import.meta.url)));
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_out.png', import.meta.url)));

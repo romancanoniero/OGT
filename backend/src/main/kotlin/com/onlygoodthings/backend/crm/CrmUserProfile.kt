@@ -14,6 +14,7 @@ internal data class CrmUserProfile(
     val displayName: String,
     val photoUrl: String? = null,
     val status: String,
+    val canPublish: Boolean = true,
     val role: String,
     val createdAt: String,
     val lastSeenAt: String? = null,
@@ -57,7 +58,7 @@ internal fun crmReadUserProfile(
 ): CrmUserProfile? {
     val profile = conn.prepareStatement(
         """
-        SELECT u.id::text, u.display_name, u.photo_url, u.status::text, u.role::text,
+        SELECT u.id::text, u.display_name, u.photo_url, u.status::text, u.role::text, NOT u.publishing_blocked AS can_publish,
                u.created_at, u.last_seen_at, u.community_points,
                (SELECT COUNT(*) FROM social_posts p
                 WHERE p.author_user_id = u.id AND p.moderation_status = 'VISIBLE') AS post_count,
@@ -79,11 +80,12 @@ internal fun crmReadUserProfile(
                 },
                 status = rs.getString(4),
                 role = rs.getString(5),
-                createdAt = rs.getTimestamp(6).toInstant().toString(),
-                lastSeenAt = rs.getTimestamp(7)?.toInstant()?.toString(),
-                communityPoints = rs.getInt(8),
-                visiblePostCount = rs.getLong(9),
-                receivedReportCount = if (canReviewReports) rs.getLong(10) else 0,
+                canPublish = rs.getBoolean(6),
+                createdAt = rs.getTimestamp(7).toInstant().toString(),
+                lastSeenAt = rs.getTimestamp(8)?.toInstant()?.toString(),
+                communityPoints = rs.getInt(9),
+                visiblePostCount = rs.getLong(10),
+                receivedReportCount = if (canReviewReports) rs.getLong(11) else 0,
                 canReviewReports = canReviewReports,
             )
         }
