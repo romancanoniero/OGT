@@ -1342,7 +1342,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
         const when = node('time', time(post.createdAt)); when.className = 'crm-profile-muted';
         const body = node('p', post.body || 'Sin texto');
         card.append(h, when, body);
-        if (post.imageUrl && /^(https?:\\/\\/|\\/media\\/)/.test(post.imageUrl)) {
+        if (post.imageUrl && /^(https?:\/\/|\/media\/)/.test(post.imageUrl)) {
           const img = node('img'); img.src = post.imageUrl; img.alt = 'Imagen de la publicación'; img.loading = 'lazy';
           card.append(img);
         }
