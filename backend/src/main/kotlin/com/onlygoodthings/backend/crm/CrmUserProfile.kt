@@ -122,7 +122,7 @@ internal fun crmReadUserProfile(
  * Cursor keyset estricto: created_at e id. La paginación nunca devuelve mensajes.
  */
 internal fun crmReadUserPosts(conn: Connection, userId: String, cursor: String?): CrmUserPostsPage {
-    val key = cursor?.let { crmParsePostPageCursor(it) }
+    val key = cursor?.let { parseCrmPostPageCursor(it) }
     val sql = buildString {
         append("""
             SELECT p.id::text, p.body, COALESCE(p.topic, '') AS topic, p.created_at,
