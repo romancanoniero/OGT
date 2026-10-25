@@ -65,6 +65,7 @@ with sync_playwright() as pw:
                         'status':'VISIBLE',
                         'authorName':'Ana Torres',
                         'body':f'Publicación de prueba {n}',
+                        'animalTitle':'Luna' if n==1 else None,
                         'createdAt':'2026-10-24T10:00:00Z',
                         'topic':'adopción',
                         'imageUrl':None,
@@ -162,6 +163,8 @@ with sync_playwright() as pw:
     page.locator('.crm-nav-btn[data-section="publicaciones"]').click()
     table_rows=page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]')
     expect(table_rows).to_have_count(20)
+    expect(table_rows.first).to_contain_text('Luna')
+    expect(table_rows.first).to_contain_text('Publicación de prueba 1')
     page.evaluate("""() => {
       window.__layoutSnapshot = {
         nav: document.querySelector('.crm-nav'),

@@ -130,7 +130,7 @@ export async function start() {
   fields.append(factorLabel, begin, recaptcha, codeLabel, verify, cancel);
   challenge.append(fields); login.insertAdjacentElement('afterend', challenge);
   // El shell viaja en paralelo con Firebase. El ingreso no lo espera para pintar.
-  const workspaceReady = import('./crm-ui.js?v=usersview-1');
+  const workspaceReady = import('./crm-ui.js?v=feedparity-1');
   const [appSdk, sdk] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),
@@ -388,7 +388,7 @@ export async function start() {
                 cells: [
                   image ? (cropped ? { image } : { image, frame }) : { text: '' },
                   { text: post.authorName || 'Alguien de la comunidad' },
-                  { text: post.body || '', clamp: true },
+                  { text: [post.animalTitle, post.body].filter(Boolean).join(' — '), clamp: true },
                   { text: when },
                   { badge: 'Visible', tone: 'calm' },
                 ],
@@ -399,8 +399,8 @@ export async function start() {
                   { icon: 'qs_trash.png', label: 'Quitar', name: 'remove' },
                 ] : [{ icon: 'qs_anecdote.svg', label: 'Ver publicación', name: 'open' }],
                 detail: {
-                  title: post.authorName || 'Alguien de la comunidad',
-                  meta: `${when} · Visible`,
+                  title: post.animalTitle || post.authorName || 'Alguien de la comunidad',
+                  meta: `${post.authorName || 'Alguien de la comunidad'} · ${when} · Visible`,
                   body: post.body || '',
                   image: editor,
                   frame,
