@@ -70,14 +70,17 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
   publish:
-    # Only an explicitly named main-branch release may publish to the existing Contabo installation.
+    # Every validated main push publishes; PRs/release branches never deploy.
+    # Keep environment approvals, secrets, backups and all validation gates.
     needs: [checks, browser]
     if: >-
-      github.ref == 'refs/heads/main' && github.repository == 'romancanoniero/OGT' &&
-      ((github.event_name == 'workflow_dispatch' && inputs.confirm == 'PUBLICAR_PRIMERA_VERSION') ||
-      (github.event_name == 'push' && github.event.head_commit.message == 'deploy: OGT verified CRM release 20261022'))
-    runs-on: ubuntu-latest
-    environment: ogt-launch
+      success() && github.ref == 'refs/heads/main' && github.repository == 'romancanoniero/OGT' &&
+      (github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.confirm == 'PUBLICAR_PRIMERA_VERSION'))
+    runs-on: ubuntu-24.04
+    environment:
+      name: ogt-launch
+      url: https://onlygoodthings.lat/crm/control/
     timeout-minutes: 45
     defaults:
       run:
@@ -146,6 +149,7 @@ jobs:
           OGT_DB_KMP_SDK_PATH: ${{ github.workspace }}/_sdk
         run: bash scripts/deploy-ogt-vps.sh --deploy
       - name: Verify installed release and backend on the existing VPS
+        id: verify
         env:
           EXPECTED_SHA: ${{ github.sha }}
         run: |
@@ -162,6 +166,27 @@ jobs:
           PY
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes ogt-release-target 'curl -fsS --max-time 15 http://127.0.0.1:19080/health >/dev/null'
           echo 'OGT backend responsive; integrated version confirmed'
+          echo 'verified=true' >> "$GITHUB_OUTPUT"
+      - name: Record verified Contabo deployment
+        if: success() && steps.verify.outputs.verified == 'true'
+        env:
+          VERIFIED_SHA: ${{ github.sha }}
+        run: |
+          {
+            echo '## Contabo: deployment verified'
+            printf '\nInstalled commit: `%s`\n' "$VERIFIED_SHA"
+            echo 'Repository, integrated scope and backend health verified on the VPS.'
+            echo 'Control: https://onlygoodthings.lat/crm/control/'
+            echo 'Real-account acceptance and native mobile tests remain separate.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve installed release evidence
+        if: success() && steps.verify.outputs.verified == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ogt-contabo-verified-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/ogt-release-check.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Remove SSH credentials
         if: always()
         run: rm -f ~/.ssh/ogt-release ~/.ssh/known_hosts ~/.ssh/config
