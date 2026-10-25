@@ -165,7 +165,9 @@ with sync_playwright() as pw:
         img.previousElementSibling?.type==='checkbox';
     }""")
     import re
-    expect(avatar_rows.nth(1).locator('.crm-list-user-avatar')).to_have_attribute('src',re.compile('avatar_anonymous\\.png    assert page.locator('.crm-query-popover').is_hidden()
+    expect(avatar_rows.nth(1).locator('.crm-list-user-avatar')).to_have_attribute('src', re.compile(r'avatar_anonymous\.png$'))
+    expect(avatar_rows.nth(2).locator('.crm-list-user-avatar')).to_have_attribute('src', re.compile(r'avatar_anonymous\.png$'))
+    assert page.locator('.crm-query-popover').is_hidden()
     page.get_by_role('button',name='Cargar 20 más').click()
     expect(page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]')).to_have_count(25)
     page.get_by_role('button',name='Filtros (0)').click()
