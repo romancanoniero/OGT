@@ -1,0 +1,70 @@
+name: OGT - habilitar Identity Platform (autorizado, una vez)
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ogt-gcip-authorized-once.yml'
+      - 'scripts/ogt_enable_gcip_once.py'
+permissions:
+  contents: read
+concurrency:
+  group: ogt-gcip-upgrade-one-time
+  cancel-in-progress: false
+jobs:
+  upgrade:
+    # User-authorized change on 2026-10-25. Other commits do not trigger it.
+    if: >-
+      github.repository == 'romancanoniero/OGT' &&
+      github.ref == 'refs/heads/main' &&
+      github.event.head_commit.message == 'enable: OGT GCIP alignment approved 20261025'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ogt-launch
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify prerequisites using credential-free unit tests
+        run: python3 -m unittest qa.test_ogt_enable_gcip_once -v
+      - name: Install Google OAuth service-account client
+        run: python3 -m pip install 'google-auth[requests]>=2.0,<3.0'
+      - name: Configure verified SSH to existing OGT VPS
+        env:
+          HOST: ${{ secrets.OGT_VPS_HOST || '217.216.82.209' }}
+          USER: ${{ secrets.OGT_VPS_USER || 'iankmp' }}
+          KEY: ${{ secrets.OGT_VPS_SSH_KEY }}
+          KNOWN: ${{ secrets.OGT_VPS_KNOWN_HOSTS }}
+          SSH_PORT: ${{ vars.OGT_VPS_SSH_PORT || '22' }}
+        run: |
+          set -euo pipefail
+          test -n "$KEY" && test -n "$KNOWN"
+          [[ "$HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$USER" =~ ^[a-zA-Z0-9_][a-zA-Z0-9_-]*$ ]]
+          [[ "$SSH_PORT" =~ ^[0-9]{1,5}$ ]]
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/ogt-gcip-once
+          printf '%s\n' "$KNOWN" > ~/.ssh/known_hosts
+          printf 'Host ogt-gcip-once\n  HostName %s\n  User %s\n  Port %s\n  IdentityFile ~/.ssh/ogt-gcip-once\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n' "$HOST" "$USER" "$SSH_PORT" > ~/.ssh/config
+      - name: Initialize Identity Platform and enable optional MFA only on OGT
+        env:
+          PRIVATE_EMAIL: ${{ secrets.OGT_MFA_AUDIT_EMAIL }}
+        run: |
+          set -euo pipefail
+          target="$PRIVATE_EMAIL"
+          if [ -z "$target" ]; then
+            target="$(ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes ogt-gcip-once \
+              'grep "^OGT_CONTROL_BOOTSTRAP_EMAIL=" "$HOME/ogt/.env" | head -n 1 | cut -d "=" -f 2-' || true)"
+          fi
+          test -n "$target" || { echo "::error::Missing private OGT Control account reference"; exit 1; }
+          # The existing Firebase Admin key is piped from the VPS to the script,
+          # never echoed, copied to disk, or included in workflow artifacts.
+          ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes ogt-gcip-once \
+            'test -r /home/iankmp/ogt-secrets/firebase-admin.json && cat /home/iankmp/ogt-secrets/firebase-admin.json' \
+            | python3 scripts/ogt_enable_gcip_once.py --project goodthings-55612 --email "$target"
+      - name: Remove runner SSH credentials
+        if: always()
+        run: rm -f ~/.ssh/ogt-gcip-once ~/.ssh/known_hosts ~/.ssh/config
