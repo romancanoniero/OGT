@@ -82,6 +82,35 @@ if [ ! -f "$CONFIG" ]; then
     fi
   done
 fi
+# If gcloud is already authenticated on the Mac, retrieve the actual Apple
+# client config from Firebase without persisting the access token anywhere.
+if [ ! -f "$CONFIG" ] && command -v gcloud >/dev/null 2>&1; then
+  TOKEN="$(gcloud auth print-access-token 2>/dev/null || true)"
+  if [ -n "$TOKEN" ]; then
+    echo "Descargando la configuración pública de cliente Firebase iOS..."
+    OGT_FIREBASE_ACCESS_TOKEN="$TOKEN" python3 - "$CONFIG" <<'PY'
+import base64, json, os, pathlib, sys
+from urllib import request, error
+from scripts.ogt_ios_firebase_config import validated_plist
+url=("https://firebase.googleapis.com/v1beta1/projects/goodthings-55612/"
+     "iosApps/1:521063054927:ios:4148b99938eb083430743a/config")
+headers={"Authorization":"Bearer "+os.environ["OGT_FIREBASE_ACCESS_TOKEN"],
+         "x-goog-user-project":"goodthings-55612"}
+try:
+    with request.urlopen(request.Request(url,headers=headers),timeout=25) as response:
+        payload=json.load(response)
+    if payload.get("configFilename")!="GoogleService-Info.plist":
+        raise ValueError("wrong Firebase config filename")
+    config=validated_plist(base64.b64decode(payload["configFileContents"]))
+    pathlib.Path(sys.argv[1]).write_bytes(config)
+    os.chmod(sys.argv[1],0o600)
+except (error.HTTPError,ValueError,KeyError) as exc:
+    print("Firebase no entregó el plist con estas credenciales:",type(exc).__name__)
+PY
+  fi
+  unset TOKEN
+fi
+
 if [ ! -f "$CONFIG" ]; then
   echo "Falta GoogleService-Info.plist para la app iOS com.onlygoodthings.app." >&2
   echo "Descargalo desde Firebase Console > Configuración del proyecto > Tus apps > iOS." >&2
