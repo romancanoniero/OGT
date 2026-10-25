@@ -83,6 +83,23 @@ with sync_playwright() as pw:
     def finish(page,code='123456'):
         page.locator('#crm-code').fill(code);page.get_by_role('button',name='Verificar e ingresar',exact=True).click()
     results=[]
+    # Navigate every currently implemented CRM workspace under an authorized
+    # simulated session. The separate tenant and MFA checks below remain in force.
+    for mode, sections in [
+        ('control', ['resumen', 'usuarios', 'empresas', 'denuncias', 'publicaciones']),
+        ('empresas', ['resumen', 'campanas', 'cupones', 'impacto']),
+    ]:
+        context,page,state,errors=session(mode);begin(page);finish(page)
+        expect(page.locator('#crm-root .crm-workspace')).to_be_visible()
+        for section in sections:
+            button=page.locator('.crm-nav-btn[data-section="'+section+'"]')
+            expect(button).to_be_visible()
+            button.click()
+            expect(button).to_have_attribute('aria-current','page')
+            assert page.locator('.crm-nav-btn[aria-current="page"]').count()==1
+        assert not errors,errors
+        context.close()
+        results.append(mode+' full navigation: '+', '.join(sections))
     context,page,state,errors=session();begin(page);finish(page)
     expect(page.locator('#crm-root')).to_contain_text('Usuarios activos: 17')
     assert page.locator('#password').input_value()==''
