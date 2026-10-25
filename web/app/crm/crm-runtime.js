@@ -1,4 +1,4 @@
-import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn } from './crm-core.js?v=suggest-2';
+import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn, isExpiredMfaChallenge } from './crm-core.js?v=totp-timeout-1';
 import { createIdentity } from './crm-auth.js?v=tacho-1';
 
 const controlSections = [
@@ -634,8 +634,18 @@ export async function start() {
     const value = code.value.trim(); code.value = ''; let complete = false;
     try { await identity.verify(value); challenge.hidden = true; complete = true; }
     catch (error) {
-      code.setAttribute('aria-invalid', 'true');
-      message(friendlyError(error), 'error');
+      if (isExpiredMfaChallenge(error)) {
+        // A valid TOTP cannot solve an expired Firebase MFA resolver. Re-run
+        // the first factor to obtain a fresh resolver; never weaken MFA.
+        clearData();
+        hideChallenge();
+        showEntry();
+        message(friendlyError(error), 'error');
+        $('email').focus();
+      } else {
+        code.setAttribute('aria-invalid', 'true');
+        message(friendlyError(error), 'error');
+      }
     }
     finally { setBusy(false); }
     if (complete) await checkAccess();

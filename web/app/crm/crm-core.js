@@ -62,7 +62,19 @@ export function createApi(fetcher, timeoutMs = 15000) {
     } finally { clearTimeout(timer); signal?.removeEventListener('abort', abort); }
   };
 }
+/** A TOTP challenge timeout requires the FIRST factor again. Never retry the
+ * old resolver or interpret this as proof that the authenticator code is wrong. */
+export function isExpiredMfaChallenge(error) {
+  const code = String(error?.code || '').toLowerCase();
+  if (/^auth\/(?:totp-challenge-timeout|invalid-multi-factor-session|missing-multi-factor-session)$/.test(code)) return true;
+  // Firebase may surface its backend reason inside auth/internal-error.
+  return code === 'auth/internal-error' &&
+    /TOTP_CHALLENGE_TIMEOUT/i.test(String(error?.message || ''));
+}
+
 export function friendlyError(error) {
+  if (isExpiredMfaChallenge(error))
+    return 'La verificación de dos pasos venció. El código puede ser correcto, pero necesitás iniciar sesión nuevamente y usar un código nuevo.';
   const code = String(error?.code || '');
   if (/email-already-in-use/.test(code)) return 'Ya existe una cuenta con ese correo. Ingresá con Google o con tu contraseña; no crees otra cuenta de administrador.';
   if (/operation-not-allowed/.test(code)) return 'El método elegido no está habilitado en Firebase Authentication de Only Good Things. Revisá Google o correo y contraseña en Sign-in method.';
