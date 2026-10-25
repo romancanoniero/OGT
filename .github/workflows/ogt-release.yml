@@ -64,6 +64,40 @@ jobs:
       - name: Compile and run backend tests before merging or publishing
         run: |
           ./gradlew "-Pogt.dbKmpSdkPath=$GITHUB_WORKSPACE/_sdk" :backend:test --no-daemon
+  database:
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: ogt
+          POSTGRES_PASSWORD: ogt-ci-only
+          POSTGRES_DB: onlygoodthings
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ogt -d onlygoodthings"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Verify user deletion, immutable audit and referential integrity in isolated PostGIS
+        env:
+          PGPASSWORD: ogt-ci-only
+        run: |
+          if ! command -v psql >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y postgresql-client
+          fi
+          for migration in 01_init 13_post_anecdotes 15_anecdote_engagement 23_crm_foundations 28_crm_user_moderation; do
+            psql -h 127.0.0.1 -U ogt -d onlygoodthings -X -v ON_ERROR_STOP=1 -f "database/migrations/$migration.sql"
+          done
+          psql -h 127.0.0.1 -U ogt -d onlygoodthings -X -v ON_ERROR_STOP=1 -f qa/crm-user-moderation-db-smoke.sql
   browser:
     needs: checks
     runs-on: ubuntu-24.04
@@ -94,7 +128,7 @@ jobs:
   publish:
     # Every validated main push publishes; PRs/release branches never deploy.
     # Keep environment approvals, secrets, backups and all validation gates.
-    needs: [checks, browser, backend]
+    needs: [checks, browser, backend, database]
     if: >-
       success() && github.ref == 'refs/heads/main' && github.repository == 'romancanoniero/OGT' &&
       (github.event_name == 'push' ||
