@@ -62,8 +62,12 @@ object ImageOptimizer {
                     val encoded = encode(resized, target)
                     // Orientation, resizing and format normalization must not be lost merely
                     // because the normalized image is larger than the original compressed file.
-                    val changed = scale < 0.999 || orientation != 1 || target != extension
-                    return if (changed || encoded.size < bytes.size) Result(encoded, target) else Result(bytes, extension)
+                    // Pixel changes (resizing / EXIF rotation) must be retained even if
+                    // re-encoding is larger. A mere format change must not enlarge an
+                    // untouched source: a small transparent WebP may be much smaller
+                    // than the equivalent PNG.
+                    val pixelsChanged = scale < 0.999 || orientation != 1
+                    return if (pixelsChanged || encoded.size < bytes.size) Result(encoded, target) else Result(bytes, extension)
                 } finally { reader.dispose() }
             }
         } catch (e: IllegalArgumentException) {
