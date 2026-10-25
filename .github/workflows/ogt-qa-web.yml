@@ -1,0 +1,51 @@
+name: OGT QA - Web y CRM
+on:
+  workflow_dispatch:
+    inputs:
+      live:
+        description: 'Comprobar rutas reales sin iniciar sesion ni modificar datos (requiere IP autorizada)'
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  browser-qa:
+    name: Browser QA - public, Control, Empresas
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Module inventory, roles and guest entrypoint contracts
+        run: node --test qa/crm-modules-qa.test.mjs qa/crm-entrypoints.test.mjs
+      - name: Install Playwright Chromium
+        run: |
+          python -m pip install 'playwright==1.56.0'
+          python -m playwright install --with-deps chromium
+      - name: CRM flows with simulated Firebase and API
+        run: python qa/crm-browser.py
+      - name: Public and CRM routing with isolated browser fixtures
+        run: python qa/crm-entrypoints-browser.py
+      - name: Live, READ-ONLY guest smoke (must have authorized source IP)
+        if: ${{ inputs.live }}
+        env:
+          OGT_QA_ORIGIN: https://onlygoodthings.lat
+        run: python qa/live-guest-browser.py
+      - name: Screenshots and audit (when live was requested)
+        if: ${{ always() && inputs.live }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ogt-qa-live-guest-${{ github.run_number }}
+          path: qa-artifacts/guest-smoke/
+          if-no-files-found: ignore
+          retention-days: 7
