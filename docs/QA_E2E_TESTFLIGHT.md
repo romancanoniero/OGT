@@ -74,6 +74,10 @@ Capturas sin sesión: `qa-artifacts/guest-smoke/`. No contiene interacción aute
 - `distribution=simulator`: compila Kotlin/Native + proyecto Xcode en macOS con firma **deshabilitada**, publica `OGT-iOS-Simulator-<run>-<sha>` como artefacto. **No se instala en iPhone físico ni equivale a TestFlight.**
 - `distribution=testflight`: requiere firma Apple Distribution para `com.onlygoodthings.app`, perfil App Store, y clave API de App Store Connect; compila, firma y entrega IPA. Una subida exitosa **no equivale a disponibilidad en TestFlight**: Apple debe procesar la versión y debe existir acceso de testers.
 
+**Compilación actualizada para dispositivos iOS modernos (octubre de 2026):** el runner GitHub es `macos-26`, con Xcode 26 o posterior, porque App Store Connect ya no acepta nuevas entregas iOS compiladas con Xcode 16. El fallo del simulador del 25/10/2026 se debió al `GoogleService-Info.plist` ausente en CI. Antes de compilar, el workflow ahora consulta por HTTPS la configuración **oficial y actual** de la aplicación iOS registrada en Firebase `goodthings-55612`, verifica `com.onlygoodthings.app` y la incorpora únicamente en el runner; no utiliza configuración Android, credenciales falsas ni un plist construido a mano. Las credenciales Firebase Admin existentes se leen por canal SSH ya configurado en el entorno protegido. La cuenta de servicio necesita permiso de solo lectura `firebase.clients.get` para recuperar esa configuración; si Google lo rechaza, el workflow se detiene y no se produce una versión engañosa.
+
+Además, se retiró de iOS el indicador de Firebase `isAppVerificationDisabledForTesting=true`, que es exclusivo de pruebas y no debe estar activo en builds distribuibles.
+
 El workflow reutiliza el SDK KMP privado fijado por `OGT_SDK_REVISION`. El entorno protegido actual `ogt-launch` aporta el token SDK y revisores existentes; cualquier separación futura de entorno iOS debe mantener secret management y aprobación explícita.
 
 ### Secretos requeridos para distribuir por TestFlight
