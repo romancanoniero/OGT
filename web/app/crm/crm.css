@@ -918,3 +918,11 @@ body[data-crm-view="pending"] #crm-root { display: none !important; }
   .crm-query-button img { display: none; }
   .crm-query-popover { position: fixed; top: auto; left: 0; right: 0; bottom: 0; width: 100%; max-height: 80vh; border-radius: 18px 18px 0 0; padding-bottom: max(20px, env(safe-area-inset-bottom)); }
 }
+
+/* Selector de valores cerrados reutilizable en listados de administración. */
+.crm-query-group { border: 0; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; min-inline-size: 0; }
+.crm-query-group legend { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--ogt-tertiary); }
+.crm-query-check { display: flex; gap: 8px; align-items: center; min-height: 36px; padding: 5px 6px; border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--ogt-ink); }
+.crm-query-check:has(input:checked) { background: var(--ogt-sand); }
+.crm-query-check input { accent-color: var(--ogt-ink); width: 16px; height: 16px; }
+.crm-query-check:focus-within { outline: 2px solid var(--ogt-secondary); outline-offset: 2px; }
