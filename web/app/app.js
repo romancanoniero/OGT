@@ -4507,8 +4507,7 @@ function renderIntro() {
   const root = document.getElementById("auth-root");
   root.innerHTML = `
     <div class="intro-stage">
-      <img class="ogt-mark ogt-mark--intro" src="${OGT_LOGO}" alt="Only Good Things (OGT)">
-      <p class="intro-kicker">Only Good Things (OGT)</p>
+      <img class="ogt-mark ogt-mark--intro" src="${OGT_LOGO}" alt="">
       <div class="intro-frame">
         <div class="intro-loader" aria-hidden="true"></div>
         <video src="${INTRO_VIDEO}" muted autoplay playsinline disablepictureinpicture controlslist="nodownload nofullscreen noremoteplayback" preload="auto"></video>
@@ -4617,7 +4616,7 @@ function ogtMark(kind) {
 
 function authBar(backHref, backLabel) {
   return `<header class="auth-bar">
-    <a class="auth-brand" href="#/portal">${ogtMark("bar")}Only Good Things (OGT)</a>
+    <span class="auth-brand">${ogtMark("bar")}</span>
     ${backHref ? `<a class="auth-back" href="${backHref}">${backLabel}</a>` : `<span></span>`}
   </header>`;
 }
@@ -4704,7 +4703,6 @@ function normalizePhone(raw) {
 function renderPortal() {
   paintAuth("portal", authStill("", "Archivo cívico · Comunidad mutua · 2025"), `
     ${ogtMark("portal")}
-    <p class="auth-kicker">ONLY GOOD THINGS</p>
     <h1>Entrá a tu comunidad.</h1>
     <p class="hint">Vecinos, empresas y hechos que suman.</p>
     <a class="auth-primary" href="#/entrar">Ingresar</a>
