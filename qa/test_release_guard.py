@@ -107,6 +107,8 @@ class DeploymentContractTests(unittest.TestCase):
         self.assertIn('24_post_media_frame.sql', source)
         self.assertIn('25_post_media_original.sql', source)
         self.assertIn('26_crm_publication_index.sql', source)
+        self.assertIn('28_crm_user_moderation.sql', source)
+        self.assertLess(source.index('26_crm_publication_index.sql'), source.index('28_crm_user_moderation.sql'))
         self.assertLess(source.index('23_crm_foundations.sql'), source.index('24_post_media_frame.sql'))
         self.assertLess(source.index('24_post_media_frame.sql'), source.index('25_post_media_original.sql'))
         self.assertLess(source.index('25_post_media_original.sql'), source.index('26_crm_publication_index.sql'))
