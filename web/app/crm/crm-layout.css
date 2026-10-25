@@ -1,0 +1,228 @@
+/* Shared bounded-list layout: Control + Empresas. See docs/BOUNDED_LIST_LAYOUT.md.
+   The whole height chain must be shrinkable; overflow on the table alone is not enough.
+   Authentication stays a normal, accessible document outside data-crm-view="app". */
+body[data-crm-view="app"] {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: var(--crm-viewport-height, 100dvh);
+  min-height: 0;
+  overflow: hidden;
+}
+body[data-crm-view="app"] #crm-auth {
+  position: relative;
+  flex: 0 0 auto;
+  max-height: 30%;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+body[data-crm-view="app"] #crm-root {
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+body[data-crm-view="app"] .crm-workspace {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  grid-template-rows: minmax(0, 1fr);
+}
+body[data-crm-view="app"] .crm-nav {
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.crm-nav > * { flex-shrink: 0; }
+body[data-crm-view="app"] .crm-workspace-main {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  padding: 20px 24px;
+  gap: 12px;
+}
+.crm-workspace-main > .crm-page-head,
+.crm-workspace-main > .crm-tools,
+.crm-workspace-main > .crm-query-chips { flex: 0 0 auto; }
+.crm-page-head h2 { overflow-wrap: anywhere; }
+.crm-tools .crm-field-search { min-width: 0; }
+.crm-workspace-main > .crm-kpis {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: min(24vh, 220px);
+  max-height: min(24dvh, 220px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  border-radius: var(--ogt-radius-card);
+}
+.crm-workspace-main > .crm-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--ogt-radius-card);
+}
+.crm-panel > h3,
+.crm-panel > .crm-bulk,
+.crm-panel > .crm-list-count,
+.crm-panel > .crm-list-more,
+.crm-panel > .crm-list-error { flex: 0 0 auto; }
+.crm-panel > .crm-list-more { align-self: flex-start; }
+.crm-panel > .crm-list-count,
+.crm-panel > .crm-list-error { overflow-wrap: anywhere; }
+.crm-panel > .crm-table-wrap {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  border-radius: max(8px, calc(var(--ogt-radius-card) - 8px));
+  scroll-padding-block: 56px 8px;
+}
+.crm-table-wrap .crm-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--ogt-canvas);
+  box-shadow: 0 1px 0 var(--ogt-hairline);
+}
+.crm-panel > .crm-detail,
+.crm-panel > .crm-empty {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 40%;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.crm-panel > .crm-empty:only-child { max-height: 100%; }
+
+/* A full profile keeps its title/tabs in place. Only the selected content scrolls. */
+.crm-dialog.crm-profile-dialog {
+  max-height: calc(100vh - 28px);
+  height: min(900px, calc(var(--crm-viewport-height, 100dvh) - 28px));
+  max-height: calc(var(--crm-viewport-height, 100dvh) - 28px);
+  overflow: hidden;
+}
+.crm-dialog.crm-profile-dialog[open] { display: flex; flex-direction: column; }
+.crm-profile-dialog > .crm-profile-head,
+.crm-profile-dialog > .crm-profile-hero,
+.crm-profile-dialog > .crm-profile-stats,
+.crm-profile-dialog > .crm-profile-tabs,
+.crm-profile-dialog > .crm-profile-note { flex: 0 0 auto; }
+.crm-profile-dialog > .crm-profile-head { position: relative; }
+.crm-profile-dialog > .crm-profile-hero { padding: 16px 24px; }
+.crm-profile-hero > div { min-width: 0; }
+.crm-profile-hero h2 { font-size: clamp(20px, 3vw, 28px); }
+.crm-profile-hero .crm-profile-avatar { width: 72px; height: 72px; }
+.crm-profile-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 0 24px 12px;
+  gap: 8px;
+}
+.crm-profile-stat { padding: 10px 12px; overflow-wrap: anywhere; }
+.crm-profile-stat strong { font-size: 20px; }
+.crm-profile-dialog > .crm-profile-content,
+.crm-profile-dialog > .crm-profile-posts {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  border: 1px solid var(--ogt-hairline);
+  border-radius: 16px;
+  margin: 12px 16px 16px;
+  padding: 16px;
+  scroll-padding: 12px;
+}
+.crm-profile-dialog > .crm-profile-posts { align-content: start; }
+.crm-profile-content > .crm-profile-posts { min-width: 0; }
+.crm-profile-dialog > .crm-profile-note { max-height: 20%; overflow: auto; }
+
+/* Other repeatable collections: comments, replies and author search results.
+   Class is assigned by the shared accessibility helper, not by each screen. */
+.crm-dialog .crm-scroll-list,
+.crm-sheet .crm-scroll-list {
+  min-height: 0;
+  max-height: min(34vh, 320px);
+  max-height: min(34dvh, 320px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  border: 1px solid var(--ogt-hairline);
+  border-radius: 16px;
+  padding: 8px;
+}
+.crm-subnode-face p { overflow-wrap: anywhere; }
+.crm-dialog, .crm-sheet {
+  max-height: calc(100vh - 24px);
+  max-height: calc(var(--crm-viewport-height, 100dvh) - 24px);
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.crm-dialog > .crm-dialog-head,
+.crm-sheet > .crm-dialog-head {
+  position: sticky;
+  top: -1px;
+  z-index: 3;
+  background: var(--ogt-canvas);
+}
+.crm-suggest-box, .crm-query-popover {
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.crm-table-wrap:focus-visible,
+.crm-profile-content:focus-visible,
+.crm-profile-posts:focus-visible,
+.crm-scroll-list:focus-visible {
+  outline: 2px solid var(--ogt-secondary);
+  outline-offset: -3px;
+}
+@media (max-width: 800px) {
+  body[data-crm-view="app"] .crm-workspace { height: 100%; }
+  body[data-crm-view="app"] .crm-nav { flex: 0 0 auto; }
+  body[data-crm-view="app"] .crm-workspace-main {
+    padding: 12px 12px max(12px, env(safe-area-inset-bottom));
+    gap: 8px;
+  }
+  .crm-profile-dialog > .crm-profile-head { padding: 8px 12px; }
+  .crm-profile-dialog > .crm-profile-hero { padding: 12px; gap: 12px; }
+  .crm-profile-stats { padding: 0 12px 8px; }
+  .crm-profile-stat { padding: 8px; }
+  .crm-profile-stat span { font-size: 12px; }
+  .crm-profile-dialog > .crm-profile-content,
+  .crm-profile-dialog > .crm-profile-posts { margin: 8px; padding: 12px; }
+}
+@media (max-width: 680px) {
+  .crm-dialog.crm-profile-dialog { height: var(--crm-viewport-height, 100dvh); max-height: var(--crm-viewport-height, 100dvh); }
+}
+@media (max-width: 380px) {
+  .crm-tools { flex-wrap: wrap; }
+  .crm-tools .crm-field-search { flex-basis: 100%; }
+}
+@media (max-height: 600px) {
+  body[data-crm-view="app"] .crm-workspace-main { padding: 6px 12px; gap: 4px; }
+  body[data-crm-view="app"] .crm-auth-card { padding-block: 4px; }
+  .crm-panel { padding-block: 4px; }
+  .crm-panel > h3 { margin-block: 4px; }
+  .crm-panel > .crm-list-count { margin-block: 2px; }
+  .crm-panel > .crm-list-more { margin-block: 2px; min-height: 36px; }
+  .crm-workspace-main > .crm-kpis { max-height: 18dvh; }
+  .crm-profile-dialog > .crm-profile-head { padding-block: 4px; }
+  .crm-profile-dialog > .crm-profile-hero { padding-block: 6px; }
+  .crm-profile-hero .crm-profile-avatar { width: 40px; height: 40px; }
+  .crm-profile-stats { padding-bottom: 4px; }
+  .crm-profile-stat { display: flex; align-items: center; gap: 6px; padding: 4px 8px; }
+  .crm-profile-stat strong { font-size: 16px; }
+  .crm-profile-tab { padding-block: 8px; }
+}
