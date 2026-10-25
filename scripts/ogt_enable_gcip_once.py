@@ -94,7 +94,8 @@ def main():
     parser.add_argument("--project", required=True)
     parser.add_argument("--email", required=True)
     args = parser.parse_args()
-    if args.project != PROJECT or not args.email.strip():
+    args.email = args.email.strip().strip("\"'")
+    if args.project != PROJECT or not args.email:
         print("ABORT: unexpected project or missing protected account reference")
         return 3
     try:
