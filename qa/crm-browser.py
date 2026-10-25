@@ -58,6 +58,18 @@ with sync_playwright() as pw:
                 import time
                 if url.endswith('/access'):
                     data={'platformRole':'OWNER','companies':[{'companyId':A,'role':'ADMIN'},{'companyId':B,'role':'VIEWER'}],'stepUpValidUntilEpochSeconds':int(time.time())+900}
+                elif url.endswith('/posts/search') and state.get('post_fixture'):
+                    start=21 if body.get('cursor') else 1
+                    posts=[{
+                        'id':f'{n:08d}-1111-4111-8111-111111111111',
+                        'status':'VISIBLE',
+                        'authorName':'Ana Torres',
+                        'body':f'Publicación de prueba {n}',
+                        'createdAt':'2026-10-24T10:00:00Z',
+                        'topic':'adopción',
+                        'imageUrl':None,
+                    } for n in range(start,26 if start==21 else 21)]
+                    data={'posts':posts,'nextCursor':'mock-cursor' if start==1 else None}
                 elif url.endswith('/company/summary'):
                     cid=body['companyId']
                     data={'companyId': B if state['mismatch'] else cid,'tradeName':'Empresa Uno' if cid==A else 'Empresa Dos','verificationStatus':'VERIFIED','campaigns':2,'activeCampaigns':1,'issuedCoupons':3,'balanceCents':0,'impactScore':10}
@@ -100,6 +112,48 @@ with sync_playwright() as pw:
         assert not errors,errors
         context.close()
         results.append(mode+' full navigation: '+', '.join(sections))
+    # Filtros, orden y paginación deben actualizar filas sin remontar el resto del CRM.
+    context,page,state,errors=session('control')
+    state['post_fixture']=True
+    begin(page);finish(page)
+    page.locator('.crm-nav-btn[data-section="publicaciones"]').click()
+    table_rows=page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]')
+    expect(table_rows).to_have_count(20)
+    page.evaluate("""() => {
+      window.__layoutSnapshot = {
+        nav: document.querySelector('.crm-nav'),
+        toolbar: document.querySelector('.crm-tools'),
+        search: document.querySelector('.crm-field-search input'),
+        table: document.querySelector('.crm-table-wrap:not([hidden]) table'),
+        row: document.querySelector('tr[data-post]')
+      };
+    }""")
+    page.get_by_role('button',name='Cargar 20 más').click()
+    expect(table_rows).to_have_count(25)
+    assert page.evaluate("""() =>
+      window.__layoutSnapshot.nav === document.querySelector('.crm-nav') &&
+      window.__layoutSnapshot.toolbar === document.querySelector('.crm-tools') &&
+      window.__layoutSnapshot.table === document.querySelector('.crm-table-wrap:not([hidden]) table') &&
+      window.__layoutSnapshot.row === document.querySelector('tr[data-post]')""")
+    page.get_by_role('button',name='Autor ↕').click()
+    expect(table_rows).to_have_count(20)
+    assert page.evaluate("""() =>
+      window.__layoutSnapshot.row === document.querySelector('tr[data-post]') &&
+      window.__layoutSnapshot.search === document.querySelector('.crm-field-search input')""")
+    page.get_by_role('button',name='Filtros (0)').click()
+    page.get_by_label('Tema de la publicación').fill('adopción')
+    page.get_by_role('button',name='Agregar',exact=True).first.click()
+    expect(page.locator('.crm-query-chip')).to_contain_text(['Tema: adopción','Orden:'])
+    expect(table_rows).to_have_count(20)
+    assert page.evaluate("""() =>
+      window.__layoutSnapshot.nav === document.querySelector('.crm-nav') &&
+      window.__layoutSnapshot.toolbar === document.querySelector('.crm-tools') &&
+      window.__layoutSnapshot.row === document.querySelector('tr[data-post]') &&
+      !document.querySelector('.crm-query-popover').hidden""")
+    assert not errors,errors
+    context.close()
+    results.append('Publications refresh only table rows across load more, sort and filters')
+
     context,page,state,errors=session();begin(page);finish(page)
     expect(page.locator('#crm-root')).to_contain_text('Usuarios activos: 17')
     assert page.locator('#password').input_value()==''
