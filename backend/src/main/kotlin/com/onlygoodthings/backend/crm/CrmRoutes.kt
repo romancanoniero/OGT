@@ -609,6 +609,13 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: Realtime
                     SocialComment.serializer(),
                     crmRemovedCommentLive(item.postId, item.id, item.authorId, "")))
             }
+            result.removedAnecdotes.filterNot { it.postId in removed }.forEach { item ->
+                db.withConnection { conn -> postLiveCounts(conn, item.postId) }?.let { counts ->
+                    hub.projectSocialPost(item.postId, WsCodec.json.encodeToString(
+                        SocialLiveCounters.serializer(),
+                        crmRemovedAnecdoteLive(item.postId, item.id, counts.commentCount, counts.impactCount)))
+                }
+            }
             result.recountPosts.filterNot { it in removed }.forEach { postId ->
                 db.withConnection { conn -> postLiveCounts(conn, postId) }?.let { counts ->
                     hub.projectSocialPost(postId, WsCodec.json.encodeToString(

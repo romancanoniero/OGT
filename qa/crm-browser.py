@@ -228,7 +228,15 @@ with sync_playwright() as pw:
     assert dialog.get_by_role('button',name='Bloquear publicaciones').is_disabled()
     dialog.locator('textarea').fill('Moderación por incumplimiento comprobado')
     dialog.get_by_role('button',name='Bloquear publicaciones').click()
-    expect(dialog).to_be_hidden()
+    try:
+        expect(dialog).to_be_hidden(timeout=3000)
+    except AssertionError:
+        print('MODERATION_DIAGNOSTIC', {
+            'alert':dialog.locator('[role="alert"]').all_text_contents(),
+            'requests':state['requests'][-4:],
+            'pageErrors':errors,
+        }, flush=True)
+        raise
     assert any(x[1].get('action')=='BLOCK' and len(x[1].get('userIds',[]))==1
                for x in state['requests'] if x[0].endswith('/users/moderate'))
     rows.first.locator('input[type="checkbox"]').check()

@@ -38,10 +38,12 @@ internal data class CrmUserMutationResponse(
 )
 
 internal data class CrmRemovedUserComment(val id: String, val postId: String, val authorId: String)
+internal data class CrmRemovedUserAnecdote(val id: String, val postId: String)
 internal data class CrmUserMutation(
     val response: CrmUserMutationResponse,
     val removedPosts: List<String> = emptyList(),
     val removedComments: List<CrmRemovedUserComment> = emptyList(),
+    val removedAnecdotes: List<CrmRemovedUserAnecdote> = emptyList(),
     val recountPosts: List<String> = emptyList(),
 )
 
@@ -85,6 +87,7 @@ internal fun crmModerateUsers(
 
         val removedPosts = mutableListOf<String>()
         val removedComments = mutableListOf<CrmRemovedUserComment>()
+        val removedAnecdotes = mutableListOf<CrmRemovedUserAnecdote>()
         val recountPosts = mutableListOf<String>()
         if (action == "DELETE") {
             // Queue media associated with the erased person's profile, posts or
@@ -137,6 +140,15 @@ internal fun crmModerateUsers(
                     while (rs.next()) removedComments.add(CrmRemovedUserComment(
                         rs.getString(1), rs.getString(2), rs.getString(3),
                     ))
+                }
+            }
+            conn.prepareStatement(
+                """SELECT id::text, post_id::text FROM post_anecdotes
+                   WHERE author_user_id = ANY(?::uuid[])"""
+            ).use { stmt ->
+                stmt.setArray(1, conn.createArrayOf("uuid", ids.toTypedArray()))
+                stmt.executeQuery().use { rs ->
+                    while (rs.next()) removedAnecdotes.add(CrmRemovedUserAnecdote(rs.getString(1), rs.getString(2)))
                 }
             }
             recountPosts.addAll(conn.queryIds(
@@ -234,7 +246,7 @@ internal fun crmModerateUsers(
         CrmUserMutation(
             response = CrmUserMutationResponse(action, ids, removedPosts.size, removedComments.size),
             removedPosts = removedPosts, removedComments = removedComments,
-            recountPosts = recountPosts,
+            removedAnecdotes = removedAnecdotes, recountPosts = recountPosts,
         )
     } catch (error: Exception) {
         conn.rollback()
