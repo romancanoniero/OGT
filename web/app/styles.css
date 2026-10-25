@@ -52,13 +52,7 @@ button { font: inherit; background: none; border: 0; cursor: pointer; color: inh
   padding: 4px 12px 28px;
   gap: 8px;
 }
-.brand-name {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--ink);
-  line-height: 1.2;
-}
+.brand-name { display: none; }
 .nav a, .nav button.nav-item {
   display: flex;
   align-items: center;
