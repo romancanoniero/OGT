@@ -1390,6 +1390,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       }
     });
     dialog.append(header, explanation, list, reason.label, ...(action === 'DELETE' ? [typeLabel] : []), result, submit);
+    dialog.addEventListener('close', () => dialog.classList.remove('crm-user-moderation-dialog'), { once: true });
     if (!dialog.open) dialog.showModal();
     reason.input.focus();
   }

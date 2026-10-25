@@ -39,7 +39,7 @@ with sync_playwright() as pw:
     def session(mode='control',factor='totp',enroll=False):
         context=browser.new_context()
         context.add_init_script("window.testFactor="+json.dumps(factor)+";window.testEnroll="+json.dumps(enroll)+"; const original=window.fetch.bind(window); window.fetch=async (url,opts)=>{if(window.testDelay&&String(url).endsWith('/summary'))await new Promise(r=>setTimeout(r,400));return original(url,opts);};")
-        state={'deny':False,'mismatch':False,'enroll':enroll,'requests':[],'avatar_version':1}
+        state={'deny':False,'mismatch':False,'enroll':enroll,'requests':[],'avatar_version':1,'blocked_ids':{'00000003-1111-4111-8111-111111111111'},'deleted_ids':set()}
         def route(route):
             url=route.request.url
             if urlsplit(url).path.startswith('/test-avatar/'):
@@ -86,7 +86,15 @@ with sync_playwright() as pw:
                         'reportedContent':[],'canReviewReports':True,'conversationsRestricted':True,
                     }
                 elif url.endswith('/users/moderate') and state.get('user_fixture'):
-                    data={'action':body.get('action'),'ids':body.get('userIds',[])}
+                    action=body.get('action')
+                    users=body.get('userIds',[])
+                    if action=='BLOCK':
+                        state['blocked_ids'].update(users)
+                    elif action=='UNBLOCK':
+                        state['blocked_ids'].difference_update(users)
+                    elif action=='DELETE':
+                        state['deleted_ids'].update(users)
+                    data={'action':action,'ids':users}
                 elif url.endswith('/users/posts') and state.get('user_fixture'):
                     data={'posts':[{'id':'12345678-1111-4111-8111-111111111111','body':'Historia de adopci\u00f3n','topic':'Adopci\u00f3n','createdAt':'2026-10-24T10:00:00Z'}], 'nextCursor':None}
                 elif url.endswith('/users/list') and state.get('user_fixture'):
@@ -96,11 +104,11 @@ with sync_playwright() as pw:
                         'displayName':f'Usuario de prueba {n:02d}',
                         'photoUrl':('/test-avatar/'+str(state['avatar_version'])) if n==1 else ('/test-avatar/broken' if n==2 else None),
                         'status':'ACTIVE' if n%2 else 'SUSPENDED',
-                        'canPublish':n%2!=0 and n!=3,
+                        'canPublish':n%2!=0 and f'{n:08d}-1111-4111-8111-111111111111' not in state['blocked_ids'],
                         'role':'USER' if n%3 else 'COMMUNITY_MODERATOR',
                         'createdAt':'2026-10-24T12:00:00Z',
                         'lastSeenAt':None,
-                    } for n in range(index,26 if index==21 else 21)]
+                    } for n in range(index,26 if index==21 else 21) if f'{n:08d}-1111-4111-8111-111111111111' not in state['deleted_ids']]
                     data={'users':values,'nextCursor':'users-fixture-cursor' if index==1 else None}
                 elif url.endswith('/company/summary'):
                     cid=body['companyId']
@@ -239,6 +247,16 @@ with sync_playwright() as pw:
         raise
     assert any(x[1].get('action')=='BLOCK' and len(x[1].get('userIds',[]))==1
                for x in state['requests'] if x[0].endswith('/users/moderate'))
+    expect(rows.first).to_contain_text('Solo lectura')
+    rows.nth(2).locator('input[type="checkbox"]').check()
+    page.get_by_role('button',name='Permitir publicar').click()
+    dialog=page.locator('.crm-user-moderation-dialog')
+    dialog.locator('textarea').fill('Revisión finalizada, puede participar nuevamente')
+    dialog.get_by_role('button',name='Permitir publicaciones').click()
+    expect(dialog).to_be_hidden()
+    assert any(x[1].get('action')=='UNBLOCK' and len(x[1].get('userIds',[]))==1
+               for x in state['requests'] if x[0].endswith('/users/moderate'))
+    expect(rows.nth(2)).not_to_contain_text('Solo lectura')
     rows.first.locator('input[type="checkbox"]').check()
     rows.nth(1).locator('input[type="checkbox"]').check()
     page.get_by_role('button',name='Eliminar usuarios').click()
@@ -252,6 +270,7 @@ with sync_playwright() as pw:
     assert any(x[1].get('action')=='DELETE' and x[1].get('confirm')=='ELIMINAR'
                and len(x[1].get('userIds',[]))==2
                for x in state['requests'] if x[0].endswith('/users/moderate'))
+    expect(rows).to_have_count(18)
     assert not errors,errors
     context.close()
     results.append('Users bulk moderation: selection actions, reason, typed deletion and API payload')
