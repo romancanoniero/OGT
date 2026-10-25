@@ -144,9 +144,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   nav.setAttribute('aria-label', 'Secciones');
   const brandBox = node('div');
   brandBox.className = 'crm-brand';
-  const brandText = node('div');
-  brandText.append(node('strong', brand), node('span', lede));
-  brandBox.append(productIcon('ogt-logo.png'), brandText);
+  brandBox.append(productIcon('ogt-logo.png'));
 
   const main = node('div');
   main.className = 'crm-workspace-main';
