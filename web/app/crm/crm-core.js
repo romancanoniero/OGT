@@ -93,7 +93,7 @@ export function friendlyError(error) {
   if (/user-disabled/.test(code)) return 'La cuenta está deshabilitada. Contactá a la administración.';
   if (code === 'STEP_UP_REQUIRED' || /segundo factor/i.test(error?.message || '')) return 'Necesit\u00e1s correo verificado y un nuevo ingreso con segundo factor. Renovar el token no renueva la autenticaci\u00f3n.';
   if (/invalid-credential|wrong-password|user-not-found/.test(code)) return 'Correo o contrase\u00f1a incorrectos.';
-  if (/invalid-verification-code|invalid-totp-code/.test(code)) return 'El c\u00f3digo no es v\u00e1lido. Prob\u00e1 nuevamente.';
+  if (/invalid-verification-code|invalid-totp-code/.test(code)) return 'El c\u00f3digo no es v\u00e1lido para el factor seleccionado. Comprob\u00e1 que uses la entrada correcta de OGT en tu autenticador, que su dispositivo tenga fecha y hora autom\u00e1ticas y prob\u00e1 con un c\u00f3digo nuevo. Si se repite, el factor registrado puede necesitar una recuperaci\u00f3n administrativa.';
   if (/too-many-requests/.test(code)) return 'Demasiados intentos. Prob\u00e1 m\u00e1s tarde.';
   if (/code-expired|multi-factor-session/.test(code)) return 'La verificaci\u00f3n venci\u00f3. Inici\u00e1 sesi\u00f3n nuevamente.';
   if (/unauthorized-domain/.test(code)) return 'Este dominio no est\u00e1 autorizado en Firebase.';
