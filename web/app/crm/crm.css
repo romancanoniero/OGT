@@ -861,3 +861,13 @@ body[data-crm-view="app"] .crm-password-wrap { width: min(280px, 100%); }
 body[data-crm-view="pending"] .crm-auth-card { animation: none; }
 body[data-crm-view="pending"] .crm-auth-card > :not(.crm-auth-head) { display: none !important; }
 body[data-crm-view="pending"] #crm-root { display: none !important; }
+
+/* Ordenamiento accesible y estado de lotes de publicaciones. */
+.crm-sort-button {
+  display: inline-flex; align-items: center; gap: 4px; border: 0; padding: 4px 0;
+  background: transparent; color: inherit; font: inherit; font-weight: 700;
+  letter-spacing: inherit; text-transform: inherit; white-space: nowrap;
+}
+.crm-sort-button:hover { color: var(--ogt-ink); }
+.crm-sort-button:focus-visible { outline: 2px solid var(--ogt-secondary); outline-offset: 3px; border-radius: 3px; }
+.crm-list-count { margin: 8px 12px 0; color: var(--ogt-muted); font-size: 13px; }

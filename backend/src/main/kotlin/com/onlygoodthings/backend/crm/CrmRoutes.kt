@@ -28,6 +28,7 @@ import java.sql.Connection
 import java.sql.ResultSet
 import java.sql.Timestamp
 import java.time.Instant
+import java.util.Base64
 import java.util.UUID
 
 @Serializable
@@ -433,11 +434,21 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: Realtime
             return@post call.respond(HttpStatusCode.BadRequest,
                 ApiResponse.fail<Unit>("La búsqueda es demasiado larga", "BAD_REQUEST"))
         }
-        val cursor = data.optString("cursor")?.trim()?.ifBlank { null }?.let { raw ->
-            parseCrmPostCursor(raw) ?: return@post call.respond(HttpStatusCode.BadRequest,
-                ApiResponse.fail<Unit>("Cursor inválido", "BAD_REQUEST"))
+        val sortBy = data.optString("sortBy")?.trim()?.ifBlank { null } ?: "createdAt"
+        val sortDirection = data.optString("sortDirection")?.trim()?.ifBlank { null } ?: "desc"
+        if (!crmValidPostSort(sortBy, sortDirection)) {
+            return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Orden inválido", "BAD_REQUEST"))
         }
-        val page = db.withConnection { conn -> searchVisiblePosts(conn, query, cursor) }
+        val cursor = data.optString("cursor")?.trim()?.ifBlank { null }?.let { raw ->
+            val parsed = parseCrmPostPageCursor(raw)
+            if (parsed == null || parsed.sortBy != sortBy || parsed.sortDirection != sortDirection) {
+                return@post call.respond(HttpStatusCode.BadRequest,
+                    ApiResponse.fail<Unit>("Cursor inválido para este orden", "BAD_REQUEST"))
+            }
+            parsed
+        }
+        val page = db.withConnection { conn -> searchVisiblePosts(conn, query, cursor, sortBy, sortDirection) }
         call.respond(ApiResponse.ok(page))
     }
     post("/api/v1/crm/platform/posts/detail") {
@@ -763,6 +774,45 @@ internal fun parseCrmPostCursor(raw: String): Pair<Long, String>? {
     return millis to id
 }
 
+/**
+ * Cursor opaco de keyset pagination. Guarda la marca temporal con su precisión
+ * completa de PostgreSQL y el valor exacto por el que ordenó la consulta.
+ */
+@Serializable
+internal data class CrmPostPageCursor(
+    val sortBy: String,
+    val sortDirection: String,
+    val sortValue: String,
+    val createdAt: String,
+    val id: String,
+)
+
+internal fun crmValidPostSort(sortBy: String, sortDirection: String): Boolean =
+    sortBy in setOf("createdAt", "author", "text") && sortDirection in setOf("asc", "desc")
+
+internal fun crmEncodePostPageCursor(cursor: CrmPostPageCursor): String {
+    val json = WsCodec.json.encodeToString(CrmPostPageCursor.serializer(), cursor)
+    return "v2." + Base64.getUrlEncoder().withoutPadding()
+        .encodeToString(json.toByteArray(Charsets.UTF_8))
+}
+
+internal fun parseCrmPostPageCursor(raw: String): CrmPostPageCursor? {
+    // Las sesiones abiertas antes del despliegue pueden terminar su lote anterior.
+    if (!raw.startsWith("v2.")) return parseCrmPostCursor(raw)?.let {
+        CrmPostPageCursor("createdAt", "desc", "", Instant.ofEpochMilli(it.first).toString(), it.second)
+    }
+    if (raw.length !in 4..32768) return null
+    val parsed = runCatching {
+        val decoded = String(Base64.getUrlDecoder().decode(raw.substring(3)), Charsets.UTF_8)
+        WsCodec.json.decodeFromString(CrmPostPageCursor.serializer(), decoded)
+    }.getOrNull() ?: return null
+    if (!crmValidPostSort(parsed.sortBy, parsed.sortDirection)) return null
+    if (parsed.sortValue.length > 20000) return null
+    if (runCatching { Instant.parse(parsed.createdAt) }.isFailure) return null
+    if (runCatching { UUID.fromString(parsed.id) }.isFailure) return null
+    return parsed
+}
+
 internal const val CRM_VISIBLE_POST_SEARCH = """
 SELECT p.id::text, p.body, COALESCE(p.topic, '') AS topic, p.moderation_status::text, p.created_at,
        COALESCE(NULLIF(btrim(u.display_name), ''), NULLIF(btrim(c.trade_name), ''), NULLIF(btrim(c.legal_name), ''), 'Alguien de la comunidad') AS author_name,
@@ -932,39 +982,64 @@ LIMIT 8
 private fun searchVisiblePosts(
     conn: Connection,
     query: String,
-    cursor: Pair<Long, String>?,
+    cursor: CrmPostPageCursor?,
+    sortBy: String,
+    sortDirection: String,
 ): CrmVisiblePostPage {
     val includeLabel = query.isNotEmpty() && crmQueryUsesAppLabel(query)
+    // Las expresiones son constantes elegidas por whitelist, nunca SQL del usuario.
+    val sortExpression = when (sortBy) {
+        "author" -> "lower(base.author_name)"
+        "text" -> "lower(coalesce(base.body, ''))"
+        else -> "base.created_at"
+    }
+    val dateSort = sortBy == "createdAt"
+    val sortTuple = if (dateSort) "(base.created_at, base.id::uuid)"
+        else "($sortExpression, base.created_at, base.id::uuid)"
+    val cursorPlaceholders = if (dateSort) "(?::timestamptz, ?::uuid)"
+        else "(?, ?::timestamptz, ?::uuid)"
+    val compare = if (sortDirection == "asc") ">" else "<"
     val sql = buildString {
+        append("SELECT base.*, $sortExpression AS sort_value FROM (")
         append(CRM_VISIBLE_POST_SEARCH.trim())
         if (query.isNotEmpty()) {
             append(" AND ")
             append(if (includeLabel) CRM_INDEX_MATCH_WITH_LABEL else CRM_INDEX_MATCH)
         }
-        if (cursor != null) append(" AND (p.created_at, p.id) < (?::timestamptz, ?::uuid)")
-        append(" ORDER BY p.created_at DESC, p.id DESC LIMIT ${CRM_POST_PAGE + 1}")
+        append(") base")
+        if (cursor != null) append(" WHERE $sortTuple $compare $cursorPlaceholders")
+        append(" ORDER BY $sortExpression $sortDirection")
+        if (!dateSort) append(", base.created_at $sortDirection")
+        append(", base.id::uuid $sortDirection LIMIT ${CRM_POST_PAGE + 1}")
     }
     val rows = conn.prepareStatement(sql.trim()).use { stmt ->
         var index = 1
         if (query.isNotEmpty()) stmt.setString(index++, crmLikeContains(query))
         if (cursor != null) {
-            stmt.setTimestamp(index++, Timestamp.from(Instant.ofEpochMilli(cursor.first)))
-            stmt.setString(index, cursor.second)
+            if (!dateSort) stmt.setString(index++, cursor.sortValue)
+            stmt.setTimestamp(index++, Timestamp.from(Instant.parse(cursor.createdAt)))
+            stmt.setString(index, cursor.id)
         }
         stmt.executeQuery().use { rs ->
             buildList {
                 while (rs.next()) {
-                    val status = rs.getString("moderation_status")
-                    if (status != "VISIBLE") continue
-                    add(rs.toCrmVisiblePost())
+                    if (rs.getString("moderation_status") != "VISIBLE") continue
+                    val post = rs.toCrmVisiblePost()
+                    add(post to if (dateSort) "" else rs.getString("sort_value").orEmpty())
                 }
             }
         }
     }
-    val page = rows.take(CRM_POST_PAGE)
+    val page = rows.take(CRM_POST_PAGE).map { it.first }
     val next = if (rows.size > CRM_POST_PAGE && page.isNotEmpty()) {
-        val last = page.last()
-        crmPostCursor(Instant.parse(last.createdAt).toEpochMilli(), last.id)
+        val last = rows[CRM_POST_PAGE - 1]
+        crmEncodePostPageCursor(CrmPostPageCursor(
+            sortBy = sortBy,
+            sortDirection = sortDirection,
+            sortValue = last.second,
+            createdAt = last.first.createdAt,
+            id = last.first.id,
+        ))
     } else null
     val suggestions = if (query.isEmpty() || cursor != null) null else CrmSearchSuggestions(
         authors = suggestIndexedNames(conn, query, includeLabel),

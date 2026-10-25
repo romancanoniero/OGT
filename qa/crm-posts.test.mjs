@@ -43,12 +43,12 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   const html = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\.svg', view: 'listing'/);
   assert.doesNotMatch(runtime, /id: 'publicaciones'[^}]*keys:/);
-  assert.match(runtime, /crm-ui\.js\?v=suggest-2/);
-  assert.match(html, /crm\.js\?v=totp-timeout-1/);
+  assert.match(runtime, /crm-ui\.js\?v=postsort-1/);
+  assert.match(html, /crm\.js\?v=postsort-1/);
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
   assert.match(runtime, /publicationImage\(post\.editorUrl\)/);
   assert.match(runtime, /imageUrl: saved\.imageUrl/);
-  assert.match(html, /crm\.css\?v=suggest-2/);
+  assert.match(html, /crm\.css\?v=postsort-1/);
   assert.match(runtime, /icon: 'qs_trash\.png', label: 'Quitar selección'/);
   assert.match(runtime, /platform\/posts\/reassign/);
   assert.match(runtime, /platform\/users\/search/);
@@ -171,7 +171,7 @@ test('la rueda del CRM web acerca arriba y aleja abajo', () => {
   const empresas = readFileSync(new URL('../web/app/crm/empresas/index.html', import.meta.url), 'utf8');
   const control = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(empresas, /crm\.js\?v=totp-timeout-1/);
-  assert.match(control, /crm\.js\?v=totp-timeout-1/);
+  assert.match(control, /crm\.js\?v=postsort-1/);
   assert.doesNotMatch(css, /crm-frame-zoom/);
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_in.png', import.meta.url)));
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_out.png', import.meta.url)));
@@ -213,4 +213,19 @@ test('la búsqueda incremental no vuelve a abrirse después de cerrarse', () => 
   );
   assert.equal(same.hold, true);
   assert.equal(reduceSuggestPanel(same, { type: 'result', hasSuggestions: true }).open, false);
+});
+
+test('publication listing sorts the complete server result, keeping a stable cursor', () => {
+  const runtime = readFileSync(new URL('../web/app/crm/crm-runtime.js', import.meta.url), 'utf8');
+  const ui = readFileSync(new URL('../web/app/crm/crm-ui.js', import.meta.url), 'utf8');
+  const backend = readFileSync(new URL('../backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmRoutes.kt', import.meta.url), 'utf8');
+  assert.match(runtime, /sortable: \{ Autor: 'author', Texto: 'text', Fecha: 'createdAt' \}/);
+  assert.match(runtime, /sortBy: sort.by, sortDirection: sort.direction/);
+  assert.match(ui, /listItems\.concat\(incoming\.filter/);
+  assert.match(ui, /Cargar 20 más/);
+  assert.match(ui, /aria-sort/);
+  assert.match(ui, /listLoading && !reset/);
+  assert.match(backend, /crmValidPostSort\(sortBy, sortDirection\)/);
+  assert.match(backend, /ORDER BY \$sortExpression \$sortDirection/);
+  assert.match(backend, /crmEncodePostPageCursor/);
 });
