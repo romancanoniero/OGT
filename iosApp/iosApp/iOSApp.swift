@@ -222,7 +222,7 @@ struct iOSApp: App {
 
     init() {
         FirebaseApp.configure()
-        Auth.auth().settings?.isAppVerificationDisabledForTesting = true
+        // Keep Firebase phone and MFA app verification enabled in all installable builds.
         IosAuthRuntime.shared.host = OgtFirebaseHost()
         OgtPushRuntime.shared.host = OgtIosPushHost()
         IosHonorInviteRuntime.shared.host = OgtIosHonorInviteHost()
