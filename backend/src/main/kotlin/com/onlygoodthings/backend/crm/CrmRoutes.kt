@@ -968,8 +968,8 @@ private fun searchVisiblePostsAdvanced(
     }
     if (cursor != null) {
         val parts = keys.indices.map { n ->
-            val tests = (0 until n).map { i -> "${keys[i].sql} = ?" }.toMutableList()
-            tests.add("${keys[n].sql} ${if (keys[n].direction == "asc") ">" else "<"} ?")
+            val tests = (0 until n).map { i -> "${keys[i].sql} = ?${if (keys[i].kind == "uuid") "::uuid" else ""}" }.toMutableList()
+            tests.add("${keys[n].sql} ${if (keys[n].direction == "asc") ">" else "<"} ?${if (keys[n].kind == "uuid") "::uuid" else ""}")
             "(" + tests.joinToString(" AND ") + ")"
         }
         clauses.add("(" + parts.joinToString(" OR ") + ")")
