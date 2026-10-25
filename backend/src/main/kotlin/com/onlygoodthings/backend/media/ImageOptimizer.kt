@@ -60,7 +60,10 @@ object ImageOptimizer {
                     // PNG stays lossless; JPEG stays photographic. WebP may already be smaller.
                     val target = if (extension == "png" || resized.colorModel.hasAlpha()) "png" else "jpg"
                     val encoded = encode(resized, target)
-                    return if (encoded.size < bytes.size) Result(encoded, target) else Result(bytes, extension)
+                    // Orientation, resizing and format normalization must not be lost merely
+                    // because the normalized image is larger than the original compressed file.
+                    val changed = scale < 0.999 || orientation != 1 || target != extension
+                    return if (changed || encoded.size < bytes.size) Result(encoded, target) else Result(bytes, extension)
                 } finally { reader.dispose() }
             }
         } catch (e: IllegalArgumentException) {
