@@ -1644,9 +1644,9 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     button.addEventListener('click', () => {
       window.clearTimeout(listTimer);
       listTicket += 1;
+      rememberListingPreferences();
       current = section.id;
       if (typeof onNavigate === 'function') onNavigate(current);
-      rememberListingPreferences();
       query = '';
       search.value = '';
       closeQueryPanel();
