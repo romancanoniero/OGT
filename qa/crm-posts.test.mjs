@@ -309,3 +309,28 @@ test('animal post titles are indexed, searchable and visible in CRM across platf
   assert.match(openMethod, /p\.moderation_status = 'VISIBLE'/);
   assert.doesNotMatch(openMethod, /LEFT JOIN social_posts p/);
 });
+
+test('full user profile and selection obey the mandatory policy', () => {
+  const ui = readFileSync(new URL('../web/app/crm/crm-ui.js', import.meta.url), 'utf8');
+  const runtime = readFileSync(new URL('../web/app/crm/crm-runtime.js', import.meta.url), 'utf8');
+  const core = readFileSync(new URL('../web/app/crm/crm-core.js', import.meta.url), 'utf8');
+  const profile = readFileSync(new URL('../backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmUserProfile.kt', import.meta.url), 'utf8');
+  const routes = readFileSync(new URL('../backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmRoutes.kt', import.meta.url), 'utf8');
+  const standard = readFileSync(new URL('../docs/DATA_VIEWS_STANDARD.md', import.meta.url), 'utf8');
+  assert.match(runtime, /userProfile: true/);
+  assert.match(runtime, /bulkReview:/);
+  assert.match(runtime, /mark: true,\s+columns: \['Nombre'/);
+  assert.match(ui, /function openUserProfile/);
+  assert.match(ui, /function openUserSelection/);
+  assert.match(ui, /crm-profile-dialog/);
+  assert.match(ui, /Chats denunciados/);
+  assert.match(ui, /El CRM no permite explorar mensajes privados/);
+  assert.match(core, /platform\/users\/detail/);
+  assert.match(core, /platform\/users\/posts/);
+  assert.match(routes, /USER_PROFILE_VIEW/);
+  assert.match(profile, /crmCanReviewUserReports/);
+  assert.match(profile, /moderation_status = 'VISIBLE'/);
+  assert.doesNotMatch(profile, /firebase_uid|phone_e164|timebank_messages|SELECT .*email/i);
+  assert.match(standard, /Selección múltiple, eliminación y acciones administrativas/);
+  assert.match(standard, /denuncia autenticada/);
+});
