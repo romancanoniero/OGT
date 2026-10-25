@@ -803,53 +803,27 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     search.setAttribute('aria-label', 'Buscar indicador');
     heading.textContent = title;
   }
-  async function loadListing(listing, reset) {
-    if (listLoading && !reset) return;
-    const ticket = ++listTicket;
-    listLoading = true;
-    if (reset) { listItems = []; listCursor = null; selectedKey = null; }
-    if (reset && !query.trim()) paintSuggestions(null);
-    renderListing(listing);
-    try {
-      const page = await listing.load(query.trim(), reset ? null : listCursor, listOrders, listFilters);
-      if (ticket !== listTicket) return;
-      const incoming = Array.isArray(page?.items) ? page.items : [];
-      listItems = reset ? incoming : listItems.concat(incoming.filter(item => !listItems.some(existing => existing.id === item.id)));
-      listCursor = page?.nextCursor || null;
-      listError.hidden = true;
-      if (reset) paintSuggestions(page?.suggestions);
-    } catch (error) {
-      if (ticket !== listTicket || error?.code === 'ABORTED') return;
-      listError.textContent = 'No se pudo actualizar el listado.';
-      listError.hidden = false;
-      if (reset) closeSuggest('error');
-    } finally {
-      if (ticket === listTicket) listLoading = false;
-    }
-    if (ticket === listTicket) renderListing(listing);
-  }
-  function renderListing(listing) {
-    heading.textContent = sections.find(item => item.id === current)?.label || title;
-    search.placeholder = listing.placeholder;
-    search.setAttribute('aria-label', listing.searchLabel || listing.placeholder);
-    kpis.hidden = true;
-    tableWrap.hidden = true;
-    entityWrap.hidden = false;
-    panelTitle.textContent = sectionOf(current)?.label || title;
-    markCurrent();
-    activeListing = listing;
-    renderQueryChips();
+  // Los cambios de búsqueda, filtros y orden no desmontan la barra ni el listado.
+  // El árbol de la pantalla se construye una sola vez; las filas se reconcilian por ID.
+  let renderedHeaderKey = '';
+  function listingHeader(listing) {
+    const key = JSON.stringify([listing.columns, listOrders, Boolean(listing.mark)]);
+    if (renderedHeaderKey === key) return;
+    renderedHeaderKey = key;
     const headRow = node('tr');
     if (listing.mark) {
       const markHead = node('th');
       const all = node('input');
       all.type = 'checkbox';
       all.setAttribute('aria-label', 'Marcar página');
-      const keys = listItems.map(item => listing.present(item)?.key).filter(Boolean);
-      all.checked = keys.length > 0 && keys.every(key => picked.has(key));
       all.addEventListener('change', () => {
-        keys.forEach(key => { if (all.checked) picked.add(key); else picked.delete(key); });
-        renderListing(listing);
+        const keys = listItems.map(item => listing.present(item)?.key).filter(Boolean);
+        keys.forEach(id => { if (all.checked) picked.add(id); else picked.delete(id); });
+        for (const row of entityBody.rows) {
+          const box = row.querySelector('input[type="checkbox"]');
+          if (box) box.checked = picked.has(row.dataset.post);
+        }
+        paintBulk(listing);
       });
       markHead.append(all);
       headRow.append(markHead);
@@ -878,77 +852,172 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       headRow.append(th);
     }
     entityHead.replaceChildren(headRow);
-    entityBody.replaceChildren();
-    detail.hidden = true;
-    detail.replaceChildren();
-    let selected = null;
+  }
+  function listingRow(listing, item, view, signature) {
+    const tr = node('tr');
+    tr.className = 'crm-row-static';
+    tr.dataset.post = view.key;
+    tr._crmSignature = signature;
+    const open = reasonFocus => {
+      const latest = listItems.find(candidate => listing.present(candidate)?.key === view.key) || item;
+      const latestView = listing.present(latest) || view;
+      selectedKey = view.key;
+      focusReason = reasonFocus;
+      for (const row of entityBody.rows) row.removeAttribute('aria-selected');
+      tr.setAttribute('aria-selected', 'true');
+      fillDetail(listing, latest, latestView);
+      void openDialog(listing, latest, latestView, reasonFocus);
+    };
+    if (view.mark) {
+      const markCell = node('td');
+      const box = node('input');
+      box.type = 'checkbox';
+      box.checked = picked.has(view.key);
+      box.setAttribute('aria-label', 'Marcar');
+      box.addEventListener('click', event => event.stopPropagation());
+      box.addEventListener('change', () => {
+        if (box.checked) picked.add(view.key); else picked.delete(view.key);
+        paintBulk(listing);
+        const all = entityHead.querySelector('input[type="checkbox"]');
+        if (all) all.checked = listItems.length > 0 && listItems.every(row => picked.has(row.id));
+      });
+      markCell.append(box);
+      tr.append(markCell);
+    }
+    view.cells.forEach((cell, index) => {
+      const td = node('td');
+      if (listing.columns[index] === 'Autor') td.dataset.field = 'author';
+      td.append(cellNode(cell, open));
+      tr.append(td);
+    });
+    const actionCell = node('td');
+    const actions = node('div');
+    actions.className = 'crm-actions';
+    for (const spec of view.actions || []) {
+      const action = iconButton(spec.icon, spec.label);
+      action.addEventListener('click', event => {
+        event.stopPropagation();
+        if (spec.name === 'reassign') {
+          const latest = listItems.find(candidate => candidate.id === view.key) || item;
+          void openReassign(listing, latest, listing.present(latest) || view);
+          return;
+        }
+        open(spec.name === 'remove');
+      });
+      actions.append(action);
+    }
+    actionCell.append(actions);
+    tr.append(actionCell);
+    return tr;
+  }
+  function patchListingRows(listing) {
+    const beforeScroll = entityWrap.scrollLeft;
+    const existing = new Map([...entityBody.rows].map(row => [row.dataset.post, row]));
+    const next = [];
     for (const item of listItems) {
       const view = listing.present(item);
       if (!view || view.hidden) continue;
-      const tr = node('tr');
-      tr.className = 'crm-row-static';
-      if (view.key === selectedKey) tr.setAttribute('aria-selected', 'true');
-      const open = (reasonFocus) => {
-        selectedKey = view.key;
-        focusReason = reasonFocus;
-        for (const other of entityBody.querySelectorAll('tr')) other.removeAttribute('aria-selected');
-        tr.setAttribute('aria-selected', 'true');
-        void openDialog(listing, item, view, reasonFocus);
-      };
-      if (view.mark) {
-        const markCell = node('td');
-        const box = node('input');
-        box.type = 'checkbox';
-        box.checked = picked.has(view.key);
-        box.setAttribute('aria-label', 'Marcar');
-        box.addEventListener('click', event => event.stopPropagation());
-        box.addEventListener('change', () => {
-          if (box.checked) picked.add(view.key); else picked.delete(view.key);
-          paintBulk(listing);
-        });
-        markCell.append(box);
-        tr.append(markCell);
-      }
-      view.cells.forEach((cell, index) => {
-        const td = node('td');
-        if (listing.columns[index] === 'Autor') td.dataset.field = 'author';
-        td.append(cellNode(cell, open));
-        tr.append(td);
-      });
-      tr.dataset.post = view.key;
-      const actionCell = node('td');
-      const actions = node('div');
-      actions.className = 'crm-actions';
-      for (const spec of view.actions || []) {
-        const action = iconButton(spec.icon, spec.label);
-        action.addEventListener('click', event => {
-          event.stopPropagation();
-          if (spec.name === 'reassign') {
-            void openReassign(listing, item, view);
-            return;
-          }
-          open(spec.name === 'remove');
-        });
-        actions.append(action);
-      }
-      actionCell.append(actions);
-      tr.append(actionCell);
-      entityBody.append(tr);
-      if (view.key === selectedKey) selected = { item, view };
+      const signature = JSON.stringify([view.cells, view.actions, view.detail, view.mark]);
+      const previous = existing.get(view.key);
+      const row = previous && previous._crmSignature === signature
+        ? previous : listingRow(listing, item, view, signature);
+      row.toggleAttribute('aria-selected', view.key === selectedKey);
+      const checkbox = row.querySelector('input[type="checkbox"]');
+      if (checkbox) checkbox.checked = picked.has(view.key);
+      next.push(row);
     }
-    if (selected) fillDetail(listing, selected.item, selected.view);
-    more.hidden = !listCursor || listLoading;
+    // Mueve únicamente las filas cuyo índice cambió; no vacía ni recrea el tbody.
+    let cursor = entityBody.firstChild;
+    for (const row of next) {
+      if (row === cursor) cursor = cursor.nextSibling;
+      else entityBody.insertBefore(row, cursor);
+    }
+    while (cursor) {
+      const following = cursor.nextSibling;
+      cursor.remove();
+      cursor = following;
+    }
+    entityWrap.scrollLeft = beforeScroll;
+    const all = entityHead.querySelector('input[type="checkbox"]');
+    if (all) all.checked = next.length > 0 && next.every(row => picked.has(row.dataset.post));
+    if (selectedKey && !next.some(row => row.dataset.post === selectedKey)) {
+      selectedKey = null;
+      detail.hidden = true;
+      detail.replaceChildren();
+    }
+  }
+  function listingStatus(listing) {
+    entityWrap.setAttribute('aria-busy', String(listLoading));
     more.disabled = listLoading;
+    // El botón mantiene su sitio durante la carga para evitar saltos verticales.
+    more.hidden = !listCursor;
     listCount.hidden = false;
     listCount.textContent = listLoading
-      ? 'Cargando publicaciones…'
-      : listItems.length + ' publicaciones cargadas' + (listCursor ? ' · Hay más resultados' : ' · Fin de los resultados');
-    paintBulk(listing);
+      ? 'Actualizando publicaciones…'
+      : listItems.length + ' publicaciones cargadas' +
+        (listCursor ? ' · Hay más resultados' : ' · Fin de los resultados');
     const isEmpty = !listLoading && listItems.length === 0;
     empty.box.hidden = !isEmpty;
     empty.title.textContent = listing.emptyTitle;
     empty.detail.textContent = listing.emptyDetail;
-    if (isEmpty) detail.hidden = true;
+  }
+  function renderListing(listing, { updateRows = true } = {}) {
+    const entering = entityWrap.hidden || activeListing !== listing;
+    if (entering) {
+      heading.textContent = sections.find(item => item.id === current)?.label || title;
+      search.placeholder = listing.placeholder;
+      search.setAttribute('aria-label', listing.searchLabel || listing.placeholder);
+      kpis.hidden = true;
+      tableWrap.hidden = true;
+      entityWrap.hidden = false;
+      panelTitle.textContent = sectionOf(current)?.label || title;
+      markCurrent();
+      activeListing = listing;
+      renderedHeaderKey = '';
+      detail.hidden = true;
+      detail.replaceChildren();
+      renderQueryChips();
+    }
+    listingHeader(listing);
+    if (updateRows) {
+      patchListingRows(listing);
+      paintBulk(listing);
+    }
+    listingStatus(listing);
+  }
+  async function loadListing(listing, reset) {
+    if (listLoading && !reset) return;
+    const ticket = ++listTicket;
+    const entering = entityWrap.hidden || activeListing !== listing;
+    listLoading = true;
+    if (entering) {
+      listItems = [];
+      listCursor = null;
+      selectedKey = null;
+      entityBody.replaceChildren();
+    }
+    if (reset && !query.trim()) paintSuggestions(null);
+    // Conservar filas existentes mientras llega la respuesta; solo cambia el estado.
+    renderListing(listing, { updateRows: entering });
+    try {
+      const page = await listing.load(query.trim(), reset ? null : listCursor, listOrders, listFilters);
+      if (ticket !== listTicket) return;
+      const incoming = Array.isArray(page?.items) ? page.items : [];
+      listItems = reset ? incoming : listItems.concat(incoming.filter(item => !listItems.some(existing => existing.id === item.id)));
+      listCursor = page?.nextCursor || null;
+      listError.hidden = true;
+      if (reset) paintSuggestions(page?.suggestions);
+    } catch (error) {
+      if (ticket !== listTicket || error?.code === 'ABORTED') return;
+      listError.textContent = 'No se pudo actualizar el listado. Los resultados anteriores se conservaron.';
+      listError.hidden = false;
+      if (reset) closeSuggest('error');
+    } finally {
+      if (ticket === listTicket) {
+        listLoading = false;
+        renderListing(listing);
+      }
+    }
   }
   function fillDetail(listing, item, view) {
     detail.hidden = false;
