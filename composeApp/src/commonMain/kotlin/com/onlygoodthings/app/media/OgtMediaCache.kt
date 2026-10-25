@@ -28,22 +28,22 @@ object OgtMediaCache {
     private val http by lazy { createPlatformHttpClient() }
 
     fun peek(url: String): ByteArray? {
-        val key = url.trim()
+        val key = canonicalMediaUrl(url)
         if (key.isBlank()) return null
         memory[key]?.let { return it }
         return readMediaCacheFile(diskName(key))?.also { putMemory(key, it) }
     }
 
     fun ingest(url: String) {
-        val key = url.trim()
+        val key = canonicalMediaUrl(url)
         if (key.isBlank() || peek(key) != null) return
         val path = localFilePath(key) ?: return
         readLocalFileBytes(path)?.let { put(key, it) }
     }
 
     fun alias(from: String, to: String) {
-        val src = from.trim()
-        val dest = to.trim()
+        val src = canonicalMediaUrl(from)
+        val dest = canonicalMediaUrl(to)
         if (src.isBlank() || dest.isBlank() || src == dest) return
         val bytes = peek(src) ?: return
         val already = peek(dest)
@@ -52,7 +52,7 @@ object OgtMediaCache {
     }
 
     fun put(url: String, bytes: ByteArray) {
-        val key = url.trim()
+        val key = canonicalMediaUrl(url)
         if (key.isBlank() || bytes.isEmpty()) return
         putMemory(key, bytes)
         runCatching { writeMediaCacheFile(diskName(key), bytes) }
@@ -60,7 +60,7 @@ object OgtMediaCache {
 
     /** Path local si ya está en disco (fotos y video). */
     fun cachedFileUrl(url: String): String? {
-        val key = url.trim()
+        val key = canonicalMediaUrl(url)
         if (key.isBlank()) return null
         if (key.startsWith("file://") || key.startsWith("/")) return key
         val path = mediaCacheFilePath(diskName(key))
@@ -68,7 +68,7 @@ object OgtMediaCache {
     }
 
     suspend fun cachedPlayableUrl(url: String): String {
-        val key = url.trim()
+        val key = canonicalMediaUrl(url)
         if (key.isBlank()) return key
         if (key.startsWith("file://") || key.startsWith("/")) return key
         load(key)
@@ -76,7 +76,7 @@ object OgtMediaCache {
     }
 
     suspend fun load(url: String): ByteArray? {
-        val key = url.trim()
+        val key = canonicalMediaUrl(url)
         if (key.isBlank()) return null
         peek(key)?.let { return it }
         val mine = CompletableDeferred<ByteArray?>()
@@ -127,7 +127,23 @@ object OgtMediaCache {
     }
 }
 
-fun isRemoteMediaUrl(url: String): Boolean = isRemoteUrl(url.trim())
+fun isRemoteMediaUrl(url: String): Boolean = isRemoteUrl(canonicalMediaUrl(url))
+
+/**
+ * A small number of historical posts still refer to the old internal OGT
+ * backend address, which is not reachable from a user's phone. Rewrite only
+ * those media URLs to the current public media proxy; leave all other hosts
+ * and routes untouched.
+ */
+fun canonicalMediaUrl(raw: String): String {
+    val url = raw.trim()
+    val privateOrigin = when {
+        url.startsWith("http://217.216.82.209:19080/media/") -> "http://217.216.82.209:19080"
+        url.startsWith("https://217.216.82.209:19080/media/") -> "https://217.216.82.209:19080"
+        else -> return url
+    }
+    return "https://onlygoodthings.lat" + url.removePrefix(privateOrigin)
+}
 
 private fun isRemoteUrl(url: String): Boolean =
     url.startsWith("http://") || url.startsWith("https://")
