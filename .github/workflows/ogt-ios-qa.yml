@@ -81,6 +81,8 @@ jobs:
           python-version: '3.12'
       - name: Install Google Firebase configuration reader
         run: python3 -m pip install 'google-auth[requests]>=2.0,<3.0'
+      - name: Validate Firebase iOS config contract without credentials
+        run: python3 -m unittest qa.test_ogt_ios_firebase_config -v
       - name: Verify SSH identity for existing OGT VPS
         shell: bash
         env:
