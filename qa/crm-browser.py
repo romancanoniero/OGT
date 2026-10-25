@@ -108,7 +108,7 @@ with sync_playwright() as pw:
                 if not relative or relative.endswith('/'): relative+='index.html'
                 file=(ROOT/'web/app/crm'/relative).resolve()
                 if file.is_relative_to((ROOT/'web/app/crm').resolve()) and file.is_file():
-                    mime='text/javascript' if file.suffix in ('.js','.mjs') else 'text/html' if file.suffix=='.html' else 'application/json'
+                    mime={'.js':'text/javascript','.mjs':'text/javascript','.html':'text/html','.css':'text/css','.png':'image/png','.svg':'image/svg+xml','.json':'application/json'}.get(file.suffix,'application/octet-stream')
                     route.fulfill(status=200,content_type=mime,body=file.read_bytes());return
                 route.fulfill(status=404,body='Not found');return
             route.abort()
