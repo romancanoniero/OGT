@@ -54,10 +54,11 @@ def access_req(path, credentials, *, method="GET", payload=None, empty_post=Fals
         body = json.dumps(payload).encode("utf-8")
     elif empty_post:
         body = b""
-    headers = {
-        "Authorization": "Bearer " + credentials.token,
-        "X-Goog-User-Project": PROJECT,
-    }
+    # Service-account OAuth tokens have their own quota attribution.
+    # A forced X-Goog-User-Project triggers an additional
+    # serviceusage.services.use IAM check that is unnecessary here.
+    # End-user gcloud credentials differ and may require that header.
+    headers = {"Authorization": "Bearer " + credentials.token}
     if body is not None:
         headers["Content-Type"] = "application/json"
     req = request.Request(API + path, data=body, headers=headers, method=method)
