@@ -31,7 +31,7 @@ const records = Array.from({length: 60}, (_, i) => ({
 }));
 const posts = records.map(u => ({id:u.id, topic:'Historia de prueba',
   body:'Contenido de la publicaci\u00f3n. '.repeat(12), createdAt:u.createdAt}));
-const profile = user => ({...user, communityPoints: 5, visiblePostCount:60,
+const profile = user => ({...user, displayName:window.fixture.longName ? user.displayName.repeat(20) : user.displayName, communityPoints: 5, visiblePostCount:60,
   receivedReportCount:40, canReviewReports:true,
   reportedContent:records.slice(0,40).map(u => ({id:u.id,reason:'Revisi\u00f3n de contenido',status:'OPEN',createdAt:u.createdAt}))});
 function listing(users) {
@@ -158,6 +158,7 @@ def main():
                 try:
                     page.goto(BASE + '/crm/' + mode + '/fixture')
                     page.wait_for_function('window.fixtureReady === true')
+                    page.evaluate('document.fonts.ready')
                     for section in sections:
                         page.locator('.crm-nav-btn[data-section="'+section+'"]').click()
                         region=page.locator('.crm-panel > .crm-table-wrap:not([hidden])')
@@ -221,6 +222,12 @@ def exercise_lists(page,width,height):
     expect(content.locator('.crm-profile-post')).to_have_count(40)
     assert_internal_scroll(page,content)
     dialog.get_by_role('button',name='Cerrar',exact=True).click()
+    page.evaluate('window.fixture.longName=true')
+    rows.first.get_by_role('button',name='Ver usuario').click()
+    expect(page.locator('.crm-profile-content')).to_contain_text('Informaci')
+    assert page.locator('.crm-profile-dialog').evaluate('(el)=>el.scrollHeight<=el.clientHeight+2')
+    assert page.locator('.crm-profile-content').bounding_box()['height'] >= 40
+    page.locator('.crm-profile-dialog').get_by_role('button',name='Cerrar',exact=True).click()
     page.get_by_role('button',name='Filtros (0)').click()
     popover=page.locator('.crm-query-popover')
     expect(popover).to_be_visible()
@@ -231,6 +238,7 @@ def exercise_lists(page,width,height):
     # Horizontal overflow stays inside the rounded card on narrow displays.
     region.evaluate('(el)=>{el.scrollLeft=el.scrollWidth}')
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth+2')
+    region.evaluate('(el)=>{el.scrollLeft=0;el.scrollTop=0}')
     if width==390:
         page.screenshot(path=str(OUTPUT/'lists-mobile.png'))
     if width==1440:
@@ -268,8 +276,10 @@ def exercise_lists(page,width,height):
     # Resizing an already mounted shell must not require reload or lose navigation.
     original=page.viewport_size
     page.set_viewport_size({'width':390,'height':600})
+    page.wait_for_function('Math.abs(document.body.getBoundingClientRect().height-innerHeight)<=1')
     check_bounds(page,'live resize')
     page.set_viewport_size(original)
+    page.wait_for_function('Math.abs(document.body.getBoundingClientRect().height-innerHeight)<=1')
     check_bounds(page,'restore viewport')
 
 

@@ -226,3 +226,8 @@ body[data-crm-view="app"] .crm-workspace-main {
   .crm-profile-stat strong { font-size: 16px; }
   .crm-profile-tab { padding-block: 8px; }
 }
+
+/* Long metadata must not consume the row/content scrollport. */
+.crm-panel > .crm-detail { max-height: 25%; }
+.crm-profile-dialog > .crm-profile-hero { min-height: 0; max-height: 26%; overflow: auto; }
+.crm-profile-dialog > .crm-profile-stats { min-height: 0; max-height: 23%; overflow: auto; }
