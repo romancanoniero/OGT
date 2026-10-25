@@ -1,5 +1,7 @@
 package com.onlygoodthings.backend.media
 
+import com.drew.imaging.ImageMetadataReader
+import com.drew.metadata.exif.ExifIFD0Directory
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import java.util.Random
@@ -13,17 +15,44 @@ import org.junit.jupiter.api.Test
 class ImageOptimizerOrientationTest {
     @Test
     fun jpegConExifGiraLosPixelesAunqueElResultadoSeaMasPesado() {
-        val source = compressedJpegWithOrientation6(160, 90)
+        // Use an EXIF segment from our known-good rotated camera fixture.
+        // Hand-crafted TIFF headers were accepted by some readers but ignored
+        // by the metadata extractor used in production.
+        val camera = javaClass.getResourceAsStream("/images/rotated.jpg")!!.use { it.readBytes() }
+        val exif = exifSegment(camera)
+        val source = compressedJpegWithExif(160, 90, exif)
+        val orientation = ImageMetadataReader.readMetadata(source.inputStream())
+            .getFirstDirectoryOfType(ExifIFD0Directory::class.java)
+            ?.getInteger(ExifIFD0Directory.TAG_ORIENTATION)
+        assertTrue(orientation == 6 || orientation == 8, "La muestra debe tener orientacion EXIF lateral")
+
         val result = ImageOptimizer.optimize(source, "jpg")
         val decoded = ImageIO.read(result.bytes.inputStream())
-
         assertEquals("jpg", result.extension)
         assertEquals(90, decoded.width)
         assertEquals(160, decoded.height)
         assertTrue(result.bytes.isNotEmpty())
     }
 
-    private fun compressedJpegWithOrientation6(width: Int, height: Int): ByteArray {
+    private fun exifSegment(jpeg: ByteArray): ByteArray {
+        require(jpeg.size > 4 && (jpeg[0].toInt() and 255) == 255 && (jpeg[1].toInt() and 255) == 216)
+        var offset = 2
+        while (offset + 6 < jpeg.size) {
+            require((jpeg[offset].toInt() and 255) == 255) { "JPEG invalido" }
+            val marker = jpeg[offset + 1].toInt() and 255
+            if (marker == 218 || marker == 217) break // start of scan / end
+            val length = ((jpeg[offset + 2].toInt() and 255) shl 8) or (jpeg[offset + 3].toInt() and 255)
+            require(length >= 2 && offset + length + 2 <= jpeg.size)
+            if (marker == 225 && length >= 8 &&
+                String(jpeg, offset + 4, 6, Charsets.US_ASCII) == "Exif\u0000\u0000") {
+                return jpeg.copyOfRange(offset, offset + length + 2)
+            }
+            offset += length + 2
+        }
+        error("La foto de referencia no contiene EXIF APP1")
+    }
+
+    private fun compressedJpegWithExif(width: Int, height: Int, exif: ByteArray): ByteArray {
         val image = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
         val random = Random(42L)
         for (y in 0 until height) for (x in 0 until width) {
@@ -42,22 +71,9 @@ class ImageOptimizerOrientationTest {
         } finally {
             writer.dispose()
         }
-
-        // Exif TIFF IFD0: tag 0x0112, SHORT, count 1, orientation 6 (90 degrees).
-        val exif = byteArrayOf(
-            0x45, 0x78, 0x69, 0x66, 0, 0,
-            0x49, 0x49, 0x2a, 0, 0x08, 0, 0, 0,
-            0x01, 0, 0x12, 0x01, 0x03, 0,
-            0x01, 0, 0, 0, 0x06, 0, 0, 0, 0, 0, 0
-        )
         val jpeg = original.toByteArray()
         val output = ByteArrayOutputStream()
-        output.write(jpeg, 0, 2) // JPEG SOI
-        output.write(0xFF)
-        output.write(0xE1) // APP1 Exif
-        val length = exif.size + 2
-        output.write(length shr 8)
-        output.write(length and 0xFF)
+        output.write(jpeg, 0, 2)
         output.write(exif)
         output.write(jpeg, 2, jpeg.size - 2)
         return output.toByteArray()
