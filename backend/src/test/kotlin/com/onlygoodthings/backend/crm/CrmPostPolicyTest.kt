@@ -77,6 +77,19 @@ class CrmPostPolicyTest {
         assertNull(parseCrmPostCursor("10|not-a-uuid"))
     }
 
+    @Test fun pageCursorRemembersOrderAndRejectsMalformedInput() {
+        val id = UUID.randomUUID().toString()
+        val cursor = CrmPostPageCursor("author", "asc", "ana", "2026-10-25T10:30:00.123456Z", id)
+        val encoded = crmEncodePostPageCursor(cursor)
+        assertEquals(cursor, parseCrmPostPageCursor(encoded))
+        assertNull(parseCrmPostPageCursor("v2.not-a-valid-cursor"))
+        assertFalse(crmValidPostSort("DROP TABLE posts", "asc"))
+        assertFalse(crmValidPostSort("author", "random"))
+        assertTrue(crmValidPostSort("createdAt", "desc"))
+        assertTrue(crmValidPostSort("text", "asc"))
+        assertEquals("createdAt", parseCrmPostPageCursor(crmPostCursor(1_700_000_000_000, id))?.sortBy)
+    }
+
     @Test fun removalProjectsTheExistingPostNodeAsRemoved() {
         val id = UUID.randomUUID().toString()
         val live = crmRemovedPostLive(id)
