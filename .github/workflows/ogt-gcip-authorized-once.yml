@@ -16,7 +16,7 @@ jobs:
     if: >-
       github.repository == 'romancanoniero/OGT' &&
       github.ref == 'refs/heads/main' &&
-      github.event.head_commit.message == 'enable: OGT GCIP alignment approved 20261025'
+      startsWith(github.event.head_commit.message, 'enable: OGT GCIP alignment approved 20261025')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: ogt-launch
