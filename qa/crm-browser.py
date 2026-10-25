@@ -128,6 +128,9 @@ with sync_playwright() as pw:
     state['user_fixture']=True
     begin(page);finish(page)
     page.locator('.crm-nav-btn[data-section="usuarios"]').click()
+    page.wait_for_timeout(450)
+    if page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]').count()==0:
+        print('DEBUG USERS:',json.dumps({'requests':state['requests'][-6:],'errors':errors,'text':page.locator('#crm-root').inner_text()[-3000:]},ensure_ascii=True))
     expect(page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]')).to_have_count(20)
     assert state['requests'][-1][0].endswith('/users/list')
     assert page.locator('.crm-query-popover').is_hidden()
