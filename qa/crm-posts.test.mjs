@@ -44,7 +44,7 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\.svg', view: 'listing'/);
   assert.doesNotMatch(runtime, /id: 'publicaciones'[^}]*keys:/);
   assert.match(runtime, /crm-ui\.js\?v=suggest-2/);
-  assert.match(html, /crm\.js\?v=suggest-2/);
+  assert.match(html, /crm\.js\?v=totp-timeout-1/);
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
   assert.match(runtime, /publicationImage\(post\.editorUrl\)/);
   assert.match(runtime, /imageUrl: saved\.imageUrl/);
@@ -170,8 +170,8 @@ test('la rueda del CRM web acerca arriba y aleja abajo', () => {
   assert.match(css, /\.crm-frame \{[^}]*overscroll-behavior: none/s);
   const empresas = readFileSync(new URL('../web/app/crm/empresas/index.html', import.meta.url), 'utf8');
   const control = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
-  assert.match(empresas, /crm\.js\?v=suggest-2/);
-  assert.match(control, /crm\.js\?v=suggest-2/);
+  assert.match(empresas, /crm\.js\?v=totp-timeout-1/);
+  assert.match(control, /crm\.js\?v=totp-timeout-1/);
   assert.doesNotMatch(css, /crm-frame-zoom/);
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_in.png', import.meta.url)));
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_out.png', import.meta.url)));
