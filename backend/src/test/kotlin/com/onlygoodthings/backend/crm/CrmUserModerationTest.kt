@@ -64,6 +64,9 @@ class CrmUserModerationTest {
             "/api/v1/media/upload", "/api/v1/animals/publish",
             "/api/v1/parking/publish", "/api/v1/timebank/need",
             "/api/v1/timebank/message/send",
+            "/api/v1/parking/interest", "/api/v1/parking/claim",
+            "/api/v1/referrals/link", "/api/v1/notifications/mention",
+            "/api/v1/csr/promo/issue",
         )) assertTrue(crmContributionPath(path), "write must be denied: $path")
     }
 }

@@ -289,6 +289,10 @@ internal val crmContributionPaths = setOf(
     "/api/v1/volunteer/check-in", "/api/v1/timebank/match",
     "/api/v1/causes/progress", "/api/v1/causes/deliver",
     "/api/v1/users/profile/update",
+    "/api/v1/referrals/link", "/api/v1/referrals/claim",
+    "/api/v1/parking/interest", "/api/v1/parking/claim", "/api/v1/parking/tick",
+    "/api/v1/notifications/mention", "/api/v1/csr/finance-action",
+    "/api/v1/csr/promo/issue",
 )
 internal fun crmContributionPath(path: String): Boolean = path in crmContributionPaths
 
