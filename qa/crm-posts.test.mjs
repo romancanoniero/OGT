@@ -43,12 +43,12 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   const html = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\.svg', view: 'listing'/);
   assert.doesNotMatch(runtime, /id: 'publicaciones'[^}]*keys:/);
-  assert.match(runtime, /crm-ui\.js\?v=feedparity-1/);
-  assert.match(html, /crm\.js\?v=feedparity-1/);
+  assert.match(runtime, /crm-ui\.js\?v=userprofile-1/);
+  assert.match(html, /crm\.js\?v=userprofile-1/);
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
   assert.match(runtime, /publicationImage\(post\.editorUrl\)/);
   assert.match(runtime, /imageUrl: saved\.imageUrl/);
-  assert.match(html, /crm\.css\?v=usersview-1/);
+  assert.match(html, /crm\.css\?v=userprofile-1/);
   assert.match(runtime, /icon: 'qs_trash\.png', label: 'Quitar selección'/);
   assert.match(runtime, /platform\/posts\/reassign/);
   assert.match(runtime, /platform\/users\/search/);
@@ -171,7 +171,7 @@ test('la rueda del CRM web acerca arriba y aleja abajo', () => {
   const empresas = readFileSync(new URL('../web/app/crm/empresas/index.html', import.meta.url), 'utf8');
   const control = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(empresas, /crm\.js\?v=totp-timeout-1/);
-  assert.match(control, /crm\.js\?v=feedparity-1/);
+  assert.match(control, /crm\.js\?v=userprofile-1/);
   assert.doesNotMatch(css, /crm-frame-zoom/);
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_in.png', import.meta.url)));
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_out.png', import.meta.url)));
