@@ -87,6 +87,44 @@ internal fun crmModerateUsers(
         val removedComments = mutableListOf<CrmRemovedUserComment>()
         val recountPosts = mutableListOf<String>()
         if (action == "DELETE") {
+            // Queue media associated with the erased person's profile, posts or
+            // animal notices. Files are purged only after DB commit and only if
+            // nobody else still references them.
+            val localNames = conn.prepareStatement(
+                """SELECT source.url FROM (
+                     SELECT photo_url AS url FROM users WHERE id = ANY(?::uuid[])
+                     UNION ALL SELECT unnest(media_urls) AS url FROM social_posts
+                       WHERE author_user_id = ANY(?::uuid[])
+                     UNION ALL SELECT unnest(photo_urls) AS url FROM animal_listings
+                       WHERE reporter_user_id = ANY(?::uuid[])
+                     UNION ALL SELECT m.url FROM post_media m
+                       JOIN social_posts p ON p.id = m.post_id
+                       WHERE p.author_user_id = ANY(?::uuid[])
+                     UNION ALL SELECT m.original_url FROM post_media m
+                       JOIN social_posts p ON p.id = m.post_id
+                       WHERE p.author_user_id = ANY(?::uuid[])
+                     UNION ALL SELECT m.poster_url FROM post_media m
+                       JOIN social_posts p ON p.id = m.post_id
+                       WHERE p.author_user_id = ANY(?::uuid[])
+                   ) source WHERE source.url IS NOT NULL"""
+            ).use { stmt ->
+                for (n in 1..6) stmt.setArray(n, conn.createArrayOf("uuid", ids.toTypedArray()))
+                stmt.executeQuery().use { rs ->
+                    buildSet {
+                        while (rs.next()) crmLocalMediaName(rs.getString(1))?.let { add(it) }
+                    }
+                }
+            }
+            localNames.forEach { name ->
+                conn.prepareStatement(
+                    """INSERT INTO crm_erased_media(stored_name) VALUES (?)
+                       ON CONFLICT (stored_name) DO UPDATE
+                       SET processed_at = NULL, outcome = NULL"""
+                ).use { stmt ->
+                    stmt.setString(1, name)
+                    stmt.executeUpdate()
+                }
+            }
             removedPosts.addAll(conn.queryIds(
                 "SELECT id::text FROM social_posts WHERE author_user_id = ANY(?::uuid[])", ids,
             ))
@@ -241,3 +279,61 @@ internal val crmContributionPaths = setOf(
     "/api/v1/users/profile/update",
 )
 internal fun crmContributionPath(path: String): Boolean = path in crmContributionPaths
+
+/** Only locally stored media names are eligible. No remote content is modified. */
+internal fun crmLocalMediaName(url: String?): String? {
+    val candidate = url?.substringBefore('?')?.substringBefore('#') ?: return null
+    val name = candidate.substringAfterLast("/media/u/", "")
+    if (name.isEmpty() || '/' in name) return null
+    return name.takeIf {
+        it.matches(Regex("[0-9a-fA-F-]{36}\\.(jpg|jpeg|png|webp|mp4|webm)"))
+    }
+}
+
+/** Best effort after commit. Journal rows survive failures for a later retry. */
+internal fun crmPurgeErasedMedia(db: Database, media: com.onlygoodthings.backend.media.MediaStore) {
+    val pending = db.withConnection { conn ->
+        conn.createStatement().use { stmt ->
+            stmt.executeQuery(
+                "SELECT stored_name FROM crm_erased_media WHERE processed_at IS NULL ORDER BY created_at LIMIT 100"
+            ).use { rs -> buildList { while (rs.next()) add(rs.getString(1)) } }
+        }
+    }
+    pending.forEach { name ->
+        try {
+            val shared = db.withConnection { conn ->
+                conn.prepareStatement(
+                    """SELECT
+                       EXISTS(SELECT 1 FROM users WHERE photo_url LIKE ?)
+                       OR EXISTS(SELECT 1 FROM social_posts
+                         WHERE array_to_string(media_urls, '|') LIKE ?)
+                       OR EXISTS(SELECT 1 FROM post_media
+                         WHERE url LIKE ? OR original_url LIKE ? OR poster_url LIKE ?)
+                       OR EXISTS(SELECT 1 FROM animal_listings
+                         WHERE array_to_string(photo_urls, '|') LIKE ?)"""
+                ).use { stmt ->
+                    for (n in 1..6) stmt.setString(n, "%/media/u/$name%")
+                    stmt.executeQuery().use { rs -> rs.next(); rs.getBoolean(1) }
+                }
+            }
+            val outcome = when {
+                shared -> "SHARED"
+                media.resolvePublic(name) == null -> "UNREFERENCED"
+                media.deleteLocal("/media/u/$name") -> "DELETED"
+                else -> null
+            }
+            if (outcome != null) db.withConnection { conn ->
+                conn.prepareStatement(
+                    """UPDATE crm_erased_media SET processed_at = now(), outcome = ?
+                       WHERE stored_name = ? AND processed_at IS NULL"""
+                ).use { stmt ->
+                    stmt.setString(1, outcome)
+                    stmt.setString(2, name)
+                    stmt.executeUpdate()
+                }
+            }
+        } catch (_: Exception) {
+            // Keep the durable pending record; never pretend the file was purged.
+        }
+    }
+}

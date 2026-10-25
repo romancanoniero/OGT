@@ -35,6 +35,15 @@ class CrmUserModerationTest {
         assertNull(crmModerationReason("x".repeat(501)))
     }
 
+    @Test fun `only local upload filenames qualify for cleanup`() {
+        val file = "12345678-1234-1234-1234-123456789abc.jpg"
+        assertEquals(file, crmLocalMediaName("https://onlygoodthings.lat/media/u/" + file))
+        assertEquals(file, crmLocalMediaName("/media/u/" + file + "?v=2"))
+        assertNull(crmLocalMediaName("https://other.example/photo.jpg"))
+        assertNull(crmLocalMediaName("/media/u/../secret.txt"))
+        assertNull(crmLocalMediaName("/media/u/123.png"))
+    }
+
     @Test fun `erased identity key is stable but never raw uid`() {
         val hash = crmFirebaseTombstoneHash("firebase-user-123")
         assertEquals(64, hash.length)

@@ -29,7 +29,10 @@ fun Route.publicAuthRoutes(verifier: FirebaseTokenVerifier, identity: IdentitySt
                 ApiResponse.fail<Unit>("Token Firebase inválido", "INVALID_TOKEN"),
             )
         }
-        val profile = identity.upsertFromFirebase(verified)
+        val profile = runCatching { identity.upsertFromFirebase(verified) }.getOrElse {
+            return@post call.respond(HttpStatusCode.Forbidden,
+                ApiResponse.fail<Unit>("Cuenta deshabilitada o eliminada", "ACCOUNT_UNAVAILABLE"))
+        }
         call.respond(ApiResponse.ok(profile, "Sesión lista"))
     }
 

@@ -616,6 +616,7 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: Realtime
                 }
             }
         }
+        if (action == "DELETE") crmPurgeErasedMedia(db, media)
         call.respond(ApiResponse.ok(result.response))
     }
     /**

@@ -42,6 +42,28 @@ jobs:
         run: bash scripts/deploy-ogt-vps.sh --check
       - name: Shell syntax
         run: bash -n scripts/deploy-ogt-vps.sh scripts/activate-ogt-release.sh scripts/ogt-ios-wifi.sh
+  backend:
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: romancanoniero/db-kmp-sdk
+          ref: ${{ vars.OGT_SDK_REVISION || '0a881b7a15c9a7d99b77da8547aabe2dd493a8b0' }}
+          token: ${{ secrets.OGT_SDK_READ_TOKEN || secrets.OGT_SDK_CHECKOUT_TOKEN }}
+          path: _sdk
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Compile and run backend tests before merging or publishing
+        run: |
+          ./gradlew "-Pogt.dbKmpSdkPath=$GITHUB_WORKSPACE/_sdk" :backend:test --no-daemon
   browser:
     needs: checks
     runs-on: ubuntu-24.04
@@ -72,7 +94,7 @@ jobs:
   publish:
     # Every validated main push publishes; PRs/release branches never deploy.
     # Keep environment approvals, secrets, backups and all validation gates.
-    needs: [checks, browser]
+    needs: [checks, browser, backend]
     if: >-
       success() && github.ref == 'refs/heads/main' && github.repository == 'romancanoniero/OGT' &&
       (github.event_name == 'push' ||
