@@ -1,4 +1,4 @@
-import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn, isExpiredMfaChallenge } from './crm-core.js?v=totp-timeout-1';
+import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn, isExpiredMfaChallenge } from './crm-core.js?v=usersview-1';
 import { createIdentity } from './crm-auth.js?v=tacho-1';
 
 const controlSections = [
