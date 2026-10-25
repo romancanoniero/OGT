@@ -121,7 +121,7 @@ with sync_playwright() as pw:
     expect(page.locator('#crm-root')).to_be_empty()
     # Same identity can authenticate with a newly issued challenge.
     begin(page);finish(page)
-    expect(page.locator('#crm-root')).to_contain_text('Empresas')
+    expect(page.locator('#crm-root')).to_contain_text('Empresa Uno')
     assert not errors,errors;context.close()
     results.append('Expired TOTP challenge resets first factor; fresh sign-in works')
     context,page,state,errors=session('empresas','phone');begin(page);finish(page)
