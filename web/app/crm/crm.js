@@ -1,4 +1,4 @@
-import { start } from './crm-runtime.js?v=compactfilters-1';
+import { start } from './crm-runtime.js?v=partialrows-1';
 
 start().catch(() => {
   document.body.dataset.crmView = 'auth';

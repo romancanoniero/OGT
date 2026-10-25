@@ -43,8 +43,8 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   const html = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\.svg', view: 'listing'/);
   assert.doesNotMatch(runtime, /id: 'publicaciones'[^}]*keys:/);
-  assert.match(runtime, /crm-ui\.js\?v=compactfilters-1/);
-  assert.match(html, /crm\.js\?v=compactfilters-1/);
+  assert.match(runtime, /crm-ui\.js\?v=partialrows-1/);
+  assert.match(html, /crm\.js\?v=partialrows-1/);
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
   assert.match(runtime, /publicationImage\(post\.editorUrl\)/);
   assert.match(runtime, /imageUrl: saved\.imageUrl/);
@@ -171,7 +171,7 @@ test('la rueda del CRM web acerca arriba y aleja abajo', () => {
   const empresas = readFileSync(new URL('../web/app/crm/empresas/index.html', import.meta.url), 'utf8');
   const control = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(empresas, /crm\.js\?v=totp-timeout-1/);
-  assert.match(control, /crm\.js\?v=compactfilters-1/);
+  assert.match(control, /crm\.js\?v=partialrows-1/);
   assert.doesNotMatch(css, /crm-frame-zoom/);
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_in.png', import.meta.url)));
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_out.png', import.meta.url)));
@@ -245,4 +245,17 @@ test('compact cumulative filters and multilevel sorting are wired to the API', (
   assert.match(backend, /searchVisiblePostsAdvanced/);
   assert.match(backend, /crmPostSortKeys/);
   assert.match(backend, /crmEncodePostMultiCursor/);
+});
+
+test('listing updates reconcile keyed rows without remounting shell, filters or search', () => {
+  const ui = readFileSync(new URL('../web/app/crm/crm-ui.js', import.meta.url), 'utf8');
+  assert.match(ui, /function patchListingRows\(listing\)/);
+  assert.match(ui, /existing = new Map\(\[\.\.\.entityBody\.rows\]/);
+  assert.match(ui, /entityBody\.insertBefore\(row, cursor\)/);
+  assert.match(ui, /renderListing\(listing, \{ updateRows: entering \}\)/);
+  const patch = ui.split('function patchListingRows(listing) {')[1].split('function listingStatus(listing) {')[0];
+  assert.doesNotMatch(patch, /entityBody\.replaceChildren\(/);
+  assert.match(ui, /if \(renderedHeaderKey === key\) return/);
+  assert.match(ui, /Los resultados anteriores se conservaron/);
+  assert.match(ui, /entityWrap\.scrollLeft = beforeScroll/);
 });
