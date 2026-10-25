@@ -55,7 +55,11 @@ with sync_playwright() as pw:
             except Exception as exc:
                 record["error"] = str(exc)[:600]
             finally:
-                page.screenshot(path=str(OUT / f"{label}.png"), full_page=True)
+                try:
+                    page.screenshot(path=str(OUT / f"{label}.png"), full_page=True)
+                except Exception:
+                    # A disconnected or blocked page must still be reported.
+                    pass
                 results.append(record)
                 context.close()
     finally:
