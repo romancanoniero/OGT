@@ -16,7 +16,8 @@ permissions:
   contents: read
 concurrency:
   group: ogt-release-${{ github.ref }}
-  cancel-in-progress: false
+  # Cancel stale PR checks, never interrupt a main deployment.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   checks:
     runs-on: ubuntu-24.04
