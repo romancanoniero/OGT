@@ -21,7 +21,7 @@ export const multiFactor=user=>({enrolledFactors:user.enrolledFactors||[],getSes
 export const sendEmailVerification=async()=>{};
 export const reload=async()=>{};
 
-export function getMultiFactorResolver(){return {session:'mfa',hints:[{uid:'factor',factorId:window.testFactor||'totp',displayName:'Factor de prueba'}],resolveSignIn:async a=>{if(a.code!=='123456')throw {code:'auth/invalid-verification-code'};auth.currentUser=window.testStale?{uid:'fixture',email:'fixture@example.test',emailVerified:true,providerData:[],enrolledFactors:[{factorId:'totp'}]}:{uid:'fixture'};listeners.forEach(f=>f());return {user:auth.currentUser};}};}
+export function getMultiFactorResolver(){return {session:'mfa',hints:[{uid:'factor',factorId:window.testFactor||'totp',displayName:'Factor de prueba'}],resolveSignIn:async a=>{if(window.testChallengeExpired){window.testChallengeExpired=false;throw {code:'auth/totp-challenge-timeout'};}if(a.code!=='123456')throw {code:'auth/invalid-verification-code'};auth.currentUser=window.testStale?{uid:'fixture',email:'fixture@example.test',emailVerified:true,providerData:[],enrolledFactors:[{factorId:'totp'}]}:{uid:'fixture'};listeners.forEach(f=>f());return {user:auth.currentUser};}};}
 export const TotpMultiFactorGenerator={assertionForSignIn:(uid,code)=>({code}),generateSecret:async()=>({secretKey:'TEST-DO-NOT-USE'}),assertionForEnrollment:(secret,code)=>({secret,code})};
 export class PhoneAuthProvider{async verifyPhoneNumber(){return 'verification';}static credential(id,code){return {code};}}
 export const PhoneMultiFactorGenerator={assertion:x=>x};
@@ -108,6 +108,22 @@ with sync_playwright() as pw:
     context,page,state,errors=session();begin(page);finish(page,'111111')
     expect(page.locator('#crm-status')).to_contain_text('no es v\u00e1lido');expect(page.locator('#crm-root')).to_be_empty()
     finish(page);expect(page.locator('#crm-root')).to_contain_text('Usuarios activos: 17');assert not errors,errors;context.close();results.append('Invalid MFA code rejected, valid retry succeeds')
+    context,page,state,errors=session('empresas')
+    begin(page)
+    page.evaluate("window.testChallengeExpired=true")
+    finish(page)
+    # A challenge timeout is not a rejected TOTP code: Firebase requires
+    # the first sign-in factor again, and the old resolver must be discarded.
+    expect(page.locator('#crm-mfa')).to_be_hidden()
+    expect(page.locator('#crm-login')).to_be_visible()
+    expect(page.locator('#crm-status')).to_contain_text('venció')
+    expect(page.locator('#crm-status')).to_contain_text('código puede ser correcto')
+    expect(page.locator('#crm-root')).to_be_empty()
+    # Same identity can authenticate with a newly issued challenge.
+    begin(page);finish(page)
+    expect(page.locator('#crm-root')).to_contain_text('Empresas')
+    assert not errors,errors;context.close()
+    results.append('Expired TOTP challenge resets first factor; fresh sign-in works')
     context,page,state,errors=session('empresas','phone');begin(page);finish(page)
     expect(page.locator('#crm-root')).to_contain_text('Empresa Uno')
     page.get_by_label('Seleccionar empresa').select_option(B);expect(page.locator('#crm-root')).to_contain_text('Empresa Dos')
