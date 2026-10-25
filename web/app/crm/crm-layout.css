@@ -231,3 +231,25 @@ body[data-crm-view="app"] .crm-workspace-main {
 .crm-panel > .crm-detail { max-height: 25%; }
 .crm-profile-dialog > .crm-profile-hero { min-height: 0; max-height: 26%; overflow: auto; }
 .crm-profile-dialog > .crm-profile-stats { min-height: 0; max-height: 23%; overflow: auto; }
+
+/* Entity details already open in their own dialog. Do not duplicate that form
+   below the table and consume its scrollport. Metric-only detail remains usable. */
+.crm-panel:has(> .crm-table-wrap:not([hidden]) .crm-row-static) > .crm-detail {
+  display: none;
+}
+/* Selection actions share the card heading instead of consuming a row of data. */
+.crm-workspace-main > .crm-panel { position: relative; }
+.crm-panel > h3 {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin-block: 0;
+  padding-inline-end: 56px;
+}
+.crm-panel > .crm-bulk {
+  position: absolute;
+  inset-block-start: 8px;
+  inset-inline-end: 12px;
+  margin: 0;
+  z-index: 2;
+}
