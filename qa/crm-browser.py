@@ -1,6 +1,7 @@
 """Browser regression checks with mock identity/API, never production credentials."""
 import json
 import os
+import re
 from urllib.parse import urlsplit
 from pathlib import Path
 from playwright.sync_api import sync_playwright, expect
@@ -69,10 +70,10 @@ with sync_playwright() as pw:
                         'id':f'{n:08d}-1111-4111-8111-111111111111',
                         'status':'VISIBLE',
                         'authorName':'Ana Torres',
-                        'body':f'Publicación de prueba {n}',
+                        'body':f'Publicaci\u00f3n de prueba {n}',
                         'animalTitle':'Luna' if n==1 else None,
                         'createdAt':'2026-10-24T10:00:00Z',
-                        'topic':'adopción',
+                        'topic':'adopci\u00f3n',
                         'imageUrl':None,
                     } for n in range(start,26 if start==21 else 21)]
                     data={'posts':posts,'nextCursor':'mock-cursor' if start==1 else None}
@@ -85,7 +86,7 @@ with sync_playwright() as pw:
                         'reportedContent':[],'canReviewReports':True,'conversationsRestricted':True,
                     }
                 elif url.endswith('/users/posts') and state.get('user_fixture'):
-                    data={'posts':[{'id':'12345678-1111-4111-8111-111111111111','body':'Historia de adopción','topic':'Adopción','createdAt':'2026-10-24T10:00:00Z'}], 'nextCursor':None}
+                    data={'posts':[{'id':'12345678-1111-4111-8111-111111111111','body':'Historia de adopci\u00f3n','topic':'Adopci\u00f3n','createdAt':'2026-10-24T10:00:00Z'}], 'nextCursor':None}
                 elif url.endswith('/users/list') and state.get('user_fixture'):
                     index=21 if body.get('cursor') else 1
                     values=[{
@@ -140,16 +141,13 @@ with sync_playwright() as pw:
         assert not errors,errors
         context.close()
         results.append(mode+' full navigation: '+', '.join(sections))
-    # Filtros, orden y paginación deben actualizar filas sin remontar el resto del CRM.
+    # Filters, order and pagination update rows without rebuilding the CRM.
     context,page,state,errors=session('control')
     state['user_fixture']=True
     begin(page);finish(page)
     page.locator('.crm-nav-btn[data-section="usuarios"]').click()
-    page.wait_for_timeout(450)
-    if page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]').count()==0:
-        print('DEBUG USERS:',json.dumps({'requests':state['requests'][-6:],'errors':errors,'text':page.locator('#crm-root').inner_text()[-3000:]},ensure_ascii=True))
     expect(page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]')).to_have_count(20)
-    # Profile-image E2E: populated, missing and invalid photos, styling, selection,
+    # Profile-image E2E: populated, missing and invalid photos, styling,
     # updated URL after server refresh, and stable navigation/toolbar DOM.
     avatar_rows=page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]')
     avatar=avatar_rows.first.locator('.crm-list-user-avatar')
@@ -158,34 +156,45 @@ with sync_playwright() as pw:
       const img=document.querySelector('.crm-list-user-avatar');
       return img && img.complete && img.naturalWidth > 0;
     }""")
-    assert page.evaluate("""() => {
-      const img=document.querySelector('.crm-list-user-avatar');
-      const style=getComputedStyle(img);
-      return style.borderRadius==='50%' && style.boxShadow!=='none' &&
-        img.previousElementSibling?.type==='checkbox';
-    }""")
-    import re
+    expect(avatar).to_have_css('border-radius', '50%')
+    expect(avatar).not_to_have_css('box-shadow', 'none')
+    assert avatar.evaluate("img => img.previousElementSibling?.type === 'checkbox'"), 'Avatar must follow the row selector'
     expect(avatar_rows.nth(1).locator('.crm-list-user-avatar')).to_have_attribute('src', re.compile(r'avatar_anonymous\.png$'))
     expect(avatar_rows.nth(2).locator('.crm-list-user-avatar')).to_have_attribute('src', re.compile(r'avatar_anonymous\.png$'))
     assert page.locator('.crm-query-popover').is_hidden()
-    page.get_by_role('button',name='Cargar 20 más').click()
+    page.get_by_role('button',name='Cargar 20 m\u00e1s').click()
     expect(page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]')).to_have_count(25)
     page.get_by_role('button',name='Filtros (0)').click()
     page.get_by_label('Activo',exact=True).check()
     expect(page.locator('.crm-query-chip')).to_contain_text(['Estado: Activo','Orden:'])
     expect(page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]')).to_have_count(20)
     assert any(item[1].get('filters',{}).get('statuses')==['ACTIVE'] for item in state['requests'] if item[0].endswith('/users/list'))
+    # Change the server fixture BEFORE requesting fresh rows. Do not weaken the
+    # version-2 assertion to version 1: list and detail must both observe a change.
+    page.evaluate("""() => {
+      window.__userAvatarNodes={nav:document.querySelector('.crm-nav'),
+        toolbar:document.querySelector('.crm-tools')};
+    }""")
+    state['avatar_version']=2
     page.get_by_role('button',name='Orden (1)').click()
     page.get_by_role('button',name='+ Nombre').click()
+    expect(avatar_rows.first.locator('.crm-list-user-avatar')).to_have_attribute('src','/test-avatar/2')
     assert any(len(item[1].get('orders',[]))==2 for item in state['requests'] if item[0].endswith('/users/list'))
+    assert page.evaluate("""() => {
+      const s=window.__userAvatarNodes;
+      return s.nav===document.querySelector('.crm-nav') &&
+        s.toolbar===document.querySelector('.crm-tools');
+    }"""), 'Avatar updates must not rebuild navigation or toolbar'
     page.locator('.crm-nav-btn[data-section="publicaciones"]').click()
     page.locator('.crm-nav-btn[data-section="usuarios"]').click()
     expect(page.locator('.crm-query-chip')).to_contain_text(['Estado: Activo','Orden:'])
+    expect(avatar_rows.first.locator('.crm-list-user-avatar')).to_have_attribute('src','/test-avatar/2')
     page.get_by_role('button',name='Ver usuario').first.click()
     expect(page.locator('.crm-dialog')).to_contain_text('Usuario de prueba')
     expect(page.locator('.crm-profile-hero')).to_be_visible()
+    expect(page.locator('.crm-profile-avatar')).to_have_attribute('src','/test-avatar/2')
     page.get_by_role('tab',name='Publicaciones').click()
-    expect(page.locator('.crm-profile-content')).to_contain_text('Historia de adopción')
+    expect(page.locator('.crm-profile-content')).to_contain_text('Historia de adopci\u00f3n')
     page.get_by_role('tab',name='Chats denunciados').click()
     expect(page.locator('.crm-profile-content')).to_contain_text('El CRM no permite explorar mensajes privados')
     page.get_by_role('tab',name='Resumen').click()
@@ -198,7 +207,7 @@ with sync_playwright() as pw:
     page.locator('.crm-dialog').get_by_role('button',name='Cerrar').click()
     assert not errors,errors
     context.close()
-    results.append('Users list: 20+5, filter/order, preserved state and safe read-only detail')
+    results.append('Users list: 20+5, filter/order, preserved state and safe read-only detail; avatar v1 -> v2')
 
     context,page,state,errors=session('control')
     state['post_fixture']=True
@@ -207,7 +216,7 @@ with sync_playwright() as pw:
     table_rows=page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]')
     expect(table_rows).to_have_count(20)
     expect(table_rows.first).to_contain_text('Luna')
-    expect(table_rows.first).to_contain_text('Publicación de prueba 1')
+    expect(table_rows.first).to_contain_text('Publicaci\u00f3n de prueba 1')
     page.evaluate("""() => {
       window.__layoutSnapshot = {
         nav: document.querySelector('.crm-nav'),
@@ -217,22 +226,22 @@ with sync_playwright() as pw:
         row: document.querySelector('tr[data-post]')
       };
     }""")
-    page.get_by_role('button',name='Cargar 20 más').click()
+    page.get_by_role('button',name='Cargar 20 m\u00e1s').click()
     expect(table_rows).to_have_count(25)
     assert page.evaluate("""() =>
       window.__layoutSnapshot.nav === document.querySelector('.crm-nav') &&
       window.__layoutSnapshot.toolbar === document.querySelector('.crm-tools') &&
       window.__layoutSnapshot.table === document.querySelector('.crm-table-wrap:not([hidden]) table') &&
       window.__layoutSnapshot.row === document.querySelector('tr[data-post]')""")
-    page.get_by_role('button',name='Autor ↕').click()
+    page.get_by_role('button',name='Autor \u2195').click()
     expect(table_rows).to_have_count(20)
     assert page.evaluate("""() =>
       window.__layoutSnapshot.row === document.querySelector('tr[data-post]') &&
       window.__layoutSnapshot.search === document.querySelector('.crm-field-search input')""")
     page.get_by_role('button',name='Filtros (0)').click()
-    page.get_by_label('Tema de la publicación').fill('adopción')
+    page.get_by_label('Tema de la publicaci\u00f3n').fill('adopci\u00f3n')
     page.get_by_role('button',name='Agregar',exact=True).first.click()
-    expect(page.locator('.crm-query-chip')).to_contain_text(['Tema: adopción','Orden:'])
+    expect(page.locator('.crm-query-chip')).to_contain_text(['Tema: adopci\u00f3n','Orden:'])
     expect(table_rows).to_have_count(20)
     assert page.evaluate("""() =>
       window.__layoutSnapshot.nav === document.querySelector('.crm-nav') &&
@@ -259,8 +268,8 @@ with sync_playwright() as pw:
     # the first sign-in factor again, and the old resolver must be discarded.
     expect(page.locator('#crm-mfa')).to_be_hidden()
     expect(page.locator('#crm-login')).to_be_visible()
-    expect(page.locator('#crm-status')).to_contain_text('venció')
-    expect(page.locator('#crm-status')).to_contain_text('código puede ser correcto')
+    expect(page.locator('#crm-status')).to_contain_text('venci\u00f3')
+    expect(page.locator('#crm-status')).to_contain_text('c\u00f3digo puede ser correcto')
     expect(page.locator('#crm-root')).to_be_empty()
     # Same identity can authenticate with a newly issued challenge.
     begin(page);finish(page)
@@ -288,9 +297,9 @@ with sync_playwright() as pw:
         expect(page.locator('#crm-onboarding')).to_be_visible()
         expect(page.locator('#crm-root')).to_be_empty()
         assert state['requests'] and all(path.endswith('/access') for path,_ in state['requests']),state['requests']
-        page.get_by_role('button',name='Configurar aplicación autenticadora').click()
-        expect(page.get_by_label('Código del autenticador')).to_be_visible()
-        page.get_by_label('Código del autenticador').fill('123456')
+        page.get_by_role('button',name='Configurar aplicaci\u00f3n autenticadora').click()
+        expect(page.get_by_label('C\u00f3digo del autenticador')).to_be_visible()
+        page.get_by_label('C\u00f3digo del autenticador').fill('123456')
         page.get_by_role('button',name='Confirmar segundo factor').click()
         expect(page.locator('#crm-login')).to_be_visible()
         expect(page.locator('#crm-onboarding')).to_be_hidden()
@@ -321,7 +330,7 @@ with sync_playwright() as pw:
         expect(eye).to_be_visible()
         eye.click()
         expect(password).to_have_attribute('type','text')
-        expect(eye).to_have_attribute('aria-label','Ocultar contraseña')
+        expect(eye).to_have_attribute('aria-label','Ocultar contrase\u00f1a')
         eye.click()
         expect(password).to_have_attribute('type','password')
         assert not errors,errors
@@ -360,9 +369,9 @@ with sync_playwright() as pw:
     expect(page.get_by_role('button',name='Ingresar',exact=True)).to_be_visible()
     expect(page.get_by_role('button',name='Continuar con Google')).to_be_visible()
     expect(page.locator('#crm-onboarding')).to_be_hidden()
-    expect(page.get_by_role('button',name='Cerrar sesión')).to_be_hidden()
+    expect(page.get_by_role('button',name='Cerrar sesi\u00f3n')).to_be_hidden()
     expect(page.locator('#crm-status')).not_to_contain_text('Renovar el token')
-    expect(page.locator('#crm-status')).not_to_contain_text('Cerrá sesión')
+    expect(page.locator('#crm-status')).not_to_contain_text('Cerr\u00e1 sesi\u00f3n')
     expect(page.locator('#crm-root')).to_be_empty()
     assert not errors,errors
     context.close()
@@ -377,10 +386,10 @@ with sync_playwright() as pw:
     snippet=source[start:stop]
     page.evaluate('() => { '+snippet+' enablePasswordVisibility(document.getElementById("auth-root")); }')
     eye=page.locator('#auth-root .auth-password-toggle')
-    expect(eye).to_have_attribute('aria-label','Mostrar contraseña')
+    expect(eye).to_have_attribute('aria-label','Mostrar contrase\u00f1a')
     eye.click()
     expect(page.locator('#public-secret')).to_have_attribute('type','text')
-    expect(eye).to_have_attribute('aria-label','Ocultar contraseña')
+    expect(eye).to_have_attribute('aria-label','Ocultar contrase\u00f1a')
     eye.click()
     expect(page.locator('#public-secret')).to_have_attribute('type','password')
     context.close()
