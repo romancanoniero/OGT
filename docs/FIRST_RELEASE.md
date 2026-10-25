@@ -180,3 +180,12 @@ permite abrir conversaciones hasta que exista denuncia autenticada de uno
 de sus participantes asociada a un expediente y auditada.
 `docs/DATA_VIEWS_STANDARD.md` v1.1 establece el patrón obligatorio de
 selección, acciones sensibles y eliminación lógica con justificación.
+
+## Corrección del release de Usuarios (25/10/2026)
+
+El primer intento de deploy del perfil integral `a8eccb42` falló
+durante :backend:compileKotlin por una referencia incorrecta
+al parser de cursores. El PR #56, integrado en `c22ca87794e915c9d20667e4c357f62ee40f1847`,
+corrige el símbolo y mantiene los controles de seguridad.
+La publicación debe verificar el nuevo commit exacto en Contabo;
+no considerar instalada la versión fallida.
