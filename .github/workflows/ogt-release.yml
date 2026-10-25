@@ -34,7 +34,7 @@ jobs:
       - name: Source checks; no server access
         run: bash scripts/deploy-ogt-vps.sh --check
       - name: Shell syntax
-        run: bash -n scripts/deploy-ogt-vps.sh scripts/activate-ogt-release.sh
+        run: bash -n scripts/deploy-ogt-vps.sh scripts/activate-ogt-release.sh scripts/ogt-ios-wifi.sh
   browser:
     needs: checks
     runs-on: ubuntu-latest
