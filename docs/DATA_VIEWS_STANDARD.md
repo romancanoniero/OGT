@@ -94,3 +94,14 @@ Antes de integrar: (1) prueba unitaria de parsers, whitelists, cursores y semán
 ## 11. Mantenimiento del estándar
 
 Al introducir un nuevo tipo de pantalla, proponer su **ficha específica** y revisar con producto cualquier interacción nueva antes de replicarla. Los patrones comunes deben ser parametrizables y probados una vez en el componente compartido; evitar bifurcaciones visuales sin razón. Conservar las excepciones documentadas con fecha y responsables.
+
+
+## 12. Paridad entre publicaciones web, Android, iOS y CRM (25/10/2026)
+
+**Regla:** todos los canales públicos y el CRM consultan las mismas publicaciones persistidas en `social_posts` con `moderation_status = 'VISIBLE'`. No se asume que los primeros 20 registros sean el total: el CRM muestra 20 por lote y continúa con keyset; la búsqueda recorre el conjunto entero en base de datos. Las fichas abiertas de animales `animal_listings` se asocian al post mediante `listing_id` y solo deben mostrarse al público si la publicación vinculada existe y es VISIBLE. La sección de Mascotas, la portada web y los clientes nativos no pueden resucitar un post moderado mediante un segundo origen.
+
+**Ficha de adopción:** el nombre y título que muestra la app se obtienen de `animal_listings.pet_name/title`. El CRM muestra ese título junto con el cuerpo y su índice de búsqueda contiene ambos valores, con actualización al editar y backfill de posts históricos (migración 27). El índice solo incluye publicaciones visibles.
+
+**Límite importante:** publicaciones locales sin sincronizar, borradores y datos de demostración empaquetados dentro de la app no cuentan como publicaciones públicas hasta estar confirmados por el backend. Una publicación pública real debe poder identificarse por el mismo UUID de `social_posts` desde cualquier cliente y encontrarse en el CRM mediante su nombre, título o ID.
+
+**Aceptación:** buscar una adopción publicada hace semanas (por ejemplo `Luna`) debe encontrarla sin cargar previamente decenas de páginas; abrirla debe mostrar nombre, autor, fecha, foto y texto. La ocultación/moderación debe quitarla de ambas experiencias públicas y del listado de visibles en el CRM.
