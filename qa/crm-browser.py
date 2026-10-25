@@ -70,6 +70,17 @@ with sync_playwright() as pw:
                         'imageUrl':None,
                     } for n in range(start,26 if start==21 else 21)]
                     data={'posts':posts,'nextCursor':'mock-cursor' if start==1 else None}
+                elif url.endswith('/users/list') and state.get('user_fixture'):
+                    index=21 if body.get('cursor') else 1
+                    values=[{
+                        'id':f'{n:08d}-1111-4111-8111-111111111111',
+                        'displayName':f'Usuario de prueba {n:02d}',
+                        'status':'ACTIVE' if n%2 else 'SUSPENDED',
+                        'role':'USER' if n%3 else 'COMMUNITY_MODERATOR',
+                        'createdAt':'2026-10-24T12:00:00Z',
+                        'lastSeenAt':None,
+                    } for n in range(index,26 if index==21 else 21)]
+                    data={'users':values,'nextCursor':'users-fixture-cursor' if index==1 else None}
                 elif url.endswith('/company/summary'):
                     cid=body['companyId']
                     data={'companyId': B if state['mismatch'] else cid,'tradeName':'Empresa Uno' if cid==A else 'Empresa Dos','verificationStatus':'VERIFIED','campaigns':2,'activeCampaigns':1,'issuedCoupons':3,'balanceCents':0,'impactScore':10}
@@ -113,6 +124,35 @@ with sync_playwright() as pw:
         context.close()
         results.append(mode+' full navigation: '+', '.join(sections))
     # Filtros, orden y paginación deben actualizar filas sin remontar el resto del CRM.
+    context,page,state,errors=session('control')
+    state['user_fixture']=True
+    begin(page);finish(page)
+    page.locator('.crm-nav-btn[data-section="usuarios"]').click()
+    expect(page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]')).to_have_count(20)
+    assert state['requests'][-1][0].endswith('/users/list')
+    assert page.locator('.crm-query-popover').is_hidden()
+    page.get_by_role('button',name='Cargar 20 más').click()
+    expect(page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]')).to_have_count(25)
+    page.get_by_role('button',name='Filtros (0)').click()
+    page.get_by_label('Activo',exact=True).check()
+    expect(page.locator('.crm-query-chip')).to_contain_text(['Estado: Activo','Orden:'])
+    expect(page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]')).to_have_count(20)
+    assert any(item[1].get('filters',{}).get('statuses')==['ACTIVE'] for item in state['requests'] if item[0].endswith('/users/list'))
+    page.get_by_role('button',name='Orden (1)').click()
+    page.get_by_role('button',name='+ Nombre').click()
+    assert any(len(item[1].get('orders',[]))==2 for item in state['requests'] if item[0].endswith('/users/list'))
+    page.locator('.crm-nav-btn[data-section="publicaciones"]').click()
+    page.locator('.crm-nav-btn[data-section="usuarios"]').click()
+    expect(page.locator('.crm-query-chip')).to_contain_text(['Estado: Activo','Orden:'])
+    page.get_by_role('button',name='Ver usuario').first.click()
+    expect(page.locator('.crm-dialog')).to_contain_text('Usuario de prueba')
+    assert page.locator('.crm-dialog').get_by_role('button',name='Confirmar quita').count()==0
+    assert page.locator('.crm-dialog').get_by_role('button',name='Quitar').count()==0
+    page.locator('.crm-dialog').get_by_role('button',name='Cerrar').click()
+    assert not errors,errors
+    context.close()
+    results.append('Users list: 20+5, filter/order, preserved state and safe read-only detail')
+
     context,page,state,errors=session('control')
     state['post_fixture']=True
     begin(page);finish(page)
