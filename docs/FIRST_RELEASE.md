@@ -122,3 +122,17 @@ La versión integrada antes de activar el release fue
 `b6e19a44fdbe34ec33027395cc8c65221a831d51`.
 El commit de release debe superar código, QA de navegador, compilación de backend,
 respaldo y verificación de revisión exacta en la instalación existente de Contabo.
+
+
+## Actualización parcial del listado de Control (25/10/2026)
+
+Integrado en main: `e3e4639533597b558695d52937107de9c8bda484`.
+El refresco de publicaciones ya no desmonta la barra de búsqueda, filtros y
+orden. Reconcilia filas por identificador, conserva las filas sin modificaciones
+y la posición horizontal mientras cambia la búsqueda, el orden o un filtro.
+Mantiene los resultados previos visibles durante la solicitud y evita saltos
+de pantalla al cargar lotes adicionales. El workflow de navegador comprueba la
+identidad de los nodos entre actualizaciones con una API simulada.
+
+Este commit de release incluye ese cambio y debe verificarse por su SHA instalado
+en Contabo; una ejecución verde de checks aislados no implica despliegue.
