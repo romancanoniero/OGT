@@ -110,3 +110,15 @@ la publicación integral de web, backend y CRM en la instalación existente.
 La publicación se considera confirmada solamente si el job `publish` verifica en Contabo
 el SHA exacto de la compilación y un backend saludable; los checks aislados no la prueban.
 
+## Publicación de filtros compactos y orden acumulativo (25/10/2026)
+
+El CRM Control incluye búsqueda combinada con filtros acumulativos por tema, autor,
+presencia de fotografía y fechas, y ordenamiento por prioridades (fecha, autor y texto).
+Las opciones se presentan en paneles compactos con etiquetas que pueden quitarse
+individualmente. El backend pagina en lotes de veinte con cursor v3 ligado a todos
+los filtros y órdenes para que el orden sea estable al cargar más resultados.
+
+La versión integrada antes de activar el release fue
+`b6e19a44fdbe34ec33027395cc8c65221a831d51`.
+El commit de release debe superar código, QA de navegador, compilación de backend,
+respaldo y verificación de revisión exacta en la instalación existente de Contabo.
