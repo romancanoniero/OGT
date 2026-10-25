@@ -3,7 +3,7 @@ import { createIdentity } from './crm-auth.js?v=tacho-1';
 
 const controlSections = [
   { id: 'resumen', label: 'Resumen', icon: 'qs_feed.svg', keys: null },
-  { id: 'usuarios', label: 'Usuarios', icon: 'qs_skills.svg', keys: ['Usuarios activos'] },
+  { id: 'usuarios', label: 'Usuarios', icon: 'qs_skills.svg', view: 'listing' },
   { id: 'empresas', label: 'Empresas', icon: 'qs_form.svg', keys: ['Empresas', 'Empresas por verificar'] },
   { id: 'denuncias', label: 'Denuncias', icon: 'qs_notifications.svg', keys: ['Denuncias pendientes'] },
   { id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote.svg', view: 'listing' },
@@ -130,7 +130,7 @@ export async function start() {
   fields.append(factorLabel, begin, recaptcha, codeLabel, verify, cancel);
   challenge.append(fields); login.insertAdjacentElement('afterend', challenge);
   // El shell viaja en paralelo con Firebase. El ingreso no lo espera para pintar.
-  const workspaceReady = import('./crm-ui.js?v=partialrows-1');
+  const workspaceReady = import('./crm-ui.js?v=usersview-1');
   const [appSdk, sdk] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),
@@ -474,8 +474,60 @@ export async function start() {
           },
         } : {}),
       };
+      const userStatus = { ACTIVE: 'Activo', PENDING: 'Pendiente', SUSPENDED: 'Suspendido', DELETED: 'Eliminado' };
+      const userRole = { USER: 'Usuario', COMPANY_ADMIN: 'Empresa', COMMUNITY_MODERATOR: 'Moderador' };
+      const userListing = {
+        advanced: true,
+        readOnly: true,
+        noun: 'usuarios',
+        filterType: 'users',
+        defaultFilters: { statuses: [], roles: [], from: '', to: '' },
+        orderLabels: { createdAt: 'Alta', name: 'Nombre', status: 'Estado', role: 'Rol', lastSeenAt: 'Actividad' },
+        maxOrders: 4,
+        placeholder: 'Buscar usuario por nombre o ID',
+        searchLabel: 'Buscar usuario',
+        mark: false,
+        columns: ['Nombre', 'Estado', 'Rol', 'Alta', 'Última actividad', 'Acción'],
+        sortable: { Nombre: 'name', Estado: 'status', Rol: 'role', Alta: 'createdAt', 'Última actividad': 'lastSeenAt' },
+        emptyTitle: 'Sin usuarios',
+        emptyDetail: 'No se encontraron usuarios con estos criterios.',
+        async load(query, cursor, orders, filters) {
+          const body = { query, orders, filters };
+          if (cursor) body.cursor = cursor;
+          const data = await api('platform/users/list', token, body, task.signal);
+          return {
+            items: Array.isArray(data.users) ? data.users.filter(u => u && typeof u.id === 'string' && u.id) : [],
+            nextCursor: data.nextCursor || null,
+            suggestions: null,
+          };
+        },
+        present(user) {
+          if (!user || !user.id) return { hidden: true };
+          const state = userStatus[user.status] || user.status || 'No informado';
+          const role = userRole[user.role] || user.role || 'No informado';
+          const last = user.lastSeenAt ? formatWhen(user.lastSeenAt) : 'Sin actividad registrada';
+          const created = formatWhen(user.createdAt);
+          return {
+            key: user.id,
+            mark: false,
+            cells: [
+              { text: user.displayName || 'Sin nombre' },
+              { badge: state, tone: user.status === 'ACTIVE' ? 'calm' : 'neutral' },
+              { text: role },
+              { text: created },
+              { text: last },
+            ],
+            actions: [{ icon: 'qs_eye.svg', label: 'Ver usuario', name: 'view' }],
+            detail: {
+              title: user.displayName || 'Sin nombre',
+              meta: state + ' · ' + role,
+              body: 'Alta: ' + created + ' · Última actividad: ' + last,
+            },
+          };
+        },
+      };
       const sections = (mode === 'control' ? controlSections : empresaSections).map(section =>
-        section.view === 'listing' ? { ...section, listing: postListing } : section
+        section.view === 'listing' ? { ...section, listing: section.id === 'usuarios' ? userListing : postListing } : section
       );
       if (typeof desk?.dispose === 'function') desk.dispose();
       desk = null;
