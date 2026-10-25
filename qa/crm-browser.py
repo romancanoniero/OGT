@@ -71,6 +71,16 @@ with sync_playwright() as pw:
                         'imageUrl':None,
                     } for n in range(start,26 if start==21 else 21)]
                     data={'posts':posts,'nextCursor':'mock-cursor' if start==1 else None}
+                elif url.endswith('/users/detail') and state.get('user_fixture'):
+                    data={
+                        'id':body['userId'],'displayName':'Usuario de prueba 01',
+                        'photoUrl':None,'status':'ACTIVE','role':'USER',
+                        'createdAt':'2026-10-24T12:00:00Z','lastSeenAt':None,
+                        'communityPoints':7,'visiblePostCount':2,'receivedReportCount':0,
+                        'reportedContent':[],'canReviewReports':True,'conversationsRestricted':True,
+                    }
+                elif url.endswith('/users/posts') and state.get('user_fixture'):
+                    data={'posts':[{'id':'12345678-1111-4111-8111-111111111111','body':'Historia de adopción','topic':'Adopción','createdAt':'2026-10-24T10:00:00Z'}], 'nextCursor':None}
                 elif url.endswith('/users/list') and state.get('user_fixture'):
                     index=21 if body.get('cursor') else 1
                     values=[{
@@ -150,6 +160,12 @@ with sync_playwright() as pw:
     expect(page.locator('.crm-query-chip')).to_contain_text(['Estado: Activo','Orden:'])
     page.get_by_role('button',name='Ver usuario').first.click()
     expect(page.locator('.crm-dialog')).to_contain_text('Usuario de prueba')
+    expect(page.locator('.crm-profile-hero')).to_be_visible()
+    page.get_by_role('tab',name='Publicaciones').click()
+    expect(page.locator('.crm-profile-content')).to_contain_text('Historia de adopción')
+    page.get_by_role('tab',name='Chats denunciados').click()
+    expect(page.locator('.crm-profile-content')).to_contain_text('El CRM no permite explorar mensajes privados')
+    page.get_by_role('tab',name='Resumen').click()
     assert page.locator('.crm-dialog').get_by_role('button',name='Confirmar quita').count()==0
     assert page.locator('.crm-dialog').get_by_role('button',name='Quitar').count()==0
     page.locator('.crm-dialog').get_by_role('button',name='Cerrar').click()

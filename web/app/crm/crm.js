@@ -1,4 +1,4 @@
-import { start } from './crm-runtime.js?v=feedparity-1';
+import { start } from './crm-runtime.js?v=userprofile-1';
 
 start().catch(() => {
   document.body.dataset.crmView = 'auth';

@@ -1,5 +1,5 @@
 # OGT — Estándar obligatorio de pantallas de datos
-**Versión 1.0 · 25/10/2026 · Ámbito: OGT Control y OGT Empresas**
+**Versión 1.1 · 25/10/2026 · Ámbito: OGT Control y OGT Empresas**
 
 Este documento define el patrón de cualquier pantalla que presente registros, tablas, listas de tarjetas, búsquedas, informes o resultados con acciones. Es un **contrato de producto, UX, acceso, frontend, backend y pruebas**. Toda pantalla nueva o modificada debe cumplirlo o registrar una excepción técnica justificada. No reemplaza `design/stitch/DESIGN.md` (identidad visual) ni `docs/CRM_ARCHITECTURE_20261021.md` (autorización/seguridad); los complementa.
 
@@ -87,9 +87,9 @@ Antes de integrar: (1) prueba unitaria de parsers, whitelists, cursores y semán
 - **Permisos:** OWNER, OPERATIONS, SUPPORT y TRUST_SAFETY de OGT Control. Otras funciones y empresas no autorizadas: 403.
 - **Datos del listado:** nombre visible, estado, rol, fecha de registro, última actividad e ID interno en ficha de lectura. No email/teléfono/Firebase UID.
 - **Búsqueda:** nombre visible o UUID exacto. **Filtros:** estados múltiples (PENDING, ACTIVE, SUSPENDED, DELETED); roles múltiples (USER, COMPANY_ADMIN, COMMUNITY_MODERATOR); fecha de alta desde/hasta. **Órdenes:** fecha de alta, nombre, estado, rol, última actividad; hasta cuatro prioridades. Desempate por ID.
-- **Lista y detalle:** 20 por página, carga incremental, panel de filtros/orden compacto, chips removibles, visualización en diálogo read-only, sin botones de suspensión/borrado/exportación hasta definir autorización/auditoría.
+- **Lista y detalle:** 20 por página, carga incremental, panel compacto de filtros/orden, chips removibles, casillas de selección y ficha a pantalla completa con foto, identidad, alta, última actividad, publicaciones paginadas, puntos y denuncias de contenido restringidas. Las conversaciones privadas no se consultan libremente.
 - **Actualización:** resultados y encabezado únicamente, con conservación del estado por sección.
-- **Fuera de alcance v1:** edición, bloqueo/reactivación, exportación masiva, perfiles privados, búsqueda por datos de contacto e historial de auditoría; requieren definición de privilegios y flujo seguro.
+- **Fuera de alcance v1.1:** edición, bloqueo/reactivación, exportación masiva, exploración general de chats, búsqueda por datos de contacto y eliminación física de cuentas. Exigen privilegios, motivo y un flujo seguro. La lectura del perfil ya queda auditada.
 
 ## 11. Mantenimiento del estándar
 
@@ -105,3 +105,29 @@ Al introducir un nuevo tipo de pantalla, proponer su **ficha específica** y rev
 **Límite importante:** publicaciones locales sin sincronizar, borradores y datos de demostración empaquetados dentro de la app no cuentan como publicaciones públicas hasta estar confirmados por el backend. Una publicación pública real debe poder identificarse por el mismo UUID de `social_posts` desde cualquier cliente y encontrarse en el CRM mediante su nombre, título o ID.
 
 **Aceptación:** buscar una adopción publicada hace semanas (por ejemplo `Luna`) debe encontrarla sin cargar previamente decenas de páginas; abrirla debe mostrar nombre, autor, fecha, foto y texto. La ocultación/moderación debe quitarla de ambas experiencias públicas y del listado de visibles en el CRM.
+
+
+## 13. Selección múltiple, eliminación y acciones administrativas (norma reforzada)
+
+1. **Toda pantalla de datos que admita acciones por registro debe permitir selección individual**, selección/deselección de la página visible y estado visual inequívoco. Los registros seleccionados se identifican por ID, no por índice de fila.
+2. **La barra de acciones por lote aparece solo con elementos seleccionados**. Informa cantidad y alcance (página cargada frente a todos los resultados). La selección debe conservarse durante actualizaciones parciales, pero no aplicarse implícitamente a otros usuarios, tenants o consultas.
+3. **La papelera se muestra únicamente si la entidad admite eliminación y el rol está autorizado por backend**. No es obligatorio ni apropiado mostrar una papelera de eliminación física sobre todas las entidades. La `×` de los filtros nunca borra registros.
+4. **Eliminación lógica preferente:** publicaciones pasan a REMOVED; cuentas pasan por procedimientos de suspensión, cierre y eventual anonimización con retención legal, no `DELETE FROM users` arbitrario. Si hay dependencia con pagos, denuncias o mensajes se preservan integridad y pruebas.
+5. **Acción sensible:** requiere motivo, confirmación con número de registros, MFA reciente, autorización de rol en servidor, auditoría de actor/objetivo/motivo/resultado, protección frente a duplicados y, según impacto, segunda aprobación. Toda operación debe mostrar éxito parcial/error sin perder selección.
+6. **Usuarios:** selección múltiple habilitada para revisión, sin acción de borrado físico. La suspensión/cierre masivo se mantiene deshabilitada hasta una política explícita de aprobación y retención. No disfrazar la revisión como papelera.
+7. **Un registro tiene ficha amplia** cuando sus datos son multisección o necesitan contexto para moderación. En esos casos la ficha ocupa pantalla completa o panel navegable, no un modal de un renglón.
+
+## 14. Ficha de usuario — permisos y privacidad
+
+La ficha desde `OGT Control → Usuarios` está organizada en **Resumen, Publicaciones, Denuncias y Chats denunciados**, en formato de pantalla completa adaptable.
+
+| Sección | Datos y visibilidad |
+|---|---|
+| Resumen | Foto pública, nombre, rol, estado, puntos, ID interno, alta y última actividad para roles operativos autorizados |
+| Publicaciones | Publicaciones VISIBLE del mismo backend público y medios asociados; consulta por páginas de 20, sin inspeccionar borradores ni mensajes |
+| Denuncias de contenido | Solo OWNER y TRUST_SAFETY ven casos de `content_reports` referidos a publicaciones/comentarios del usuario; mínimo de datos y eventos de auditoría |
+| Chats denunciados | **Bloqueado por defecto.** Solo se podrá abrir la conversación exacta cuando un participante haya presentado una denuncia autenticada que vincule su ID al chat y exista un expediente válido con alcance y auditoría |
+
+**Condiciones para habilitar evidencia de chat** (no están cumplidas con el actual `content_reports`): la app debe permitir «Denunciar conversación» desde un chat concreto; el backend debe verificar que quien denuncia participa en ese chat; almacenar un expediente inmutable con `match_id`, denunciante, denunciado, causa, fecha y rango de mensajes permitido; el visor debe verificar OWNER/TRUST_SAFETY, MFA reciente, que el expediente siga abierto y registrar cada lectura. Jamás ofrecer «Ver todos los chats de este usuario». Evitar captura masiva o mensajes fuera de los límites del expediente. Sin ese vínculo, mostrar únicamente la restricción sin exponer mensajes.
+
+La tarjeta de usuario no muestra correo, teléfono, UID de Firebase, ubicación ni conversaciones privadas por defecto. Las consultas del perfil quedan en `crm_audit_events`. No debe mostrarse una «eliminación» de cuentas que el servidor no admita explícitamente.

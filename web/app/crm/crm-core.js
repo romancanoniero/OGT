@@ -4,7 +4,7 @@ export class CrmError extends Error {
     super(message); this.name = 'CrmError'; this.code = code; this.status = status;
   }
 }
-const routes = new Set(['access', 'platform/summary', 'company/summary', 'platform/posts/search', 'platform/posts/detail', 'platform/posts/remove', 'platform/posts/comments/remove', 'platform/posts/anecdotes/remove', 'platform/users/search', 'platform/users/list', 'platform/posts/reassign', 'platform/posts/frame']);
+const routes = new Set(['access', 'platform/summary', 'company/summary', 'platform/posts/search', 'platform/posts/detail', 'platform/posts/remove', 'platform/posts/comments/remove', 'platform/posts/anecdotes/remove', 'platform/users/search', 'platform/users/list', 'platform/users/detail', 'platform/users/posts', 'platform/posts/reassign', 'platform/posts/frame']);
 const staffRoles = new Set(['OWNER','OPERATIONS','TRUST_SAFETY','FINANCE','SUPPORT','ANALYST']);
 const companyRoles = new Set(['OWNER','ADMIN','CAMPAIGN_MANAGER','FINANCE','ANALYST','VIEWER']);
 /** La ventana ya venció y el segundo factor está registrado: hay que ingresar de nuevo. */

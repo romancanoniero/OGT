@@ -1130,7 +1130,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   function paintBulk(listing) {
     // El patrón del listado: la acción solo está con una selección. Sin texto; el nombre va en el hint.
     bulkBar.replaceChildren();
-    const action = listing?.bulk;
+    const action = listing?.bulkReview || listing?.bulk;
     const keys = action
       ? listItems.map(item => listing.present(item)?.key).filter(key => key && picked.has(key))
       : [];
@@ -1140,7 +1140,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     }
     bulkBar.hidden = false;
     const button = iconButton(action.icon, action.label);
-    button.addEventListener('click', () => openBulk(listing));
+    button.addEventListener('click', () => listing.bulkReview ? openUserSelection(listing) : openBulk(listing));
     bulkBar.append(button);
   }
   function reasonField(card) {
@@ -1260,9 +1260,211 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     if (!sheet.open) sheet.showModal();
     field.focus();
   }
+  // Una selección de usuarios es una lista de revisión. Jamás se puede convertir
+  // indirectamente en una eliminación física de cuentas.
+  function openUserSelection(listing) {
+    const candidates = listItems.filter(item => picked.has(item.id));
+    if (!candidates.length) return;
+    dialogPostId = null;
+    dialog.replaceChildren();
+    dialog.classList.add('crm-profile-dialog');
+    const head = node('header'); head.className = 'crm-profile-head';
+    const close = iconButton('qs_close.svg', 'Cerrar');
+    close.addEventListener('click', () => dialog.close());
+    head.append(node('h2', 'Usuarios seleccionados (' + candidates.length + ')'), close);
+    const description = node('p', 'Selección de la página cargada. Desde aquí podés revisar cada perfil; la eliminación o suspensión de cuentas requiere un procedimiento administrativo específico.');
+    description.className = 'crm-profile-note';
+    const list = node('div'); list.className = 'crm-profile-posts';
+    candidates.forEach(item => {
+      const btn = node('button', item.displayName || 'Sin nombre');
+      btn.type = 'button';
+      btn.className = 'crm-btn crm-btn-secondary';
+      btn.addEventListener('click', () => { void openUserProfile(listing, item); });
+      list.append(btn);
+    });
+    dialog.append(head, description, list);
+    if (!dialog.open) dialog.showModal();
+  }
+
+  /**
+   * Pantalla de perfil completa, no un cuadro de cuatro campos.
+   * Los mensajes privados NUNCA se solicitan desde aquí.
+   * Las denuncias de contenido llegan solo si el backend autoriza el rol.
+   */
+  async function openUserProfile(listing, user) {
+    const userId = user.id;
+    dialogPostId = null;
+    stopWatchingComments();
+    dialog.replaceChildren();
+    dialog.classList.add('crm-profile-dialog');
+    dialog.setAttribute('aria-label', 'Ficha completa de usuario');
+    const head = node('header'); head.className = 'crm-profile-head';
+    const back = node('span', 'OGT Control / Usuarios');
+    back.className = 'crm-profile-breadcrumb';
+    const close = iconButton('qs_close.svg', 'Cerrar');
+    close.addEventListener('click', () => dialog.close());
+    head.append(back, close);
+    const hero = node('section'); hero.className = 'crm-profile-hero';
+    const face = node('img'); face.className = 'crm-profile-avatar';
+    face.alt = 'Foto del perfil de ' + (user.displayName || 'usuario');
+    face.src = '../icons/avatar_anonymous.png';
+    face.addEventListener('error', () => { face.src = '../icons/avatar_anonymous.png'; });
+    const identity = node('div');
+    const heading = node('h2', user.displayName || 'Sin nombre');
+    const status = node('p', 'Cargando perfil…'); status.className = 'crm-profile-muted';
+    identity.append(heading, status);
+    hero.append(face, identity);
+    const stats = node('div'); stats.className = 'crm-profile-stats';
+    const tabs = node('div'); tabs.className = 'crm-profile-tabs'; tabs.setAttribute('role', 'tablist');
+    const content = node('section'); content.className = 'crm-profile-content';
+    const statusLine = node('p', 'Consultando información autorizada…');
+    statusLine.setAttribute('role', 'status'); statusLine.className = 'crm-profile-note';
+    dialog.append(head, hero, stats, tabs, content, statusLine);
+    if (!dialog.open) dialog.showModal();
+    close.focus();
+    let profile = null;
+    let posts = [];
+    let postCursor = null;
+    let postLoading = false;
+    let selected = 'resumen';
+    const time = value => value ? new Date(value).toLocaleString('es-AR') : 'Sin actividad registrada';
+    function textRow(label, value) {
+      const row = node('div'); row.className = 'crm-profile-field';
+      row.append(node('dt', label), node('dd', value == null || value === '' ? 'No informado' : String(value)));
+      return row;
+    }
+    function postCards() {
+      const host = node('div'); host.className = 'crm-profile-posts';
+      if (!posts.length) host.append(node('p', 'No hay publicaciones visibles.'));
+      posts.forEach(post => {
+        const card = node('article'); card.className = 'crm-profile-post';
+        const h = node('h3', post.topic || 'Publicación');
+        const when = node('time', time(post.createdAt)); when.className = 'crm-profile-muted';
+        const body = node('p', post.body || 'Sin texto');
+        card.append(h, when, body);
+        if (post.imageUrl && /^(https?:\/\/|\/media\/)/.test(post.imageUrl)) {
+          const img = node('img'); img.src = post.imageUrl; img.alt = 'Imagen de la publicación'; img.loading = 'lazy';
+          card.append(img);
+        }
+        const id = node('small', 'ID ' + post.id); id.className = 'crm-profile-muted';
+        card.append(id);
+        host.append(card);
+      });
+      if (postCursor) {
+        const more = node('button', 'Cargar 20 publicaciones más');
+        more.className = 'crm-btn crm-btn-secondary';
+        more.type = 'button'; more.disabled = postLoading;
+        more.addEventListener('click', async () => {
+          if (postLoading) return;
+          postLoading = true; more.disabled = true;
+          try {
+            const page = await listing.loadUserPosts(user, postCursor);
+            if (!dialog.open || selectedKey !== userId) return;
+            posts.push(...(Array.isArray(page.posts) ? page.posts : []));
+            postCursor = page.nextCursor || null;
+            renderTab('publicaciones');
+          } catch (error) {
+            more.disabled = false;
+            statusLine.textContent = error?.message || 'No se pudieron cargar más publicaciones.';
+          } finally { postLoading = false; }
+        });
+        host.append(more);
+      }
+      return host;
+    }
+    function renderTab(which) {
+      if (!profile || !dialog.open || selectedKey !== userId) return;
+      selected = which;
+      tabs.querySelectorAll('button').forEach(btn => {
+        const active = btn.dataset.tab === which;
+        btn.setAttribute('aria-selected', String(active));
+        btn.tabIndex = active ? 0 : -1;
+      });
+      content.replaceChildren();
+      if (which === 'resumen') {
+        const title = node('h3', 'Información general');
+        const fields = node('dl'); fields.className = 'crm-profile-fields';
+        fields.append(
+          textRow('Nombre visible', profile.displayName),
+          textRow('Estado de cuenta', profile.status),
+          textRow('Rol', profile.role),
+          textRow('Alta', time(profile.createdAt)),
+          textRow('Última actividad', time(profile.lastSeenAt)),
+          textRow('ID interno', profile.id),
+        );
+        content.append(title, fields);
+      } else if (which === 'publicaciones') {
+        content.append(node('h3', 'Publicaciones visibles'), postCards());
+      } else if (which === 'denuncias') {
+        content.append(node('h3', 'Denuncias relacionadas con su contenido'));
+        if (!profile.canReviewReports) {
+          content.append(node('p', 'Solo los roles de titular de plataforma y Confianza y Seguridad pueden consultar denuncias de contenido.'));
+        } else if (!profile.reportedContent?.length) {
+          content.append(node('p', 'No hay denuncias registradas en los resultados recientes.'));
+        } else {
+          const reports = node('div'); reports.className = 'crm-profile-posts';
+          profile.reportedContent.forEach(report => {
+            const card = node('article'); card.className = 'crm-profile-post';
+            card.append(node('strong', report.reason || 'Denuncia'),
+              node('p', (report.status || 'Sin estado') + ' · ' + time(report.createdAt)),
+              node('small', 'Expediente ' + report.id));
+            reports.append(card);
+          });
+          content.append(reports);
+        }
+      } else if (which === 'chats') {
+        content.append(node('h3', 'Conversaciones denunciadas'),
+          node('p', 'El CRM no permite explorar mensajes privados. La lectura de un chat se habilitará únicamente desde un expediente formal de denuncia presentado por uno de sus participantes, para el rol autorizado, con motivo y auditoría. No existe todavía un expediente de chat enlazado a este perfil.'));
+      }
+    }
+    selectedKey = userId;
+    try {
+      const [detail, first] = await Promise.all([
+        listing.loadDetail(user), listing.loadUserPosts(user, null),
+      ]);
+      if (!dialog.open || selectedKey !== userId) return;
+      profile = detail;
+      if (!profile || profile.id !== userId) throw new Error('El servidor devolvió un perfil inválido.');
+      posts = Array.isArray(first?.posts) ? first.posts : [];
+      postCursor = first?.nextCursor || null;
+      heading.textContent = profile.displayName;
+      if (profile.photoUrl) face.src = profile.photoUrl;
+      status.textContent = profile.status + ' · ' + profile.role + ' · Alta: ' + time(profile.createdAt);
+      stats.replaceChildren();
+      const counts = [
+        [String(profile.visiblePostCount ?? 0), 'Publicaciones'],
+        [String(profile.communityPoints ?? 0), 'Puntos'],
+        [profile.canReviewReports ? String(profile.receivedReportCount ?? 0) : 'Restringido', 'Denuncias'],
+      ];
+      counts.forEach(([value, caption]) => {
+        const tile = node('div'); tile.className = 'crm-profile-stat';
+        tile.append(node('strong', value), node('span', caption)); stats.append(tile);
+      });
+      for (const [id, caption] of [['resumen','Resumen'],['publicaciones','Publicaciones'],['denuncias','Denuncias'],['chats','Chats denunciados']]) {
+        const button = node('button', caption);
+        button.type = 'button'; button.className = 'crm-profile-tab';
+        button.dataset.tab = id; button.setAttribute('role', 'tab');
+        button.addEventListener('click', () => renderTab(id));
+        tabs.append(button);
+      }
+      statusLine.remove();
+      renderTab('resumen');
+    } catch (error) {
+      if (dialog.open && selectedKey === userId) statusLine.textContent = error?.message || 'No se pudo cargar la ficha.';
+    }
+  }
+  dialog.addEventListener('close', () => {
+    dialog.classList.remove('crm-profile-dialog');
+    dialog.removeAttribute('aria-label');
+  });
+
   async function openDialog(listing, item, view, reasonFocus) {
     closeSuggest('dialog');
     const card = view.detail || {};
+    if (listing.userProfile) {
+      await openUserProfile(listing, item);
+      return;
+    }
     if (listing.readOnly) {
       stopWatchingComments();
       dialogPostId = null;
