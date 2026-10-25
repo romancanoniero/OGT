@@ -1,5 +1,11 @@
 name: OGT iOS - Simulator / TestFlight
 on:
+  # Validate simulator build once on main when this workflow changes.
+  # Sending to TestFlight remains a separate protected manual action.
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ogt-ios-qa.yml'
   workflow_dispatch:
     inputs:
       distribution:
@@ -19,7 +25,7 @@ concurrency:
 
 jobs:
   ios:
-    name: iOS ${{ inputs.distribution }} / ${{ github.sha }}
+    name: iOS ${{ github.event_name == 'workflow_dispatch' && inputs.distribution || 'simulator' }} / ${{ github.sha }}
     runs-on: macos-15
     environment: ogt-launch
     timeout-minutes: 90
@@ -27,6 +33,7 @@ jobs:
       SDK_TOKEN: ${{ secrets.OGT_SDK_READ_TOKEN || secrets.OGT_SDK_CHECKOUT_TOKEN }}
       SDK_REF: ${{ vars.OGT_SDK_REVISION || '0a881b7a15c9a7d99b77da8547aabe2dd493a8b0' }}
       IOS_TEAM_ID: WER3D825VB
+      DISTRIBUTION: ${{ github.event_name == 'workflow_dispatch' && inputs.distribution || 'simulator' }}
     steps:
       - name: Validate private SDK permission
         shell: bash
@@ -60,7 +67,7 @@ jobs:
           xcodebuild -version
           ./gradlew --version
       - name: Build iOS Simulator without signing
-        if: ${{ inputs.distribution == 'simulator' }}
+        if: ${{ env.DISTRIBUTION == 'simulator' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -75,7 +82,7 @@ jobs:
           ditto -c -k --keepParent "$APP" "$RUNNER_TEMP/OGT-iOS-Simulator.zip"
           echo 'Compilacion de simulador completada. Este ZIP NO es instalable en un iPhone fisico.' >> "$GITHUB_STEP_SUMMARY"
       - name: Upload simulator build for QA
-        if: ${{ inputs.distribution == 'simulator' }}
+        if: ${{ env.DISTRIBUTION == 'simulator' }}
         uses: actions/upload-artifact@v4
         with:
           name: OGT-iOS-Simulator-${{ github.run_number }}-${{ github.sha }}
@@ -83,7 +90,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Check Apple delivery prerequisites
-        if: ${{ inputs.distribution == 'testflight' }}
+        if: ${{ env.DISTRIBUTION == 'testflight' }}
         shell: bash
         env:
           KEY_ID: ${{ secrets.OGT_ASC_KEY_ID }}
@@ -98,7 +105,7 @@ jobs:
             test -n "${!var}" || { echo "::error::Missing $var for TestFlight signing; see docs/QA_E2E_TESTFLIGHT.md"; exit 1; }
           done
       - name: Import Apple distribution signing identities
-        if: ${{ inputs.distribution == 'testflight' }}
+        if: ${{ env.DISTRIBUTION == 'testflight' }}
         shell: bash
         env:
           CERT_B64: ${{ secrets.OGT_IOS_DISTRIBUTION_P12_B64 }}
@@ -127,7 +134,7 @@ jobs:
           cp "$RUNNER_TEMP/ogt.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
           echo "OGT_PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_ENV"
       - name: Archive signed iPhone app and export App Store IPA
-        if: ${{ inputs.distribution == 'testflight' }}
+        if: ${{ env.DISTRIBUTION == 'testflight' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -157,7 +164,7 @@ jobs:
           test -f "$RUNNER_TEMP/ogt-export/iosApp.ipa" || \
             { echo '::error::Expected iosApp.ipa in export directory'; exit 1; }
       - name: Submit signed IPA to App Store Connect
-        if: ${{ inputs.distribution == 'testflight' }}
+        if: ${{ env.DISTRIBUTION == 'testflight' }}
         shell: bash
         env:
           KEY_ID: ${{ secrets.OGT_ASC_KEY_ID }}
