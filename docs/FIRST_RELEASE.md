@@ -167,3 +167,16 @@ autenticado; contenidos exclusivamente locales no constituyen posts públicos.
 El release requiere migración, checks de código, regresión de navegador,
 compilación integral y verificación del commit exacto + backend health en
 Contabo para declararse instalado.
+
+## Ficha integral de usuarios y estándar de selección (25/10/2026)
+
+PR #55 integrado en `c716009d841e862dab62ccd9bd22c95d8cbe535c`.
+Control/Usuarios ahora tiene selección por registro y revisión por lote,
+sin eliminar cuentas por error. La ficha se abre a pantalla completa en
+desktop o móvil y muestra avatar, actividad, puntos, publicaciones reales
+paginadas y denuncias de contenido con restricción OWNER/TRUST_SAFETY.
+Las lecturas de perfil generan auditoría. La pestaña «Chats denunciados» no
+permite abrir conversaciones hasta que exista denuncia autenticada de uno
+de sus participantes asociada a un expediente y auditada.
+`docs/DATA_VIEWS_STANDARD.md` v1.1 establece el patrón obligatorio de
+selección, acciones sensibles y eliminación lógica con justificación.
