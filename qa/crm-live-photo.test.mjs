@@ -28,9 +28,9 @@ test('el aviso usa url y mediaUrls, los nombres que ya pinta la web', () => {
   assert.match(css, /aspect-ratio: 16 \/ 9/);
 });
 
-test('el feed publico no reutiliza el JavaScript del encuadre anterior', () => {
+test('el feed publico carga el JavaScript actualizado de la aplicacion', () => {
   assert.match(bootstrap, /\/ogt-sdk\.js\?v=frame-size/);
-  assert.match(bootstrap, /\/app\.js\?v=frame-size/);
+  assert.match(bootstrap, /\/app\.js\?v=baja/);
   assert.match(html, /\/bootstrap\.js\?v=frame-size/);
   assert.match(nginx, /location = \/index\.html[\s\S]*no-store/);
   assert.match(nginx, /location ~\*\s*\\\.\(css\|js\|mjs[\s\S]*?no-store/);
