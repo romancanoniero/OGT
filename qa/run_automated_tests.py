@@ -14,7 +14,7 @@ import time
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
-SUITES = ('qa/crm-browser.py', 'qa/crm-entrypoints-browser.py')
+SUITES = ('qa/crm-browser.py', 'qa/crm-entrypoints-browser.py', 'qa/crm-control-scroll-browser.py')
 
 
 def check_syntax(root: Path) -> bool:
@@ -114,7 +114,7 @@ def main() -> int:
         return 0
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
-    # Both suites run even if the first fails; the final status keeps every failure.
+    # All suites run even if an earlier one fails; the final status keeps every failure.
     results = [run_suite(ROOT, suite, output) for suite in SUITES]
     return write_report(results, output)
 
