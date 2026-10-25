@@ -1,4 +1,4 @@
-import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn, isExpiredMfaChallenge } from './crm-core.js?v=usersview-1';
+import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn, isExpiredMfaChallenge } from './crm-core.js?v=userprofile-1';
 import { createIdentity } from './crm-auth.js?v=tacho-1';
 
 const controlSections = [
@@ -479,6 +479,8 @@ export async function start() {
       const userListing = {
         advanced: true,
         readOnly: true,
+        userProfile: true,
+        bulkReview: { icon: 'qs_eye.svg', label: 'Revisar seleccionados' },
         noun: 'usuarios',
         filterType: 'users',
         defaultFilters: { statuses: [], roles: [], from: '', to: '' },
@@ -486,7 +488,7 @@ export async function start() {
         maxOrders: 4,
         placeholder: 'Buscar usuario por nombre o ID',
         searchLabel: 'Buscar usuario',
-        mark: false,
+        mark: true,
         columns: ['Nombre', 'Estado', 'Rol', 'Alta', 'Última actividad', 'Acción'],
         sortable: { Nombre: 'name', Estado: 'status', Rol: 'role', Alta: 'createdAt', 'Última actividad': 'lastSeenAt' },
         emptyTitle: 'Sin usuarios',
@@ -501,6 +503,12 @@ export async function start() {
             suggestions: null,
           };
         },
+        async loadDetail(user) {
+          return api('platform/users/detail', token, { userId: user.id }, task.signal);
+        },
+        async loadUserPosts(user, cursor) {
+          return api('platform/users/posts', token, { userId: user.id, ...(cursor ? { cursor } : {}) }, task.signal);
+        },
         present(user) {
           if (!user || !user.id) return { hidden: true };
           const state = userStatus[user.status] || user.status || 'No informado';
@@ -509,7 +517,7 @@ export async function start() {
           const created = formatWhen(user.createdAt);
           return {
             key: user.id,
-            mark: false,
+            mark: true,
             cells: [
               { text: user.displayName || 'Sin nombre' },
               { badge: state, tone: user.status === 'ACTIVE' ? 'calm' : 'neutral' },
