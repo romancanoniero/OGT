@@ -190,6 +190,10 @@ with sync_playwright() as pw:
     assert page.locator('.crm-dialog').get_by_role('button',name='Confirmar quita').count()==0
     assert page.locator('.crm-dialog').get_by_role('button',name='Quitar').count()==0
     page.locator('.crm-dialog').get_by_role('button',name='Cerrar').click()
+    # Detail must use the same latest avatar after the listing updates.
+    page.get_by_role('button',name='Ver usuario').first.click()
+    expect(page.locator('.crm-profile-avatar')).to_have_attribute('src','/test-avatar/2')
+    page.locator('.crm-dialog').get_by_role('button',name='Cerrar').click()
     assert not errors,errors
     context.close()
     results.append('Users list: 20+5, filter/order, preserved state and safe read-only detail')
