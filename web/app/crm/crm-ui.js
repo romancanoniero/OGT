@@ -192,10 +192,14 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   const entityBody = node('tbody');
   entityTable.append(entityHead, entityBody);
   entityWrap.append(entityTable);
-  const more = node('button', 'Ver más');
+  const more = node('button', 'Cargar 20 más');
   more.type = 'button';
   more.className = 'crm-btn crm-btn-secondary crm-list-more';
   more.hidden = true;
+  const listCount = node('p');
+  listCount.className = 'crm-list-count';
+  listCount.setAttribute('role', 'status');
+  listCount.hidden = true;
   const bulkBar = node('div');
   bulkBar.className = 'crm-bulk';
   bulkBar.hidden = true;
@@ -220,7 +224,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   const detailLine = node('p');
   const detailNote = node('p', 'El servidor informó este total. Desde acá no se editan permisos ni registros.');
   detail.append(detailTitle, detailLine, detailNote);
-  panel.append(panelTitle, bulkBar, tableWrap, entityWrap, more, listError, empty.box, detail);
+  panel.append(panelTitle, bulkBar, tableWrap, entityWrap, listCount, more, listError, empty.box, detail);
   main.append(header, tools, kpis, panel);
   workspace.append(nav, main);
   const dialog = node('dialog');
@@ -250,6 +254,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   const suggestListeners = new AbortController();
   let listItems = [];
   let listCursor = null;
+  let listSort = { by: 'createdAt', direction: 'desc' };
   let listTicket = 0;
   let listTimer = 0;
   let selectedKey = null;
@@ -542,22 +547,24 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     clearBulk();
     entityWrap.hidden = true;
     more.hidden = true;
+    listCount.hidden = true;
     listError.hidden = true;
     search.placeholder = 'Buscar indicador';
     search.setAttribute('aria-label', 'Buscar indicador');
     heading.textContent = title;
   }
   async function loadListing(listing, reset) {
+    if (listLoading && !reset) return;
     const ticket = ++listTicket;
     listLoading = true;
     if (reset) { listItems = []; listCursor = null; selectedKey = null; }
     if (reset && !query.trim()) paintSuggestions(null);
     renderListing(listing);
     try {
-      const page = await listing.load(query.trim(), reset ? null : listCursor);
+      const page = await listing.load(query.trim(), reset ? null : listCursor, listSort);
       if (ticket !== listTicket) return;
       const incoming = Array.isArray(page?.items) ? page.items : [];
-      listItems = reset ? incoming : listItems.concat(incoming);
+      listItems = reset ? incoming : listItems.concat(incoming.filter(item => !listItems.some(existing => existing.id === item.id)));
       listCursor = page?.nextCursor || null;
       listError.hidden = true;
       if (reset) paintSuggestions(page?.suggestions);
@@ -596,7 +603,31 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       markHead.append(all);
       headRow.append(markHead);
     }
-    for (const name of listing.columns) headRow.append(node('th', name));
+    for (const name of listing.columns) {
+      const th = node('th');
+      const sortable = listing.sortable?.[name];
+      if (sortable) {
+        const active = listSort.by === sortable;
+        th.setAttribute('aria-sort', active ? (listSort.direction === 'asc' ? 'ascending' : 'descending') : 'none');
+        const button = node('button', name + (active ? (listSort.direction === 'asc' ? ' ↑' : ' ↓') : ' ↕'));
+        button.type = 'button';
+        button.className = 'crm-sort-button';
+        button.setAttribute('aria-label', 'Ordenar por ' + name);
+        button.addEventListener('click', () => {
+          listSort = {
+            by: sortable,
+            direction: active
+              ? (listSort.direction === 'asc' ? 'desc' : 'asc')
+              : (sortable === 'createdAt' ? 'desc' : 'asc'),
+          };
+          picked.clear();
+          closeSuggest('more');
+          void loadListing(listing, true);
+        });
+        th.append(button);
+      } else th.textContent = name;
+      headRow.append(th);
+    }
     entityHead.replaceChildren(headRow);
     entityBody.replaceChildren();
     detail.hidden = true;
@@ -657,7 +688,12 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       if (view.key === selectedKey) selected = { item, view };
     }
     if (selected) fillDetail(listing, selected.item, selected.view);
-    more.hidden = !listCursor;
+    more.hidden = !listCursor || listLoading;
+    more.disabled = listLoading;
+    listCount.hidden = false;
+    listCount.textContent = listLoading
+      ? 'Cargando publicaciones…'
+      : listItems.length + ' publicaciones cargadas' + (listCursor ? ' · Hay más resultados' : ' · Fin de los resultados');
     paintBulk(listing);
     const isEmpty = !listLoading && listItems.length === 0;
     empty.box.hidden = !isEmpty;
