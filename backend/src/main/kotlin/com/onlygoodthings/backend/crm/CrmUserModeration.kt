@@ -73,12 +73,12 @@ internal fun crmModerateUsers(
         }
         val privileged = conn.prepareStatement(
             """SELECT EXISTS(SELECT 1 FROM crm_platform_staff
-                              WHERE user_id = ANY(?::uuid[]))
+                              WHERE user_id = ANY(?::uuid[]) OR approved_by = ANY(?::uuid[]))
                    OR EXISTS(SELECT 1 FROM crm_company_members
                              WHERE user_id = ANY(?::uuid[]) AND member_role = 'OWNER'
                                AND status = 'ACTIVE')"""
         ).use { stmt ->
-            for (i in 1..2) stmt.setArray(i, conn.createArrayOf("uuid", ids.toTypedArray()))
+            for (i in 1..3) stmt.setArray(i, conn.createArrayOf("uuid", ids.toTypedArray()))
             stmt.executeQuery().use { rs -> rs.next(); rs.getBoolean(1) }
         }
         require(!privileged) { "No se pueden modificar cuentas administrativas ni titulares de empresas" }

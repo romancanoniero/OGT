@@ -228,6 +228,7 @@ with sync_playwright() as pw:
     assert dialog.get_by_role('button',name='Bloquear publicaciones').is_disabled()
     dialog.locator('textarea').fill('Moderación por incumplimiento comprobado')
     dialog.get_by_role('button',name='Bloquear publicaciones').click()
+    expect(dialog).to_be_hidden()
     assert any(x[1].get('action')=='BLOCK' and len(x[1].get('userIds',[]))==1
                for x in state['requests'] if x[0].endswith('/users/moderate'))
     rows.first.locator('input[type="checkbox"]').check()
@@ -239,6 +240,7 @@ with sync_playwright() as pw:
     assert dialog.get_by_role('button',name='Eliminar definitivamente').is_disabled()
     dialog.get_by_label('Escribí ELIMINAR para confirmar').fill('ELIMINAR')
     dialog.get_by_role('button',name='Eliminar definitivamente').click()
+    expect(dialog).to_be_hidden()
     assert any(x[1].get('action')=='DELETE' and x[1].get('confirm')=='ELIMINAR'
                and len(x[1].get('userIds',[]))==2
                for x in state['requests'] if x[0].endswith('/users/moderate'))

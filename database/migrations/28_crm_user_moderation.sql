@@ -26,3 +26,18 @@ CREATE TABLE IF NOT EXISTS crm_erased_media (
     processed_at TIMESTAMPTZ,
     outcome TEXT CHECK (outcome IN ('DELETED','UNREFERENCED','SHARED'))
 );
+
+-- ON DELETE SET NULL on crm_audit_events.actor_user_id must not fail against
+-- the append-only audit trigger. Permit only that privacy-preserving FK action;
+-- every other UPDATE/DELETE remains prohibited.
+CREATE OR REPLACE FUNCTION crm_audit_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP = 'UPDATE'
+     AND OLD.actor_user_id IS NOT NULL
+     AND NEW.actor_user_id IS NULL
+     AND (to_jsonb(NEW) - 'actor_user_id') = (to_jsonb(OLD) - 'actor_user_id') THEN
+    RETURN NEW;
+  END IF;
+  RAISE EXCEPTION 'crm_audit_events is append-only';
+END;
+$$;
