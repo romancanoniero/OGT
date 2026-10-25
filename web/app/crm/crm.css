@@ -926,3 +926,69 @@ body[data-crm-view="pending"] #crm-root { display: none !important; }
 .crm-query-check:has(input:checked) { background: var(--ogt-sand); }
 .crm-query-check input { accent-color: var(--ogt-ink); width: 16px; height: 16px; }
 .crm-query-check:focus-within { outline: 2px solid var(--ogt-secondary); outline-offset: 2px; }
+
+/* Perfil de usuario de OGT Control: pantalla completa, sin invadir datos privados. */
+.crm-dialog.crm-profile-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(1100px, calc(100vw - 28px));
+  max-width: 1100px;
+  height: min(900px, calc(100dvh - 28px));
+  max-height: none;
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--ogt-hairline);
+  border-radius: 20px;
+  overflow: auto;
+  background: var(--ogt-canvas);
+}
+.crm-profile-dialog .crm-profile-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--ogt-hairline);
+  background: var(--ogt-canvas);
+}
+.crm-profile-dialog .crm-profile-head h2 { margin: 0; font-size: 21px; }
+.crm-profile-breadcrumb, .crm-profile-muted, .crm-profile-note { color: var(--ogt-tertiary); font-size: 13px; }
+.crm-profile-hero { display: flex; align-items: center; gap: 24px; padding: 26px 32px 18px; }
+.crm-profile-hero h2 { margin: 0 0 6px; font-size: clamp(22px, 4vw, 32px); overflow-wrap: anywhere; }
+.crm-profile-hero p { margin: 0; }
+.crm-profile-avatar { width: 112px; height: 112px; object-fit: cover; border-radius: 50%; border: 1px solid var(--ogt-hairline); flex: none; }
+.crm-profile-stats { display: flex; gap: 16px; flex-wrap: wrap; padding: 0 32px 22px; }
+.crm-profile-stat { flex: 1 1 125px; min-width: 0; padding: 16px; border-radius: 14px; background: var(--ogt-sand); display: grid; gap: 3px; }
+.crm-profile-stat strong { font-size: 24px; font-weight: 700; }
+.crm-profile-stat span { color: var(--ogt-tertiary); font-size: 13px; }
+.crm-profile-tabs { display: flex; gap: 3px; overflow-x: auto; white-space: nowrap; padding: 0 24px; border-bottom: 1px solid var(--ogt-hairline); }
+.crm-profile-tab { flex: none; border: 0; border-bottom: 3px solid transparent; background: transparent; padding: 15px 14px 11px; font-size: 14px; font-weight: 600; }
+.crm-profile-tab[aria-selected="true"] { border-color: var(--ogt-secondary); color: var(--ogt-secondary); }
+.crm-profile-tab:focus-visible { outline: 2px solid var(--ogt-secondary); outline-offset: -2px; }
+.crm-profile-content { padding: 24px 32px 40px; min-height: 280px; }
+.crm-profile-content h3 { margin: 0 0 20px; }
+.crm-profile-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px 32px; margin: 0; }
+.crm-profile-field { border-bottom: 1px solid var(--ogt-hairline); padding-bottom: 11px; min-width: 0; }
+.crm-profile-field dt { color: var(--ogt-tertiary); font-size: 12px; margin-bottom: 4px; }
+.crm-profile-field dd { margin: 0; overflow-wrap: anywhere; font-size: 15px; }
+.crm-profile-posts { display: grid; gap: 14px; padding: 0; }
+.crm-profile-post { border: 1px solid var(--ogt-hairline); border-radius: 14px; padding: 16px; }
+.crm-profile-post h3 { margin: 0 0 3px; font-size: 16px; }
+.crm-profile-post p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.crm-profile-post img { max-width: 100%; max-height: 260px; border-radius: 8px; object-fit: contain; display: block; }
+.crm-profile-dialog > .crm-profile-note { margin: 14px 32px; }
+@media (max-width: 680px) {
+  .crm-dialog.crm-profile-dialog { inset: 0; width: 100vw; height: 100dvh; max-width: none; border: 0; border-radius: 0; }
+  .crm-profile-hero { padding: 20px 16px; gap: 12px; }
+  .crm-profile-avatar { width: 74px; height: 74px; }
+  .crm-profile-stats { padding: 0 16px 18px; gap: 8px; }
+  .crm-profile-stat { padding: 12px; flex-basis: 100px; }
+  .crm-profile-stat strong { font-size: 18px; }
+  .crm-profile-tabs { padding: 0 12px; }
+  .crm-profile-content { padding: 20px 16px 36px; }
+  .crm-profile-fields { grid-template-columns: minmax(0, 1fr); }
+  .crm-profile-dialog .crm-profile-head { padding: 12px 16px; }
+}
