@@ -64,7 +64,9 @@ test('Google uses a brand logo beside CRM actions and public sign-in', () => {
   const logo = readFileSync(new URL('web/app/google-logo.svg', root), 'utf8');
   const crm = readFileSync(new URL('web/app/crm/crm-runtime.js', root), 'utf8');
   const publicApp = readFileSync(new URL('web/app/app.js', root), 'utf8');
-  assert.match(logo, /<svg[^>]+viewBox="0 0 24 24"/);
+  assert.match(logo, /<svg[^>]+viewBox="0 0 120 120"/);
+  assert.match(publicApp, /src="\/google-logo.svg"/);
+  assert.match(crm, /Continuar con Google/);
   for (const color of ['#4285F4', '#34A853', '#FBBC05', '#EA4335']) assert.ok(logo.includes(color));
   assert.match(crm, /googleLogin\.prepend\(googleIcon\(\)\)/);
   assert.match(crm, /addGoogle\.prepend\(googleIcon\(\)\)/);

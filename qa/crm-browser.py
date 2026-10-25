@@ -124,7 +124,7 @@ with sync_playwright() as pw:
         results.append(mode+' cannot access before MFA; enrollment requires a new login')
     for mode in ['control','empresas']:
         context,page,state,errors=session(mode)
-        page.get_by_role('button',name='Ingresar con Google').click()
+        page.get_by_role('button',name='Continuar con Google').click()
         expect(page.locator('#crm-mfa')).to_be_visible()
         page.get_by_role('button',name='Usar este factor').click()
         page.locator('#crm-code').fill('123456')
@@ -164,7 +164,7 @@ with sync_playwright() as pw:
     expect(page.locator('#crm-refresh')).to_be_hidden()
     assert page.locator('#email').input_value()=='fixture@example.test'
     assert page.locator('#password').input_value()==''
-    page.get_by_role('button',name='Ingresar con Google').click()
+    page.get_by_role('button',name='Continuar con Google').click()
     expect(page.locator('#crm-mfa')).to_be_visible()
     page.get_by_role('button',name='Usar este factor').click()
     page.locator('#crm-code').fill('123456')
@@ -182,7 +182,7 @@ with sync_playwright() as pw:
     expect(page.locator('#password')).to_be_visible()
     expect(page.locator('#crm-login .crm-password-eye')).to_be_visible()
     expect(page.get_by_role('button',name='Ingresar',exact=True)).to_be_visible()
-    expect(page.get_by_role('button',name='Ingresar con Google')).to_be_visible()
+    expect(page.get_by_role('button',name='Continuar con Google')).to_be_visible()
     expect(page.locator('#crm-onboarding')).to_be_hidden()
     expect(page.get_by_role('button',name='Cerrar sesión')).to_be_hidden()
     expect(page.locator('#crm-status')).not_to_contain_text('Renovar el token')

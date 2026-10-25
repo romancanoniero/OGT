@@ -46,7 +46,7 @@ export async function start() {
     icon.height = 20;
     return icon;
   };
-  const googleLogin = make('button', 'Ingresar con Google');
+  const googleLogin = make('button', 'Continuar con Google');
   googleLogin.id = 'crm-google-login'; googleLogin.type = 'button';
   googleLogin.className = 'crm-google-button crm-btn crm-btn-google';
   googleLogin.prepend(googleIcon());
