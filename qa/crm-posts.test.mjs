@@ -43,12 +43,12 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   const html = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\.svg', view: 'listing'/);
   assert.doesNotMatch(runtime, /id: 'publicaciones'[^}]*keys:/);
-  assert.match(runtime, /crm-ui\.js\?v=partialrows-1/);
-  assert.match(html, /crm\.js\?v=partialrows-1/);
+  assert.match(runtime, /crm-ui\.js\?v=usersview-1/);
+  assert.match(html, /crm\.js\?v=usersview-1/);
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
   assert.match(runtime, /publicationImage\(post\.editorUrl\)/);
   assert.match(runtime, /imageUrl: saved\.imageUrl/);
-  assert.match(html, /crm\.css\?v=compactfilters-1/);
+  assert.match(html, /crm\.css\?v=usersview-1/);
   assert.match(runtime, /icon: 'qs_trash\.png', label: 'Quitar selección'/);
   assert.match(runtime, /platform\/posts\/reassign/);
   assert.match(runtime, /platform\/users\/search/);
@@ -171,7 +171,7 @@ test('la rueda del CRM web acerca arriba y aleja abajo', () => {
   const empresas = readFileSync(new URL('../web/app/crm/empresas/index.html', import.meta.url), 'utf8');
   const control = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(empresas, /crm\.js\?v=totp-timeout-1/);
-  assert.match(control, /crm\.js\?v=partialrows-1/);
+  assert.match(control, /crm\.js\?v=usersview-1/);
   assert.doesNotMatch(css, /crm-frame-zoom/);
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_in.png', import.meta.url)));
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_out.png', import.meta.url)));
@@ -258,4 +258,30 @@ test('listing updates reconcile keyed rows without remounting shell, filters or 
   assert.match(ui, /if \(renderedHeaderKey === key\) return/);
   assert.match(ui, /Los resultados anteriores se conservaron/);
   assert.match(ui, /entityWrap\.scrollLeft = beforeScroll/);
+});
+
+test('users section follows the mandatory data-view standard without destructive actions', () => {
+  const runtime = readFileSync(new URL('../web/app/crm/crm-runtime.js', import.meta.url), 'utf8');
+  const ui = readFileSync(new URL('../web/app/crm/crm-ui.js', import.meta.url), 'utf8');
+  const routes = readFileSync(new URL('../backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmRoutes.kt', import.meta.url), 'utf8');
+  const users = readFileSync(new URL('../backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmUserListing.kt', import.meta.url), 'utf8');
+  const guide = readFileSync(new URL('../docs/DATA_VIEWS_STANDARD.md', import.meta.url), 'utf8');
+  assert.match(runtime, /id: 'usuarios', label: 'Usuarios', icon: 'qs_skills\.svg', view: 'listing'/);
+  assert.match(runtime, /platform\/users\/list/);
+  assert.match(runtime, /readOnly: true/);
+  assert.match(runtime, /filterType: 'users'/);
+  assert.match(ui, /userStatusLabels/);
+  assert.match(ui, /userRoleLabels/);
+  assert.match(ui, /rememberListingPreferences/);
+  assert.match(ui, /if \(listing\.readOnly\)/);
+  assert.match(routes, /post\("\/api\/v1\/crm\/platform\/users\/list"\)/);
+  assert.match(users, /crmParseUserListCursor/);
+  assert.match(users, /crmUserSortKeys/);
+  assert.match(users, /LIMIT 21/);
+  for (const forbidden of ['u.email', 'u.phone_e164', 'u.firebase_uid']) {
+    assert.ok(!users.includes(forbidden), 'do not expose sensitive contact field '+forbidden);
+  }
+  for (const standard of ['búsqueda', 'filtros', 'orden', 'paginación', 'actualización parcial', 'seguridad', 'Contabo']) {
+    assert.ok(guide.toLocaleLowerCase('es').includes(standard.toLocaleLowerCase('es')));
+  }
 });

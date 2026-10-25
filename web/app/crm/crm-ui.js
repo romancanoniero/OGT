@@ -282,7 +282,29 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     const section = sectionOf(id);
     return section?.listing || listings[id] || null;
   }
-  const orderLabels = { createdAt: 'Fecha', author: 'Autor', text: 'Texto' };
+  const defaultPostFilters = () => ({ topics: [], authors: [], photo: 'any', from: '', to: '' });
+  const listingViews = new Map();
+  function defaultFiltersFor(listing) {
+    return listing?.defaultFilters ? structuredClone(listing.defaultFilters) : defaultPostFilters();
+  }
+  function restoreListingPreferences(listing) {
+    const saved = listingViews.get(current);
+    listFilters = saved ? structuredClone(saved.filters) : defaultFiltersFor(listing);
+    listOrders = saved ? structuredClone(saved.orders) : [{ by: 'createdAt', direction: 'desc' }];
+    query = saved?.query || '';
+    search.value = query;
+  }
+  function rememberListingPreferences() {
+    const listing = listingOf(current);
+    if (listing?.advanced) listingViews.set(current, {
+      filters: structuredClone(listFilters), orders: structuredClone(listOrders), query,
+    });
+  }
+  function orderLabelsFor() {
+    return listingOf(current)?.orderLabels || { createdAt: 'Fecha', author: 'Autor', text: 'Texto' };
+  }
+  const userStatusLabels = { ACTIVE: 'Activo', PENDING: 'Pendiente', SUSPENDED: 'Suspendido', DELETED: 'Eliminado' };
+  const userRoleLabels = { USER: 'Usuario', COMPANY_ADMIN: 'Empresa', COMMUNITY_MODERATOR: 'Moderador' };
   function isAdvancedListing() {
     return Boolean(listingOf(current)?.advanced);
   }
@@ -302,16 +324,18 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   }
   function updateFilters(next) {
     listFilters = next;
+    rememberListingPreferences();
     renderQueryChips();
     applyQueryCriteria();
   }
   function updateOrders(next) {
     listOrders = next;
+    rememberListingPreferences();
     renderQueryChips();
     applyQueryCriteria();
   }
   function removeFilter(kind, value) {
-    if (kind === 'topics' || kind === 'authors') {
+    if (['topics', 'authors', 'statuses', 'roles'].includes(kind)) {
       updateFilters({ ...listFilters, [kind]: listFilters[kind].filter(x => x !== value) });
     } else updateFilters({ ...listFilters, [kind]: kind === 'photo' ? 'any' : '' });
     if (openQueryPanel) renderQueryPanel(openQueryPanel);
@@ -336,19 +360,29 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     advancedOrdersButton.hidden = !advanced;
     queryChips.hidden = !advanced;
     if (!advanced) { closeQueryPanel(); return; }
-    const count = listFilters.topics.length + listFilters.authors.length +
-      Number(listFilters.photo !== 'any') + Number(Boolean(listFilters.from)) + Number(Boolean(listFilters.to));
+    const users = listingOf(current)?.filterType === 'users';
+    const count = users
+      ? listFilters.statuses.length + listFilters.roles.length +
+        Number(Boolean(listFilters.from)) + Number(Boolean(listFilters.to))
+      : listFilters.topics.length + listFilters.authors.length +
+        Number(listFilters.photo !== 'any') + Number(Boolean(listFilters.from)) + Number(Boolean(listFilters.to));
     advancedFiltersButton.lastChild.textContent = 'Filtros (' + count + ')';
     advancedOrdersButton.textContent = 'Orden (' + listOrders.length + ')';
     const chips = [];
-    listFilters.topics.forEach(v => chips.push(queryChip('Tema: ' + v, () => removeFilter('topics', v))));
-    listFilters.authors.forEach(v => chips.push(queryChip('Autor: ' + v, () => removeFilter('authors', v))));
-    if (listFilters.photo !== 'any') chips.push(queryChip(listFilters.photo === 'yes' ? 'Con foto' : 'Sin foto',
-      () => removeFilter('photo')));
+    if (users) {
+      listFilters.statuses.forEach(v => chips.push(queryChip('Estado: ' + (userStatusLabels[v] || v), () => removeFilter('statuses', v))));
+      listFilters.roles.forEach(v => chips.push(queryChip('Rol: ' + (userRoleLabels[v] || v), () => removeFilter('roles', v))));
+    } else {
+      listFilters.topics.forEach(v => chips.push(queryChip('Tema: ' + v, () => removeFilter('topics', v))));
+      listFilters.authors.forEach(v => chips.push(queryChip('Autor: ' + v, () => removeFilter('authors', v))));
+      if (listFilters.photo !== 'any') chips.push(queryChip(listFilters.photo === 'yes' ? 'Con foto' : 'Sin foto',
+        () => removeFilter('photo')));
+    }
     if (listFilters.from) chips.push(queryChip('Desde ' + listFilters.from, () => removeFilter('from')));
     if (listFilters.to) chips.push(queryChip('Hasta ' + listFilters.to, () => removeFilter('to')));
+    const labels = orderLabelsFor();
     const orderSummary = listOrders.length
-      ? listOrders.map((o,i) => (i + 1) + ' ' + orderLabels[o.by] + (o.direction === 'asc' ? ' ↑' : ' ↓')).join(' · ')
+      ? listOrders.map((o,i) => (i + 1) + ' ' + labels[o.by] + (o.direction === 'asc' ? ' ↑' : ' ↓')).join(' · ')
       : 'Fecha ↓ (predeterminado)';
     chips.push(queryChip('Orden: ' + orderSummary));
     queryChips.replaceChildren(...chips);
@@ -402,8 +436,34 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     head.append(title, close);
     advancedPopover.append(head);
     if (which === 'filters') {
-      advancedPopover.append(
-        filterTextGroup('Tema de la publicación', 'topics', 'Ej. adopción'),
+      if (listingOf(current)?.filterType === 'users') {
+        for (const [key, label, values] of [
+          ['statuses', 'Estado de la cuenta', userStatusLabels],
+          ['roles', 'Rol de la cuenta', userRoleLabels],
+        ]) {
+          const group = node('fieldset');
+          group.className = 'crm-query-group';
+          group.append(node('legend', label));
+          for (const [value, caption] of Object.entries(values)) {
+            const item = node('label');
+            item.className = 'crm-query-check';
+            const box = node('input');
+            box.type = 'checkbox';
+            box.checked = listFilters[key].includes(value);
+            box.addEventListener('change', () => {
+              updateFilters({ ...listFilters,
+                [key]: box.checked ? [...listFilters[key], value] : listFilters[key].filter(v => v !== value),
+              });
+              renderQueryPanel('filters');
+            });
+            item.append(box, node('span', caption));
+            group.append(item);
+          }
+          advancedPopover.append(group);
+        }
+      } else {
+        advancedPopover.append(
+          filterTextGroup('Tema de la publicación', 'topics', 'Ej. adopción'),
         filterTextGroup('Nombre del autor', 'authors', 'Nombre exacto del autor'),
       );
       const photo = node('select');
@@ -418,7 +478,8 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
         updateFilters({ ...listFilters, photo: photo.value });
         renderQueryPanel('filters');
       });
-      advancedPopover.append(advancedLabel('Fotografía', photo));
+        advancedPopover.append(advancedLabel('Fotografía', photo));
+      }
       const dateRow = node('div');
       dateRow.className = 'crm-query-input-row';
       for (const [key,label] of [['from','Desde'],['to','Hasta']]) {
@@ -445,7 +506,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       clear.className = 'crm-btn crm-btn-ghost';
       clear.type = 'button';
       clear.addEventListener('click', () => {
-        updateFilters({ topics: [], authors: [], photo: 'any', from: '', to: '' });
+        updateFilters(defaultFiltersFor(listingOf(current)));
         renderQueryPanel('filters');
       });
       advancedPopover.append(clear);
@@ -453,7 +514,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       listOrders.forEach((entry,i) => {
         const line = node('div');
         line.className = 'crm-order-line';
-        line.append(node('strong', String(i + 1) + '. ' + orderLabels[entry.by]));
+        line.append(node('strong', String(i + 1) + '. ' + orderLabelsFor()[entry.by]));
         const direction = node('button', entry.direction === 'asc' ? '↑ Asc.' : '↓ Desc.');
         direction.className = 'crm-btn crm-btn-secondary';
         direction.type = 'button';
@@ -476,7 +537,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
         del.type = 'button';
         del.className = 'crm-query-close';
         del.title = 'Quitar criterio de orden';
-        del.setAttribute('aria-label', 'Quitar orden ' + orderLabels[entry.by]);
+        del.setAttribute('aria-label', 'Quitar orden ' + orderLabelsFor()[entry.by]);
         del.addEventListener('click', () => {
           updateOrders(listOrders.filter((_,j) => i !== j));
           renderQueryPanel('orders');
@@ -486,12 +547,12 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       });
       const addLine = node('div');
       addLine.className = 'crm-query-input-row';
-      for (const candidate of ['createdAt','author','text'].filter(by => !listOrders.some(o => o.by === by))) {
-        const add = node('button', '+ ' + orderLabels[candidate]);
+      for (const candidate of Object.keys(orderLabelsFor()).filter(by => !listOrders.some(o => o.by === by))) {
+        const add = node('button', '+ ' + orderLabelsFor()[candidate]);
         add.type = 'button';
         add.className = 'crm-btn crm-btn-secondary';
         add.addEventListener('click', () => {
-          updateOrders([...listOrders, { by: candidate, direction: candidate === 'createdAt' ? 'desc' : 'asc' }]);
+          updateOrders([...listOrders, { by: candidate, direction: candidate === 'createdAt' || candidate === 'lastSeenAt' ? 'desc' : 'asc' }]);
           renderQueryPanel('orders');
         });
         addLine.append(add);
@@ -843,8 +904,8 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
         button.addEventListener('click', () => {
           if (selected) updateOrders(listOrders.map((o,i) => i === orderIndex
             ? { ...o, direction: o.direction === 'asc' ? 'desc' : 'asc' } : o));
-          else if (listOrders.length < 3) updateOrders([...listOrders, {
-            by: sortable, direction: sortable === 'createdAt' ? 'desc' : 'asc',
+          else if (listOrders.length < (listing.maxOrders || 3)) updateOrders([...listOrders, {
+            by: sortable, direction: ['createdAt', 'lastSeenAt'].includes(sortable) ? 'desc' : 'asc',
           }]);
         });
         th.append(button);
@@ -865,7 +926,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       focusReason = reasonFocus;
       for (const row of entityBody.rows) row.removeAttribute('aria-selected');
       tr.setAttribute('aria-selected', 'true');
-      fillDetail(listing, latest, latestView);
+      if (!listing.readOnly) fillDetail(listing, latest, latestView);
       void openDialog(listing, latest, latestView, reasonFocus);
     };
     if (view.mark) {
@@ -952,9 +1013,10 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     // El botón mantiene su sitio durante la carga para evitar saltos verticales.
     more.hidden = !listCursor;
     listCount.hidden = false;
+    const plural = listing.noun || 'publicaciones';
     listCount.textContent = listLoading
-      ? 'Actualizando publicaciones…'
-      : listItems.length + ' publicaciones cargadas' +
+      ? 'Actualizando ' + plural + '…'
+      : listItems.length + ' ' + plural + ' cargados' +
         (listCursor ? ' · Hay más resultados' : ' · Fin de los resultados');
     const isEmpty = !listLoading && listItems.length === 0;
     empty.box.hidden = !isEmpty;
@@ -1201,6 +1263,25 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   async function openDialog(listing, item, view, reasonFocus) {
     closeSuggest('dialog');
     const card = view.detail || {};
+    if (listing.readOnly) {
+      stopWatchingComments();
+      dialogPostId = null;
+      dialog.replaceChildren();
+      const head = node('div');
+      head.className = 'crm-dialog-head';
+      const close = iconButton('qs_close.svg', 'Cerrar');
+      close.addEventListener('click', () => dialog.close());
+      head.append(node('h3', card.title || 'Detalle de usuario'), close);
+      const meta = node('p', card.meta || '');
+      const body = node('p', card.body || '');
+      body.className = 'crm-detail-body';
+      const reference = node('p', 'ID: ' + (item.id || 'No informado'));
+      reference.className = 'crm-list-count';
+      dialog.append(head, meta, body, reference);
+      if (!dialog.open) dialog.showModal();
+      close.focus();
+      return;
+    }
     dialogPostId = view.key;
     dialog.replaceChildren();
     const close = iconButton('qs_close.svg', 'Cerrar');
@@ -1563,12 +1644,15 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     button.addEventListener('click', () => {
       window.clearTimeout(listTimer);
       listTicket += 1;
+      rememberListingPreferences();
       current = section.id;
       if (typeof onNavigate === 'function') onNavigate(current);
       query = '';
       search.value = '';
       closeQueryPanel();
       closeSuggest('nav');
+      const destination = listingOf(current);
+      if (destination?.advanced) restoreListingPreferences(destination);
       paint();
     });
     buttons.push(button);
@@ -1592,6 +1676,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     }
     const listing = listingOf(current);
     if (!listing) { paint(); return; }
+    rememberListingPreferences();
     window.clearTimeout(listTimer);
     listTimer = window.setTimeout(() => { void loadListing(listing, true); }, 280);
   });

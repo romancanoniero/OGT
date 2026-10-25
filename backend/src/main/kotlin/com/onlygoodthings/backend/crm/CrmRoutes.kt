@@ -488,6 +488,40 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: Realtime
         call.respond(ApiResponse.ok(detail))
     }
     /**
+     * Vista de lectura de usuarios (distinta del selector de autor de publicaciones).
+     * Solo personal operativo, sin datos de contacto ni mutaciones.
+     */
+    post("/api/v1/crm/platform/users/list") {
+        val auth = crmContext(call, db, verifier) ?: return@post
+        if (!crmCanViewUserListing(auth.platformRole)) {
+            return@post call.respond(HttpStatusCode.Forbidden,
+                ApiResponse.fail<Unit>("Sin permiso para consultar usuarios", "FORBIDDEN"))
+        }
+        val data = JsonBody.receiveMap(call)
+        val query = data.optString("query")?.trim().orEmpty()
+        if (query.length > 120) {
+            return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Búsqueda demasiado larga", "BAD_REQUEST"))
+        }
+        val filters = crmParseUserListFilters(data["filters"])
+        val orders = crmParseUserListOrders(data["orders"])
+        if (filters == null || orders == null) {
+            return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Filtros u órdenes inválidos", "BAD_REQUEST"))
+        }
+        val cursor = data.optString("cursor")?.trim()?.ifBlank { null }?.let { raw ->
+            val parsed = crmParseUserListCursor(raw)
+            if (parsed == null || parsed.query != query || parsed.filters != filters || parsed.orders != orders) {
+                return@post call.respond(HttpStatusCode.BadRequest,
+                    ApiResponse.fail<Unit>("Cursor inválido para estos criterios", "BAD_REQUEST"))
+            }
+            parsed
+        }
+        call.respond(ApiResponse.ok(db.withConnection { conn ->
+            crmSearchUsersPage(conn, query, filters, orders, cursor)
+        }))
+    }
+    /**
      * Busca un usuario activo para atribuirle una publicación.
      * Body: `{ "query": "Ana" }`
      */
