@@ -56,6 +56,8 @@ data class CrmVisiblePost(
     val body: String,
     val createdAt: String,
     val status: String,
+    /** El título visible en la app para adopciones y alertas animales. */
+    val animalTitle: String? = null,
     /** Primera foto IMAGE de `post_media.url`. Vacío si el post no tiene imagen. */
     val imageUrl: String? = null,
     val authorUserId: String? = null,
@@ -1057,7 +1059,7 @@ private fun searchVisiblePostsAdvanced(
     val suggestions = if (query.isEmpty() || cursor != null) null else CrmSearchSuggestions(
         authors = suggestIndexedNames(conn, query, crmQueryUsesAppLabel(query)),
         posts = page.take(6).map { (post, _) ->
-            CrmPostSuggestion(post.id, post.authorName, crmSuggestText(post.body))
+            CrmPostSuggestion(post.id, post.authorName, crmSuggestText(listOfNotNull(post.animalTitle, post.body).joinToString(" — ")))
         },
     )
     return CrmVisiblePostPage(page.map { it.first }, next, suggestions)
@@ -1070,8 +1072,10 @@ SELECT p.id::text, p.body, COALESCE(p.topic, '') AS topic, p.moderation_status::
        u.photo_url AS author_photo,
        photo.url AS image_url,
        photo.original_url AS editor_url,
-       photo.frame_x, photo.frame_y, photo.frame_zoom
+       photo.frame_x, photo.frame_y, photo.frame_zoom,
+       COALESCE(NULLIF(btrim(a.pet_name), ''), NULLIF(btrim(a.title), '')) AS animal_title
 FROM social_posts p
+LEFT JOIN animal_listings a ON a.id = p.listing_id
 LEFT JOIN users u ON u.id = p.author_user_id
 LEFT JOIN companies c ON c.id = p.author_company_id
 LEFT JOIN LATERAL (
@@ -1099,6 +1103,7 @@ private fun ResultSet.toCrmVisiblePost(): CrmVisiblePost = CrmVisiblePost(
     body = getString("body"),
     createdAt = getTimestamp("created_at").toInstant().toString(),
     status = getString("moderation_status"),
+    animalTitle = getString("animal_title")?.trim()?.takeIf { it.isNotEmpty() },
     imageUrl = crmPostImageUrl(getString("image_url")),
     authorUserId = getString("author_user_id"),
     authorPhotoUrl = getString("author_photo")?.trim()?.takeIf { it.isNotEmpty() },
@@ -1294,7 +1299,7 @@ private fun searchVisiblePosts(
     val suggestions = if (query.isEmpty() || cursor != null) null else CrmSearchSuggestions(
         authors = suggestIndexedNames(conn, query, includeLabel),
         posts = page.take(6).map { post ->
-            CrmPostSuggestion(id = post.id, authorName = post.authorName, text = crmSuggestText(post.body))
+            CrmPostSuggestion(id = post.id, authorName = post.authorName, text = crmSuggestText(listOfNotNull(post.animalTitle, post.body).joinToString(" — ")))
         },
     )
     return CrmVisiblePostPage(posts = page, nextCursor = next, suggestions = suggestions)
