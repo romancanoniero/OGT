@@ -33,6 +33,25 @@ test('visible post search and removal use the CRM routes', async () => {
   ]);
 });
 
+test('moderation route is explicitly allowed and carries selected IDs to the server', async () => {
+  const recorded = [];
+  const api = createApi(async (path, request) => {
+    recorded.push([path, JSON.parse(request.body)]);
+    return response({ success: true, data: { action: 'BLOCK', ids: ['11111111-1111-4111-8111-111111111111'] } });
+  });
+  const body = {
+    action: 'BLOCK',
+    userIds: ['11111111-1111-4111-8111-111111111111'],
+    reason: 'Moderación comprobada',
+    confirm: '',
+  };
+  const result = await api('platform/users/moderate', 'jwt', body);
+  assert.deepEqual(result.ids, body.userIds);
+  assert.deepEqual(recorded, [['/api/v1/crm/platform/users/moderate', body]]);
+  await assert.rejects(() => api('platform/users/forbidden', 'jwt', body),
+    error => error.code === 'INVALID_ROUTE');
+});
+
 test('publicaciones abre el listado y no el tablero de resumen', () => {
   const publicaciones = { id: 'publicaciones', label: 'Publicaciones', view: 'listing' };
   const resumen = { id: 'resumen', label: 'Resumen', keys: null };
