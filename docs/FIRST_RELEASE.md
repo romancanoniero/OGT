@@ -100,3 +100,13 @@ CI de fuentes/browser, build/test backend, migracion real, respaldo/recuperacion
 HTTPS desde la red permitida, MFA real, cuentas autorizadas, permisos negativos
 entre empresas y funciones de negocio deben verificarse por separado. Los tests
 de navegador usan mocks. Un job verde de fuentes no certifica el servidor.
+
+## Solicitud de publicación del CRM Control (25/10/2026)
+
+Versión base integrada en `main`: `b28e51a39c16e936f848d9a5d424442c4778a069`.
+Incluye ordenamiento global por fecha, autor y texto, y paginación de 20 publicaciones.
+La implementación de GitHub Actions ejecuta validaciones de código y navegador antes de activar
+la publicación integral de web, backend y CRM en la instalación existente.
+La publicación se considera confirmada solamente si el job `publish` verifica en Contabo
+el SHA exacto de la compilación y un backend saludable; los checks aislados no la prueban.
+
