@@ -231,6 +231,13 @@ def exercise_lists(page,width,height):
     page.get_by_role('button',name='Filtros (0)').click()
     popover=page.locator('.crm-query-popover')
     expect(popover).to_be_visible()
+    # The shared observer schedules geometry in the next animation frame.
+    # Wait for the actual viewport contract, not an arbitrary delay or weaker bound.
+    page.wait_for_function("""() => {
+      const el=document.querySelector('.crm-query-popover');
+      const r=el.getBoundingClientRect();
+      return r.top>=0 && r.bottom<=innerHeight+1;
+    }""", timeout=5000)
     box=popover.bounding_box()
     assert box['y']>=0 and box['y']+box['height'] <= page.viewport_size['height']+1,box
     page.keyboard.press('Escape')
