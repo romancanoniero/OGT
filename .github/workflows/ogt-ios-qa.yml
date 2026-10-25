@@ -26,7 +26,7 @@ concurrency:
 jobs:
   ios:
     name: iOS ${{ github.event_name == 'workflow_dispatch' && inputs.distribution || 'simulator' }} / ${{ github.sha }}
-    runs-on: macos-15
+    runs-on: macos-26
     environment: ogt-launch
     timeout-minutes: 90
     env:
@@ -66,6 +66,55 @@ jobs:
           printf 'ogt.dbKmpSdkPath=%s/_sdk\n' "$GITHUB_WORKSPACE" >> "$HOME/.gradle/gradle.properties"
           xcodebuild -version
           ./gradlew --version
+      - name: Enforce Apple toolchain compatible with App Store Connect
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          XCODE_MAJOR="$(xcodebuild -version | sed -n 's/^Xcode \([0-9][0-9]*\).*/\1/p')"
+          test -n "$XCODE_MAJOR" && test "$XCODE_MAJOR" -ge 26 || {
+            echo "::error::App Store Connect requires Xcode 26+ for current iOS submissions"; exit 1;
+          }
+      - name: Set up Python for verified Firebase Apple configuration
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Google Firebase configuration reader
+        run: python3 -m pip install 'google-auth[requests]>=2.0,<3.0'
+      - name: Validate Firebase iOS config contract without credentials
+        run: python3 -m unittest qa.test_ogt_ios_firebase_config -v
+      - name: Verify SSH identity for existing OGT VPS
+        shell: bash
+        env:
+          HOST: ${{ secrets.OGT_VPS_HOST || '217.216.82.209' }}
+          USER: ${{ secrets.OGT_VPS_USER || 'iankmp' }}
+          SSH_KEY: ${{ secrets.OGT_VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.OGT_VPS_KNOWN_HOSTS }}
+          SSH_PORT: ${{ vars.OGT_VPS_SSH_PORT || '22' }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY" && test -n "$KNOWN_HOSTS"
+          [[ "$HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$USER" =~ ^[a-zA-Z0-9_][a-zA-Z0-9_-]*$ ]]
+          [[ "$SSH_PORT" =~ ^[0-9]{1,5}$ ]]
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/ogt-ios-firebase
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host ogt-ios-firebase\n  HostName %s\n  User %s\n  Port %s\n  IdentityFile ~/.ssh/ogt-ios-firebase\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n' "$HOST" "$USER" "$SSH_PORT" > ~/.ssh/config
+      - name: Retrieve real OGT iOS Firebase app config from the authoritative project
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes ogt-ios-firebase \
+            'test -r /home/iankmp/ogt-secrets/firebase-admin.json && cat /home/iankmp/ogt-secrets/firebase-admin.json' \
+            | python3 scripts/ogt_ios_firebase_config.py \
+                --output "$GITHUB_WORKSPACE/iosApp/iosApp/GoogleService-Info.plist"
+          plutil -lint iosApp/iosApp/GoogleService-Info.plist
+      - name: Remove SSH material after Firebase configuration retrieval
+        if: always()
+        shell: bash
+        run: rm -f "$HOME/.ssh/ogt-ios-firebase" "$HOME/.ssh/known_hosts" "$HOME/.ssh/config"
       - name: Build iOS Simulator without signing
         if: ${{ env.DISTRIBUTION == 'simulator' }}
         shell: bash
@@ -186,6 +235,7 @@ jobs:
         if: always()
         shell: bash
         run: |
+          rm -f "$GITHUB_WORKSPACE/iosApp/iosApp/GoogleService-Info.plist"
           rm -f "$RUNNER_TEMP/ogt-dist.p12" "$RUNNER_TEMP/ogt.mobileprovision" "$RUNNER_TEMP/ogt-profile.plist"
           rm -f "$HOME"/.private_keys/AuthKey_*.p8
           security delete-keychain "$RUNNER_TEMP/ogt-qa.keychain-db" 2>/dev/null || true
