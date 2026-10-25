@@ -481,6 +481,15 @@ export async function start() {
         readOnly: true,
         userProfile: true,
         bulkReview: { icon: 'qs_eye.svg', label: 'Revisar seleccionados' },
+        userActions: {
+          block: mode === 'control' && ['OWNER', 'TRUST_SAFETY'].includes(permission.platformRole),
+          delete: mode === 'control' && permission.platformRole === 'OWNER',
+        },
+        async bulkModerate(action, users, reason, confirm = '') {
+          return api('platform/users/moderate', token, {
+            action, userIds: users.map(user => user.id), reason, confirm,
+          }, task.signal);
+        },
         noun: 'usuarios',
         filterType: 'users',
         defaultFilters: { statuses: [], roles: [], from: '', to: '' },
@@ -520,7 +529,7 @@ export async function start() {
             mark: true,
             cells: [
               { text: user.displayName || 'Sin nombre' },
-              { badge: state, tone: user.status === 'ACTIVE' ? 'calm' : 'neutral' },
+              { badge: user.canPublish === false ? 'Solo lectura' : state, tone: user.canPublish === false ? 'attention' : user.status === 'ACTIVE' ? 'calm' : 'neutral' },
               { text: role },
               { text: created },
               { text: last },
@@ -528,7 +537,7 @@ export async function start() {
             actions: [{ icon: 'qs_eye.svg', label: 'Ver usuario', name: 'view' }],
             detail: {
               title: user.displayName || 'Sin nombre',
-              meta: state + ' · ' + role,
+              meta: state + (user.canPublish === false ? ' · Solo lectura' : '') + ' · ' + role,
               body: 'Alta: ' + created + ' · Última actividad: ' + last,
             },
           };

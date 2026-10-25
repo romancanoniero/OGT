@@ -11,6 +11,14 @@ import java.util.UUID
 class IdentityStore(private val db: Database) {
 
     fun upsertFromFirebase(verified: VerifiedFirebaseUser): UserProfile = db.withConnection { connection ->
+        val erased = connection.prepareStatement(
+            "SELECT EXISTS(SELECT 1 FROM crm_erased_accounts WHERE uid_hash = ?)",
+        ).use { stmt ->
+            stmt.setString(1, com.onlygoodthings.backend.crm.crmFirebaseTombstoneHash(verified.firebaseUid))
+            stmt.executeQuery().use { rs -> rs.next(); rs.getBoolean(1) }
+        }
+        check(!erased) { "Cuenta eliminada administrativamente" }
+
         val existing = connection.prepareStatement(
             "SELECT id, firebase_uid, display_name, photo_url, role, community_points, invite_code FROM users WHERE firebase_uid = ?",
         ).use { stmt ->
@@ -78,6 +86,16 @@ class IdentityStore(private val db: Database) {
             communityPoints = 0,
             inviteCode = invite,
         )
+    }
+
+    /** New tokens never restore posting privileges: the database is authoritative. */
+    fun canPublish(userId: String): Boolean = db.withConnection { connection ->
+        connection.prepareStatement(
+            "SELECT status = 'ACTIVE' AND NOT publishing_blocked FROM users WHERE id = ?::uuid",
+        ).use { stmt ->
+            stmt.setString(1, userId)
+            stmt.executeQuery().use { rs -> rs.next() && rs.getBoolean(1) }
+        }
     }
 
     fun byId(userId: String): UserProfile? = db.withConnection { connection ->

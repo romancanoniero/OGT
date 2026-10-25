@@ -1,6 +1,7 @@
 package com.onlygoodthings.backend
 
 import com.onlygoodthings.backend.crm.crmRoutes
+import com.onlygoodthings.backend.crm.crmContributionPath
 import com.onlygoodthings.backend.auth.AuthPrincipal
 import com.onlygoodthings.backend.auth.AuthSettings
 import com.onlygoodthings.backend.auth.CompositeTokenVerifier
@@ -40,11 +41,14 @@ import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.bearer
+import io.ktor.server.auth.principal
+import io.ktor.server.request.path
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.calllogging.CallLogging
@@ -134,12 +138,14 @@ fun Application.module() {
             authenticate { credential ->
                 val verified = runCatching { verifier.verify(credential.token) }.getOrNull()
                     ?: return@authenticate null
-                val profile = identity.upsertFromFirebase(verified)
+                val profile = runCatching { identity.upsertFromFirebase(verified) }.getOrNull()
+                    ?: return@authenticate null
                 AuthPrincipal(
                     userId = profile.id,
                     firebaseUid = profile.firebaseUid,
                     role = profile.role,
                     email = verified.email,
+                    canPublish = identity.canPublish(profile.id),
                 )
             }
         }
@@ -155,6 +161,16 @@ fun Application.module() {
         publicMediaRoutes(mediaStore)
         dbGatewayRoutes(verifier, identity, hub)
         authenticate("firebase") {
+            // One security boundary for web, Android and iOS. Reading, reports,
+            // account exports and removal of own content remain possible.
+            intercept(ApplicationCallPipeline.Call) {
+                val actor = call.principal<AuthPrincipal>()
+                if (actor != null && !actor.canPublish && crmContributionPath(call.request.path())) {
+                    call.respond(HttpStatusCode.Forbidden,
+                        ApiResponse.fail<Unit>("Esta cuenta puede leer, pero no publicar", "PUBLISHING_BLOCKED"))
+                    finish()
+                }
+            }
             protectedAuthRoutes(identity)
             crmRoutes(db, verifier, hub, mediaStore)
             parkingRoutes(ParkingSqlRepository(db), redis, hub, FootRoutingService.fromEnv(), parkingProximity)

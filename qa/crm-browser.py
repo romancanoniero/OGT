@@ -63,7 +63,7 @@ with sync_playwright() as pw:
                     route.fulfill(status=403,content_type='application/json',body=json.dumps({'success':False,'errorCode':'FORBIDDEN','message':'Acceso revocado'}));return
                 import time
                 if url.endswith('/access'):
-                    data={'platformRole':'OWNER','companies':[{'companyId':A,'role':'ADMIN'},{'companyId':B,'role':'VIEWER'}],'stepUpValidUntilEpochSeconds':int(time.time())+900}
+                    data={'platformRole':state.get('platform_role','OWNER'),'companies':[{'companyId':A,'role':'ADMIN'},{'companyId':B,'role':'VIEWER'}],'stepUpValidUntilEpochSeconds':int(time.time())+900}
                 elif url.endswith('/posts/search') and state.get('post_fixture'):
                     start=21 if body.get('cursor') else 1
                     posts=[{
@@ -85,6 +85,8 @@ with sync_playwright() as pw:
                         'communityPoints':7,'visiblePostCount':2,'receivedReportCount':0,
                         'reportedContent':[],'canReviewReports':True,'conversationsRestricted':True,
                     }
+                elif url.endswith('/users/moderate') and state.get('user_fixture'):
+                    data={'action':body.get('action'),'ids':body.get('userIds',[])}
                 elif url.endswith('/users/posts') and state.get('user_fixture'):
                     data={'posts':[{'id':'12345678-1111-4111-8111-111111111111','body':'Historia de adopci\u00f3n','topic':'Adopci\u00f3n','createdAt':'2026-10-24T10:00:00Z'}], 'nextCursor':None}
                 elif url.endswith('/users/list') and state.get('user_fixture'):
@@ -94,6 +96,7 @@ with sync_playwright() as pw:
                         'displayName':f'Usuario de prueba {n:02d}',
                         'photoUrl':('/test-avatar/'+str(state['avatar_version'])) if n==1 else ('/test-avatar/broken' if n==2 else None),
                         'status':'ACTIVE' if n%2 else 'SUSPENDED',
+                        'canPublish':n%2!=0 and n!=3,
                         'role':'USER' if n%3 else 'COMMUNITY_MODERATOR',
                         'createdAt':'2026-10-24T12:00:00Z',
                         'lastSeenAt':None,
@@ -208,6 +211,52 @@ with sync_playwright() as pw:
     assert not errors,errors
     context.close()
     results.append('Users list: 20+5, filter/order, preserved state and safe read-only detail; avatar v1 -> v2')
+
+    # The new user moderation toolbar only appears after selecting rows.
+    context,page,state,errors=session('control')
+    state['user_fixture']=True
+    begin(page);finish(page)
+    page.locator('.crm-nav-btn[data-section="usuarios"]').click()
+    rows=page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]')
+    assert page.get_by_role('button',name='Bloquear publicaciones').count()==0
+    rows.first.locator('input[type="checkbox"]').check()
+    expect(page.get_by_role('button',name='Bloquear publicaciones')).to_be_visible()
+    expect(page.get_by_role('button',name='Eliminar usuarios')).to_be_visible()
+    page.get_by_role('button',name='Bloquear publicaciones').click()
+    dialog=page.locator('.crm-user-moderation-dialog')
+    expect(dialog).to_contain_text('podrán seguir entrando y leyendo')
+    assert dialog.get_by_role('button',name='Bloquear publicaciones').is_disabled()
+    dialog.locator('textarea').fill('Moderación por incumplimiento comprobado')
+    dialog.get_by_role('button',name='Bloquear publicaciones').click()
+    assert any(x[1].get('action')=='BLOCK' and len(x[1].get('userIds',[]))==1
+               for x in state['requests'] if x[0].endswith('/users/moderate'))
+    rows.first.locator('input[type="checkbox"]').check()
+    rows.nth(1).locator('input[type="checkbox"]').check()
+    page.get_by_role('button',name='Eliminar usuarios').click()
+    dialog=page.locator('.crm-user-moderation-dialog')
+    expect(dialog).to_contain_text('Irreversible')
+    dialog.locator('textarea').fill('Eliminación ordenada tras revisión administrativa')
+    assert dialog.get_by_role('button',name='Eliminar definitivamente').is_disabled()
+    dialog.get_by_label('Escribí ELIMINAR para confirmar').fill('ELIMINAR')
+    dialog.get_by_role('button',name='Eliminar definitivamente').click()
+    assert any(x[1].get('action')=='DELETE' and x[1].get('confirm')=='ELIMINAR'
+               and len(x[1].get('userIds',[]))==2
+               for x in state['requests'] if x[0].endswith('/users/moderate'))
+    assert not errors,errors
+    context.close()
+    results.append('Users bulk moderation: selection actions, reason, typed deletion and API payload')
+
+    for role,may_block in [('TRUST_SAFETY',True),('SUPPORT',False)]:
+        context,page,state,errors=session('control')
+        state['platform_role']=role;state['user_fixture']=True
+        begin(page);finish(page)
+        page.locator('.crm-nav-btn[data-section="usuarios"]').click()
+        page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]').first.locator('input[type="checkbox"]').check()
+        assert page.get_by_role('button',name='Bloquear publicaciones').count()==(1 if may_block else 0)
+        assert page.get_by_role('button',name='Eliminar usuarios').count()==0
+        assert not errors,errors
+        context.close()
+    results.append('Users toolbar respects Trust & Safety and support permissions')
 
     context,page,state,errors=session('control')
     state['post_fixture']=True
