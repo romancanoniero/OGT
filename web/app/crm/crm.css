@@ -992,3 +992,6 @@ body[data-crm-view="pending"] #crm-root { display: none !important; }
   .crm-profile-fields { grid-template-columns: minmax(0, 1fr); }
   .crm-profile-dialog .crm-profile-head { padding: 12px 16px; }
 }
+
+/* User listing: profile image immediately after selection checkbox. */
+.crm-list-user-avatar { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-inline-start: 12px; box-shadow: 0 3px 10px rgba(0,0,0,.19); background: var(--ogt-surface, #fff); }

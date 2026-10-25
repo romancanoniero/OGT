@@ -943,6 +943,15 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
         if (all) all.checked = listItems.length > 0 && listItems.every(row => picked.has(row.id));
       });
       markCell.append(box);
+      if (listing.filterType === 'users') {
+        const avatar = node('img');
+        avatar.className = 'crm-list-user-avatar';
+        avatar.alt = '';
+        avatar.loading = 'lazy';
+        avatar.src = item.photoUrl || '../icons/avatar_anonymous.png';
+        avatar.addEventListener('error', () => { if (!avatar.src.endsWith('avatar_anonymous.png')) avatar.src = '../icons/avatar_anonymous.png'; });
+        markCell.append(avatar);
+      }
       tr.append(markCell);
     }
     view.cells.forEach((cell, index) => {
@@ -978,7 +987,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     for (const item of listItems) {
       const view = listing.present(item);
       if (!view || view.hidden) continue;
-      const signature = JSON.stringify([view.cells, view.actions, view.detail, view.mark]);
+      const signature = JSON.stringify([view.cells, view.actions, view.detail, view.mark, listing.filterType === 'users' ? item.photoUrl : null]);
       const previous = existing.get(view.key);
       const row = previous && previous._crmSignature === signature
         ? previous : listingRow(listing, item, view, signature);

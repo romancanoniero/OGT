@@ -15,6 +15,7 @@ import java.util.UUID
 internal data class CrmUserListItem(
     val id: String,
     val displayName: String,
+    val photoUrl: String? = null,
     val status: String,
     val role: String,
     val createdAt: String,
@@ -132,7 +133,7 @@ internal fun crmParseUserListCursor(raw: String): CrmUserListCursor? {
 /** Todos los criterios se aplican ANTES del LIMIT; ningún campo SQL viene del cliente. */
 internal const val CRM_USERS_LIST_BASE = """
 SELECT u.id::text AS id, u.display_name, u.status::text AS status,
-       u.role::text AS role, u.created_at, u.last_seen_at,
+       u.role::text AS role, u.photo_url, u.created_at, u.last_seen_at,
        COALESCE(u.last_seen_at, '1970-01-01 00:00:00+00'::timestamptz) AS seen_key
 FROM users u
 """
@@ -200,6 +201,7 @@ internal fun crmSearchUsersPage(
                     val item = CrmUserListItem(
                         id = rs.getString("id"),
                         displayName = rs.getString("display_name") ?: "Sin nombre",
+                        photoUrl = rs.getString("photo_url")?.takeIf { it.startsWith("https://") || it.startsWith("/media/") },
                         status = rs.getString("status"),
                         role = rs.getString("role"),
                         createdAt = rs.getTimestamp("created_at").toInstant().toString(),
