@@ -253,3 +253,8 @@ body[data-crm-view="app"] .crm-workspace-main {
   margin: 0;
   z-index: 2;
 }
+
+/* Preserve the avatar as a circle beside its selector at every viewport width. */
+.crm-list-user-avatar { width: 38px; height: 38px; min-width: 38px; max-width: none; flex-shrink: 0; }
+.crm-table td:has(> .crm-list-user-avatar) { min-width: 100px; white-space: nowrap; }
+.crm-table tr:has(.crm-list-user-avatar) td:nth-child(2) { min-width: 140px; }

@@ -86,7 +86,12 @@ BOUNDS = '''() => {
   const region=panel.querySelector('.crm-table-wrap:not([hidden])');
   const p=panel.getBoundingClientRect(), r=region.getBoundingClientRect();
   const doc=document.documentElement;
-  return {pageWidth:doc.scrollWidth,pageHeight:doc.scrollHeight,w:innerWidth,h:innerHeight,
+  const image=region.querySelector('.crm-list-user-avatar');
+  const face=image?.getBoundingClientRect();
+  const selector=image?.previousElementSibling?.getBoundingClientRect();
+  const avatar=face ? {width:face.width,height:face.height,x:face.left,selectRight:selector.right,
+    dy:(face.top+face.height/2)-(selector.top+selector.height/2)} : null;
+  return {avatar,pageWidth:doc.scrollWidth,pageHeight:doc.scrollHeight,w:innerWidth,h:innerHeight,
     panel:{x:p.left,y:p.top,right:p.right,bottom:p.bottom},
     region:{x:r.left,y:r.top,right:r.right,bottom:r.bottom,height:r.height},
     client:region.clientHeight,scroll:region.scrollHeight,
@@ -104,6 +109,10 @@ def check_bounds(page, label):
     assert region['y'] >= panel['y'] and region['bottom'] <= panel['bottom'] + 1, (label, value)
     assert region['height'] >= 40 and value['scroll'] > value['client'], (label, value)
     assert value['overflow'] == 'auto' and float(value['radius'].replace('px', '')) > 0, (label, value)
+    if value['avatar']:
+        avatar=value['avatar']
+        assert abs(avatar['width']-38)<1 and abs(avatar['height']-38)<1, (label,avatar)
+        assert avatar['x']>=avatar['selectRight'] and abs(avatar['dy'])<=8, (label,avatar)
     return value
 
 
