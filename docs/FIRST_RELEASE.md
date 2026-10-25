@@ -189,3 +189,7 @@ al parser de cursores. El PR #56, integrado en `c22ca87794e915c9d20667e4c357f62e
 corrige el símbolo y mantiene los controles de seguridad.
 La publicación debe verificar el nuevo commit exacto en Contabo;
 no considerar instalada la versión fallida.
+
+## Avatar en listado de Usuarios (25/10/2026)
+
+El listado incorpora avatar circular junto a la casilla de seleccion, sombra discreta, imagen por defecto y URL segura desde la API. Este commit dispara el proceso de publicacion; el resultado solo se considera publicado cuando el job publish verifica el SHA de Contabo.
