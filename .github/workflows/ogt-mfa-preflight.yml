@@ -63,15 +63,25 @@ jobs:
           printf 'Host ogt-mfa-audit\n  HostName %s\n  User %s\n  Port %s\n  IdentityFile ~/.ssh/ogt-mfa-readonly\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n' "$HOST" "$USER" "$SSH_PORT" > ~/.ssh/config
       - name: Read Firebase MFA config and verified factor count, never change state
         env:
-          TARGET_EMAIL: ${{ secrets.OGT_MFA_AUDIT_EMAIL || 'romancanoniero@gmail.com' }}
+          TARGET_EMAIL: ${{ secrets.OGT_MFA_AUDIT_EMAIL }}
         run: |
           set -euo pipefail
+          # The target email is a protected GitHub secret if available;
+          # otherwise derive it privately from the existing VPS .env.
+          # Do not echo either value. Shell tracing must stay disabled.
+          target="$TARGET_EMAIL"
+          if [ -z "$target" ]; then
+            target="$(ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes ogt-mfa-audit \
+              'grep "^OGT_CONTROL_BOOTSTRAP_EMAIL=" "$HOME/ogt/.env" | head -n 1 | cut -d "=" -f 2-' || true)"
+            target="${target%\"}"; target="${target#\"}"
+            target="${target%\'}"; target="${target#\'}"
+          fi
           # Existing server-side service account is streamed directly into
           # the audit process stdin. It is not written to the runner filesystem,
           # uploaded as an artifact or echoed into action logs.
           ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes ogt-mfa-audit \
             'test -r /home/iankmp/ogt-secrets/firebase-admin.json && cat /home/iankmp/ogt-secrets/firebase-admin.json' \
-            | python3 scripts/ogt_mfa_preflight.py --email "$TARGET_EMAIL"
+            | python3 scripts/ogt_mfa_preflight.py --email "$target"
       - name: Delete temporary runner SSH identity
         if: always()
         run: rm -f ~/.ssh/ogt-mfa-readonly ~/.ssh/known_hosts ~/.ssh/config
