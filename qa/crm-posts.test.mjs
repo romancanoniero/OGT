@@ -41,7 +41,7 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   assert.equal(workspaceView({ id: 'usuarios', keys: ['Usuarios activos'] }, {}), 'metrics');
   const runtime = readFileSync(new URL('../web/app/crm/crm-runtime.js', import.meta.url), 'utf8');
   const html = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
-  assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\\.svg', view: 'listing'/);
+  assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\.svg', view: 'listing'/);
   assert.doesNotMatch(runtime, /id: 'publicaciones'[^}]*keys:/);
   assert.match(runtime, /crm-ui\.js\?v=usersview-1/);
   assert.match(html, /crm\.js\?v=usersview-1/);
