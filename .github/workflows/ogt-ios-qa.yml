@@ -71,7 +71,7 @@ jobs:
         run: |
           set -euo pipefail
           xcodebuild -version
-          XCODE_MAJOR="$(xcodebuild -version | sed -n 's/^Xcode \\([0-9][0-9]*\\).*/\\1/p')"
+          XCODE_MAJOR="$(xcodebuild -version | sed -n 's/^Xcode \([0-9][0-9]*\).*/\1/p')"
           test -n "$XCODE_MAJOR" && test "$XCODE_MAJOR" -ge 26 || {
             echo "::error::App Store Connect requires Xcode 26+ for current iOS submissions"; exit 1;
           }
@@ -97,16 +97,16 @@ jobs:
           [[ "$SSH_PORT" =~ ^[0-9]{1,5}$ ]]
           umask 077
           mkdir -p ~/.ssh
-          printf '%s\\n' "$SSH_KEY" > ~/.ssh/ogt-ios-firebase
-          printf '%s\\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
-          printf 'Host ogt-ios-firebase\\n  HostName %s\\n  User %s\\n  Port %s\\n  IdentityFile ~/.ssh/ogt-ios-firebase\\n  IdentitiesOnly yes\\n  StrictHostKeyChecking yes\\n' "$HOST" "$USER" "$SSH_PORT" > ~/.ssh/config
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/ogt-ios-firebase
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host ogt-ios-firebase\n  HostName %s\n  User %s\n  Port %s\n  IdentityFile ~/.ssh/ogt-ios-firebase\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n' "$HOST" "$USER" "$SSH_PORT" > ~/.ssh/config
       - name: Retrieve real OGT iOS Firebase app config from the authoritative project
         shell: bash
         run: |
           set -euo pipefail
-          ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes ogt-ios-firebase \\
-            'test -r /home/iankmp/ogt-secrets/firebase-admin.json && cat /home/iankmp/ogt-secrets/firebase-admin.json' \\
-            | python3 scripts/ogt_ios_firebase_config.py \\
+          ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes ogt-ios-firebase \
+            'test -r /home/iankmp/ogt-secrets/firebase-admin.json && cat /home/iankmp/ogt-secrets/firebase-admin.json' \
+            | python3 scripts/ogt_ios_firebase_config.py \
                 --output "$GITHUB_WORKSPACE/iosApp/iosApp/GoogleService-Info.plist"
           plutil -lint iosApp/iosApp/GoogleService-Info.plist
       - name: Remove SSH material after Firebase configuration retrieval
