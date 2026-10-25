@@ -78,9 +78,11 @@ internal fun crmModerateUsers(
                               WHERE user_id = ANY(?::uuid[]) OR approved_by = ANY(?::uuid[]))
                    OR EXISTS(SELECT 1 FROM crm_company_members
                              WHERE user_id = ANY(?::uuid[]) AND member_role = 'OWNER'
-                               AND status = 'ACTIVE')"""
+                               AND status = 'ACTIVE')
+                   OR EXISTS(SELECT 1 FROM company_admins
+                             WHERE user_id = ANY(?::uuid[]) AND is_primary)"""
         ).use { stmt ->
-            for (i in 1..3) stmt.setArray(i, conn.createArrayOf("uuid", ids.toTypedArray()))
+            for (i in 1..4) stmt.setArray(i, conn.createArrayOf("uuid", ids.toTypedArray()))
             stmt.executeQuery().use { rs -> rs.next(); rs.getBoolean(1) }
         }
         require(!privileged) { "No se pueden modificar cuentas administrativas ni titulares de empresas" }
