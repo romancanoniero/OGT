@@ -1,0 +1,184 @@
+name: OGT iOS - Simulator / TestFlight
+on:
+  workflow_dispatch:
+    inputs:
+      distribution:
+        description: 'Simulator verifies compilation; TestFlight requires Apple signing and App Store Connect keys'
+        required: true
+        type: choice
+        default: simulator
+        options:
+          - simulator
+          - testflight
+
+permissions:
+  contents: read
+concurrency:
+  group: ogt-ios-qa-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ios:
+    name: iOS ${{ inputs.distribution }} / ${{ github.sha }}
+    runs-on: macos-15
+    environment: ogt-launch
+    timeout-minutes: 90
+    env:
+      SDK_TOKEN: ${{ secrets.OGT_SDK_READ_TOKEN || secrets.OGT_SDK_CHECKOUT_TOKEN }}
+      SDK_REF: ${{ vars.OGT_SDK_REVISION || '0a881b7a15c9a7d99b77da8547aabe2dd493a8b0' }}
+      IOS_TEAM_ID: WER3D825VB
+    steps:
+      - name: Validate private SDK permission
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SDK_TOKEN" || { echo '::error::OGT_SDK_READ_TOKEN not configured in ogt-launch'; exit 1; }
+          [[ "$SDK_REF" =~ ^[0-9a-f]{40}$ ]] || { echo '::error::Expected full, pinned OGT_SDK_REVISION'; exit 1; }
+      - name: Checkout canonical OGT revision
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout pinned private Kotlin SDK
+        uses: actions/checkout@v4
+        with:
+          repository: romancanoniero/db-kmp-sdk
+          ref: ${{ env.SDK_REF }}
+          token: ${{ env.SDK_TOKEN }}
+          path: _sdk
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Configure private composite build on macOS
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f _sdk/settings.gradle.kts
+          mkdir -p "$HOME/.gradle"
+          printf 'ogt.dbKmpSdkPath=%s/_sdk\n' "$GITHUB_WORKSPACE" >> "$HOME/.gradle/gradle.properties"
+          xcodebuild -version
+          ./gradlew --version
+      - name: Build iOS Simulator without signing
+        if: ${{ inputs.distribution == 'simulator' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64 --no-daemon
+          xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp \
+            -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/ogt-ios-derived" \
+            ARCHS=arm64 CODE_SIGNING_ALLOWED=NO build
+          APP="$(find "$RUNNER_TEMP/ogt-ios-derived/Build/Products" -type d -name iosApp.app | head -n 1)"
+          test -n "$APP" && test -d "$APP"
+          ditto -c -k --keepParent "$APP" "$RUNNER_TEMP/OGT-iOS-Simulator.zip"
+          echo 'Compilacion de simulador completada. Este ZIP NO es instalable en un iPhone fisico.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload simulator build for QA
+        if: ${{ inputs.distribution == 'simulator' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: OGT-iOS-Simulator-${{ github.run_number }}-${{ github.sha }}
+          path: ${{ runner.temp }}/OGT-iOS-Simulator.zip
+          if-no-files-found: error
+          retention-days: 14
+      - name: Check Apple delivery prerequisites
+        if: ${{ inputs.distribution == 'testflight' }}
+        shell: bash
+        env:
+          KEY_ID: ${{ secrets.OGT_ASC_KEY_ID }}
+          ISSUER_ID: ${{ secrets.OGT_ASC_ISSUER_ID }}
+          P8_B64: ${{ secrets.OGT_ASC_PRIVATE_KEY_B64 }}
+          CERT_B64: ${{ secrets.OGT_IOS_DISTRIBUTION_P12_B64 }}
+          CERT_PASSWORD: ${{ secrets.OGT_IOS_DISTRIBUTION_P12_PASSWORD }}
+          PROFILE_B64: ${{ secrets.OGT_IOS_APPSTORE_PROFILE_B64 }}
+        run: |
+          set -euo pipefail
+          for var in KEY_ID ISSUER_ID P8_B64 CERT_B64 CERT_PASSWORD PROFILE_B64; do
+            test -n "${!var}" || { echo "::error::Missing $var for TestFlight signing; see docs/QA_E2E_TESTFLIGHT.md"; exit 1; }
+          done
+      - name: Import Apple distribution signing identities
+        if: ${{ inputs.distribution == 'testflight' }}
+        shell: bash
+        env:
+          CERT_B64: ${{ secrets.OGT_IOS_DISTRIBUTION_P12_B64 }}
+          CERT_PASSWORD: ${{ secrets.OGT_IOS_DISTRIBUTION_P12_PASSWORD }}
+          PROFILE_B64: ${{ secrets.OGT_IOS_APPSTORE_PROFILE_B64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$CERT_B64" | base64 -D > "$RUNNER_TEMP/ogt-dist.p12"
+          printf '%s' "$PROFILE_B64" | base64 -D > "$RUNNER_TEMP/ogt.mobileprovision"
+          KC="$RUNNER_TEMP/ogt-qa.keychain-db"
+          KP="$(openssl rand -hex 20)"
+          security create-keychain -p "$KP" "$KC"
+          security unlock-keychain -p "$KP" "$KC"
+          security set-keychain-settings -lut 7200 "$KC"
+          security import "$RUNNER_TEMP/ogt-dist.p12" -k "$KC" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KP" "$KC"
+          security list-keychains -d user -s "$KC"
+          security default-keychain -s "$KC"
+          security cms -D -i "$RUNNER_TEMP/ogt.mobileprovision" > "$RUNNER_TEMP/ogt-profile.plist"
+          PROFILE_UUID="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$RUNNER_TEMP/ogt-profile.plist")"
+          PROFILE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$RUNNER_TEMP/ogt-profile.plist")"
+          PROFILE_TEAM="$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$RUNNER_TEMP/ogt-profile.plist")"
+          test "$PROFILE_TEAM" = "$IOS_TEAM_ID" || { echo '::error::Provisioning team differs from project team'; exit 1; }
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$RUNNER_TEMP/ogt.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+          echo "OGT_PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_ENV"
+      - name: Archive signed iPhone app and export App Store IPA
+        if: ${{ inputs.distribution == 'testflight' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          plutil -replace CFBundleVersion -string "$GITHUB_RUN_NUMBER" iosApp/iosApp/Info.plist
+          xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/OGT.xcarchive" \
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY='Apple Distribution' \
+            PROVISIONING_PROFILE_SPECIFIER="$OGT_PROFILE_NAME" \
+            DEVELOPMENT_TEAM="$IOS_TEAM_ID" archive
+          cat > "$RUNNER_TEMP/ogt-export.plist" <<ENDPLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+          <key>method</key><string>app-store-connect</string>
+          <key>destination</key><string>export</string>
+          <key>teamID</key><string>$IOS_TEAM_ID</string>
+          <key>signingStyle</key><string>manual</string>
+          <key>provisioningProfiles</key><dict>
+          <key>com.onlygoodthings.app</key><string>$OGT_PROFILE_NAME</string>
+          </dict>
+          </dict></plist>
+          ENDPLIST
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/OGT.xcarchive" \
+            -exportPath "$RUNNER_TEMP/ogt-export" \
+            -exportOptionsPlist "$RUNNER_TEMP/ogt-export.plist"
+          test -f "$RUNNER_TEMP/ogt-export/iosApp.ipa" || \
+            { echo '::error::Expected iosApp.ipa in export directory'; exit 1; }
+      - name: Submit signed IPA to App Store Connect
+        if: ${{ inputs.distribution == 'testflight' }}
+        shell: bash
+        env:
+          KEY_ID: ${{ secrets.OGT_ASC_KEY_ID }}
+          ISSUER_ID: ${{ secrets.OGT_ASC_ISSUER_ID }}
+          P8_B64: ${{ secrets.OGT_ASC_PRIVATE_KEY_B64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$HOME/.private_keys"
+          printf '%s' "$P8_B64" | base64 -D > "$HOME/.private_keys/AuthKey_${KEY_ID}.p8"
+          xcrun altool --upload-app -t ios -f "$RUNNER_TEMP/ogt-export/iosApp.ipa" \
+            --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"
+          {
+            echo "### OGT iOS enviado a Apple"
+            echo "Commit: \`${GITHUB_SHA}\` / numero de compilacion: \`${GITHUB_RUN_NUMBER}\`."
+            echo "Subida aceptada; TestFlight NO esta listo hasta procesamiento de Apple y acceso de testers."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Delete ephemeral signing material
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/ogt-dist.p12" "$RUNNER_TEMP/ogt.mobileprovision" "$RUNNER_TEMP/ogt-profile.plist"
+          rm -f "$HOME"/.private_keys/AuthKey_*.p8
+          security delete-keychain "$RUNNER_TEMP/ogt-qa.keychain-db" 2>/dev/null || true
