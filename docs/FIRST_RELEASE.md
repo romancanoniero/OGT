@@ -136,3 +136,18 @@ identidad de los nodos entre actualizaciones con una API simulada.
 
 Este commit de release incluye ese cambio y debe verificarse por su SHA instalado
 en Contabo; una ejecución verde de checks aislados no implica despliegue.
+
+## Estándar de datos y pantalla Usuarios de OGT Control (25/10/2026)
+
+Integración inicial: `e18f8c35345ecfd44145da6bcbc3f3217a68a602`.
+El estándar obligatorio de listas de datos está en `docs/DATA_VIEWS_STANDARD.md`.
+La sección Usuarios pasa de métrica agregada a listado real de solo lectura,
+con búsqueda por nombre/ID, filtros acumulativos por estado, rol y fecha de
+alta, ordenamiento multinivel, chips compactos y paginación de 20 usuarios.
+La respuesta no contiene contactos ni identificadores Firebase y la API exige
+rol operativo autorizado por el backend. No se incorporan botones de eliminación
+o suspensión de cuentas. Los filtros/órdenes se recuerdan al volver a la sección.
+
+El release exige checks, regresión de navegador, compilación de backend y
+verificación en la VPS del mismo SHA; hasta que `publish` marque success
+no se puede afirmar que Contabo haya sido actualizado.
