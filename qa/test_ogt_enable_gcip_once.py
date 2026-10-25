@@ -1,6 +1,8 @@
 """Dry-run validation for the one-time, restricted OGT Identity Platform upgrade."""
 import unittest
-from scripts.ogt_enable_gcip_once import mfa_facts, permitted_state, factor_ids
+from unittest.mock import patch
+from io import BytesIO
+from scripts.ogt_enable_gcip_once import mfa_facts, permitted_state, factor_ids, access_req
 
 
 def config(subtype="FIREBASE_AUTH", general="DISABLED",
@@ -12,6 +14,28 @@ def config(subtype="FIREBASE_AUTH", general="DISABLED",
 
 
 class UpgradeGuardTest(unittest.TestCase):
+    def test_service_account_does_not_force_quota_project(self):
+        class Response:
+            def __enter__(self):
+                return self
+            def __exit__(self, *_):
+                return False
+            def read(self):
+                return b'{}'
+        class Credentials:
+            token = 'private-test-token'
+        seen = []
+        def capture(req, timeout):
+            seen.append(req)
+            return Response()
+        with patch('scripts.ogt_enable_gcip_once.request.urlopen', side_effect=capture):
+            access_req('/v2/projects/goodthings-55612/identityPlatform:initializeAuth',
+                       Credentials(), method='POST', empty_post=True)
+        self.assertEqual(len(seen), 1)
+        self.assertEqual(seen[0].method, 'POST')
+        self.assertNotIn('X-goog-user-project', seen[0].headers)
+        self.assertEqual(seen[0].data, b'')
+
     def test_observed_ogt_configuration_is_eligible(self):
         self.assertEqual(permitted_state(config()), {
             "subtype": "FIREBASE_AUTH", "general": "DISABLED",
