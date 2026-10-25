@@ -151,3 +151,19 @@ o suspensión de cuentas. Los filtros/órdenes se recuerdan al volver a la secci
 El release exige checks, regresión de navegador, compilación de backend y
 verificación en la VPS del mismo SHA; hasta que `publish` marque success
 no se puede afirmar que Contabo haya sido actualizado.
+
+## Paridad de publicaciones de mascotas en CRM y feed (25/10/2026)
+
+Código integrado: `617e5011b4ffbfd4d49297b353ff6913d4d847e7` (PR #54).
+La migración `27_crm_animal_search_parity.sql` indexa nombres y títulos de
+mascotas, incluidos los posts históricos. Control devuelve `animalTitle`
+y permite buscar `Luna` desde toda la base, sin cargar previamente los
+lotes antiguos. `animals/open` ya no reinyecta publicaciones con estado de
+moderación diferente de VISIBLE en la app web. El CRM sigue manejando todos
+los posts VISIBLE a través de la misma tabla `social_posts`, en lotes de
+20 (sin límite global de 20). Las apps nativas sincronizadas consultan el feed
+autenticado; contenidos exclusivamente locales no constituyen posts públicos.
+
+El release requiere migración, checks de código, regresión de navegador,
+compilación integral y verificación del commit exacto + backend health en
+Contabo para declararse instalado.
