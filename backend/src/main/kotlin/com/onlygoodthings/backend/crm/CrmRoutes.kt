@@ -490,6 +490,48 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: Realtime
         call.respond(ApiResponse.ok(detail))
     }
     /**
+     * Ficha operativa completa: datos del perfil, actividad pública y denuncias
+     * de contenido solo para OWNERS y TRUST_SAFETY. Chats privados nunca aquí.
+     */
+    post("/api/v1/crm/platform/users/detail") {
+        val auth = crmContext(call, db, verifier) ?: return@post
+        if (!crmCanViewUserListing(auth.platformRole)) {
+            return@post call.respond(HttpStatusCode.Forbidden,
+                ApiResponse.fail<Unit>("Sin permiso para ver perfiles", "FORBIDDEN"))
+        }
+        val data = JsonBody.receiveMap(call)
+        val userId = runCatching { UUID.fromString(data.reqString("userId")).toString() }.getOrNull()
+            ?: return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Identificador de usuario inválido", "BAD_REQUEST"))
+        val profile = db.withConnection { conn ->
+            val result = crmReadUserProfile(conn, userId, crmCanReviewUserReports(auth.platformRole))
+            if (result != null) writeAudit(conn, auth.userId, "USER_PROFILE_VIEW", "user", userId, "Consulta operativa")
+            result
+        } ?: return@post call.respond(HttpStatusCode.NotFound,
+            ApiResponse.fail<Unit>("Usuario no encontrado", "NOT_FOUND"))
+        call.respond(ApiResponse.ok(profile))
+    }
+    post("/api/v1/crm/platform/users/posts") {
+        val auth = crmContext(call, db, verifier) ?: return@post
+        if (!crmCanViewUserListing(auth.platformRole)) {
+            return@post call.respond(HttpStatusCode.Forbidden,
+                ApiResponse.fail<Unit>("Sin permiso para ver publicaciones", "FORBIDDEN"))
+        }
+        val data = JsonBody.receiveMap(call)
+        val userId = runCatching { UUID.fromString(data.reqString("userId")).toString() }.getOrNull()
+            ?: return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Identificador de usuario inválido", "BAD_REQUEST"))
+        val raw = data.optString("cursor")?.trim()?.ifBlank { null }
+        val cursor = crmParseUserPostsCursor(raw)
+        if (raw != null && cursor == null) {
+            return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Cursor inválido", "BAD_REQUEST"))
+        }
+        call.respond(ApiResponse.ok(db.withConnection { conn ->
+            crmReadUserPosts(conn, userId, cursor)
+        }))
+    }
+    /**
      * Vista de lectura de usuarios (distinta del selector de autor de publicaciones).
      * Solo personal operativo, sin datos de contacto ni mutaciones.
      */
