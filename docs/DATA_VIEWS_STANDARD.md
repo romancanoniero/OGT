@@ -131,3 +131,30 @@ La ficha desde `OGT Control → Usuarios` está organizada en **Resumen, Publica
 **Condiciones para habilitar evidencia de chat** (no están cumplidas con el actual `content_reports`): la app debe permitir «Denunciar conversación» desde un chat concreto; el backend debe verificar que quien denuncia participa en ese chat; almacenar un expediente inmutable con `match_id`, denunciante, denunciado, causa, fecha y rango de mensajes permitido; el visor debe verificar OWNER/TRUST_SAFETY, MFA reciente, que el expediente siga abierto y registrar cada lectura. Jamás ofrecer «Ver todos los chats de este usuario». Evitar captura masiva o mensajes fuera de los límites del expediente. Sin ese vínculo, mostrar únicamente la restricción sin exponer mensajes.
 
 La tarjeta de usuario no muestra correo, teléfono, UID de Firebase, ubicación ni conversaciones privadas por defecto. Las consultas del perfil quedan en `crm_audit_events`. No debe mostrarse una «eliminación» de cuentas que el servidor no admita explícitamente.
+
+## 14. Scroll interno obligatorio en OGT Control (25/10/2026)
+
+En escritorio, todas las tablas del CRM Control — Usuarios, Publicaciones,
+Resumen, Empresas y Denuncias — deben ocupar **solo el espacio restante de la ventana**.
+Los registros se desplazan vertical y horizontalmente dentro de la tarjeta
+redondeada; las filas nunca alargan la página. El encabezado de columnas queda
+fijo al desplazar la tabla. Título, búsqueda, filtros, orden, acciones por
+selección, contador y «Cargar 20 más» permanecen fuera del desplazamiento de filas.
+
+La implementación depende de una cadena completa de alturas restringidas y de
+padres que admitan reducirse: `body[data-crm-view="app"]` → `#crm-root` →
+`.crm-workspace` → `.crm-workspace-main` → `.crm-panel` →
+`.crm-table-wrap`. Definir solo `overflow-y: auto` en la tabla, sin
+`min-height: 0` en flex/grid y una altura de pantalla limitada, **no resuelve**
+el problema. Las áreas desplazables tienen foco por teclado y etiqueta accesible.
+
+**Alcance de esta corrección:** únicamente web OGT Control en escritorio
+(anchura de 801 px o más). No introduce modificaciones de diseño en OGT Empresas,
+Android, iOS ni el diseño compacto del CRM web. El ingreso y la pantalla de
+verificación conservan desplazamiento normal hasta que se autoriza el acceso.
+
+**Aceptación automatizada:** `qa/crm-control-scroll-browser.py` usa el
+`mountWorkspace` real con datos simulados y comprueba las cinco secciones,
+carga incremental 20→40→60, scroll interno con teclado, cabecera fija,
+selección, cambio de tamaño, estados vacío/error y ausencia de scroll en el
+documento. Se ejecuta junto con las suites E2E actuales antes de publicar.
