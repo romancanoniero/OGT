@@ -130,7 +130,7 @@ export async function start() {
   fields.append(factorLabel, begin, recaptcha, codeLabel, verify, cancel);
   challenge.append(fields); login.insertAdjacentElement('afterend', challenge);
   // El shell viaja en paralelo con Firebase. El ingreso no lo espera para pintar.
-  const workspaceReady = import('./crm-ui.js?v=suggest-2');
+  const workspaceReady = import('./crm-ui.js?v=postsort-1');
   const [appSdk, sdk] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),
@@ -353,14 +353,15 @@ export async function start() {
             searchLabel: 'Buscar publicación',
             bulk: canPosts ? { icon: 'qs_trash.png', label: 'Quitar selección' } : null,
             columns: ['Foto', 'Autor', 'Texto', 'Fecha', 'Estado', 'Acción'],
+            sortable: { Autor: 'author', Texto: 'text', Fecha: 'createdAt' },
             mark: true,
             emptyTitle: canPosts ? 'Sin publicaciones' : 'Sin acceso',
             emptyDetail: canPosts
               ? 'Ninguna publicación visible coincide con la búsqueda.'
               : 'No tenés permiso para administrar publicaciones.',
-            async load(query, cursor) {
+            async load(query, cursor, sort = { by: 'createdAt', direction: 'desc' }) {
               if (!canPosts) return { items: [], nextCursor: null, suggestions: null };
-              const body = { query };
+              const body = { query, sortBy: sort.by, sortDirection: sort.direction };
               if (cursor) body.cursor = cursor;
               const data = await api('platform/posts/search', token, body, task.signal);
               const posts = Array.isArray(data.posts) ? data.posts : [];
