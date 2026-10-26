@@ -130,7 +130,7 @@ export async function start() {
   fields.append(factorLabel, begin, recaptcha, codeLabel, verify, cancel);
   challenge.append(fields); login.insertAdjacentElement('afterend', challenge);
   // El shell viaja en paralelo con Firebase. El ingreso no lo espera para pintar.
-  const workspaceReady = import('./crm-ui.js?v=user-moderation-20261025');
+  const workspaceReady = import('./crm-ui.js?v=users-action-icons-1');
   const [appSdk, sdk] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),
@@ -476,15 +476,17 @@ export async function start() {
       };
       const userStatus = { ACTIVE: 'Activo', PENDING: 'Pendiente', SUSPENDED: 'Suspendido', DELETED: 'Eliminado' };
       const userRole = { USER: 'Usuario', COMPANY_ADMIN: 'Empresa', COMMUNITY_MODERATOR: 'Moderador' };
+      // Una sola política para acciones de cada fila y de selección múltiple.
+      const userActions = {
+        block: mode === 'control' && ['OWNER', 'TRUST_SAFETY'].includes(permission.platformRole),
+        delete: mode === 'control' && permission.platformRole === 'OWNER',
+      };
       const userListing = {
         advanced: true,
         readOnly: true,
         userProfile: true,
         bulkReview: { icon: 'qs_eye.svg', label: 'Revisar seleccionados' },
-        userActions: {
-          block: mode === 'control' && ['OWNER', 'TRUST_SAFETY'].includes(permission.platformRole),
-          delete: mode === 'control' && permission.platformRole === 'OWNER',
-        },
+        userActions,
         async bulkModerate(action, users, reason, confirm = '') {
           return api('platform/users/moderate', token, {
             action, userIds: users.map(user => user.id), reason, confirm,
@@ -534,7 +536,15 @@ export async function start() {
               { text: created },
               { text: last },
             ],
-            actions: [{ icon: 'qs_eye.svg', label: 'Ver usuario', name: 'view' }],
+            actions: [
+              { icon: 'qs_eye.svg', label: 'Ver usuario', name: 'view' },
+              ...(userActions.block ? [user.canPublish === false
+                ? { icon: 'qs_publish_allow.svg', label: 'Permitir publicaciones de ' + (user.displayName || 'usuario'), name: 'userUnblock' }
+                : { icon: 'qs_publish_block.svg', label: 'Bloquear publicaciones de ' + (user.displayName || 'usuario'), name: 'userBlock' }] : []),
+              ...(userActions.delete ? [
+                { icon: 'qs_trash.png', label: 'Eliminar usuario ' + (user.displayName || 'sin nombre'), name: 'userDelete', danger: true },
+              ] : []),
+            ],
             detail: {
               title: user.displayName || 'Sin nombre',
               meta: state + (user.canPublish === false ? ' · Solo lectura' : '') + ' · ' + role,

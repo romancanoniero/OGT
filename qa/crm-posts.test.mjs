@@ -62,12 +62,12 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   const html = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\.svg', view: 'listing'/);
   assert.doesNotMatch(runtime, /id: 'publicaciones'[^}]*keys:/);
-  assert.match(runtime, /crm-ui\.js\?v=user-moderation-20261025/);
-  assert.match(html, /crm\.js\?v=usuarios-person-1/);
+  assert.match(runtime, /crm-ui\.js\?v=users-action-icons-1/);
+  assert.match(html, /crm\.js\?v=users-action-icons-1/);
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
   assert.match(runtime, /publicationImage\(post\.editorUrl\)/);
   assert.match(runtime, /imageUrl: saved\.imageUrl/);
-  assert.match(html, /crm\.css\?v=user-moderation-20261025/);
+  assert.match(html, /crm\.css\?v=users-action-icons-1/);
   assert.match(runtime, /icon: 'qs_trash\.png', label: 'Quitar selección'/);
   assert.match(runtime, /platform\/posts\/reassign/);
   assert.match(runtime, /platform\/users\/search/);
@@ -190,7 +190,7 @@ test('la rueda del CRM web acerca arriba y aleja abajo', () => {
   const empresas = readFileSync(new URL('../web/app/crm/empresas/index.html', import.meta.url), 'utf8');
   const control = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(empresas, /crm\.js\?v=totp-timeout-1/);
-  assert.match(control, /crm\.js\?v=usuarios-person-1/);
+  assert.match(control, /crm\.js\?v=users-action-icons-1/);
   assert.doesNotMatch(css, /crm-frame-zoom/);
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_in.png', import.meta.url)));
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_out.png', import.meta.url)));
@@ -279,13 +279,23 @@ test('listing updates reconcile keyed rows without remounting shell, filters or 
   assert.match(ui, /entityWrap\.scrollLeft = beforeScroll/);
 });
 
-test('users section follows the mandatory data-view standard without destructive actions', () => {
+test('users section follows the mandatory data-view standard and role-gated action icons', () => {
   const runtime = readFileSync(new URL('../web/app/crm/crm-runtime.js', import.meta.url), 'utf8');
   const ui = readFileSync(new URL('../web/app/crm/crm-ui.js', import.meta.url), 'utf8');
   const routes = readFileSync(new URL('../backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmRoutes.kt', import.meta.url), 'utf8');
   const users = readFileSync(new URL('../backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmUserListing.kt', import.meta.url), 'utf8');
   const guide = readFileSync(new URL('../docs/DATA_VIEWS_STANDARD.md', import.meta.url), 'utf8');
   assert.match(runtime, /id: 'usuarios', label: 'Usuarios', icon: 'qs_user\.svg', view: 'listing'/);
+  assert.match(runtime, /qs_publish_block\.svg/);
+  assert.match(runtime, /qs_publish_allow\.svg/);
+  assert.match(runtime, /userDelete/);
+  assert.match(ui, /function openUserModeration\(listing, action, targets = null\)/);
+  assert.match(ui, /showModal\(\)/);
+  assert.match(ui, /crm-user-bulk-icon/);
+  assert.ok(existsSync(new URL('../web/app/crm/icons/qs_publish_block.svg', import.meta.url)));
+  assert.ok(existsSync(new URL('../web/app/crm/icons/qs_publish_allow.svg', import.meta.url)));
+  assert.match(guide, /Norma visual de acciones en tablas y listas/);
+  assert.match(guide, /bordes redondeados de 20/);
   assert.match(runtime, /platform\/users\/list/);
   assert.match(runtime, /readOnly: true/);
   assert.match(runtime, /filterType: 'users'/);

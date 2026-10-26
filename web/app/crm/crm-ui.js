@@ -965,11 +965,19 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     actions.className = 'crm-actions';
     for (const spec of view.actions || []) {
       const action = iconButton(spec.icon, spec.label);
+      if (spec.danger) action.classList.add('crm-icon-btn-danger');
       action.addEventListener('click', event => {
         event.stopPropagation();
         if (spec.name === 'reassign') {
           const latest = listItems.find(candidate => candidate.id === view.key) || item;
           void openReassign(listing, latest, listing.present(latest) || view);
+          return;
+        }
+        const moderation = { userBlock: 'BLOCK', userUnblock: 'UNBLOCK', userDelete: 'DELETE' }[spec.name];
+        if (moderation && listing.userActions) {
+          // Una acción por fila NUNCA incluye accidentalmente otros seleccionados.
+          const latest = listItems.find(candidate => candidate.id === view.key);
+          if (latest) openUserModeration(listing, moderation, [latest]);
           return;
         }
         open(spec.name === 'remove');
@@ -1152,22 +1160,24 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       const count = node('span', chosen.length + (chosen.length === 1 ? ' usuario seleccionado' : ' usuarios seleccionados'));
       count.className = 'crm-user-bulk-count';
       bulkBar.append(count);
-      const add = (title, handler, danger = false) => {
-        const button = node('button', title);
-        button.type = 'button';
-        button.className = 'crm-btn crm-btn-secondary crm-user-bulk-button' + (danger ? ' crm-user-bulk-danger' : '');
+      const add = (file, title, handler, danger = false) => {
+        const button = iconButton(file, title);
+        button.classList.add('crm-user-bulk-icon');
+        if (danger) button.classList.add('crm-icon-btn-danger');
         button.addEventListener('click', handler);
         bulkBar.append(button);
       };
-      add('Ver perfiles', () => openUserSelection(listing));
+      add('qs_eye.svg', 'Ver perfiles seleccionados', () => openUserSelection(listing));
       if (listing.userActions.block) {
         if (chosen.some(item => item.canPublish !== false))
-          add('Bloquear publicaciones', () => openUserModeration(listing, 'BLOCK'));
+          add('qs_publish_block.svg', 'Bloquear publicaciones', () =>
+            openUserModeration(listing, 'BLOCK', chosen.filter(item => item.canPublish !== false)));
         if (chosen.some(item => item.canPublish === false))
-          add('Permitir publicar', () => openUserModeration(listing, 'UNBLOCK'));
+          add('qs_publish_allow.svg', 'Permitir publicar', () =>
+            openUserModeration(listing, 'UNBLOCK', chosen.filter(item => item.canPublish === false)));
       }
       if (listing.userActions.delete)
-        add('Eliminar usuarios', () => openUserModeration(listing, 'DELETE'), true);
+        add('qs_trash.png', 'Eliminar usuarios', () => openUserModeration(listing, 'DELETE', chosen), true);
       return;
     }
     const button = iconButton(action.icon, action.label);
@@ -1291,8 +1301,8 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     if (!sheet.open) sheet.showModal();
     field.focus();
   }
-  // Una selección de usuarios es una lista de revisión. Jamás se puede convertir
-  // indirectamente en una eliminación física de cuentas.
+  // Ver perfiles seleccionados nunca ejecuta acciones de moderación por sí solo.
+  // Las acciones se eligen explícitamente por ícono y requieren confirmación.
   function openUserSelection(listing) {
     const candidates = listItems.filter(item => picked.has(item.id));
     if (!candidates.length) return;
@@ -1317,39 +1327,57 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     if (!dialog.open) dialog.showModal();
   }
 
-  /** Moderación administrativa, distinta de la revisión de perfiles. */
-  function openUserModeration(listing, action) {
+  /**
+   * Mismo diálogo modal para acción individual y masiva. Solo se confirma aquí,
+   * nunca al pulsar el ícono de la fila o de la barra.
+   */
+  function openUserModeration(listing, action, targets = null) {
     closeSuggest('dialog');
     if (!listing.userActions || typeof listing.bulkModerate !== 'function') return;
     if (action === 'DELETE' && !listing.userActions.delete) return;
-    if (action !== 'DELETE' && !listing.userActions.block) return;
-    const candidates = listItems.filter(item => picked.has(item.id));
+    if ((action === 'BLOCK' || action === 'UNBLOCK') && !listing.userActions.block) return;
+    if (!['BLOCK', 'UNBLOCK', 'DELETE'].includes(action)) return;
+    const currentIds = new Set(listItems.map(item => item.id));
+    const source = targets || listItems.filter(item => picked.has(item.id));
+    const unique = new Map(source.filter(item => item?.id && currentIds.has(item.id)).map(item => [item.id, item]));
+    const candidates = [...unique.values()].filter(item => action === 'DELETE'
+      || (action === 'BLOCK' ? item.canPublish !== false : item.canPublish === false));
     if (!candidates.length) return;
+    if (candidates.length > 25) {
+      listError.textContent = 'Podés moderar hasta 25 usuarios por operación. Reducí la selección.';
+      listError.hidden = false;
+      return;
+    }
     stopWatchingComments();
     dialogPostId = null;
     dialog.replaceChildren();
     dialog.classList.remove('crm-profile-dialog');
     dialog.classList.add('crm-user-moderation-dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    dialog.setAttribute('role', action === 'BLOCK' || action === 'DELETE' ? 'alertdialog' : 'dialog');
+    dialog.setAttribute('aria-labelledby', 'crm-user-moderation-title');
     const header = node('header'); header.className = 'crm-dialog-head';
     const labels = {
       BLOCK: 'Bloquear publicaciones', UNBLOCK: 'Permitir publicaciones',
       DELETE: 'Eliminar cuenta y participación',
     };
     const heading = node('h3', labels[action] + ' · ' + candidates.length);
-    const close = iconButton('qs_close.svg', 'Cerrar');
+    heading.id = 'crm-user-moderation-title';
+    const close = iconButton('qs_close.svg', 'Cerrar sin aplicar cambios');
     close.addEventListener('click', () => dialog.close());
     header.append(heading, close);
     const explanation = node('p', action === 'DELETE'
-      ? 'Irreversible: elimina las cuentas y sus aportes, comentarios, reacciones y vínculos. Los datos de terceros y los registros de auditoría o contables obligatorios se protegen.'
+      ? 'Esta acción es irreversible: elimina las cuentas y sus publicaciones, comentarios y reacciones. Las evidencias y obligaciones legales que deban conservarse quedan protegidas.'
       : action === 'BLOCK'
-        ? 'Las personas seleccionadas podrán seguir entrando y leyendo, pero no publicar, comentar ni realizar nuevas contribuciones.'
-        : 'Vuelve a permitir las publicaciones de estas cuentas. No restaura contenido eliminado.');
+        ? '¿Confirmás el bloqueo? Estas personas podrán seguir ingresando y leyendo, pero no publicar, comentar ni realizar nuevas contribuciones.'
+        : '¿Confirmás el desbloqueo? Estas personas podrán volver a publicar y comentar; no se restaura contenido eliminado.');
     explanation.className = 'crm-user-moderation-note';
     const list = node('ul');
     list.className = 'crm-user-moderation-targets';
-    candidates.slice(0, 25).forEach(item => list.append(node('li', item.displayName || item.id)));
+    candidates.forEach(item => list.append(node('li', item.displayName || item.id)));
     const reason = reasonField({ reasonLabel: 'Motivo obligatorio (mínimo 10 caracteres)' });
     reason.input.minLength = 10;
+    reason.input.maxLength = 500;
     const typeLabel = node('label'); typeLabel.className = 'crm-field';
     const typeDescription = node('span', 'Para confirmar escribí ELIMINAR');
     typeDescription.className = 'crm-field-label';
@@ -1362,14 +1390,21 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     typeLabel.append(typeDescription, typeInput);
     const result = node('p'); result.className = 'crm-list-error'; result.setAttribute('role', 'alert');
     result.hidden = true;
-    const submit = node('button', action === 'DELETE' ? 'Eliminar definitivamente' : labels[action]);
+    const cancel = node('button', 'Cancelar');
+    cancel.type = 'button';
+    cancel.className = 'crm-btn crm-btn-secondary';
+    cancel.addEventListener('click', () => dialog.close());
+    const submit = node('button', action === 'DELETE' ? 'Eliminar definitivamente' : 'Confirmar ' + labels[action].toLowerCase());
     submit.type = 'button';
     submit.className = 'crm-btn ' + (action === 'DELETE' ? 'crm-user-bulk-danger' : 'crm-btn-primary');
     submit.disabled = true;
     let inFlight = false;
     const update = () => {
-      submit.disabled = inFlight || reason.input.value.trim().length < 10 ||
-        (action === 'DELETE' && typeInput.value.trim() !== 'ELIMINAR');
+      submit.disabled = inFlight || reason.input.value.trim().length < 10
+        || reason.input.value.trim().length > 500
+        || (action === 'DELETE' && typeInput.value.trim() !== 'ELIMINAR');
+      cancel.disabled = inFlight;
+      close.disabled = inFlight;
     };
     reason.input.addEventListener('input', update);
     typeInput.addEventListener('input', update);
@@ -1377,6 +1412,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       if (submit.disabled || inFlight) return;
       inFlight = true; update(); result.hidden = true;
       try {
+        // El servidor verifica nuevamente rol, MFA, estado, motivo e IDs.
         await listing.bulkModerate(action, candidates, reason.input.value.trim(),
           action === 'DELETE' ? 'ELIMINAR' : '');
         candidates.forEach(item => picked.delete(item.id));
@@ -1389,8 +1425,18 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
         inFlight = false; update();
       }
     });
-    dialog.append(header, explanation, list, reason.label, ...(action === 'DELETE' ? [typeLabel] : []), result, submit);
-    dialog.addEventListener('close', () => dialog.classList.remove('crm-user-moderation-dialog'), { once: true });
+    const footer = node('footer'); footer.className = 'crm-user-moderation-footer';
+    footer.append(cancel, submit);
+    dialog.append(header, explanation, list, reason.label,
+      ...(action === 'DELETE' ? [typeLabel] : []), result, footer);
+    dialog.addEventListener('close', () => {
+      dialog.classList.remove('crm-user-moderation-dialog');
+      dialog.removeAttribute('role');
+      dialog.removeAttribute('aria-modal');
+      dialog.removeAttribute('aria-labelledby');
+    }, { once: true });
+    // HTMLDialogElement.showModal() coloca la confirmación en el top layer,
+    // por encima de tablas, listas, popovers y barras laterales.
     if (!dialog.open) dialog.showModal();
     reason.input.focus();
   }

@@ -1004,7 +1004,16 @@ body[data-crm-view="pending"] #crm-root { display: none !important; }
   gap: 8px;
 }
 .crm-user-bulk-count { margin-right: auto; color: var(--ogt-muted); font-size: 13px; font-weight: 600; }
-.crm-user-bulk-button { width: auto; min-height: 38px; padding: 6px 12px; font-size: 13px; white-space: nowrap; }
+/* Patrón obligatorio: barra y filas solo con íconos, controles de 44x44 px.
+   Los rótulos accesibles viven en aria-label y title, no como botones de texto. */
+.crm-bulk .crm-user-bulk-icon { flex: 0 0 44px; border-radius: 12px; }
+.crm-bulk .crm-user-bulk-icon:hover,
+.crm-actions .crm-icon-btn:hover { background: var(--ogt-sand); border-radius: 12px; }
+.crm-icon-btn-danger { border-radius: 12px; }
+.crm-icon-btn-danger:is(:hover, :focus-visible) {
+  background: color-mix(in srgb, var(--ogt-error-container) 85%, white) !important;
+}
+.crm-icon-btn:focus-visible { outline: 2px solid var(--ogt-secondary); outline-offset: 2px; }
 .crm-user-bulk-danger {
   background: var(--ogt-error-container);
   color: var(--ogt-on-error-container);
@@ -1013,7 +1022,34 @@ body[data-crm-view="pending"] #crm-root { display: none !important; }
 .crm-user-bulk-danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--ogt-error-container) 85%, var(--ogt-error));
 }
-.crm-user-moderation-dialog { width: min(650px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; }
+/* showModal() sitúa este diálogo en el top layer del navegador: ni la tabla
+   con scroll, ni el panel de filtros, ni la navegación pueden superponerse. */
+.crm-dialog.crm-user-moderation-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  box-sizing: border-box;
+  width: min(650px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  border: 0;
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 20px 65px rgba(14, 22, 32, 0.26);
+}
+.crm-dialog.crm-user-moderation-dialog::backdrop {
+  background: rgba(13, 24, 31, 0.5);
+  backdrop-filter: blur(2px);
+}
+.crm-user-moderation-footer {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+.crm-user-moderation-footer > .crm-btn { min-height: 44px; }
 .crm-user-moderation-dialog h3 { margin: 0; }
 .crm-user-moderation-note { font-size: 14px; color: var(--ogt-tertiary); }
 .crm-user-moderation-targets {
@@ -1025,4 +1061,4 @@ body[data-crm-view="pending"] #crm-root { display: none !important; }
   font-size: 13px;
 }
 .crm-user-moderation-dialog .crm-field { margin-top: 12px; }
-.crm-user-moderation-dialog > .crm-btn { margin-top: 16px; }
+.crm-user-moderation-footer > .crm-btn { margin-top: 0; }
