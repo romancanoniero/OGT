@@ -149,6 +149,13 @@ with sync_playwright() as pw:
             button.click()
             expect(button).to_have_attribute('aria-current','page')
             assert page.locator('.crm-nav-btn[aria-current="page"]').count()==1
+        if mode == 'control':
+            user_icon=page.locator('.crm-nav-btn[data-section="usuarios"] img')
+            expect(user_icon).to_have_attribute('src','../icons/qs_user.svg')
+            page.wait_for_function("""() => {
+              const img=document.querySelector('.crm-nav-btn[data-section="usuarios"] img');
+              return img && img.complete && img.naturalWidth > 0;
+            }""")
         assert not errors,errors
         context.close()
         results.append(mode+' full navigation: '+', '.join(sections))

@@ -3,7 +3,7 @@ import { createIdentity } from './crm-auth.js?v=tacho-1';
 
 const controlSections = [
   { id: 'resumen', label: 'Resumen', icon: 'qs_feed.svg', keys: null },
-  { id: 'usuarios', label: 'Usuarios', icon: 'qs_skills.svg', view: 'listing' },
+  { id: 'usuarios', label: 'Usuarios', icon: 'qs_user.svg', view: 'listing' },
   { id: 'empresas', label: 'Empresas', icon: 'qs_form.svg', keys: ['Empresas', 'Empresas por verificar'] },
   { id: 'denuncias', label: 'Denuncias', icon: 'qs_notifications.svg', keys: ['Denuncias pendientes'] },
   { id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote.svg', view: 'listing' },
