@@ -1,11 +1,14 @@
 name: OGT iOS - Simulator / TestFlight
 on:
-  # Validate simulator build once on main when this workflow changes.
-  # Sending to TestFlight remains a separate protected manual action.
+  # Verify the native app when mobile/shared code reaches trusted main.
+  # TestFlight stays a separate protected and signed manual delivery.
   push:
     branches: [main]
     paths:
       - '.github/workflows/ogt-ios-qa.yml'
+      - 'composeApp/src/**'
+      - 'shared/src/**'
+      - 'iosApp/**'
   workflow_dispatch:
     inputs:
       distribution:

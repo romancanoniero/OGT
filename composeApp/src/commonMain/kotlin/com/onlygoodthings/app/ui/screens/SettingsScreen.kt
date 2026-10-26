@@ -381,7 +381,10 @@ private fun impactExport(me: LocalUser, db: OgtLocalDatabase): String = buildStr
 /** Foto centrada. El origen se elige en un sheet, después de cerrarlo. */
 @Composable
 private fun ProfilePhotoEditor() {
-    val session = LocalOgtSession.current
+    val auth = LocalAuth.current
+    val scope = rememberCoroutineScope()
+    var saving by remember { mutableStateOf(false) }
+    var saved by remember { mutableStateOf(false) }
     var sheet by remember { mutableStateOf(false) }
     var afterClose by remember { mutableStateOf<(() -> Unit)?>(null) }
     var pendingPick by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -398,7 +401,19 @@ private fun ProfilePhotoEditor() {
             return@rememberOgtMediaPicker
         }
         photoError = null
-        session.applyProfilePhoto(picked.path)
+        saved = false
+        if (saving) return@rememberOgtMediaPicker
+        saving = true
+        scope.launch {
+            try {
+                auth.saveMyProfilePhoto(picked.path)
+                saved = true
+            } catch (err: Exception) {
+                photoError = err.message ?: "No se pudo guardar la imagen en el servidor"
+            } finally {
+                saving = false
+            }
+        }
     }
     Column(
         Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 12.dp),
@@ -415,7 +430,7 @@ private fun ProfilePhotoEditor() {
             Modifier
                 .size(112.dp)
                 .scale(scale)
-                .clickable(interactionSource = press, indication = null) { sheet = true },
+                .clickable(enabled = !saving, interactionSource = press, indication = null) { sheet = true },
             contentAlignment = Alignment.Center,
         ) {
             OgtSessionAvatar(
@@ -441,6 +456,14 @@ private fun ProfilePhotoEditor() {
                     contentScale = ContentScale.Fit,
                 )
             }
+        }
+        if (saving || saved) {
+            Text(
+                if (saving) "Guardando foto en tu perfil…" else "Foto guardada y sincronizada",
+                color = if (saving) OgtColors.muted else OgtColors.primary,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(top = 8.dp),
+            )
         }
         if (!photoError.isNullOrBlank()) {
             Text(

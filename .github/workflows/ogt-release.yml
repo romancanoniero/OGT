@@ -39,6 +39,8 @@ jobs:
         run: python qa/run_automated_tests.py --syntax
       - name: QA automation self-tests
         run: python -m unittest discover -s qa -p 'test_qa_automation.py' -v
+      - name: Verify iOS/mobile start, remote-only posts and avatar contract
+        run: python -m unittest discover -s qa -p 'test_mobile_production_contract.py' -v
       - name: Source checks; no server access
         run: bash scripts/deploy-ogt-vps.sh --check
       - name: Shell syntax

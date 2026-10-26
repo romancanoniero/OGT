@@ -108,6 +108,7 @@ import com.onlygoodthings.app.ui.screens.SettingsScreen
 import com.onlygoodthings.app.ui.screens.VehicleEditorScreen
 import com.onlygoodthings.app.ui.screens.SkillsScreen
 import com.onlygoodthings.app.ui.screens.SplashScreen
+import com.onlygoodthings.app.ui.screens.LandingScreen
 import com.onlygoodthings.app.ui.screens.SplashSponsorsScreen
 import com.onlygoodthings.app.ui.screens.SponsorsScreen
 import com.onlygoodthings.app.ui.screens.WalletScreen
@@ -328,6 +329,7 @@ fun App() {
             route = applyHonorRoute(home)
         }
         val authGate = route == OgtRoute.Splash ||
+            route == OgtRoute.Landing ||
             route == OgtRoute.Onboarding ||
             route == OgtRoute.OnboardingFeatures ||
             route == OgtRoute.Login ||
@@ -509,16 +511,24 @@ fun App() {
                 when (route) {
                     OgtRoute.Splash -> SplashScreen {
                         scope.launch {
-                            route = when (auth.restore()) {
-                                AuthRestore.LoggedOut -> OgtRoute.Onboarding
+                            // Restaurar Firebase tras la animación, sin mostrar
+                            // una landing intermedia a quien ya tiene sesión.
+                            val restored = auth.restore()
+                            route = when (restored) {
+                                AuthRestore.LoggedOut -> OgtRoute.Landing
                                 AuthRestore.NeedsBiometric -> OgtRoute.Login
-                                AuthRestore.FirstRun -> OgtRoute.Permissions
-                                AuthRestore.Home -> applyHonorRoute(OgtRoute.Feed)
+                                AuthRestore.FirstRun, AuthRestore.Home ->
+                                    applyHonorRoute(OgtRoute.Feed)
                             }
-                            auth.hydratePublishedAnimals(db)
-                            session.persistPublishedAnimals()
+                            if (restored == AuthRestore.Home || restored == AuthRestore.FirstRun) {
+                                auth.hydratePublishedAnimals(db)
+                            }
                         }
                     }
+                    OgtRoute.Landing -> LandingScreen(
+                        onContinue = { route = OgtRoute.Onboarding },
+                        onLogin = { route = OgtRoute.Login },
+                    )
                     OgtRoute.AnimatedSvg -> AnimatedSvgScreen(
                         onBack = if (settingsResume) closeSettingsLeaf else null,
                     )

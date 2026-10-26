@@ -162,6 +162,8 @@ fun PublishActionScreen(
     var includePlace by remember { mutableStateOf(false) }
     var spotIndex by remember { mutableStateOf(0) }
     var toast by remember { mutableStateOf(false) }
+    var publishing by remember { mutableStateOf(false) }
+    var publishError by remember { mutableStateOf<String?>(null) }
     val mentionPool = remember(me.id, db.follows.size) { db.mentionPool(me.id) }
     var protagonist by remember(kind) { mutableStateOf<MentionCandidate?>(null) }
     val neighbors = remember { mutableStateListOf<MentionCandidate>() }
@@ -202,6 +204,7 @@ fun PublishActionScreen(
     }
 
     fun publish() {
+        if (publishing) return
         if ((honorForm || ternuraForm) && !canPublish) {
             triedPublish = true
             return
@@ -210,127 +213,89 @@ fun PublishActionScreen(
             ternuraForm -> "Ternura"
             else -> categories.firstOrNull { it.id == category }?.label ?: "Ayuda vecinal"
         }
-        if (editing && existing != null) {
-            optimisticEditPost(db, auth.feed, scope, me.id, existing.id, story, tag) {
-                session.persistSocialFeed()
-            }
-            toast = true
-            return
-        }
-        val now = currentEpochMs()
-        val postId = "post-pub-$now"
-        db.posts += LocalSocialPost(
-            id = postId,
-            authorKind = AuthorKind.USER,
-            authorUserId = me.id,
-            authorCompanyId = null,
-            place = when {
-                includePlace -> spot.title
-                ternuraForm -> ""
-                else -> me.barrio
-            },
-            timeLabel = "Ahora",
-            tag = tag,
-            body = story,
-            impactCount = 0,
-            commentCount = 0,
-            isStory = false,
-            storyLabel = null,
-            createdAtEpochMs = now,
-            honoreeName = protagonist
-                ?.takeIf { it.namedOnly }
-                ?.displayName,
-        )
-        db.postPeople += LocalPostPerson(postId, me.id, PostPersonRole.AUTHOR)
+        val submittedStory = story.trim()
+        val pickedImages = draftMedia.take(PostMediaRules.MAX_ITEMS).toList()
         val heroId = when {
             ternuraForm -> null
             authorIsSelf -> me.id
             else -> protagonist?.userId
         }
-        if (!heroId.isNullOrBlank()) {
-            db.postPeople += LocalPostPerson(postId, heroId, PostPersonRole.PROTAGONIST)
-        }
-        neighbors.mapNotNull { it.userId }.distinct().forEach { uid ->
-            if (uid != me.id && uid != heroId) {
-                db.postPeople += LocalPostPerson(postId, uid, PostPersonRole.PARTICIPANT)
-            }
-        }
-        if (!ternuraForm && !authorIsSelf) {
-            protagonist?.honorId?.let { db.attachHonorToPost(postId, it, PostPersonRole.PROTAGONIST) }
-        }
-        neighbors.forEach { hit ->
-            hit.honorId?.let { db.attachHonorToPost(postId, it, PostPersonRole.PARTICIPANT) }
-        }
-        draftMedia.take(PostMediaRules.MAX_ITEMS).forEachIndexed { order, item ->
-            val video = item.kind == MediaKind.VIDEO
-            val url = if (item.fromDevice) "file://${item.path}" else "asset://${item.path}"
-            val poster = item.posterPath?.let { "file://$it" }
-            db.postMedia += LocalPostMedia(
-                id = "$postId-m$order",
-                postId = postId,
-                kind = item.kind,
-                url = url,
-                posterUrl = poster,
-                sortOrder = order,
-                assetKey = if (item.fromDevice || video) "" else item.path,
-                altText = tag,
-            )
-            if (item.fromDevice) {
-                OgtMediaCache.ingest(url)
-                poster?.let { OgtMediaCache.ingest(it) }
-            }
-        }
-        db.recordFeedEvent(me.id, postId, FeedEventKind.SHARE)
-        db.bumpFeed()
-        val published = db.post(postId)
-        scope.launch {
-            auth.ensureDevBearer()
-            val remote = runCatching {
-                auth.feed.publishPost(
-                    body = story,
-                    topic = tag,
-                    media = draftMedia.take(PostMediaRules.MAX_ITEMS).mapIndexed { order, item ->
-                        val video = item.kind == MediaKind.VIDEO
-                        PostMediaItem(
-                            id = "$postId-m$order",
-                            kind = item.kind,
-                            url = if (item.fromDevice) "file://${item.path}" else "asset://${item.path}",
-                            posterUrl = item.posterPath?.let { "file://$it" },
-                            sortOrder = order,
-                            altText = tag,
-                            assetKey = if (item.fromDevice || video) "" else item.path,
-                        )
-                    },
-                    protagonistUserId = heroId,
-                    participantUserIds = neighbors.mapNotNull { it.userId }.distinct(),
-                    honoreeName = protagonist?.takeIf { it.namedOnly }?.displayName,
-                )
-            }.getOrNull()
-            if (remote != null) db.upsertRemoteSocial(remote)
-            announcePublishedPost(db, published)
-        }
-        session.persistHonors()
-        val mentionedIds = buildList {
+        val selectedNeighbors = neighbors.toList()
+        val mentions = buildList {
             if (!ternuraForm && !authorIsSelf) protagonist?.userId?.let(::add)
-            neighbors.mapNotNull { it.userId }.forEach(::add)
+            selectedNeighbors.mapNotNull { it.userId }.forEach(::add)
         }
-        // En preview el destinatario comparte este dispositivo: el banner verifica el canal.
-        db.notifyMentionedUsers(me.id, postId, mentionedIds).forEach(::showSystemNotice)
         val honorHits = buildList {
             if (!ternuraForm && !authorIsSelf) protagonist?.let { add(it to PostPersonRole.PROTAGONIST) }
-            neighbors.forEach { add(it to PostPersonRole.PARTICIPANT) }
+            selectedNeighbors.forEach { add(it to PostPersonRole.PARTICIPANT) }
         }
+        val namedHonoree = protagonist?.takeIf { it.namedOnly }?.displayName
+        publishError = null
+        publishing = true
         scope.launch {
-            honorHits.forEach { (hit, role) ->
-                val token = db.honors.firstOrNull { it.id == hit.honorId }?.claimToken ?: return@forEach
-                auth.honor.attach(token, postId, role)
-            }
-            mentionedIds.distinct().filter { it != me.id }.forEach { rid ->
-                val role = if (rid == heroId) "PROTAGONIST" else "PARTICIPANT"
-                auth.notices.notifyMention(rid, postId, role)
+            try {
+                auth.ensureDevBearer()
+                if (editing && existing != null) {
+                    // La UI confirma edición solo tras respuesta exitosa del servidor.
+                    val remote = auth.feed.editPost(existing.id, submittedStory, tag)
+                    db.upsertRemoteSocial(remote)
+                    session.persistSocialFeed()
+                } else {
+                    val media = pickedImages.mapIndexed { index, item ->
+                        require(item.fromDevice && item.kind == MediaKind.IMAGE) {
+                            "Seleccioná una imagen real de la galería; los videos necesitan un formato compatible."
+                        }
+                        val uploaded = auth.uploadPublicationImage(item.path)
+                        PostMediaItem(
+                            id = uploaded.id,
+                            kind = uploaded.kind,
+                            url = uploaded.url,
+                            sortOrder = index,
+                            altText = tag,
+                        )
+                    }
+                    val remote = auth.feed.publishPost(
+                        body = submittedStory,
+                        topic = tag,
+                        media = media,
+                        protagonistUserId = heroId,
+                        participantUserIds = selectedNeighbors.mapNotNull { it.userId }.distinct(),
+                        honoreeName = namedHonoree,
+                    )
+                    // El servidor devuelve un UUID; nunca almacenar un post-pub- local
+                    // que el CRM no puede encontrar.
+                    db.upsertRemoteSocial(remote)
+                    session.persistSocialFeed()
+                    announcePublishedPost(db, db.post(remote.id))
+                    session.persistHonors()
+                    // Fallas de avisos o atribuciones secundarias no revierten
+                    // una publicación que Postgres ya confirmó.
+                    runCatching {
+                        db.notifyMentionedUsers(me.id, remote.id, mentions).forEach(::showSystemNotice)
+                    }
+                    honorHits.forEach { (hit, role) ->
+                        val token = db.honors.firstOrNull { it.id == hit.honorId }?.claimToken
+                        if (!token.isNullOrBlank()) runCatching {
+                            auth.honor.attach(token, remote.id, role)
+                        }
+                    }
+                    mentions.distinct().filter { it != me.id }.forEach { rid ->
+                        runCatching {
+                            auth.notices.notifyMention(
+                                rid, remote.id,
+                                if (rid == heroId) "PROTAGONIST" else "PARTICIPANT",
+                            )
+                        }
+                    }
+                }
+                toast = true
+            } catch (failure: Exception) {
+                publishError = failure.message
+                    ?: "No se pudo publicar. Conservamos el borrador para reintentar."
+            } finally {
+                publishing = false
             }
         }
-        toast = true
     }
 
     LaunchedEffect(toast) {
@@ -649,6 +614,20 @@ fun PublishActionScreen(
                                 },
                                 onClick = ::publish,
                             )
+                            if (publishing) {
+                                Text(
+                                    "Guardando en la comunidad…",
+                                    color = OgtColors.muted,
+                                    fontSize = 12.sp,
+                                )
+                            }
+                            if (publishError != null) {
+                                Text(
+                                    publishError.orEmpty(),
+                                    color = OgtColors.error,
+                                    fontSize = 12.sp,
+                                )
+                            }
                             if (showMissing && honorForm && missingHonorBits.isNotEmpty()) {
                                 Text(
                                     "Falta ${joinHonorMissing(missingHonorBits)}.",

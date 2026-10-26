@@ -93,7 +93,7 @@ class OgtPreviewSession(
     init {
         db.importHonors(prefs.honorsJson)
         db.importPublishedAnimals(prefs.publishedAnimalsJson)
-        db.importSocialFeed(prefs.feedCacheJson)
+        db.importSocialFeed(prefs.feedCacheJson, verifiedOnly = true)
         db.postMedia.forEach { row ->
             OgtMediaCache.ingest(row.url)
             row.posterUrl?.let { OgtMediaCache.ingest(it) }
@@ -106,7 +106,7 @@ class OgtPreviewSession(
     }
 
     fun persistSocialFeed() {
-        prefs.feedCacheJson = db.exportSocialFeed(me().id)
+        prefs.feedCacheJson = db.exportSocialFeed(me().id, verifiedOnly = true)
     }
 
     fun rememberHonorToken(token: String?) {
