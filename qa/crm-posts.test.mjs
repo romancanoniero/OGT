@@ -63,7 +63,7 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\.svg', view: 'listing'/);
   assert.doesNotMatch(runtime, /id: 'publicaciones'[^}]*keys:/);
   assert.match(runtime, /crm-ui\.js\?v=user-moderation-20261025/);
-  assert.match(html, /crm\.js\?v=user-moderation-20261025/);
+  assert.match(html, /crm\.js\?v=usuarios-person-1/);
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
   assert.match(runtime, /publicationImage\(post\.editorUrl\)/);
   assert.match(runtime, /imageUrl: saved\.imageUrl/);
@@ -190,7 +190,7 @@ test('la rueda del CRM web acerca arriba y aleja abajo', () => {
   const empresas = readFileSync(new URL('../web/app/crm/empresas/index.html', import.meta.url), 'utf8');
   const control = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(empresas, /crm\.js\?v=totp-timeout-1/);
-  assert.match(control, /crm\.js\?v=user-moderation-20261025/);
+  assert.match(control, /crm\.js\?v=usuarios-person-1/);
   assert.doesNotMatch(css, /crm-frame-zoom/);
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_in.png', import.meta.url)));
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_out.png', import.meta.url)));
@@ -285,7 +285,7 @@ test('users section follows the mandatory data-view standard without destructive
   const routes = readFileSync(new URL('../backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmRoutes.kt', import.meta.url), 'utf8');
   const users = readFileSync(new URL('../backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmUserListing.kt', import.meta.url), 'utf8');
   const guide = readFileSync(new URL('../docs/DATA_VIEWS_STANDARD.md', import.meta.url), 'utf8');
-  assert.match(runtime, /id: 'usuarios', label: 'Usuarios', icon: 'qs_skills\.svg', view: 'listing'/);
+  assert.match(runtime, /id: 'usuarios', label: 'Usuarios', icon: 'qs_user\.svg', view: 'listing'/);
   assert.match(runtime, /platform\/users\/list/);
   assert.match(runtime, /readOnly: true/);
   assert.match(runtime, /filterType: 'users'/);
