@@ -31,7 +31,8 @@ permissions:
   contents: read
 concurrency:
   group: ogt-ios-qa-${{ github.ref }}
-  cancel-in-progress: false
+  # Cancelar compilaciones antiguas de PR, nunca una distribucion real de main.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   ios:
