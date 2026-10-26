@@ -58,7 +58,7 @@ fun LandingScreen(onContinue: () -> Unit, onLogin: () -> Unit) {
         Spacer(Modifier.height(20.dp))
         AuthFeatureReel()
         Spacer(Modifier.weight(1f))
-        OgtPrimaryButton("Conocer la comunidad", onContinue)
+        OgtPrimaryButton("Conocer la comunidad") { onContinue() }
         Spacer(Modifier.height(6.dp))
         GhostLink("Ya tengo cuenta · Iniciar sesión", onLogin)
     }
