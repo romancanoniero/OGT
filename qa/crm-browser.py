@@ -268,7 +268,7 @@ with sync_playwright() as pw:
     rows.nth(1).locator('input[type="checkbox"]').check()
     page.locator('.crm-bulk').get_by_role('button',name='Eliminar usuarios',exact=True).click()
     dialog=page.locator('.crm-user-moderation-dialog')
-    expect(dialog).to_contain_text('Irreversible')
+    expect(dialog).to_contain_text('irreversible')
     dialog.locator('textarea').fill('Eliminación ordenada tras revisión administrativa')
     assert dialog.get_by_role('button',name='Eliminar definitivamente').is_disabled()
     dialog.get_by_label('Escribí ELIMINAR para confirmar').fill('ELIMINAR')
