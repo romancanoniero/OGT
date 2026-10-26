@@ -50,6 +50,15 @@ import kotlinx.serialization.json.Json
 /** Lo que acabo de publicar queda pinneado arriba del feed durante esta ventana. */
 private const val OWN_PIN_WINDOW_MS = 2 * 3_600_000L
 
+/** Solo IDs de PostgreSQL: los registros post-pub-* y catálogos Stitch
+ * permanecen como borradores/fixtures, nunca como posts de la comunidad. */
+private val SERVER_POST_ID = Regex(
+    "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+fun isServerBackedPostId(id: String): Boolean =
+    SERVER_POST_ID.matches(id) && id !in OgtIds.phoneFixturePostIds
+
+
 /**
  * Catálogo en memoria que espeja las tablas de `01_init.sql`.
  * Sirve para preview Compose; Postgres sigue siendo la fuente de verdad de plataforma.
@@ -989,7 +998,8 @@ class OgtLocalDatabase {
         val aliases = viewerAliases(viewerId)
         val hideShare: (LocalSocialPost) -> Boolean = { hidesOwnAnecdoteShare(viewerId, it) }
         val hidden = hiddenPostIds(viewerId)
-        fun allowed(post: LocalSocialPost) = post.id !in hidden && !hideShare(post)
+        fun allowed(post: LocalSocialPost) = isServerBackedPostId(post.id) &&
+            post.id !in hidden && !hideShare(post)
         fun matches(post: LocalSocialPost): Boolean {
             if (!allowed(post)) return false
             if (family == null) return true
@@ -1012,8 +1022,9 @@ class OgtLocalDatabase {
         return (pinned + body).distinctBy { it.id }
     }
 
-    fun exportSocialFeed(viewerId: String): String {
+    fun exportSocialFeed(viewerId: String, verifiedOnly: Boolean = false): String {
         val cached = feedPosts()
+            .filter { !verifiedOnly || isServerBackedPostId(it.id) }
             .sortedByDescending { it.createdAtEpochMs }
             .take(80)
         val postIds = cached.map { it.id }.toSet()
@@ -1029,10 +1040,11 @@ class OgtLocalDatabase {
         )
     }
 
-    fun importSocialFeed(raw: String) {
+    fun importSocialFeed(raw: String, verifiedOnly: Boolean = false) {
         if (raw.isBlank()) return
         val snap = runCatching { honorJson.decodeFromString<SocialFeedSnapshot>(raw) }.getOrNull() ?: return
         snap.posts.forEach { row ->
+            if (verifiedOnly && !isServerBackedPostId(row.id)) return@forEach
             if (row.id in OgtIds.phoneFixturePostIds && posts.none { it.id == row.id }) return@forEach
             val idx = posts.indexOfFirst { it.id == row.id }
             if (idx >= 0) {
@@ -1049,7 +1061,8 @@ class OgtLocalDatabase {
             }
         }
         fun fixtureAusente(postId: String) =
-            postId in OgtIds.phoneFixturePostIds && posts.none { it.id == postId }
+            (verifiedOnly && !isServerBackedPostId(postId)) ||
+            (postId in OgtIds.phoneFixturePostIds && posts.none { it.id == postId })
         snap.media.forEach { row ->
             if (fixtureAusente(row.postId)) return@forEach
             val idx = postMedia.indexOfFirst { it.id == row.id }

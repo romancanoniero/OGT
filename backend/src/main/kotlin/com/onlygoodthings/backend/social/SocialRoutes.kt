@@ -25,6 +25,17 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
 
+/** El avatar guardado en la base debe venir de media/upload, nunca de
+ * un path temporal iOS o un asset de demostración. */
+internal fun ogtUploadedProfilePhotoUrl(value: String): Boolean {
+    val url = runCatching { java.net.URI(value.trim()) }.getOrNull() ?: return false
+    if (url.scheme != "https" || url.host !in setOf("onlygoodthings.lat", "www.onlygoodthings.lat")) return false
+    val filename = url.path?.substringAfterLast("/media/u/", "") ?: return false
+    if (filename.contains('/') || filename.isEmpty()) return false
+    return com.onlygoodthings.backend.media.MediaStore.isSafeName(filename) &&
+        filename.substringAfterLast('.').lowercase() in setOf("jpg", "jpeg", "png", "webp")
+}
+
 fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
     post("/api/v1/social/feed") {
         val principal = call.principal<AuthPrincipal>() ?: return@post call.respond(
@@ -166,6 +177,13 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
         )
         val dataMap = JsonBody.receiveMap(call)
         val name = dataMap.optString("displayName")?.trim().orEmpty()
+        val photo = dataMap.optString("photoUrl")?.trim().orEmpty()
+        if (photo.isNotBlank() && !ogtUploadedProfilePhotoUrl(photo)) {
+            return@post call.respond(
+                HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("La foto debe estar guardada en OGT", "INVALID_PROFILE_PHOTO"),
+            )
+        }
         if (name.length < 2) {
             return@post call.respond(
                 HttpStatusCode.BadRequest,

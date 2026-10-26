@@ -32,6 +32,17 @@ class AuthController(
     val animals = RestAnimalsRepository(createPlatformHttpClient(), session)
     val feed = RestFeedRepository(createPlatformHttpClient(), session)
 
+    /** Publicar archivos del dispositivo siempre mediante media/upload. */
+    suspend fun uploadPublicationImage(path: String): com.onlygoodthings.shared.domain.UploadedMedia =
+        api.uploadPublicationImage(path)
+
+    /** Se muestra en todos los dispositivos solo después del commit remoto. */
+    suspend fun saveMyProfilePhoto(path: String) {
+        val me = preview.overlayUser ?: error("Iniciá sesión para cambiar tu foto")
+        val saved = api.saveProfilePhoto(path, me.displayName)
+        preview.applyProfilePhoto(saved)
+    }
+
     suspend fun updateMyLocation(latitude: Double, longitude: Double, accuracyMeters: Double?) {
         val ok = api.updateLocation(latitude, longitude, accuracyMeters)
         if (!ok) return
@@ -50,14 +61,24 @@ class AuthController(
     val signedIn: StateFlow<Boolean> = _signedIn
 
     suspend fun restore(): AuthRestore {
-        val user = platform.currentUser() ?: return AuthRestore.LoggedOut
+        val user = runCatching { platform.currentUser() }.getOrNull()
+            ?: return AuthRestore.LoggedOut
         if (prefs.biometricEnabled) return AuthRestore.NeedsBiometric
         if (!prefs.keepSession) {
             platform.signOut()
             return AuthRestore.LoggedOut
         }
-        runCatching { finishSession(user) }
-        return if (prefs.onboardingDone) AuthRestore.Home else AuthRestore.FirstRun
+        // Firebase puede conservar la sesión, pero no habilitamos el feed si
+        // OGT no aceptó el JWT. Un fallo no se transforma en un falso login.
+        return try {
+            finishSession(user)
+            AuthRestore.Home
+        } catch (failure: Exception) {
+            session.firebaseJwt = null
+            _signedIn.value = false
+            error = "No pudimos validar tu sesión. Revisá la conexión e intentá de nuevo."
+            AuthRestore.NeedsBiometric
+        }
     }
 
     suspend fun signInIdentifier(identifier: String, password: String, keep: Boolean): Boolean = wrap {
@@ -242,14 +263,14 @@ class AuthController(
             displayName = user.displayName ?: existing.displayName,
             email = user.email ?: existing.email,
             phoneE164 = user.phone ?: existing.phoneE164,
-            photoUrl = user.photoUrl ?: existing.photoUrl,
+            photoUrl = profile?.photoUrl?.takeIf { it.isNotBlank() } ?: user.photoUrl ?: existing.photoUrl,
         ) ?: LocalUser(
             id = user.firebaseUid,
             firebaseUid = user.firebaseUid,
             email = user.email,
             phoneE164 = user.phone,
             displayName = user.displayName ?: user.email ?: "Alguien de la comunidad",
-            photoUrl = user.photoUrl,
+            photoUrl = profile?.photoUrl?.takeIf { it.isNotBlank() } ?: user.photoUrl,
             role = profile?.role ?: UserRole.USER,
             communityPoints = profile?.communityPoints ?: 0,
             inviteCode = profile?.inviteCode ?: (user.firebaseUid.take(8).uppercase() + "-GOOD"),
