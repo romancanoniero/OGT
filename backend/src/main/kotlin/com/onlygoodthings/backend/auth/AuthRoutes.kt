@@ -6,6 +6,7 @@ import com.onlygoodthings.backend.http.optString
 import com.onlygoodthings.backend.http.reqDouble
 import com.onlygoodthings.backend.http.reqString
 import com.onlygoodthings.backend.infra.IdentityStore
+import com.onlygoodthings.backend.media.MediaStore
 import com.onlygoodthings.shared.domain.ApiResponse
 import com.onlygoodthings.shared.domain.AuthMe
 import com.onlygoodthings.shared.domain.communityLevelLabel
@@ -38,7 +39,7 @@ fun Route.publicAuthRoutes(verifier: FirebaseTokenVerifier, identity: IdentitySt
 
 }
 
-fun Route.protectedAuthRoutes(identity: IdentityStore) {
+fun Route.protectedAuthRoutes(identity: IdentityStore, mediaStore: MediaStore) {
     post("/api/v1/auth/me") {
         val principal = call.principal<AuthPrincipal>() ?: return@post call.respond(
             HttpStatusCode.Unauthorized,
@@ -60,6 +61,26 @@ fun Route.protectedAuthRoutes(identity: IdentityStore) {
                 ),
             ),
         )
+    }
+
+    post("/api/v1/users/profile/photo") {
+        val principal = call.principal<AuthPrincipal>() ?: return@post call.respond(
+            HttpStatusCode.Unauthorized, ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"))
+        val data = runCatching { JsonBody.receiveMap(call) }.getOrElse {
+            return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("JSON inválido", "BAD_REQUEST"))
+        }
+        val requested = data.optString("photoUrl").orEmpty()
+        // Nunca guardar file://, data:, URLs remotas arbitrarias ni rutas de otros hosts.
+        // La imagen debe haber sido subida a nuestro almacenamiento de medios.
+        val name = mediaStore.storedName(requested)
+        if (name == null || mediaStore.resolvePublic(name) == null ||
+            !mediaStore.contentTypeOf(name).startsWith("image/")) {
+            return@post call.respond(HttpStatusCode.BadRequest,
+                ApiResponse.fail<Unit>("Subí primero una imagen válida", "BAD_MEDIA"))
+        }
+        val canonical = mediaStore.publicUrl(name)
+        call.respond(ApiResponse.ok(identity.updatePhoto(principal.userId, canonical)))
     }
 
     post("/api/v1/me/location") {

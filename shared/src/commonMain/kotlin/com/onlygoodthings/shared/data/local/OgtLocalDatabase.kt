@@ -1001,7 +1001,8 @@ class OgtLocalDatabase {
         } else {
             visibleFeed(viewerId, mode, family).filter(::allowed)
         }
-        val pinned = feedPosts()
+        // Solo la lista REST autenticada decide qué IDs se muestran.
+        val pinned = (if (remoteOrder == null) feedPosts() else emptyList())
             .filter { post ->
                 isOwnPost(post, aliases) &&
                     allowed(post) &&

@@ -382,6 +382,9 @@ private fun impactExport(me: LocalUser, db: OgtLocalDatabase): String = buildStr
 @Composable
 private fun ProfilePhotoEditor() {
     val session = LocalOgtSession.current
+    val auth = LocalAuth.current
+    val scope = rememberCoroutineScope()
+    var savingPhoto by remember { mutableStateOf(false) }
     var sheet by remember { mutableStateOf(false) }
     var afterClose by remember { mutableStateOf<(() -> Unit)?>(null) }
     var pendingPick by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -397,8 +400,19 @@ private fun ProfilePhotoEditor() {
             photoError = "Elegí una foto"
             return@rememberOgtMediaPicker
         }
+        if (savingPhoto) return@rememberOgtMediaPicker
         photoError = null
-        session.applyProfilePhoto(picked.path)
+        savingPhoto = true
+        scope.launch {
+            try {
+                auth.changeProfilePhoto(picked.path)
+                photoError = null
+            } catch (error: Exception) {
+                photoError = error.message ?: "No se pudo guardar la foto"
+            } finally {
+                savingPhoto = false
+            }
+        }
     }
     Column(
         Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 12.dp),
@@ -441,6 +455,9 @@ private fun ProfilePhotoEditor() {
                     contentScale = ContentScale.Fit,
                 )
             }
+        }
+        if (savingPhoto) {
+            Text("Guardando foto en tu cuenta…", color = OgtColors.muted, fontSize = 13.sp)
         }
         if (!photoError.isNullOrBlank()) {
             Text(

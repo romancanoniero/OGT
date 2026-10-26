@@ -171,15 +171,15 @@ fun FeedScreen(
     var refreshTick by remember { mutableStateOf(0) }
     var refreshing by remember { mutableStateOf(false) }
     var pullPx by remember { mutableStateOf(0f) }
-    var feedPosts by remember {
-        mutableStateOf(db.composeVisibleRiver(me.id, feedMode, feedFamily))
-    }
+    // No renderizar feeds locales no verificados como publicaciones en producción.
+    var feedPosts by remember { mutableStateOf<List<LocalSocialPost>>(emptyList()) }
     var lastRemoteOrder by remember { mutableStateOf<List<String>?>(null) }
     var incomingToast by remember { mutableStateOf(false) }
     var suppressIncomingToast by remember { mutableStateOf(false) }
     val seenPostIds = remember { mutableStateListOf<String>() }
     fun paintRiver(remoteOrder: List<String>? = lastRemoteOrder) {
-        feedPosts = db.composeVisibleRiver(me.id, feedMode, feedFamily, remoteOrder)
+        feedPosts = if (remoteOrder == null) emptyList()
+            else db.composeVisibleRiver(me.id, feedMode, feedFamily, remoteOrder)
     }
     LaunchedEffect(feedMode, feedFamily) { page = 1 }
     LaunchedEffect(me.id, feedMode, feedFamily, feedTick, socialTick) {

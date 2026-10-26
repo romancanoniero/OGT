@@ -6,6 +6,16 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/ogt-ios-qa.yml'
+      - 'composeApp/**'
+      - 'shared/**'
+      - 'iosApp/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/ogt-ios-qa.yml'
+      - 'composeApp/**'
+      - 'shared/**'
+      - 'iosApp/**'
   workflow_dispatch:
     inputs:
       distribution:
@@ -21,7 +31,8 @@ permissions:
   contents: read
 concurrency:
   group: ogt-ios-qa-${{ github.ref }}
-  cancel-in-progress: false
+  # Cancelar compilaciones antiguas de PR, nunca una distribucion real de main.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   ios:

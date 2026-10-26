@@ -37,6 +37,20 @@ class OgtLocalDatabaseTest {
     }
 
     @Test
+    fun feedConfirmadoPorServidorNoMezclaPosteosLocalesNiMocks() {
+        val db = OgtLocalDatabase.seeded()
+        val localOnly = db.feedPosts().first()
+        val another = db.feedPosts().first { it.id != localOnly.id }
+        assertTrue(db.composeVisibleRiver(OgtIds.Mariana, remoteOrder = listOf(another.id))
+            .none { it.id == localOnly.id },
+            "Un registro local no validado por REST nunca aparece al lado del feed oficial")
+        assertEquals(listOf(another.id),
+            db.composeVisibleRiver(OgtIds.Mariana, remoteOrder = listOf(another.id)).map { it.id })
+        assertTrue(db.composeVisibleRiver(OgtIds.Mariana, remoteOrder = emptyList()).isEmpty(),
+            "Si el backend devuelve feed vacío, no se deben resucitar publicaciones cacheadas")
+    }
+
+    @Test
     fun seedMantieneIntegridadYPersonajesStitch() {
         val db = OgtLocalDatabase.seeded()
         val me = db.user(OgtIds.Mariana)
