@@ -50,6 +50,22 @@ class QaAutomationTests(unittest.TestCase):
         self.assertEqual(report['suiteCount'], 2)
         self.assertIn('second suite executed', (self.output / 'next.log').read_text())
 
+    def test_control_ux_audit_in_every_browser_run_and_weekly(self):
+        self.assertEqual(qa.UX_SUITE, 'qa/crm-control-ux-audit.py')
+        self.assertIn(qa.UX_SUITE, qa.SUITES)
+        root = Path(__file__).resolve().parents[1]
+        workflow = (root / '.github/workflows/ogt-control-ux-audit.yml').read_text()
+        audit = (root / qa.UX_SUITE).read_text()
+        standard = (root / 'docs/DATA_VIEWS_STANDARD.md').read_text()
+        self.assertIn("cron: '0 11 * * 1'", workflow)
+        self.assertIn('python qa/run_automated_tests.py --ux', workflow)
+        self.assertIn('actions/upload-artifact@v6', workflow)
+        self.assertNotIn('secrets.OGT_VPS_SSH_KEY', workflow)
+        self.assertIn('crm-control-scroll-browser.py', audit)
+        self.assertIn('findings.json', audit)
+        self.assertIn('page.screenshot(', audit)
+        self.assertIn('## 17. Auditoría automática', standard)
+
     def test_timeout_is_failure(self):
         suite = self.script('slow.py', 'import time\ntime.sleep(5)\n')
         result = qa.run_suite(self.root, suite, self.output, timeout=0.1)

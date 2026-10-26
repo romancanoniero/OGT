@@ -1,5 +1,5 @@
 # OGT — Estándar obligatorio de pantallas de datos
-**Versión 1.1 · 25/10/2026 · Ámbito: OGT Control y OGT Empresas**
+**Versión 1.3 · 26/10/2026 · Ámbito: OGT Control y OGT Empresas**
 
 Este documento define el patrón de cualquier pantalla que presente registros, tablas, listas de tarjetas, búsquedas, informes o resultados con acciones. Es un **contrato de producto, UX, acceso, frontend, backend y pruebas**. Toda pantalla nueva o modificada debe cumplirlo o registrar una excepción técnica justificada. No reemplaza `design/stitch/DESIGN.md` (identidad visual) ni `docs/CRM_ARCHITECTURE_20261021.md` (autorización/seguridad); los complementa.
 
@@ -173,3 +173,24 @@ documento. Se ejecuta junto con las suites E2E actuales antes de publicar.
 La confirmación de Usuarios utiliza 24 px; la de Publicaciones conserva sus 20 px redondeados existentes.
 
 **Implementación de referencia:** `web/app/crm/crm-ui.js` y `crm-runtime.js`, en OGT Control → Usuarios. Esta corrección no rediseña Empresas ni los clientes Android/iOS.
+
+
+## 17. Auditoría automática de pantallas de OGT Control (26/10/2026)
+
+La calidad de interfaz de OGT Control debe verificarse **en cada PR y en cada
+push a main**, y repetirse **semanalmente** aun sin cambios nuevos.
+El auditor de `qa/crm-control-ux-audit.py` recorre las cinco secciones y
+resoluciones de escritorio, tablet y teléfono **del CRM web**, con datos
+simulados, y entrega capturas e informe por pantalla. Detecta, como mínimo,
+desbordamiento, tarjeta no contenida, íconos semánticamente incorrectos,
+recursos gráficos rotos, botones sin nombres accesibles, controles demasiado
+pequeños y confirmaciones fuera del primer plano. Errores objetivos bloquean
+la publicación; las advertencias se presentan para revisión.
+
+**La auditoría no reemplaza el juicio de diseño:** aspectos estéticos o
+pertinencia de datos no modelados por reglas requieren revisar las capturas
+con criterio humano o una futura herramienta explícita de revisión visual.
+Nunca se usa una cuenta administrativa real en la rutina automática. El
+workflow semanal no despliega ni consulta datos privados de Contabo.
+
+Referencia completa: `docs/CRM_CONTROL_UX_AUDIT.md`.
