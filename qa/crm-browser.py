@@ -239,7 +239,7 @@ with sync_playwright() as pw:
     expect(page.locator('.crm-bulk').get_by_role('button',name='Eliminar usuarios',exact=True)).to_be_visible()
     page.locator('.crm-bulk').get_by_role('button',name='Bloquear publicaciones',exact=True).click()
     dialog=page.locator('.crm-user-moderation-dialog')
-    expect(dialog).to_contain_text('podrán seguir entrando y leyendo')
+    expect(dialog).to_contain_text('podrán seguir ingresando y leyendo')
     assert dialog.get_by_role('button',name='Confirmar bloquear publicaciones').is_disabled()
     dialog.locator('textarea').fill('Moderación por incumplimiento comprobado')
     dialog.get_by_role('button',name='Confirmar bloquear publicaciones').click()
