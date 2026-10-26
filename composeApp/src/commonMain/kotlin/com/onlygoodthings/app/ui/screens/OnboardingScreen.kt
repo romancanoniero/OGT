@@ -46,7 +46,7 @@ fun OnboardingScreen(onDone: () -> Unit, onLogin: () -> Unit) {
 
     Column(Modifier.fillMaxSize().background(OgtColors.canvas).padding(horizontal = 20.dp, vertical = 16.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("Only Good Things (OGT)", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = OgtColors.ink)
+            Text("Only Good Things", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = OgtColors.ink)
             Text(
                 "Omitir",
                 modifier = Modifier.clip(CircleShape).clickable(onClick = onDone).padding(horizontal = 12.dp, vertical = 8.dp),

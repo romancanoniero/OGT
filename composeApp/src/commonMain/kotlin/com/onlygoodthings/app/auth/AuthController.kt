@@ -240,6 +240,7 @@ class AuthController(
             token
         }
         val profile = api.openSession(session.firebaseJwt ?: token)
+            ?: error("No se pudo validar tu sesión con el servidor")
         attachLocal(user, profile)
         ensureDevBearer()
         _signedIn.value = true
