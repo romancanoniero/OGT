@@ -14,7 +14,9 @@ import time
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
-SUITES = ('qa/crm-browser.py', 'qa/crm-entrypoints-browser.py', 'qa/crm-control-scroll-browser.py')
+UX_SUITE = 'qa/crm-control-ux-audit.py'
+SUITES = ('qa/crm-browser.py', 'qa/crm-entrypoints-browser.py',
+          'qa/crm-control-scroll-browser.py', UX_SUITE)
 
 
 def check_syntax(root: Path) -> bool:
@@ -42,6 +44,7 @@ def run_suite(root: Path, suite: str, output: Path, timeout: float = 300) -> dic
     started = time.monotonic()
     status, code = 'failed', 1
     env = {**os.environ, 'PYTHONDONTWRITEBYTECODE': '1', 'PYTHONUNBUFFERED': '1'}
+    env['OGT_QA_OUTPUT'] = str(output)
     env.pop('PYTHONOPTIMIZE', None)
     with log_path.open('w', encoding='utf-8') as log:
         try:
@@ -104,6 +107,7 @@ def main() -> int:
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument('--syntax', action='store_true')
     modes.add_argument('--browser', action='store_true')
+    modes.add_argument('--ux', action='store_true', help='Run only Control UX audit')
     parser.add_argument('--output', type=Path, default=Path(tempfile.gettempdir()) / 'ogt-qa-results')
     args = parser.parse_args()
     if not __debug__:
@@ -115,7 +119,8 @@ def main() -> int:
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     # All suites run even if an earlier one fails; the final status keeps every failure.
-    results = [run_suite(ROOT, suite, output) for suite in SUITES]
+    chosen = (UX_SUITE,) if args.ux else SUITES
+    results = [run_suite(ROOT, suite, output) for suite in chosen]
     return write_report(results, output)
 
 
