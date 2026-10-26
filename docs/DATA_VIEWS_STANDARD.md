@@ -89,7 +89,7 @@ Antes de integrar: (1) prueba unitaria de parsers, whitelists, cursores y semán
 - **Búsqueda:** nombre visible o UUID exacto. **Filtros:** estados múltiples (PENDING, ACTIVE, SUSPENDED, DELETED); roles múltiples (USER, COMPANY_ADMIN, COMMUNITY_MODERATOR); fecha de alta desde/hasta. **Órdenes:** fecha de alta, nombre, estado, rol, última actividad; hasta cuatro prioridades. Desempate por ID.
 - **Lista y detalle:** 20 por página, carga incremental, panel compacto de filtros/orden, chips removibles, casillas de selección y ficha a pantalla completa con foto, identidad, alta, última actividad, publicaciones paginadas, puntos y denuncias de contenido restringidas. Las conversaciones privadas no se consultan libremente.
 - **Actualización:** resultados y encabezado únicamente, con conservación del estado por sección.
-- **Fuera de alcance v1.1:** edición, bloqueo/reactivación, exportación masiva, exploración general de chats, búsqueda por datos de contacto y eliminación física de cuentas. Exigen privilegios, motivo y un flujo seguro. La lectura del perfil ya queda auditada.
+- **Situación actual (v1.2):** la moderación en Control permite bloquear/desbloquear publicaciones y eliminar cuentas/participación individualmente o por lote, solo para los roles autorizados y mediante endpoint verificado, motivo obligatorio, confirmación y auditoría. Siguen fuera de alcance la edición libre, exportación masiva, exploración general de chats y búsqueda por datos de contacto.
 
 ## 11. Mantenimiento del estándar
 
@@ -112,9 +112,9 @@ Al introducir un nuevo tipo de pantalla, proponer su **ficha específica** y rev
 1. **Toda pantalla de datos que admita acciones por registro debe permitir selección individual**, selección/deselección de la página visible y estado visual inequívoco. Los registros seleccionados se identifican por ID, no por índice de fila.
 2. **La barra de acciones por lote aparece solo con elementos seleccionados**. Informa cantidad y alcance (página cargada frente a todos los resultados). La selección debe conservarse durante actualizaciones parciales, pero no aplicarse implícitamente a otros usuarios, tenants o consultas.
 3. **La papelera se muestra únicamente si la entidad admite eliminación y el rol está autorizado por backend**. No es obligatorio ni apropiado mostrar una papelera de eliminación física sobre todas las entidades. La `×` de los filtros nunca borra registros.
-4. **Eliminación lógica preferente:** publicaciones pasan a REMOVED; cuentas pasan por procedimientos de suspensión, cierre y eventual anonimización con retención legal, no `DELETE FROM users` arbitrario. Si hay dependencia con pagos, denuncias o mensajes se preservan integridad y pruebas.
+4. **Eliminación controlada según el tipo de entidad:** las publicaciones se moderan lógicamente; la eliminación definitiva de cuentas, cuando esté expresamente habilitada en backend, retira participaciones en una transacción, protege los datos de terceros, conserva las evidencias y obligaciones legales y evita que la cuenta se recree. No se ejecuta un `DELETE FROM users` arbitrario desde la UI.
 5. **Acción sensible:** requiere motivo, confirmación con número de registros, MFA reciente, autorización de rol en servidor, auditoría de actor/objetivo/motivo/resultado, protección frente a duplicados y, según impacto, segunda aprobación. Toda operación debe mostrar éxito parcial/error sin perder selección.
-6. **Usuarios:** selección múltiple habilitada para revisión, sin acción de borrado físico. La suspensión/cierre masivo se mantiene deshabilitada hasta una política explícita de aprobación y retención. No disfrazar la revisión como papelera.
+6. **Usuarios (OGT Control):** OWNER puede bloquear, desbloquear y eliminar cuentas seleccionadas; TRUST_SAFETY puede bloquear/desbloquear, pero no eliminar; otros roles ven la ficha sin mutaciones. El bloqueo permite continuar leyendo y rechaza nuevas contribuciones; la eliminación usa el procedimiento de baja auditado. Seleccionar o revisar perfiles nunca borra registros por sí solo.
 7. **Un registro tiene ficha amplia** cuando sus datos son multisección o necesitan contexto para moderación. En esos casos la ficha ocupa pantalla completa o panel navegable, no un modal de un renglón.
 
 ## 14. Ficha de usuario — permisos y privacidad
@@ -132,7 +132,7 @@ La ficha desde `OGT Control → Usuarios` está organizada en **Resumen, Publica
 
 La tarjeta de usuario no muestra correo, teléfono, UID de Firebase, ubicación ni conversaciones privadas por defecto. Las consultas del perfil quedan en `crm_audit_events`. No debe mostrarse una «eliminación» de cuentas que el servidor no admita explícitamente.
 
-## 14. Scroll interno obligatorio en OGT Control (25/10/2026)
+## 15. Scroll interno obligatorio en OGT Control (25/10/2026)
 
 En escritorio, todas las tablas del CRM Control — Usuarios, Publicaciones,
 Resumen, Empresas y Denuncias — deben ocupar **solo el espacio restante de la ventana**.
@@ -158,3 +158,18 @@ verificación conservan desplazamiento normal hasta que se autoriza el acceso.
 carga incremental 20→40→60, scroll interno con teclado, cabecera fija,
 selección, cambio de tamaño, estados vacío/error y ausencia de scroll en el
 documento. Se ejecuta junto con las suites E2E actuales antes de publicar.
+
+## 16. Norma visual de acciones en tablas y listas (26/10/2026)
+
+**Este patrón es obligatorio para todas las pantallas de datos del CRM.**
+
+1. **Cabeceras y barra de selección:** las acciones de consultar, bloquear, desbloquear, eliminar y otras operaciones se representan **solo mediante íconos**, tal como sucede en Publicaciones; nunca mediante una fila de botones de texto. El contador de registros seleccionados puede seguir siendo texto. Se reutilizan los componentes `crm-icon-btn` y los símbolos vectoriales Quiet Studio. Cada ícono tendrá `aria-label`, `title` descriptivo, foco visible y superficie táctil de 44 × 44 px.
+2. **Acciones individuales:** cada registro podrá mostrar en su **columna Acción** los íconos pertinentes, de acuerdo con sus capacidades, estado y permisos. Las acciones de esa fila afectan únicamente ese registro, aunque existan otros seleccionados. No usar menús genéricos donde los íconos visibles y accesibles resuelvan la interacción.
+3. **Selección múltiple:** las mismas operaciones aparecen como íconos en una barra de acciones visible solo si hay registros marcados, con el contador y alcance de la selección. Los botones de lectura y modificación no deben confundirse con papelera. No aplicar operaciones a registros fuera de la selección elegida.
+4. **Diálogo obligatorio para bloquear y eliminar:** pulsar un ícono **no ejecuta la modificación**. Primero se abre un `<dialog>` nativo con `showModal()`, en el *top layer* del navegador, **centrado, con bordes redondeados de 20–24 px, sombra y fondo oscurecido** por delante de los objetos de la pantalla. Debe indicar la acción y los usuarios afectados, consecuencias, motivo obligatorio, **Cancelar** y un botón de confirmación claramente rotulado. La eliminación irreversible exige además escribir `ELIMINAR`. Bloqueo y desbloqueo usan el mismo patrón de confirmación.
+5. **Seguridad y accesibilidad:** la interfaz no sustituye las verificaciones del servidor. El backend vuelve a controlar permisos, MFA, alcance, motivo, límites y auditoría; las pruebas confirman que no sale ninguna petición de mutación antes de la confirmación. Esc y Cancelar cierran sin cambios; `aria-labelledby`, rol adecuado, foco y teclado se verifican en QA.
+6. **Coherencia y pruebas:** el comportamiento de fila y de lote comparte una única rutina de confirmación y API. Verificar existencia de íconos, roles permitidos, acciones individuales que no arrastren seleccionados, cambios de estado, confirmación, cancelación, orden del diálogo sobre la interfaz, redondez, scroll interno y regresiones en Publicaciones.
+
+La confirmación de Usuarios utiliza 24 px; la de Publicaciones conserva sus 20 px redondeados existentes.
+
+**Implementación de referencia:** `web/app/crm/crm-ui.js` y `crm-runtime.js`, en OGT Control → Usuarios. Esta corrección no rediseña Empresas ni los clientes Android/iOS.

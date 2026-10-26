@@ -149,6 +149,13 @@ with sync_playwright() as pw:
             button.click()
             expect(button).to_have_attribute('aria-current','page')
             assert page.locator('.crm-nav-btn[aria-current="page"]').count()==1
+        if mode == 'control':
+            user_icon=page.locator('.crm-nav-btn[data-section="usuarios"] img')
+            expect(user_icon).to_have_attribute('src','../icons/qs_user.svg')
+            page.wait_for_function("""() => {
+              const img=document.querySelector('.crm-nav-btn[data-section="usuarios"] img');
+              return img && img.complete && img.naturalWidth > 0;
+            }""")
         assert not errors,errors
         context.close()
         results.append(mode+' full navigation: '+', '.join(sections))
@@ -226,16 +233,16 @@ with sync_playwright() as pw:
     begin(page);finish(page)
     page.locator('.crm-nav-btn[data-section="usuarios"]').click()
     rows=page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]')
-    assert page.get_by_role('button',name='Bloquear publicaciones').count()==0
+    assert page.locator('.crm-bulk').get_by_role('button',name='Bloquear publicaciones',exact=True).count()==0
     rows.first.locator('input[type="checkbox"]').check()
-    expect(page.get_by_role('button',name='Bloquear publicaciones')).to_be_visible()
-    expect(page.get_by_role('button',name='Eliminar usuarios')).to_be_visible()
-    page.get_by_role('button',name='Bloquear publicaciones').click()
+    expect(page.locator('.crm-bulk').get_by_role('button',name='Bloquear publicaciones',exact=True)).to_be_visible()
+    expect(page.locator('.crm-bulk').get_by_role('button',name='Eliminar usuarios',exact=True)).to_be_visible()
+    page.locator('.crm-bulk').get_by_role('button',name='Bloquear publicaciones',exact=True).click()
     dialog=page.locator('.crm-user-moderation-dialog')
-    expect(dialog).to_contain_text('podrán seguir entrando y leyendo')
-    assert dialog.get_by_role('button',name='Bloquear publicaciones').is_disabled()
+    expect(dialog).to_contain_text('podrán seguir ingresando y leyendo')
+    assert dialog.get_by_role('button',name='Confirmar bloquear publicaciones').is_disabled()
     dialog.locator('textarea').fill('Moderación por incumplimiento comprobado')
-    dialog.get_by_role('button',name='Bloquear publicaciones').click()
+    dialog.get_by_role('button',name='Confirmar bloquear publicaciones').click()
     try:
         expect(dialog).to_be_hidden(timeout=3000)
     except AssertionError:
@@ -249,19 +256,19 @@ with sync_playwright() as pw:
                for x in state['requests'] if x[0].endswith('/users/moderate'))
     expect(rows.first).to_contain_text('Solo lectura')
     rows.nth(2).locator('input[type="checkbox"]').check()
-    page.get_by_role('button',name='Permitir publicar').click()
+    page.locator('.crm-bulk').get_by_role('button',name='Permitir publicar',exact=True).click()
     dialog=page.locator('.crm-user-moderation-dialog')
     dialog.locator('textarea').fill('Revisión finalizada, puede participar nuevamente')
-    dialog.get_by_role('button',name='Permitir publicaciones').click()
+    dialog.get_by_role('button',name='Confirmar permitir publicaciones').click()
     expect(dialog).to_be_hidden()
     assert any(x[1].get('action')=='UNBLOCK' and len(x[1].get('userIds',[]))==1
                for x in state['requests'] if x[0].endswith('/users/moderate'))
     expect(rows.nth(2)).not_to_contain_text('Solo lectura')
     rows.first.locator('input[type="checkbox"]').check()
     rows.nth(1).locator('input[type="checkbox"]').check()
-    page.get_by_role('button',name='Eliminar usuarios').click()
+    page.locator('.crm-bulk').get_by_role('button',name='Eliminar usuarios',exact=True).click()
     dialog=page.locator('.crm-user-moderation-dialog')
-    expect(dialog).to_contain_text('Irreversible')
+    expect(dialog).to_contain_text('irreversible')
     dialog.locator('textarea').fill('Eliminación ordenada tras revisión administrativa')
     assert dialog.get_by_role('button',name='Eliminar definitivamente').is_disabled()
     dialog.get_by_label('Escribí ELIMINAR para confirmar').fill('ELIMINAR')
@@ -275,14 +282,83 @@ with sync_playwright() as pw:
     context.close()
     results.append('Users bulk moderation: selection actions, reason, typed deletion and API payload')
 
+    # Per-row actions do not inherit the bulk selection. Every dangerous click
+    # first opens a foreground rounded native modal; Cancel/Escape never mutate.
+    context,page,state,errors=session('control')
+    state['user_fixture']=True
+    begin(page);finish(page)
+    page.locator('.crm-nav-btn[data-section="usuarios"]').click()
+    rows=page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]')
+    expect(rows).to_have_count(20)
+    first=rows.first
+    second=rows.nth(1)
+    expect(first.get_by_role('button',name='Bloquear publicaciones de Usuario de prueba 01')).to_be_visible()
+    expect(first.get_by_role('button',name='Eliminar usuario Usuario de prueba 01')).to_be_visible()
+    expect(rows.nth(2).get_by_role('button',name='Permitir publicaciones de Usuario de prueba 03')).to_be_visible()
+    assert first.get_by_role('button',name='Bloquear publicaciones de Usuario de prueba 01').evaluate(
+        '(el) => el.textContent.trim() === "" && el.querySelector("img") !== null')
+    second.locator('input[type="checkbox"]').check()
+    first.get_by_role('button',name='Bloquear publicaciones de Usuario de prueba 01').click()
+    dialog=page.locator('.crm-user-moderation-dialog')
+    expect(dialog).to_be_visible()
+    assert dialog.evaluate("(el) => el.matches(':modal') && el.getAttribute('aria-modal') === 'true'")
+    assert dialog.evaluate("(el) => parseFloat(getComputedStyle(el).borderTopLeftRadius)") >= 20
+    assert dialog.evaluate("(el) => getComputedStyle(el, '::backdrop').backgroundColor.includes('0.5')")
+    expect(dialog).to_contain_text('Usuario de prueba 01')
+    assert not any(url.endswith('/users/moderate') for url,_ in state['requests'])
+    dialog.get_by_role('button',name='Cancelar').click()
+    expect(dialog).to_be_hidden()
+    assert not any(url.endswith('/users/moderate') for url,_ in state['requests'])
+    # Canceling must not alter the previously selected second row.
+    assert second.locator('input[type="checkbox"]').is_checked()
+    first.get_by_role('button',name='Bloquear publicaciones de Usuario de prueba 01').click()
+    dialog=page.locator('.crm-user-moderation-dialog')
+    dialog.locator('textarea').fill('Incumplimiento comprobado de la política de publicación')
+    dialog.get_by_role('button',name='Confirmar bloquear publicaciones').click()
+    expect(dialog).to_be_hidden()
+    one='00000001-1111-4111-8111-111111111111'
+    two='00000002-1111-4111-8111-111111111111'
+    mods=[body for url,body in state['requests'] if url.endswith('/users/moderate')]
+    assert mods[-1]['action']=='BLOCK' and mods[-1]['userIds']==[one],mods
+    expect(rows.first).to_contain_text('Solo lectura')
+    expect(rows.first.get_by_role('button',name='Permitir publicaciones de Usuario de prueba 01')).to_be_visible()
+    assert second.locator('input[type="checkbox"]').is_checked()
+    rows.first.get_by_role('button',name='Eliminar usuario Usuario de prueba 01').click()
+    dialog=page.locator('.crm-user-moderation-dialog')
+    assert dialog.evaluate("(el) => el.matches(':modal')")
+    expect(dialog).to_contain_text('irreversible')
+    dialog.locator('textarea').fill('Baja administrativa tras investigación documentada')
+    dialog.get_by_label('Escribí ELIMINAR para confirmar').fill('ELIMINAR')
+    page.keyboard.press('Escape')
+    expect(dialog).to_be_hidden()
+    assert len([1 for url,_ in state['requests'] if url.endswith('/users/moderate')]) == 1
+    rows.first.get_by_role('button',name='Eliminar usuario Usuario de prueba 01').click()
+    dialog=page.locator('.crm-user-moderation-dialog')
+    dialog.locator('textarea').fill('Baja administrativa tras investigación documentada')
+    dialog.get_by_label('Escribí ELIMINAR para confirmar').fill('ELIMINAR')
+    dialog.get_by_role('button',name='Eliminar definitivamente').click()
+    expect(dialog).to_be_hidden()
+    mods=[body for url,body in state['requests'] if url.endswith('/users/moderate')]
+    assert mods[-1]['action']=='DELETE' and mods[-1]['userIds']==[one] and mods[-1]['confirm']=='ELIMINAR',mods
+    expect(rows).to_have_count(19)
+    assert rows.first.get_attribute('data-post')==two
+    assert rows.first.locator('input[type="checkbox"]').is_checked()
+    assert not errors,errors
+    context.close()
+    results.append('Users per-row icon actions: isolated target, 24px modal, top layer, Cancel/Escape, block/delete confirmation')
+
+
     for role,may_block in [('TRUST_SAFETY',True),('SUPPORT',False)]:
         context,page,state,errors=session('control')
         state['platform_role']=role;state['user_fixture']=True
         begin(page);finish(page)
         page.locator('.crm-nav-btn[data-section="usuarios"]').click()
         page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]').first.locator('input[type="checkbox"]').check()
-        assert page.get_by_role('button',name='Bloquear publicaciones').count()==(1 if may_block else 0)
-        assert page.get_by_role('button',name='Eliminar usuarios').count()==0
+        assert page.locator('.crm-bulk').get_by_role('button',name='Bloquear publicaciones',exact=True).count()==(1 if may_block else 0)
+        assert page.locator('.crm-bulk').get_by_role('button',name='Eliminar usuarios',exact=True).count()==0
+        first=page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]').first
+        assert first.get_by_role('button',name='Eliminar usuario Usuario de prueba 01').count()==0
+        assert first.get_by_role('button',name='Bloquear publicaciones de Usuario de prueba 01').count()==(1 if may_block else 0)
         assert not errors,errors
         context.close()
     results.append('Users toolbar respects Trust & Safety and support permissions')
