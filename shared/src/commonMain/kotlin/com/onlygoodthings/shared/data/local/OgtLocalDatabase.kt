@@ -841,9 +841,7 @@ class OgtLocalDatabase {
         val ranked = rankedFeed(viewerId, mode, nowEpochMs, 0, limit, family)
             .filter { !hidesOwnAnecdoteShare(viewerId, it) }
         val aliases = viewerAliases(viewerId)
-        // Cuando REST respondió, únicamente el servidor decide qué publicaciones
-        // existen. Nunca mezclar posts viejos de caché ni pendientes locales.
-        val pinned = (if (remoteOrder == null) feedPosts() else emptyList())
+        val pinned = feedPosts()
             .filter { post ->
                 isOwnPost(post, aliases) &&
                     !hidesOwnAnecdoteShare(viewerId, post) &&
@@ -1003,7 +1001,8 @@ class OgtLocalDatabase {
         } else {
             visibleFeed(viewerId, mode, family).filter(::allowed)
         }
-        val pinned = feedPosts()
+        // Solo la lista REST autenticada decide qué IDs se muestran.
+        val pinned = (if (remoteOrder == null) feedPosts() else emptyList())
             .filter { post ->
                 isOwnPost(post, aliases) &&
                     allowed(post) &&
