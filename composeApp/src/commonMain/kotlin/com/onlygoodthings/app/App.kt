@@ -107,6 +107,7 @@ import com.onlygoodthings.app.ui.screens.ReportAnimalScreen
 import com.onlygoodthings.app.ui.screens.SettingsScreen
 import com.onlygoodthings.app.ui.screens.VehicleEditorScreen
 import com.onlygoodthings.app.ui.screens.SkillsScreen
+import com.onlygoodthings.app.ui.screens.LandingScreen
 import com.onlygoodthings.app.ui.screens.SplashScreen
 import com.onlygoodthings.app.ui.screens.SplashSponsorsScreen
 import com.onlygoodthings.app.ui.screens.SponsorsScreen
@@ -532,8 +533,8 @@ fun App() {
                         onDone = { route = OgtRoute.SignUp },
                         onLogin = { route = OgtRoute.Login },
                     )
-                    OgtRoute.Onboarding -> OnboardingScreen(
-                        onDone = { route = OgtRoute.SignUp },
+                    OgtRoute.Onboarding -> LandingScreen(
+                        onContinue = { route = OgtRoute.OnboardingFeatures },
                         onLogin = { route = OgtRoute.Login },
                     )
                     OgtRoute.SignUp -> SignUpScreen(

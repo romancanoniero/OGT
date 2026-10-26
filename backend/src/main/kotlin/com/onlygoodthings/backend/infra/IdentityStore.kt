@@ -118,6 +118,20 @@ class IdentityStore(private val db: Database) {
         }
     }
 
+    /** Avatar persistido en PostgreSQL. Solo acepta URL ya validada en MediaStore. */
+    fun updatePhoto(userId: String, photoUrl: String): UserProfile {
+        db.withConnection { connection ->
+            connection.prepareStatement(
+                "UPDATE users SET photo_url = ?, updated_at = now() WHERE id = ?::uuid AND status = 'ACTIVE'"
+            ).use { stmt ->
+                stmt.setString(1, photoUrl)
+                stmt.setString(2, userId)
+                check(stmt.executeUpdate() == 1) { "Usuario no disponible" }
+            }
+        }
+        return requireNotNull(byId(userId))
+    }
+
     /** Última posición conocida del vecino. No es historial de ruta. */
     fun updateHomeLocation(
         userId: String,

@@ -171,7 +171,7 @@ fun Application.module() {
                     finish()
                 }
             }
-            protectedAuthRoutes(identity)
+            protectedAuthRoutes(identity, mediaStore)
             crmRoutes(db, verifier, hub, mediaStore)
             parkingRoutes(ParkingSqlRepository(db), redis, hub, FootRoutingService.fromEnv(), parkingProximity)
             socialRoutes(SocialSqlRepository(db), hub)

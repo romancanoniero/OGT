@@ -42,6 +42,18 @@ class AuthController(
         preview.overlayUser = updated
     }
 
+    /** Backend first: returning from Settings must never pretend a temporary file was saved. */
+    suspend fun changeProfilePhoto(path: String): String {
+        val bytes = com.onlygoodthings.app.platform.readLocalFileBytes(path)
+            ?: error("No se pudo leer la foto elegida")
+        val filename = path.substringAfterLast('/').substringBefore('?')
+            .takeIf { it.isNotBlank() } ?: "perfil.jpg"
+        val profile = api.uploadAndSaveProfilePhoto(bytes, filename)
+        val url = profile.photoUrl ?: error("El servidor no devolvió la foto guardada")
+        preview.applyProfilePhoto(url)
+        return url
+    }
+
     var pendingPhone by mutableStateOf<PendingPhoneAuth?>(null)
     var busy by mutableStateOf(false)
     var error by mutableStateOf<String?>(null)
@@ -56,7 +68,8 @@ class AuthController(
             platform.signOut()
             return AuthRestore.LoggedOut
         }
-        runCatching { finishSession(user) }
+        val opened = runCatching { finishSession(user) }.isSuccess
+        if (!opened || !_signedIn.value) return AuthRestore.LoggedOut
         return if (prefs.onboardingDone) AuthRestore.Home else AuthRestore.FirstRun
     }
 
@@ -242,14 +255,14 @@ class AuthController(
             displayName = user.displayName ?: existing.displayName,
             email = user.email ?: existing.email,
             phoneE164 = user.phone ?: existing.phoneE164,
-            photoUrl = user.photoUrl ?: existing.photoUrl,
+            photoUrl = profile?.photoUrl ?: user.photoUrl ?: existing.photoUrl,
         ) ?: LocalUser(
             id = user.firebaseUid,
             firebaseUid = user.firebaseUid,
             email = user.email,
             phoneE164 = user.phone,
             displayName = user.displayName ?: user.email ?: "Alguien de la comunidad",
-            photoUrl = user.photoUrl,
+            photoUrl = profile?.photoUrl ?: user.photoUrl,
             role = profile?.role ?: UserRole.USER,
             communityPoints = profile?.communityPoints ?: 0,
             inviteCode = profile?.inviteCode ?: (user.firebaseUid.take(8).uppercase() + "-GOOD"),
