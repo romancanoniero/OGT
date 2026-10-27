@@ -21,6 +21,7 @@ REQUIRED = (
     "database/migrations/24_post_media_frame.sql",
     "database/migrations/25_post_media_original.sql",
     "database/migrations/26_crm_publication_index.sql",
+    "database/migrations/28_crm_user_moderation.sql",
 )
 
 

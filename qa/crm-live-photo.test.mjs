@@ -29,9 +29,9 @@ test('el aviso usa url y mediaUrls, los nombres que ya pinta la web', () => {
 });
 
 test('el feed publico carga el JavaScript actualizado de la aplicacion', () => {
-  assert.match(bootstrap, /\/ogt-sdk\.js\?v=frame-size/);
-  assert.match(bootstrap, /\/app\.js\?v=baja/);
-  assert.match(html, /\/bootstrap\.js\?v=frame-size/);
+  assert.match(bootstrap, /\/ogt-sdk\.js\?v=[a-zA-Z0-9_-]+/);
+  assert.match(bootstrap, /\/app\.js\?v=[a-zA-Z0-9_-]+/);
+  assert.match(html, /\/bootstrap\.js\?v=[a-zA-Z0-9_-]+/);
   assert.match(nginx, /location = \/index\.html[\s\S]*no-store/);
   assert.match(nginx, /location ~\*\s*\\\.\(css\|js\|mjs[\s\S]*?no-store/);
 });

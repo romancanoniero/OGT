@@ -16,52 +16,128 @@ permissions:
   contents: read
 concurrency:
   group: ogt-release-${{ github.ref }}
-  cancel-in-progress: false
+  # Cancel stale PR checks, never interrupt a main deployment.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   checks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
-      - uses: actions/setup-python@v5
+          package-manager-cache: false
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+      - name: Python syntax before browser installation
+        run: python qa/run_automated_tests.py --syntax
+      - name: QA automation self-tests
+        run: python -m unittest discover -s qa -p 'test_qa_automation.py' -v
       - name: Source checks; no server access
         run: bash scripts/deploy-ogt-vps.sh --check
       - name: Shell syntax
         run: bash -n scripts/deploy-ogt-vps.sh scripts/activate-ogt-release.sh scripts/ogt-ios-wifi.sh
-  browser:
+  backend:
     needs: checks
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+        with:
+          repository: romancanoniero/db-kmp-sdk
+          ref: ${{ vars.OGT_SDK_REVISION || '0a881b7a15c9a7d99b77da8547aabe2dd493a8b0' }}
+          token: ${{ secrets.OGT_SDK_READ_TOKEN || secrets.OGT_SDK_CHECKOUT_TOKEN }}
+          path: _sdk
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Compile and run backend tests before merging or publishing
+        run: |
+          ./gradlew "-Pogt.dbKmpSdkPath=$GITHUB_WORKSPACE/_sdk" :backend:test --no-daemon
+  database:
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: ogt
+          POSTGRES_PASSWORD: ogt-ci-only
+          POSTGRES_DB: onlygoodthings
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ogt -d onlygoodthings"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Verify user deletion, immutable audit and referential integrity in isolated PostGIS
+        env:
+          PGPASSWORD: ogt-ci-only
+        run: |
+          if ! command -v psql >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y postgresql-client
+          fi
+          for migration in 01_init 13_post_anecdotes 15_anecdote_engagement 23_crm_foundations 28_crm_user_moderation; do
+            psql -h 127.0.0.1 -U ogt -d onlygoodthings -X -v ON_ERROR_STOP=1 -f "database/migrations/$migration.sql"
+          done
+          psql -h 127.0.0.1 -U ogt -d onlygoodthings -X -v ON_ERROR_STOP=1 -f qa/crm-user-moderation-db-smoke.sql
+  browser:
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - run: |
-          pip install 'playwright==1.56.0'
+      - name: Install pinned browser test dependencies
+        run: |
+          python -m pip install 'playwright==1.56.0'
           python -m playwright install --with-deps chromium
-      - name: Browser regression with mocked identity and API, not live MFA
-        run: python qa/crm-browser.py
-      - name: Public entrypoint and missing CRM assets regression (local fixtures)
-        run: python qa/crm-entrypoints-browser.py
+      - name: Run all browser suites and preserve every failure
+        run: python qa/run_automated_tests.py --browser --output "$RUNNER_TEMP/ogt-qa"
+      - name: Preserve browser QA reports even on failure
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ogt-browser-qa-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ogt-qa/
+          if-no-files-found: ignore
+          retention-days: 7
   publish:
-    # Only an explicitly named main-branch release may publish to the existing Contabo installation.
-    needs: [checks, browser]
+    # Every validated main push publishes; PRs/release branches never deploy.
+    # Keep environment approvals, secrets, backups and all validation gates.
+    needs: [checks, browser, backend, database]
     if: >-
-      github.ref == 'refs/heads/main' && github.repository == 'romancanoniero/OGT' &&
-      ((github.event_name == 'workflow_dispatch' && inputs.confirm == 'PUBLICAR_PRIMERA_VERSION') ||
-      (github.event_name == 'push' && github.event.head_commit.message == 'deploy: OGT verified CRM release 20261022'))
-    runs-on: ubuntu-latest
-    environment: ogt-launch
+      success() && github.ref == 'refs/heads/main' && github.repository == 'romancanoniero/OGT' &&
+      (github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.confirm == 'PUBLICAR_PRIMERA_VERSION'))
+    runs-on: ubuntu-24.04
+    environment:
+      name: ogt-launch
+      url: https://onlygoodthings.lat/crm/control/
     timeout-minutes: 45
     defaults:
       run:
@@ -130,6 +206,7 @@ jobs:
           OGT_DB_KMP_SDK_PATH: ${{ github.workspace }}/_sdk
         run: bash scripts/deploy-ogt-vps.sh --deploy
       - name: Verify installed release and backend on the existing VPS
+        id: verify
         env:
           EXPECTED_SHA: ${{ github.sha }}
         run: |
@@ -146,6 +223,27 @@ jobs:
           PY
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes ogt-release-target 'curl -fsS --max-time 15 http://127.0.0.1:19080/health >/dev/null'
           echo 'OGT backend responsive; integrated version confirmed'
+          echo 'verified=true' >> "$GITHUB_OUTPUT"
+      - name: Record verified Contabo deployment
+        if: success() && steps.verify.outputs.verified == 'true'
+        env:
+          VERIFIED_SHA: ${{ github.sha }}
+        run: |
+          {
+            echo '## Contabo: deployment verified'
+            printf '\nInstalled commit: `%s`\n' "$VERIFIED_SHA"
+            echo 'Repository, integrated scope and backend health verified on the VPS.'
+            echo 'Control: https://onlygoodthings.lat/crm/control/'
+            echo 'Real-account acceptance and native mobile tests remain separate.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve installed release evidence
+        if: success() && steps.verify.outputs.verified == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ogt-contabo-verified-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/ogt-release-check.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Remove SSH credentials
         if: always()
         run: rm -f ~/.ssh/ogt-release ~/.ssh/known_hosts ~/.ssh/config

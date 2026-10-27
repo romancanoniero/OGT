@@ -33,6 +33,25 @@ test('visible post search and removal use the CRM routes', async () => {
   ]);
 });
 
+test('moderation route is explicitly allowed and carries selected IDs to the server', async () => {
+  const recorded = [];
+  const api = createApi(async (path, request) => {
+    recorded.push([path, JSON.parse(request.body)]);
+    return response({ success: true, data: { action: 'BLOCK', ids: ['11111111-1111-4111-8111-111111111111'] } });
+  });
+  const body = {
+    action: 'BLOCK',
+    userIds: ['11111111-1111-4111-8111-111111111111'],
+    reason: 'Moderación comprobada',
+    confirm: '',
+  };
+  const result = await api('platform/users/moderate', 'jwt', body);
+  assert.deepEqual(result.ids, body.userIds);
+  assert.deepEqual(recorded, [['/api/v1/crm/platform/users/moderate', body]]);
+  await assert.rejects(() => api('platform/users/forbidden', 'jwt', body),
+    error => error.code === 'INVALID_ROUTE');
+});
+
 test('publicaciones abre el listado y no el tablero de resumen', () => {
   const publicaciones = { id: 'publicaciones', label: 'Publicaciones', view: 'listing' };
   const resumen = { id: 'resumen', label: 'Resumen', keys: null };
@@ -43,12 +62,12 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   const html = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\.svg', view: 'listing'/);
   assert.doesNotMatch(runtime, /id: 'publicaciones'[^}]*keys:/);
-  assert.match(runtime, /crm-ui\.js\?v=suggest-2/);
-  assert.match(html, /crm\.js\?v=totp-timeout-1/);
+  assert.match(runtime, /crm-ui\.js\?v=[a-zA-Z0-9_-]+/);
+  assert.match(html, /crm\.js\?v=users-action-icons-1/);
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
   assert.match(runtime, /publicationImage\(post\.editorUrl\)/);
   assert.match(runtime, /imageUrl: saved\.imageUrl/);
-  assert.match(html, /crm\.css\?v=suggest-2/);
+  assert.match(html, /crm\.css\?v=users-action-icons-1/);
   assert.match(runtime, /icon: 'qs_trash\.png', label: 'Quitar selección'/);
   assert.match(runtime, /platform\/posts\/reassign/);
   assert.match(runtime, /platform\/users\/search/);
@@ -171,7 +190,7 @@ test('la rueda del CRM web acerca arriba y aleja abajo', () => {
   const empresas = readFileSync(new URL('../web/app/crm/empresas/index.html', import.meta.url), 'utf8');
   const control = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
   assert.match(empresas, /crm\.js\?v=totp-timeout-1/);
-  assert.match(control, /crm\.js\?v=totp-timeout-1/);
+  assert.match(control, /crm\.js\?v=users-action-icons-1/);
   assert.doesNotMatch(css, /crm-frame-zoom/);
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_in.png', import.meta.url)));
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_out.png', import.meta.url)));
@@ -213,4 +232,134 @@ test('la búsqueda incremental no vuelve a abrirse después de cerrarse', () => 
   );
   assert.equal(same.hold, true);
   assert.equal(reduceSuggestPanel(same, { type: 'result', hasSuggestions: true }).open, false);
+});
+
+test('publication listing sorts the complete server result, keeping a stable cursor', () => {
+  const runtime = readFileSync(new URL('../web/app/crm/crm-runtime.js', import.meta.url), 'utf8');
+  const ui = readFileSync(new URL('../web/app/crm/crm-ui.js', import.meta.url), 'utf8');
+  const backend = readFileSync(new URL('../backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmRoutes.kt', import.meta.url), 'utf8');
+  assert.match(runtime, /sortable: \{ Autor: 'author', Texto: 'text', Fecha: 'createdAt' \}/);
+  assert.match(runtime, /const body = \{ query, orders, filters \}/);
+  assert.match(ui, /listItems\.concat\(incoming\.filter/);
+  assert.match(ui, /Cargar 20 más/);
+  assert.match(ui, /aria-sort/);
+  assert.match(ui, /listLoading && !reset/);
+  assert.match(backend, /crmValidPostSort\(sortBy, sortDirection\)/);
+  assert.match(backend, /ORDER BY \$sortExpression \$sortDirection/);
+  assert.match(backend, /crmEncodePostPageCursor/);
+});
+
+test('compact cumulative filters and multilevel sorting are wired to the API', () => {
+  const ui = readFileSync(new URL('../web/app/crm/crm-ui.js', import.meta.url), 'utf8');
+  const runtime = readFileSync(new URL('../web/app/crm/crm-runtime.js', import.meta.url), 'utf8');
+  const backend = readFileSync(new URL('../backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmRoutes.kt', import.meta.url), 'utf8');
+  assert.match(ui, /crm-query-popover/);
+  assert.match(ui, /crm-query-chips/);
+  assert.match(ui, /Quitar filtro/);
+  assert.match(ui, /listOrders/);
+  assert.match(ui, /listFilters/);
+  assert.match(ui, /closeQueryPanel/);
+  assert.match(runtime, /advanced: true/);
+  assert.match(runtime, /const body = \{ query, orders, filters \}/);
+  assert.match(backend, /searchVisiblePostsAdvanced/);
+  assert.match(backend, /crmPostSortKeys/);
+  assert.match(backend, /crmEncodePostMultiCursor/);
+});
+
+test('listing updates reconcile keyed rows without remounting shell, filters or search', () => {
+  const ui = readFileSync(new URL('../web/app/crm/crm-ui.js', import.meta.url), 'utf8');
+  assert.match(ui, /function patchListingRows\(listing\)/);
+  assert.match(ui, /existing = new Map\(\[\.\.\.entityBody\.rows\]/);
+  assert.match(ui, /entityBody\.insertBefore\(row, cursor\)/);
+  assert.match(ui, /renderListing\(listing, \{ updateRows: entering \}\)/);
+  const patch = ui.split('function patchListingRows(listing) {')[1].split('function listingStatus(listing) {')[0];
+  assert.doesNotMatch(patch, /entityBody\.replaceChildren\(/);
+  assert.match(ui, /if \(renderedHeaderKey === key\) return/);
+  assert.match(ui, /Los resultados anteriores se conservaron/);
+  assert.match(ui, /entityWrap\.scrollLeft = beforeScroll/);
+});
+
+test('users section follows the mandatory data-view standard and role-gated action icons', () => {
+  const runtime = readFileSync(new URL('../web/app/crm/crm-runtime.js', import.meta.url), 'utf8');
+  const ui = readFileSync(new URL('../web/app/crm/crm-ui.js', import.meta.url), 'utf8');
+  const routes = readFileSync(new URL('../backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmRoutes.kt', import.meta.url), 'utf8');
+  const users = readFileSync(new URL('../backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmUserListing.kt', import.meta.url), 'utf8');
+  const guide = readFileSync(new URL('../docs/DATA_VIEWS_STANDARD.md', import.meta.url), 'utf8');
+  assert.match(runtime, /id: 'usuarios', label: 'Usuarios', icon: 'qs_user\.svg', view: 'listing'/);
+  assert.match(runtime, /qs_publish_block\.svg/);
+  assert.match(runtime, /qs_publish_allow\.svg/);
+  assert.match(runtime, /userDelete/);
+  assert.match(ui, /function openUserModeration\(listing, action, targets = null\)/);
+  assert.match(ui, /showModal\(\)/);
+  assert.match(ui, /crm-user-bulk-icon/);
+  assert.ok(existsSync(new URL('../web/app/crm/icons/qs_publish_block.svg', import.meta.url)));
+  assert.ok(existsSync(new URL('../web/app/crm/icons/qs_publish_allow.svg', import.meta.url)));
+  assert.match(guide, /Norma visual de acciones en tablas y listas/);
+  assert.match(guide, /bordes redondeados de 20/);
+  assert.match(runtime, /platform\/users\/list/);
+  assert.match(runtime, /readOnly: true/);
+  assert.match(runtime, /filterType: 'users'/);
+  assert.match(ui, /userStatusLabels/);
+  assert.match(ui, /userRoleLabels/);
+  assert.match(ui, /rememberListingPreferences/);
+  assert.match(ui, /if \(listing\.readOnly\)/);
+  assert.match(routes, /post\("\/api\/v1\/crm\/platform\/users\/list"\)/);
+  assert.match(users, /crmParseUserListCursor/);
+  assert.match(users, /crmUserSortKeys/);
+  assert.match(users, /LIMIT 21/);
+  for (const forbidden of ['u.email', 'u.phone_e164', 'u.firebase_uid']) {
+    assert.ok(!users.includes(forbidden), 'do not expose sensitive contact field '+forbidden);
+  }
+  for (const standard of ['búsqueda', 'filtros', 'orden', 'paginación', 'actualización parcial', 'seguridad', 'Contabo']) {
+    assert.ok(guide.toLocaleLowerCase('es').includes(standard.toLocaleLowerCase('es')));
+  }
+});
+
+test('animal post titles are indexed, searchable and visible in CRM across platforms', () => {
+  const migration = readFileSync(new URL('../database/migrations/27_crm_animal_search_parity.sql', import.meta.url), 'utf8');
+  const backend = readFileSync(new URL('../backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmRoutes.kt', import.meta.url), 'utf8');
+  const animals = readFileSync(new URL('../backend/src/main/kotlin/com/onlygoodthings/backend/modules/AnimalRepository.kt', import.meta.url), 'utf8');
+  const runtime = readFileSync(new URL('../web/app/crm/crm-runtime.js', import.meta.url), 'utf8');
+  const publicApp = readFileSync(new URL('../web/app/app.js', import.meta.url), 'utf8');
+  const mobile = readFileSync(new URL('../shared/src/commonMain/kotlin/com/onlygoodthings/shared/data/remote/RestFeedRepository.kt', import.meta.url), 'utf8');
+  assert.match(migration, /'pet_name'/);
+  assert.match(migration, /'animal_title'/);
+  assert.match(migration, /JOIN animal_listings a/);
+  assert.match(migration, /CREATE TRIGGER trg_crm_publication_index_animal/);
+  assert.match(migration, /SELECT crm_refresh_publication_index\(p\.id\)/);
+  assert.match(backend, /LEFT JOIN animal_listings a ON a\.id = p\.listing_id/);
+  assert.match(backend, /AS animal_title/);
+  assert.match(backend, /animalTitle = getString\("animal_title"\)/);
+  assert.match(runtime, /post\.animalTitle/);
+  assert.match(publicApp, /\/api\/v1\/social\/feed/);
+  assert.match(mobile, /\/api\/v1\/social\/feed/);
+  const openMethod = animals.split('fun open(): List<AnimalListingDto>')[1].split('fun homeLocation')[0];
+  assert.match(openMethod, /JOIN social_posts p ON p\.listing_id = a\.id/);
+  assert.match(openMethod, /p\.moderation_status = 'VISIBLE'/);
+  assert.doesNotMatch(openMethod, /LEFT JOIN social_posts p/);
+});
+
+test('full user profile and selection obey the mandatory policy', () => {
+  const ui = readFileSync(new URL('../web/app/crm/crm-ui.js', import.meta.url), 'utf8');
+  const runtime = readFileSync(new URL('../web/app/crm/crm-runtime.js', import.meta.url), 'utf8');
+  const core = readFileSync(new URL('../web/app/crm/crm-core.js', import.meta.url), 'utf8');
+  const profile = readFileSync(new URL('../backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmUserProfile.kt', import.meta.url), 'utf8');
+  const routes = readFileSync(new URL('../backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmRoutes.kt', import.meta.url), 'utf8');
+  const standard = readFileSync(new URL('../docs/DATA_VIEWS_STANDARD.md', import.meta.url), 'utf8');
+  assert.match(runtime, /userProfile: true/);
+  assert.match(runtime, /bulkReview:/);
+  assert.match(runtime, /mark: true,\s+columns: \['Nombre'/);
+  assert.match(ui, /function openUserProfile/);
+  assert.match(ui, /function openUserSelection/);
+  assert.match(ui, /crm-profile-dialog/);
+  assert.match(ui, /Chats denunciados/);
+  assert.match(ui, /El CRM no permite explorar mensajes privados/);
+  assert.match(core, /platform\/users\/detail/);
+  assert.match(core, /platform\/users\/posts/);
+  assert.match(routes, /USER_PROFILE_VIEW/);
+  assert.match(profile, /crmCanReviewUserReports/);
+  assert.match(profile, /moderation_status = 'VISIBLE'/);
+  assert.doesNotMatch(profile, /firebase_uid|phone_e164|timebank_messages|SELECT .*email/i);
+  assert.match(standard, /Selección múltiple, eliminación y acciones administrativas/);
+  assert.match(standard, /denuncia autenticada/);
 });

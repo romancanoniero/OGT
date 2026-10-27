@@ -175,6 +175,20 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   search.autocomplete = 'off';
   searchLabel.append(productIcon('qs_lupa.svg', 'crm-field-icon'), search, suggestBox);
   tools.append(searchLabel);
+  const advancedFiltersButton = node('button', 'Filtros (0)');
+  advancedFiltersButton.type = 'button';
+  advancedFiltersButton.className = 'crm-btn crm-btn-secondary crm-query-button';
+  advancedFiltersButton.prepend(productIcon('qs_search.svg'));
+  const advancedOrdersButton = node('button', 'Orden (1)');
+  advancedOrdersButton.type = 'button';
+  advancedOrdersButton.className = 'crm-btn crm-btn-secondary crm-query-button';
+  const advancedPopover = node('div');
+  advancedPopover.className = 'crm-query-popover';
+  advancedPopover.hidden = true;
+  const queryChips = node('div');
+  queryChips.className = 'crm-query-chips';
+  queryChips.hidden = true;
+  tools.append(advancedFiltersButton, advancedOrdersButton, advancedPopover);
 
   const kpis = node('div');
   kpis.className = 'crm-kpis';
@@ -192,10 +206,14 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   const entityBody = node('tbody');
   entityTable.append(entityHead, entityBody);
   entityWrap.append(entityTable);
-  const more = node('button', 'Ver más');
+  const more = node('button', 'Cargar 20 más');
   more.type = 'button';
   more.className = 'crm-btn crm-btn-secondary crm-list-more';
   more.hidden = true;
+  const listCount = node('p');
+  listCount.className = 'crm-list-count';
+  listCount.setAttribute('role', 'status');
+  listCount.hidden = true;
   const bulkBar = node('div');
   bulkBar.className = 'crm-bulk';
   bulkBar.hidden = true;
@@ -220,8 +238,8 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   const detailLine = node('p');
   const detailNote = node('p', 'El servidor informó este total. Desde acá no se editan permisos ni registros.');
   detail.append(detailTitle, detailLine, detailNote);
-  panel.append(panelTitle, bulkBar, tableWrap, entityWrap, more, listError, empty.box, detail);
-  main.append(header, tools, kpis, panel);
+  panel.append(panelTitle, bulkBar, tableWrap, entityWrap, listCount, more, listError, empty.box, detail);
+  main.append(header, tools, queryChips, kpis, panel);
   workspace.append(nav, main);
   const dialog = node('dialog');
   dialog.className = 'crm-dialog';
@@ -250,6 +268,9 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   const suggestListeners = new AbortController();
   let listItems = [];
   let listCursor = null;
+  let listFilters = { topics: [], authors: [], photo: 'any', from: '', to: '' };
+  let listOrders = [{ by: 'createdAt', direction: 'desc' }];
+  let openQueryPanel = null;
   let listTicket = 0;
   let listTimer = 0;
   let selectedKey = null;
@@ -261,6 +282,300 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     const section = sectionOf(id);
     return section?.listing || listings[id] || null;
   }
+  const defaultPostFilters = () => ({ topics: [], authors: [], photo: 'any', from: '', to: '' });
+  const listingViews = new Map();
+  function defaultFiltersFor(listing) {
+    return listing?.defaultFilters ? structuredClone(listing.defaultFilters) : defaultPostFilters();
+  }
+  function restoreListingPreferences(listing) {
+    const saved = listingViews.get(current);
+    listFilters = saved ? structuredClone(saved.filters) : defaultFiltersFor(listing);
+    listOrders = saved ? structuredClone(saved.orders) : [{ by: 'createdAt', direction: 'desc' }];
+    query = saved?.query || '';
+    search.value = query;
+  }
+  function rememberListingPreferences() {
+    const listing = listingOf(current);
+    if (listing?.advanced) listingViews.set(current, {
+      filters: structuredClone(listFilters), orders: structuredClone(listOrders), query,
+    });
+  }
+  function orderLabelsFor() {
+    return listingOf(current)?.orderLabels || { createdAt: 'Fecha', author: 'Autor', text: 'Texto' };
+  }
+  const userStatusLabels = { ACTIVE: 'Activo', PENDING: 'Pendiente', SUSPENDED: 'Suspendido', DELETED: 'Eliminado' };
+  const userRoleLabels = { USER: 'Usuario', COMPANY_ADMIN: 'Empresa', COMMUNITY_MODERATOR: 'Moderador' };
+  function isAdvancedListing() {
+    return Boolean(listingOf(current)?.advanced);
+  }
+  function closeQueryPanel() {
+    openQueryPanel = null;
+    advancedPopover.hidden = true;
+    advancedPopover.replaceChildren();
+    advancedFiltersButton.setAttribute('aria-expanded', 'false');
+    advancedOrdersButton.setAttribute('aria-expanded', 'false');
+  }
+  function applyQueryCriteria() {
+    picked.clear();
+    closeSuggest('more');
+    window.clearTimeout(listTimer);
+    const listing = listingOf(current);
+    if (listing && listing.advanced) void loadListing(listing, true);
+  }
+  function updateFilters(next) {
+    listFilters = next;
+    rememberListingPreferences();
+    renderQueryChips();
+    applyQueryCriteria();
+  }
+  function updateOrders(next) {
+    listOrders = next;
+    rememberListingPreferences();
+    renderQueryChips();
+    applyQueryCriteria();
+  }
+  function removeFilter(kind, value) {
+    if (['topics', 'authors', 'statuses', 'roles'].includes(kind)) {
+      updateFilters({ ...listFilters, [kind]: listFilters[kind].filter(x => x !== value) });
+    } else updateFilters({ ...listFilters, [kind]: kind === 'photo' ? 'any' : '' });
+    if (openQueryPanel) renderQueryPanel(openQueryPanel);
+  }
+  function queryChip(label, onRemove) {
+    const chip = node('span');
+    chip.className = 'crm-query-chip';
+    chip.append(node('span', label));
+    if (onRemove) {
+      const x = node('button', '×');
+      x.type = 'button';
+      x.setAttribute('aria-label', 'Quitar filtro ' + label);
+      x.title = 'Quitar filtro ' + label;
+      x.addEventListener('click', onRemove);
+      chip.append(x);
+    }
+    return chip;
+  }
+  function renderQueryChips() {
+    const advanced = isAdvancedListing();
+    advancedFiltersButton.hidden = !advanced;
+    advancedOrdersButton.hidden = !advanced;
+    queryChips.hidden = !advanced;
+    if (!advanced) { closeQueryPanel(); return; }
+    const users = listingOf(current)?.filterType === 'users';
+    const count = users
+      ? listFilters.statuses.length + listFilters.roles.length +
+        Number(Boolean(listFilters.from)) + Number(Boolean(listFilters.to))
+      : listFilters.topics.length + listFilters.authors.length +
+        Number(listFilters.photo !== 'any') + Number(Boolean(listFilters.from)) + Number(Boolean(listFilters.to));
+    advancedFiltersButton.lastChild.textContent = 'Filtros (' + count + ')';
+    advancedOrdersButton.textContent = 'Orden (' + listOrders.length + ')';
+    const chips = [];
+    if (users) {
+      listFilters.statuses.forEach(v => chips.push(queryChip('Estado: ' + (userStatusLabels[v] || v), () => removeFilter('statuses', v))));
+      listFilters.roles.forEach(v => chips.push(queryChip('Rol: ' + (userRoleLabels[v] || v), () => removeFilter('roles', v))));
+    } else {
+      listFilters.topics.forEach(v => chips.push(queryChip('Tema: ' + v, () => removeFilter('topics', v))));
+      listFilters.authors.forEach(v => chips.push(queryChip('Autor: ' + v, () => removeFilter('authors', v))));
+      if (listFilters.photo !== 'any') chips.push(queryChip(listFilters.photo === 'yes' ? 'Con foto' : 'Sin foto',
+        () => removeFilter('photo')));
+    }
+    if (listFilters.from) chips.push(queryChip('Desde ' + listFilters.from, () => removeFilter('from')));
+    if (listFilters.to) chips.push(queryChip('Hasta ' + listFilters.to, () => removeFilter('to')));
+    const labels = orderLabelsFor();
+    const orderSummary = listOrders.length
+      ? listOrders.map((o,i) => (i + 1) + ' ' + labels[o.by] + (o.direction === 'asc' ? ' ↑' : ' ↓')).join(' · ')
+      : 'Fecha ↓ (predeterminado)';
+    chips.push(queryChip('Orden: ' + orderSummary));
+    queryChips.replaceChildren(...chips);
+  }
+  function advancedLabel(text, control) {
+    const el = node('label');
+    el.className = 'crm-query-field';
+    el.append(node('span', text), control);
+    return el;
+  }
+  function filterTextGroup(title, kind, placeholder) {
+    const wrapper = node('div');
+    wrapper.className = 'crm-query-field';
+    const field = node('input');
+    field.className = 'crm-input';
+    field.placeholder = placeholder;
+    field.maxLength = 80;
+    field.setAttribute('aria-label', title);
+    const add = node('button', 'Agregar');
+    add.type = 'button';
+    add.className = 'crm-btn crm-btn-secondary';
+    const submit = () => {
+      const value = field.value.trim();
+      if (!value || listFilters[kind].some(x => x.toLocaleLowerCase('es') === value.toLocaleLowerCase('es')) ||
+          listFilters[kind].length >= 8) return;
+      updateFilters({ ...listFilters, [kind]: [...listFilters[kind], value] });
+      renderQueryPanel('filters');
+    };
+    add.addEventListener('click', submit);
+    field.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
+    const line = node('div');
+    line.className = 'crm-query-input-row';
+    line.append(field, add);
+    wrapper.append(node('span', title), line);
+    return wrapper;
+  }
+  function renderQueryPanel(which) {
+    openQueryPanel = which;
+    advancedPopover.replaceChildren();
+    advancedPopover.hidden = false;
+    advancedFiltersButton.setAttribute('aria-expanded', String(which === 'filters'));
+    advancedOrdersButton.setAttribute('aria-expanded', String(which === 'orders'));
+    const head = node('div');
+    head.className = 'crm-query-popover-head';
+    const title = node('strong', which === 'filters' ? 'Filtros acumulativos' : 'Ordenamiento por prioridad');
+    const close = node('button', '×');
+    close.className = 'crm-query-close';
+    close.type = 'button';
+    close.setAttribute('aria-label', 'Cerrar panel');
+    close.addEventListener('click', closeQueryPanel);
+    head.append(title, close);
+    advancedPopover.append(head);
+    if (which === 'filters') {
+      if (listingOf(current)?.filterType === 'users') {
+        for (const [key, label, values] of [
+          ['statuses', 'Estado de la cuenta', userStatusLabels],
+          ['roles', 'Rol de la cuenta', userRoleLabels],
+        ]) {
+          const group = node('fieldset');
+          group.className = 'crm-query-group';
+          group.append(node('legend', label));
+          for (const [value, caption] of Object.entries(values)) {
+            const item = node('label');
+            item.className = 'crm-query-check';
+            const box = node('input');
+            box.type = 'checkbox';
+            box.checked = listFilters[key].includes(value);
+            box.addEventListener('change', () => {
+              updateFilters({ ...listFilters,
+                [key]: box.checked ? [...listFilters[key], value] : listFilters[key].filter(v => v !== value),
+              });
+              renderQueryPanel('filters');
+            });
+            item.append(box, node('span', caption));
+            group.append(item);
+          }
+          advancedPopover.append(group);
+        }
+      } else {
+        advancedPopover.append(
+          filterTextGroup('Tema de la publicación', 'topics', 'Ej. adopción'),
+        filterTextGroup('Nombre del autor', 'authors', 'Nombre exacto del autor'),
+      );
+      const photo = node('select');
+      photo.className = 'crm-input';
+      for (const [val,label] of [['any','Todas'],['yes','Con foto'],['no','Sin foto']]) {
+        const option = node('option', label);
+        option.value = val;
+        photo.append(option);
+      }
+      photo.value = listFilters.photo;
+      photo.addEventListener('change', () => {
+        updateFilters({ ...listFilters, photo: photo.value });
+        renderQueryPanel('filters');
+      });
+        advancedPopover.append(advancedLabel('Fotografía', photo));
+      }
+      const dateRow = node('div');
+      dateRow.className = 'crm-query-input-row';
+      for (const [key,label] of [['from','Desde'],['to','Hasta']]) {
+        const input = node('input');
+        input.type = 'date';
+        input.className = 'crm-input';
+        input.value = listFilters[key];
+        input.setAttribute('aria-label', label);
+        input.addEventListener('change', () => {
+          const next = { ...listFilters, [key]: input.value };
+          if (next.from && next.to && next.from > next.to) {
+            input.setCustomValidity('La fecha inicial debe ser anterior a la final.');
+            input.reportValidity();
+            return;
+          }
+          input.setCustomValidity('');
+          updateFilters(next);
+          renderQueryPanel('filters');
+        });
+        dateRow.append(advancedLabel(label, input));
+      }
+      advancedPopover.append(dateRow);
+      const clear = node('button', 'Limpiar todos los filtros');
+      clear.className = 'crm-btn crm-btn-ghost';
+      clear.type = 'button';
+      clear.addEventListener('click', () => {
+        updateFilters(defaultFiltersFor(listingOf(current)));
+        renderQueryPanel('filters');
+      });
+      advancedPopover.append(clear);
+    } else {
+      listOrders.forEach((entry,i) => {
+        const line = node('div');
+        line.className = 'crm-order-line';
+        line.append(node('strong', String(i + 1) + '. ' + orderLabelsFor()[entry.by]));
+        const direction = node('button', entry.direction === 'asc' ? '↑ Asc.' : '↓ Desc.');
+        direction.className = 'crm-btn crm-btn-secondary';
+        direction.type = 'button';
+        direction.addEventListener('click', () => {
+          updateOrders(listOrders.map((o,j) => j === i ? { ...o, direction: o.direction === 'asc' ? 'desc' : 'asc' } : o));
+          renderQueryPanel('orders');
+        });
+        const up = node('button', '↑');
+        up.type = 'button';
+        up.className = 'crm-query-close';
+        up.title = 'Subir prioridad';
+        up.disabled = i === 0;
+        up.addEventListener('click', () => {
+          const next = [...listOrders];
+          [next[i-1], next[i]] = [next[i], next[i-1]];
+          updateOrders(next);
+          renderQueryPanel('orders');
+        });
+        const del = node('button', '×');
+        del.type = 'button';
+        del.className = 'crm-query-close';
+        del.title = 'Quitar criterio de orden';
+        del.setAttribute('aria-label', 'Quitar orden ' + orderLabelsFor()[entry.by]);
+        del.addEventListener('click', () => {
+          updateOrders(listOrders.filter((_,j) => i !== j));
+          renderQueryPanel('orders');
+        });
+        line.append(direction, up, del);
+        advancedPopover.append(line);
+      });
+      const addLine = node('div');
+      addLine.className = 'crm-query-input-row';
+      for (const candidate of Object.keys(orderLabelsFor()).filter(by => !listOrders.some(o => o.by === by))) {
+        const add = node('button', '+ ' + orderLabelsFor()[candidate]);
+        add.type = 'button';
+        add.className = 'crm-btn crm-btn-secondary';
+        add.addEventListener('click', () => {
+          updateOrders([...listOrders, { by: candidate, direction: candidate === 'createdAt' || candidate === 'lastSeenAt' ? 'desc' : 'asc' }]);
+          renderQueryPanel('orders');
+        });
+        addLine.append(add);
+      }
+      advancedPopover.append(addLine);
+      const reset = node('button', 'Restablecer: más recientes primero');
+      reset.type = 'button';
+      reset.className = 'crm-btn crm-btn-ghost';
+      reset.addEventListener('click', () => {
+        updateOrders([{ by: 'createdAt', direction: 'desc' }]);
+        renderQueryPanel('orders');
+      });
+      advancedPopover.append(reset);
+    }
+  }
+  function toggleQueryPanel(which) {
+    if (openQueryPanel === which) closeQueryPanel();
+    else { closeSuggest('more'); renderQueryPanel(which); }
+  }
+  advancedFiltersButton.setAttribute('aria-expanded', 'false');
+  advancedOrdersButton.setAttribute('aria-expanded', 'false');
+  advancedFiltersButton.addEventListener('click', () => toggleQueryPanel('filters'));
+  advancedOrdersButton.addEventListener('click', () => toggleQueryPanel('orders'));
   function iconButton(file, label) {
     const button = node('button');
     button.type = 'button';
@@ -542,128 +857,246 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     clearBulk();
     entityWrap.hidden = true;
     more.hidden = true;
+    listCount.hidden = true;
+    renderQueryChips();
     listError.hidden = true;
     search.placeholder = 'Buscar indicador';
     search.setAttribute('aria-label', 'Buscar indicador');
     heading.textContent = title;
   }
-  async function loadListing(listing, reset) {
-    const ticket = ++listTicket;
-    listLoading = true;
-    if (reset) { listItems = []; listCursor = null; selectedKey = null; }
-    if (reset && !query.trim()) paintSuggestions(null);
-    renderListing(listing);
-    try {
-      const page = await listing.load(query.trim(), reset ? null : listCursor);
-      if (ticket !== listTicket) return;
-      const incoming = Array.isArray(page?.items) ? page.items : [];
-      listItems = reset ? incoming : listItems.concat(incoming);
-      listCursor = page?.nextCursor || null;
-      listError.hidden = true;
-      if (reset) paintSuggestions(page?.suggestions);
-    } catch (error) {
-      if (ticket !== listTicket || error?.code === 'ABORTED') return;
-      listError.textContent = 'No se pudo actualizar el listado.';
-      listError.hidden = false;
-      if (reset) closeSuggest('error');
-    } finally {
-      if (ticket === listTicket) listLoading = false;
-    }
-    if (ticket === listTicket) renderListing(listing);
-  }
-  function renderListing(listing) {
-    heading.textContent = sections.find(item => item.id === current)?.label || title;
-    search.placeholder = listing.placeholder;
-    search.setAttribute('aria-label', listing.searchLabel || listing.placeholder);
-    kpis.hidden = true;
-    tableWrap.hidden = true;
-    entityWrap.hidden = false;
-    panelTitle.textContent = sectionOf(current)?.label || title;
-    markCurrent();
-    activeListing = listing;
+  // Los cambios de búsqueda, filtros y orden no desmontan la barra ni el listado.
+  // El árbol de la pantalla se construye una sola vez; las filas se reconcilian por ID.
+  let renderedHeaderKey = '';
+  function listingHeader(listing) {
+    const key = JSON.stringify([listing.columns, listOrders, Boolean(listing.mark)]);
+    if (renderedHeaderKey === key) return;
+    renderedHeaderKey = key;
     const headRow = node('tr');
     if (listing.mark) {
       const markHead = node('th');
       const all = node('input');
       all.type = 'checkbox';
       all.setAttribute('aria-label', 'Marcar página');
-      const keys = listItems.map(item => listing.present(item)?.key).filter(Boolean);
-      all.checked = keys.length > 0 && keys.every(key => picked.has(key));
       all.addEventListener('change', () => {
-        keys.forEach(key => { if (all.checked) picked.add(key); else picked.delete(key); });
-        renderListing(listing);
+        const keys = listItems.map(item => listing.present(item)?.key).filter(Boolean);
+        keys.forEach(id => { if (all.checked) picked.add(id); else picked.delete(id); });
+        for (const row of entityBody.rows) {
+          const box = row.querySelector('input[type="checkbox"]');
+          if (box) box.checked = picked.has(row.dataset.post);
+        }
+        paintBulk(listing);
       });
       markHead.append(all);
       headRow.append(markHead);
     }
-    for (const name of listing.columns) headRow.append(node('th', name));
+    for (const name of listing.columns) {
+      const th = node('th');
+      const sortable = listing.sortable?.[name];
+      if (sortable) {
+        const orderIndex = listOrders.findIndex(o => o.by === sortable);
+        const selected = orderIndex >= 0 ? listOrders[orderIndex] : null;
+        th.setAttribute('aria-sort', orderIndex === 0 ? (selected.direction === 'asc' ? 'ascending' : 'descending') : 'none');
+        const suffix = selected ? ' ' + (selected.direction === 'asc' ? '↑' : '↓') + ' ' + (orderIndex + 1) : ' ↕';
+        const button = node('button', name + suffix);
+        button.type = 'button';
+        button.className = 'crm-sort-button';
+        button.title = selected ? 'Invertir dirección (prioridad ' + (orderIndex + 1) + ')' : 'Agregar criterio al orden';
+        button.addEventListener('click', () => {
+          if (selected) updateOrders(listOrders.map((o,i) => i === orderIndex
+            ? { ...o, direction: o.direction === 'asc' ? 'desc' : 'asc' } : o));
+          else if (listOrders.length < (listing.maxOrders || 3)) updateOrders([...listOrders, {
+            by: sortable, direction: ['createdAt', 'lastSeenAt'].includes(sortable) ? 'desc' : 'asc',
+          }]);
+        });
+        th.append(button);
+      } else th.textContent = name;
+      headRow.append(th);
+    }
     entityHead.replaceChildren(headRow);
-    entityBody.replaceChildren();
-    detail.hidden = true;
-    detail.replaceChildren();
-    let selected = null;
+  }
+  function listingRow(listing, item, view, signature) {
+    const tr = node('tr');
+    tr.className = 'crm-row-static';
+    tr.dataset.post = view.key;
+    tr._crmSignature = signature;
+    const open = reasonFocus => {
+      const latest = listItems.find(candidate => listing.present(candidate)?.key === view.key) || item;
+      const latestView = listing.present(latest) || view;
+      selectedKey = view.key;
+      focusReason = reasonFocus;
+      for (const row of entityBody.rows) row.removeAttribute('aria-selected');
+      tr.setAttribute('aria-selected', 'true');
+      if (!listing.readOnly) fillDetail(listing, latest, latestView);
+      void openDialog(listing, latest, latestView, reasonFocus);
+    };
+    if (view.mark) {
+      const markCell = node('td');
+      const box = node('input');
+      box.type = 'checkbox';
+      box.checked = picked.has(view.key);
+      box.setAttribute('aria-label', 'Marcar');
+      box.addEventListener('click', event => event.stopPropagation());
+      box.addEventListener('change', () => {
+        if (box.checked) picked.add(view.key); else picked.delete(view.key);
+        paintBulk(listing);
+        const all = entityHead.querySelector('input[type="checkbox"]');
+        if (all) all.checked = listItems.length > 0 && listItems.every(row => picked.has(row.id));
+      });
+      markCell.append(box);
+      if (listing.filterType === 'users') {
+        const avatar = node('img');
+        avatar.className = 'crm-list-user-avatar';
+        avatar.alt = '';
+        avatar.loading = 'lazy';
+        avatar.src = item.photoUrl || '../icons/avatar_anonymous.png';
+        avatar.addEventListener('error', () => { if (!avatar.src.endsWith('avatar_anonymous.png')) avatar.src = '../icons/avatar_anonymous.png'; });
+        markCell.append(avatar);
+      }
+      tr.append(markCell);
+    }
+    view.cells.forEach((cell, index) => {
+      const td = node('td');
+      if (listing.columns[index] === 'Autor') td.dataset.field = 'author';
+      td.append(cellNode(cell, open));
+      tr.append(td);
+    });
+    const actionCell = node('td');
+    const actions = node('div');
+    actions.className = 'crm-actions';
+    for (const spec of view.actions || []) {
+      const action = iconButton(spec.icon, spec.label);
+      if (spec.danger) action.classList.add('crm-icon-btn-danger');
+      action.addEventListener('click', event => {
+        event.stopPropagation();
+        if (spec.name === 'reassign') {
+          const latest = listItems.find(candidate => candidate.id === view.key) || item;
+          void openReassign(listing, latest, listing.present(latest) || view);
+          return;
+        }
+        const moderation = { userBlock: 'BLOCK', userUnblock: 'UNBLOCK', userDelete: 'DELETE' }[spec.name];
+        if (moderation && listing.userActions) {
+          // Una acción por fila NUNCA incluye accidentalmente otros seleccionados.
+          const latest = listItems.find(candidate => candidate.id === view.key);
+          if (latest) openUserModeration(listing, moderation, [latest]);
+          return;
+        }
+        open(spec.name === 'remove');
+      });
+      actions.append(action);
+    }
+    actionCell.append(actions);
+    tr.append(actionCell);
+    return tr;
+  }
+  function patchListingRows(listing) {
+    const beforeScroll = entityWrap.scrollLeft;
+    const existing = new Map([...entityBody.rows].map(row => [row.dataset.post, row]));
+    const next = [];
     for (const item of listItems) {
       const view = listing.present(item);
       if (!view || view.hidden) continue;
-      const tr = node('tr');
-      tr.className = 'crm-row-static';
-      if (view.key === selectedKey) tr.setAttribute('aria-selected', 'true');
-      const open = (reasonFocus) => {
-        selectedKey = view.key;
-        focusReason = reasonFocus;
-        for (const other of entityBody.querySelectorAll('tr')) other.removeAttribute('aria-selected');
-        tr.setAttribute('aria-selected', 'true');
-        void openDialog(listing, item, view, reasonFocus);
-      };
-      if (view.mark) {
-        const markCell = node('td');
-        const box = node('input');
-        box.type = 'checkbox';
-        box.checked = picked.has(view.key);
-        box.setAttribute('aria-label', 'Marcar');
-        box.addEventListener('click', event => event.stopPropagation());
-        box.addEventListener('change', () => {
-          if (box.checked) picked.add(view.key); else picked.delete(view.key);
-          paintBulk(listing);
-        });
-        markCell.append(box);
-        tr.append(markCell);
-      }
-      view.cells.forEach((cell, index) => {
-        const td = node('td');
-        if (listing.columns[index] === 'Autor') td.dataset.field = 'author';
-        td.append(cellNode(cell, open));
-        tr.append(td);
-      });
-      tr.dataset.post = view.key;
-      const actionCell = node('td');
-      const actions = node('div');
-      actions.className = 'crm-actions';
-      for (const spec of view.actions || []) {
-        const action = iconButton(spec.icon, spec.label);
-        action.addEventListener('click', event => {
-          event.stopPropagation();
-          if (spec.name === 'reassign') {
-            void openReassign(listing, item, view);
-            return;
-          }
-          open(spec.name === 'remove');
-        });
-        actions.append(action);
-      }
-      actionCell.append(actions);
-      tr.append(actionCell);
-      entityBody.append(tr);
-      if (view.key === selectedKey) selected = { item, view };
+      const signature = JSON.stringify([view.cells, view.actions, view.detail, view.mark, listing.filterType === 'users' ? item.photoUrl : null]);
+      const previous = existing.get(view.key);
+      const row = previous && previous._crmSignature === signature
+        ? previous : listingRow(listing, item, view, signature);
+      row.toggleAttribute('aria-selected', view.key === selectedKey);
+      const checkbox = row.querySelector('input[type="checkbox"]');
+      if (checkbox) checkbox.checked = picked.has(view.key);
+      next.push(row);
     }
-    if (selected) fillDetail(listing, selected.item, selected.view);
+    // Mueve únicamente las filas cuyo índice cambió; no vacía ni recrea el tbody.
+    let cursor = entityBody.firstChild;
+    for (const row of next) {
+      if (row === cursor) cursor = cursor.nextSibling;
+      else entityBody.insertBefore(row, cursor);
+    }
+    while (cursor) {
+      const following = cursor.nextSibling;
+      cursor.remove();
+      cursor = following;
+    }
+    entityWrap.scrollLeft = beforeScroll;
+    const all = entityHead.querySelector('input[type="checkbox"]');
+    if (all) all.checked = next.length > 0 && next.every(row => picked.has(row.dataset.post));
+    if (selectedKey && !next.some(row => row.dataset.post === selectedKey)) {
+      selectedKey = null;
+      detail.hidden = true;
+      detail.replaceChildren();
+    }
+  }
+  function listingStatus(listing) {
+    entityWrap.setAttribute('aria-busy', String(listLoading));
+    more.disabled = listLoading;
+    // El botón mantiene su sitio durante la carga para evitar saltos verticales.
     more.hidden = !listCursor;
-    paintBulk(listing);
+    listCount.hidden = false;
+    const plural = listing.noun || 'publicaciones';
+    listCount.textContent = listLoading
+      ? 'Actualizando ' + plural + '…'
+      : listItems.length + ' ' + plural + ' cargados' +
+        (listCursor ? ' · Hay más resultados' : ' · Fin de los resultados');
     const isEmpty = !listLoading && listItems.length === 0;
     empty.box.hidden = !isEmpty;
     empty.title.textContent = listing.emptyTitle;
     empty.detail.textContent = listing.emptyDetail;
-    if (isEmpty) detail.hidden = true;
+  }
+  function renderListing(listing, { updateRows = true } = {}) {
+    const entering = entityWrap.hidden || activeListing !== listing;
+    if (entering) {
+      heading.textContent = sections.find(item => item.id === current)?.label || title;
+      search.placeholder = listing.placeholder;
+      search.setAttribute('aria-label', listing.searchLabel || listing.placeholder);
+      kpis.hidden = true;
+      tableWrap.hidden = true;
+      entityWrap.hidden = false;
+      panelTitle.textContent = sectionOf(current)?.label || title;
+      markCurrent();
+      activeListing = listing;
+      renderedHeaderKey = '';
+      detail.hidden = true;
+      detail.replaceChildren();
+      renderQueryChips();
+    }
+    listingHeader(listing);
+    if (updateRows) {
+      patchListingRows(listing);
+      paintBulk(listing);
+    }
+    listingStatus(listing);
+  }
+  async function loadListing(listing, reset) {
+    if (listLoading && !reset) return;
+    const ticket = ++listTicket;
+    const entering = entityWrap.hidden || activeListing !== listing;
+    listLoading = true;
+    if (entering) {
+      listItems = [];
+      listCursor = null;
+      selectedKey = null;
+      entityBody.replaceChildren();
+    }
+    if (reset && !query.trim()) paintSuggestions(null);
+    // Conservar filas existentes mientras llega la respuesta; solo cambia el estado.
+    renderListing(listing, { updateRows: entering });
+    try {
+      const page = await listing.load(query.trim(), reset ? null : listCursor, listOrders, listFilters);
+      if (ticket !== listTicket) return;
+      const incoming = Array.isArray(page?.items) ? page.items : [];
+      listItems = reset ? incoming : listItems.concat(incoming.filter(item => !listItems.some(existing => existing.id === item.id)));
+      listCursor = page?.nextCursor || null;
+      listError.hidden = true;
+      if (reset) paintSuggestions(page?.suggestions);
+    } catch (error) {
+      if (ticket !== listTicket || error?.code === 'ABORTED') return;
+      listError.textContent = 'No se pudo actualizar el listado. Los resultados anteriores se conservaron.';
+      listError.hidden = false;
+      if (reset) closeSuggest('error');
+    } finally {
+      if (ticket === listTicket) {
+        listLoading = false;
+        renderListing(listing);
+      }
+    }
   }
   function fillDetail(listing, item, view) {
     detail.hidden = false;
@@ -712,19 +1145,43 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   }
 
   function paintBulk(listing) {
-    // El patrón del listado: la acción solo está con una selección. Sin texto; el nombre va en el hint.
     bulkBar.replaceChildren();
-    const action = listing?.bulk;
-    const keys = action
-      ? listItems.map(item => listing.present(item)?.key).filter(key => key && picked.has(key))
-      : [];
-    if (!action || !keys.length) {
+    const action = listing?.bulkReview || listing?.bulk;
+    const chosen = action ? listItems.filter(item => {
+      const key = listing.present(item)?.key;
+      return key && picked.has(key);
+    }) : [];
+    if (!action || !chosen.length) {
       bulkBar.hidden = true;
       return;
     }
     bulkBar.hidden = false;
+    if (listing.userActions) {
+      const count = node('span', chosen.length + (chosen.length === 1 ? ' usuario seleccionado' : ' usuarios seleccionados'));
+      count.className = 'crm-user-bulk-count';
+      bulkBar.append(count);
+      const add = (file, title, handler, danger = false) => {
+        const button = iconButton(file, title);
+        button.classList.add('crm-user-bulk-icon');
+        if (danger) button.classList.add('crm-icon-btn-danger');
+        button.addEventListener('click', handler);
+        bulkBar.append(button);
+      };
+      add('qs_eye.svg', 'Ver perfiles seleccionados', () => openUserSelection(listing));
+      if (listing.userActions.block) {
+        if (chosen.some(item => item.canPublish !== false))
+          add('qs_publish_block.svg', 'Bloquear publicaciones', () =>
+            openUserModeration(listing, 'BLOCK', chosen.filter(item => item.canPublish !== false)));
+        if (chosen.some(item => item.canPublish === false))
+          add('qs_publish_allow.svg', 'Permitir publicar', () =>
+            openUserModeration(listing, 'UNBLOCK', chosen.filter(item => item.canPublish === false)));
+      }
+      if (listing.userActions.delete)
+        add('qs_trash.png', 'Eliminar usuarios', () => openUserModeration(listing, 'DELETE', chosen), true);
+      return;
+    }
     const button = iconButton(action.icon, action.label);
-    button.addEventListener('click', () => openBulk(listing));
+    button.addEventListener('click', () => listing.bulkReview ? openUserSelection(listing) : openBulk(listing));
     bulkBar.append(button);
   }
   function reasonField(card) {
@@ -844,6 +1301,319 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     if (!sheet.open) sheet.showModal();
     field.focus();
   }
+  // Ver perfiles seleccionados nunca ejecuta acciones de moderación por sí solo.
+  // Las acciones se eligen explícitamente por ícono y requieren confirmación.
+  function openUserSelection(listing) {
+    const candidates = listItems.filter(item => picked.has(item.id));
+    if (!candidates.length) return;
+    dialogPostId = null;
+    dialog.replaceChildren();
+    dialog.classList.add('crm-profile-dialog');
+    const head = node('header'); head.className = 'crm-profile-head';
+    const close = iconButton('qs_close.svg', 'Cerrar');
+    close.addEventListener('click', () => dialog.close());
+    head.append(node('h2', 'Usuarios seleccionados (' + candidates.length + ')'), close);
+    const description = node('p', 'Selección de la página cargada. Desde aquí podés revisar cada perfil; la eliminación o suspensión de cuentas requiere un procedimiento administrativo específico.');
+    description.className = 'crm-profile-note';
+    const list = node('div'); list.className = 'crm-profile-posts';
+    candidates.forEach(item => {
+      const btn = node('button', item.displayName || 'Sin nombre');
+      btn.type = 'button';
+      btn.className = 'crm-btn crm-btn-secondary';
+      btn.addEventListener('click', () => { void openUserProfile(listing, item); });
+      list.append(btn);
+    });
+    dialog.append(head, description, list);
+    if (!dialog.open) dialog.showModal();
+  }
+
+  /**
+   * Mismo diálogo modal para acción individual y masiva. Solo se confirma aquí,
+   * nunca al pulsar el ícono de la fila o de la barra.
+   */
+  function openUserModeration(listing, action, targets = null) {
+    closeSuggest('dialog');
+    if (!listing.userActions || typeof listing.bulkModerate !== 'function') return;
+    if (action === 'DELETE' && !listing.userActions.delete) return;
+    if ((action === 'BLOCK' || action === 'UNBLOCK') && !listing.userActions.block) return;
+    if (!['BLOCK', 'UNBLOCK', 'DELETE'].includes(action)) return;
+    const currentIds = new Set(listItems.map(item => item.id));
+    const source = targets || listItems.filter(item => picked.has(item.id));
+    const unique = new Map(source.filter(item => item?.id && currentIds.has(item.id)).map(item => [item.id, item]));
+    const candidates = [...unique.values()].filter(item => action === 'DELETE'
+      || (action === 'BLOCK' ? item.canPublish !== false : item.canPublish === false));
+    if (!candidates.length) return;
+    if (candidates.length > 25) {
+      listError.textContent = 'Podés moderar hasta 25 usuarios por operación. Reducí la selección.';
+      listError.hidden = false;
+      return;
+    }
+    stopWatchingComments();
+    dialogPostId = null;
+    dialog.replaceChildren();
+    dialog.classList.remove('crm-profile-dialog');
+    dialog.classList.add('crm-user-moderation-dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    dialog.setAttribute('role', action === 'BLOCK' || action === 'DELETE' ? 'alertdialog' : 'dialog');
+    dialog.setAttribute('aria-labelledby', 'crm-user-moderation-title');
+    const header = node('header'); header.className = 'crm-dialog-head';
+    const labels = {
+      BLOCK: 'Bloquear publicaciones', UNBLOCK: 'Permitir publicaciones',
+      DELETE: 'Eliminar cuenta y participación',
+    };
+    const heading = node('h3', labels[action] + ' · ' + candidates.length);
+    heading.id = 'crm-user-moderation-title';
+    const close = iconButton('qs_close.svg', 'Cerrar sin aplicar cambios');
+    close.addEventListener('click', () => dialog.close());
+    header.append(heading, close);
+    const explanation = node('p', action === 'DELETE'
+      ? 'Esta acción es irreversible: elimina las cuentas y sus publicaciones, comentarios y reacciones. Las evidencias y obligaciones legales que deban conservarse quedan protegidas.'
+      : action === 'BLOCK'
+        ? '¿Confirmás el bloqueo? Estas personas podrán seguir ingresando y leyendo, pero no publicar, comentar ni realizar nuevas contribuciones.'
+        : '¿Confirmás el desbloqueo? Estas personas podrán volver a publicar y comentar; no se restaura contenido eliminado.');
+    explanation.className = 'crm-user-moderation-note';
+    const list = node('ul');
+    list.className = 'crm-user-moderation-targets';
+    candidates.forEach(item => list.append(node('li', item.displayName || item.id)));
+    const reason = reasonField({ reasonLabel: 'Motivo obligatorio (mínimo 10 caracteres)' });
+    reason.input.minLength = 10;
+    reason.input.maxLength = 500;
+    const typeLabel = node('label'); typeLabel.className = 'crm-field';
+    const typeDescription = node('span', 'Para confirmar escribí ELIMINAR');
+    typeDescription.className = 'crm-field-label';
+    const typeInput = node('input');
+    typeInput.type = 'text';
+    typeInput.className = 'crm-input';
+    typeInput.autocomplete = 'off';
+    typeInput.placeholder = 'ELIMINAR';
+    typeInput.setAttribute('aria-label', 'Escribí ELIMINAR para confirmar');
+    typeLabel.append(typeDescription, typeInput);
+    const result = node('p'); result.className = 'crm-list-error'; result.setAttribute('role', 'alert');
+    result.hidden = true;
+    const cancel = node('button', 'Cancelar');
+    cancel.type = 'button';
+    cancel.className = 'crm-btn crm-btn-secondary';
+    cancel.addEventListener('click', () => dialog.close());
+    const submit = node('button', action === 'DELETE' ? 'Eliminar definitivamente' : 'Confirmar ' + labels[action].toLowerCase());
+    submit.type = 'button';
+    submit.className = 'crm-btn ' + (action === 'DELETE' ? 'crm-user-bulk-danger' : 'crm-btn-primary');
+    submit.disabled = true;
+    let inFlight = false;
+    const update = () => {
+      submit.disabled = inFlight || reason.input.value.trim().length < 10
+        || reason.input.value.trim().length > 500
+        || (action === 'DELETE' && typeInput.value.trim() !== 'ELIMINAR');
+      cancel.disabled = inFlight;
+      close.disabled = inFlight;
+    };
+    reason.input.addEventListener('input', update);
+    typeInput.addEventListener('input', update);
+    submit.addEventListener('click', async () => {
+      if (submit.disabled || inFlight) return;
+      inFlight = true; update(); result.hidden = true;
+      try {
+        // El servidor verifica nuevamente rol, MFA, estado, motivo e IDs.
+        await listing.bulkModerate(action, candidates, reason.input.value.trim(),
+          action === 'DELETE' ? 'ELIMINAR' : '');
+        candidates.forEach(item => picked.delete(item.id));
+        dialog.close();
+        await loadListing(listing, true);
+      } catch (error) {
+        result.textContent = error?.message || 'No se pudo completar la operación. No se realizaron cambios.';
+        result.hidden = false;
+      } finally {
+        inFlight = false; update();
+      }
+    });
+    const footer = node('footer'); footer.className = 'crm-user-moderation-footer';
+    footer.append(cancel, submit);
+    dialog.append(header, explanation, list, reason.label,
+      ...(action === 'DELETE' ? [typeLabel] : []), result, footer);
+    dialog.addEventListener('close', () => {
+      dialog.classList.remove('crm-user-moderation-dialog');
+      dialog.removeAttribute('role');
+      dialog.removeAttribute('aria-modal');
+      dialog.removeAttribute('aria-labelledby');
+    }, { once: true });
+    // HTMLDialogElement.showModal() coloca la confirmación en el top layer,
+    // por encima de tablas, listas, popovers y barras laterales.
+    if (!dialog.open) dialog.showModal();
+    reason.input.focus();
+  }
+
+  /**
+   * Pantalla de perfil completa, no un cuadro de cuatro campos.
+   * Los mensajes privados NUNCA se solicitan desde aquí.
+   * Las denuncias de contenido llegan solo si el backend autoriza el rol.
+   */
+  async function openUserProfile(listing, user) {
+    const userId = user.id;
+    dialogPostId = null;
+    stopWatchingComments();
+    dialog.replaceChildren();
+    dialog.classList.add('crm-profile-dialog');
+    dialog.setAttribute('aria-label', 'Ficha completa de usuario');
+    const head = node('header'); head.className = 'crm-profile-head';
+    const back = node('span', 'OGT Control / Usuarios');
+    back.className = 'crm-profile-breadcrumb';
+    const close = iconButton('qs_close.svg', 'Cerrar');
+    close.addEventListener('click', () => dialog.close());
+    head.append(back, close);
+    const hero = node('section'); hero.className = 'crm-profile-hero';
+    const face = node('img'); face.className = 'crm-profile-avatar';
+    face.alt = 'Foto del perfil de ' + (user.displayName || 'usuario');
+    face.src = '../icons/avatar_anonymous.png';
+    face.addEventListener('error', () => { face.src = '../icons/avatar_anonymous.png'; });
+    const identity = node('div');
+    const heading = node('h2', user.displayName || 'Sin nombre');
+    const status = node('p', 'Cargando perfil…'); status.className = 'crm-profile-muted';
+    identity.append(heading, status);
+    hero.append(face, identity);
+    const stats = node('div'); stats.className = 'crm-profile-stats';
+    const tabs = node('div'); tabs.className = 'crm-profile-tabs'; tabs.setAttribute('role', 'tablist');
+    const content = node('section'); content.className = 'crm-profile-content';
+    const statusLine = node('p', 'Consultando información autorizada…');
+    statusLine.setAttribute('role', 'status'); statusLine.className = 'crm-profile-note';
+    dialog.append(head, hero, stats, tabs, content, statusLine);
+    if (!dialog.open) dialog.showModal();
+    close.focus();
+    let profile = null;
+    let posts = [];
+    let postCursor = null;
+    let postLoading = false;
+    let selected = 'resumen';
+    const time = value => value ? new Date(value).toLocaleString('es-AR') : 'Sin actividad registrada';
+    function textRow(label, value) {
+      const row = node('div'); row.className = 'crm-profile-field';
+      row.append(node('dt', label), node('dd', value == null || value === '' ? 'No informado' : String(value)));
+      return row;
+    }
+    function postCards() {
+      const host = node('div'); host.className = 'crm-profile-posts';
+      if (!posts.length) host.append(node('p', 'No hay publicaciones visibles.'));
+      posts.forEach(post => {
+        const card = node('article'); card.className = 'crm-profile-post';
+        const h = node('h3', post.topic || 'Publicación');
+        const when = node('time', time(post.createdAt)); when.className = 'crm-profile-muted';
+        const body = node('p', post.body || 'Sin texto');
+        card.append(h, when, body);
+        if (post.imageUrl && /^(https?:\/\/|\/media\/)/.test(post.imageUrl)) {
+          const img = node('img'); img.src = post.imageUrl; img.alt = 'Imagen de la publicación'; img.loading = 'lazy';
+          card.append(img);
+        }
+        const id = node('small', 'ID ' + post.id); id.className = 'crm-profile-muted';
+        card.append(id);
+        host.append(card);
+      });
+      if (postCursor) {
+        const more = node('button', 'Cargar 20 publicaciones más');
+        more.className = 'crm-btn crm-btn-secondary';
+        more.type = 'button'; more.disabled = postLoading;
+        more.addEventListener('click', async () => {
+          if (postLoading) return;
+          postLoading = true; more.disabled = true;
+          try {
+            const page = await listing.loadUserPosts(user, postCursor);
+            if (!dialog.open || selectedKey !== userId) return;
+            posts.push(...(Array.isArray(page.posts) ? page.posts : []));
+            postCursor = page.nextCursor || null;
+            renderTab('publicaciones');
+          } catch (error) {
+            more.disabled = false;
+            statusLine.textContent = error?.message || 'No se pudieron cargar más publicaciones.';
+          } finally { postLoading = false; }
+        });
+        host.append(more);
+      }
+      return host;
+    }
+    function renderTab(which) {
+      if (!profile || !dialog.open || selectedKey !== userId) return;
+      selected = which;
+      tabs.querySelectorAll('button').forEach(btn => {
+        const active = btn.dataset.tab === which;
+        btn.setAttribute('aria-selected', String(active));
+        btn.tabIndex = active ? 0 : -1;
+      });
+      content.replaceChildren();
+      if (which === 'resumen') {
+        const title = node('h3', 'Información general');
+        const fields = node('dl'); fields.className = 'crm-profile-fields';
+        fields.append(
+          textRow('Nombre visible', profile.displayName),
+          textRow('Estado de cuenta', profile.status),
+          textRow('Permiso de publicación', profile.canPublish === false ? 'Solo lectura' : 'Puede publicar'),
+          textRow('Rol', profile.role),
+          textRow('Alta', time(profile.createdAt)),
+          textRow('Última actividad', time(profile.lastSeenAt)),
+          textRow('ID interno', profile.id),
+        );
+        content.append(title, fields);
+      } else if (which === 'publicaciones') {
+        content.append(node('h3', 'Publicaciones visibles'), postCards());
+      } else if (which === 'denuncias') {
+        content.append(node('h3', 'Denuncias relacionadas con su contenido'));
+        if (!profile.canReviewReports) {
+          content.append(node('p', 'Solo los roles de titular de plataforma y Confianza y Seguridad pueden consultar denuncias de contenido.'));
+        } else if (!profile.reportedContent?.length) {
+          content.append(node('p', 'No hay denuncias registradas en los resultados recientes.'));
+        } else {
+          const reports = node('div'); reports.className = 'crm-profile-posts';
+          profile.reportedContent.forEach(report => {
+            const card = node('article'); card.className = 'crm-profile-post';
+            card.append(node('strong', report.reason || 'Denuncia'),
+              node('p', (report.status || 'Sin estado') + ' · ' + time(report.createdAt)),
+              node('small', 'Expediente ' + report.id));
+            reports.append(card);
+          });
+          content.append(reports);
+        }
+      } else if (which === 'chats') {
+        content.append(node('h3', 'Conversaciones denunciadas'),
+          node('p', 'El CRM no permite explorar mensajes privados. La lectura de un chat se habilitará únicamente desde un expediente formal de denuncia presentado por uno de sus participantes, para el rol autorizado, con motivo y auditoría. No existe todavía un expediente de chat enlazado a este perfil.'));
+      }
+    }
+    selectedKey = userId;
+    try {
+      const [detail, first] = await Promise.all([
+        listing.loadDetail(user), listing.loadUserPosts(user, null),
+      ]);
+      if (!dialog.open || selectedKey !== userId) return;
+      profile = detail;
+      if (!profile || profile.id !== userId) throw new Error('El servidor devolvió un perfil inválido.');
+      posts = Array.isArray(first?.posts) ? first.posts : [];
+      postCursor = first?.nextCursor || null;
+      heading.textContent = profile.displayName;
+      if (profile.photoUrl) face.src = profile.photoUrl;
+      status.textContent = profile.status + (profile.canPublish === false ? ' · Solo lectura' : '') + ' · ' + profile.role + ' · Alta: ' + time(profile.createdAt);
+      stats.replaceChildren();
+      const counts = [
+        [String(profile.visiblePostCount ?? 0), 'Publicaciones'],
+        [String(profile.communityPoints ?? 0), 'Puntos'],
+        [profile.canReviewReports ? String(profile.receivedReportCount ?? 0) : 'Restringido', 'Denuncias'],
+      ];
+      counts.forEach(([value, caption]) => {
+        const tile = node('div'); tile.className = 'crm-profile-stat';
+        tile.append(node('strong', value), node('span', caption)); stats.append(tile);
+      });
+      for (const [id, caption] of [['resumen','Resumen'],['publicaciones','Publicaciones'],['denuncias','Denuncias'],['chats','Chats denunciados']]) {
+        const button = node('button', caption);
+        button.type = 'button'; button.className = 'crm-profile-tab';
+        button.dataset.tab = id; button.setAttribute('role', 'tab');
+        button.addEventListener('click', () => renderTab(id));
+        tabs.append(button);
+      }
+      statusLine.remove();
+      renderTab('resumen');
+    } catch (error) {
+      if (dialog.open && selectedKey === userId) statusLine.textContent = error?.message || 'No se pudo cargar la ficha.';
+    }
+  }
+  dialog.addEventListener('close', () => {
+    dialog.classList.remove('crm-profile-dialog');
+    dialog.removeAttribute('aria-label');
+  });
+
   async function openDialog(listing, item, view, reasonFocus) {
     if (typeof listing.open === 'function') {
       try { await listing.open(item, () => loadListing(listing, true)); }
@@ -852,6 +1622,29 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     }
     closeSuggest('dialog');
     const card = view.detail || {};
+    if (listing.userProfile) {
+      await openUserProfile(listing, item);
+      return;
+    }
+    if (listing.readOnly) {
+      stopWatchingComments();
+      dialogPostId = null;
+      dialog.replaceChildren();
+      const head = node('div');
+      head.className = 'crm-dialog-head';
+      const close = iconButton('qs_close.svg', 'Cerrar');
+      close.addEventListener('click', () => dialog.close());
+      head.append(node('h3', card.title || 'Detalle de usuario'), close);
+      const meta = node('p', card.meta || '');
+      const body = node('p', card.body || '');
+      body.className = 'crm-detail-body';
+      const reference = node('p', 'ID: ' + (item.id || 'No informado'));
+      reference.className = 'crm-list-count';
+      dialog.append(head, meta, body, reference);
+      if (!dialog.open) dialog.showModal();
+      close.focus();
+      return;
+    }
     dialogPostId = view.key;
     dialog.replaceChildren();
     const close = iconButton('qs_close.svg', 'Cerrar');
@@ -1127,6 +1920,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     more.hidden = true;
     listError.hidden = true;
     detail.hidden = true;
+    renderQueryChips();
     clearBulk();
     panelTitle.textContent = section?.label || title;
     empty.title.textContent = 'Sin listado';
@@ -1213,11 +2007,15 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     button.addEventListener('click', () => {
       window.clearTimeout(listTimer);
       listTicket += 1;
+      rememberListingPreferences();
       current = section.id;
       if (typeof onNavigate === 'function') onNavigate(current);
       query = '';
       search.value = '';
+      closeQueryPanel();
       closeSuggest('nav');
+      const destination = listingOf(current);
+      if (destination?.advanced) restoreListingPreferences(destination);
       paint();
     });
     buttons.push(button);
@@ -1241,6 +2039,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     }
     const listing = listingOf(current);
     if (!listing) { paint(); return; }
+    rememberListingPreferences();
     window.clearTimeout(listTimer);
     listTimer = window.setTimeout(() => { void loadListing(listing, true); }, 280);
   });
@@ -1272,8 +2071,12 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   });
   const dismiss = { signal: suggestListeners.signal };
   document.addEventListener('pointerdown', event => {
+    if (openQueryPanel && !tools.contains(event.target)) closeQueryPanel();
     if (suggestBox.hidden || searchLabel.contains(event.target)) return;
     closeSuggest('outside');
+  }, dismiss);
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && openQueryPanel) closeQueryPanel();
   }, dismiss);
   window.addEventListener('scroll', event => {
     if (suggestBox.hidden) return;
@@ -1287,6 +2090,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     if (!suggestBox.hidden) closeSuggest('window');
   }, dismiss);
   function dispose() {
+    closeQueryPanel();
     closeSuggest('session');
     suggestListeners.abort();
   }

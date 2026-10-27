@@ -163,3 +163,14 @@ test('unknown Firebase error code is safely shown for troubleshooting without ex
   assert.match(leaked, /Only Good Things/);
   assert.doesNotMatch(leaked, /521063054927|goodthings-55612|project-/);
 });
+
+test('candidate keeps story moderation and user management in the same protected API', async () => {
+  const seen=[];
+  const api=createApi(async(path)=>{
+    seen.push(path);return {ok:true,status:200,json:async()=>({success:true,data:{ok:true}})};
+  });
+  const routes=['platform/stories/search','platform/stories/remove','platform/users/list','platform/users/detail','platform/users/posts','platform/users/moderate'];
+  for(const route of routes) await api(route,'qa-jwt',{});
+  assert.deepEqual(seen,routes.map(route=>'/api/v1/crm/'+route));
+  await assert.rejects(()=>api('platform/users/elevate','qa-jwt',{}),error=>error.code==='INVALID_ROUTE');
+});

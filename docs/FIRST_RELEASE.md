@@ -100,3 +100,96 @@ CI de fuentes/browser, build/test backend, migracion real, respaldo/recuperacion
 HTTPS desde la red permitida, MFA real, cuentas autorizadas, permisos negativos
 entre empresas y funciones de negocio deben verificarse por separado. Los tests
 de navegador usan mocks. Un job verde de fuentes no certifica el servidor.
+
+## Solicitud de publicación del CRM Control (25/10/2026)
+
+Versión base integrada en `main`: `b28e51a39c16e936f848d9a5d424442c4778a069`.
+Incluye ordenamiento global por fecha, autor y texto, y paginación de 20 publicaciones.
+La implementación de GitHub Actions ejecuta validaciones de código y navegador antes de activar
+la publicación integral de web, backend y CRM en la instalación existente.
+La publicación se considera confirmada solamente si el job `publish` verifica en Contabo
+el SHA exacto de la compilación y un backend saludable; los checks aislados no la prueban.
+
+## Publicación de filtros compactos y orden acumulativo (25/10/2026)
+
+El CRM Control incluye búsqueda combinada con filtros acumulativos por tema, autor,
+presencia de fotografía y fechas, y ordenamiento por prioridades (fecha, autor y texto).
+Las opciones se presentan en paneles compactos con etiquetas que pueden quitarse
+individualmente. El backend pagina en lotes de veinte con cursor v3 ligado a todos
+los filtros y órdenes para que el orden sea estable al cargar más resultados.
+
+La versión integrada antes de activar el release fue
+`b6e19a44fdbe34ec33027395cc8c65221a831d51`.
+El commit de release debe superar código, QA de navegador, compilación de backend,
+respaldo y verificación de revisión exacta en la instalación existente de Contabo.
+
+
+## Actualización parcial del listado de Control (25/10/2026)
+
+Integrado en main: `e3e4639533597b558695d52937107de9c8bda484`.
+El refresco de publicaciones ya no desmonta la barra de búsqueda, filtros y
+orden. Reconcilia filas por identificador, conserva las filas sin modificaciones
+y la posición horizontal mientras cambia la búsqueda, el orden o un filtro.
+Mantiene los resultados previos visibles durante la solicitud y evita saltos
+de pantalla al cargar lotes adicionales. El workflow de navegador comprueba la
+identidad de los nodos entre actualizaciones con una API simulada.
+
+Este commit de release incluye ese cambio y debe verificarse por su SHA instalado
+en Contabo; una ejecución verde de checks aislados no implica despliegue.
+
+## Estándar de datos y pantalla Usuarios de OGT Control (25/10/2026)
+
+Integración inicial: `e18f8c35345ecfd44145da6bcbc3f3217a68a602`.
+El estándar obligatorio de listas de datos está en `docs/DATA_VIEWS_STANDARD.md`.
+La sección Usuarios pasa de métrica agregada a listado real de solo lectura,
+con búsqueda por nombre/ID, filtros acumulativos por estado, rol y fecha de
+alta, ordenamiento multinivel, chips compactos y paginación de 20 usuarios.
+La respuesta no contiene contactos ni identificadores Firebase y la API exige
+rol operativo autorizado por el backend. No se incorporan botones de eliminación
+o suspensión de cuentas. Los filtros/órdenes se recuerdan al volver a la sección.
+
+El release exige checks, regresión de navegador, compilación de backend y
+verificación en la VPS del mismo SHA; hasta que `publish` marque success
+no se puede afirmar que Contabo haya sido actualizado.
+
+## Paridad de publicaciones de mascotas en CRM y feed (25/10/2026)
+
+Código integrado: `617e5011b4ffbfd4d49297b353ff6913d4d847e7` (PR #54).
+La migración `27_crm_animal_search_parity.sql` indexa nombres y títulos de
+mascotas, incluidos los posts históricos. Control devuelve `animalTitle`
+y permite buscar `Luna` desde toda la base, sin cargar previamente los
+lotes antiguos. `animals/open` ya no reinyecta publicaciones con estado de
+moderación diferente de VISIBLE en la app web. El CRM sigue manejando todos
+los posts VISIBLE a través de la misma tabla `social_posts`, en lotes de
+20 (sin límite global de 20). Las apps nativas sincronizadas consultan el feed
+autenticado; contenidos exclusivamente locales no constituyen posts públicos.
+
+El release requiere migración, checks de código, regresión de navegador,
+compilación integral y verificación del commit exacto + backend health en
+Contabo para declararse instalado.
+
+## Ficha integral de usuarios y estándar de selección (25/10/2026)
+
+PR #55 integrado en `c716009d841e862dab62ccd9bd22c95d8cbe535c`.
+Control/Usuarios ahora tiene selección por registro y revisión por lote,
+sin eliminar cuentas por error. La ficha se abre a pantalla completa en
+desktop o móvil y muestra avatar, actividad, puntos, publicaciones reales
+paginadas y denuncias de contenido con restricción OWNER/TRUST_SAFETY.
+Las lecturas de perfil generan auditoría. La pestaña «Chats denunciados» no
+permite abrir conversaciones hasta que exista denuncia autenticada de uno
+de sus participantes asociada a un expediente y auditada.
+`docs/DATA_VIEWS_STANDARD.md` v1.1 establece el patrón obligatorio de
+selección, acciones sensibles y eliminación lógica con justificación.
+
+## Corrección del release de Usuarios (25/10/2026)
+
+El primer intento de deploy del perfil integral `a8eccb42` falló
+durante :backend:compileKotlin por una referencia incorrecta
+al parser de cursores. El PR #56, integrado en `c22ca87794e915c9d20667e4c357f62ee40f1847`,
+corrige el símbolo y mantiene los controles de seguridad.
+La publicación debe verificar el nuevo commit exacto en Contabo;
+no considerar instalada la versión fallida.
+
+## Avatar en listado de Usuarios (25/10/2026)
+
+El listado incorpora avatar circular junto a la casilla de seleccion, sombra discreta, imagen por defecto y URL segura desde la API. Este commit dispara el proceso de publicacion; el resultado solo se considera publicado cuando el job publish verifica el SHA de Contabo.

@@ -174,7 +174,8 @@ class AnimalSqlRepository(private val db: Database) {
                    EXTRACT(EPOCH FROM a.created_at) * 1000 AS created_ms
             FROM animal_listings a
             JOIN users u ON u.id = a.reporter_user_id
-            LEFT JOIN social_posts p ON p.listing_id = a.id
+            JOIN social_posts p ON p.listing_id = a.id
+                AND p.moderation_status = 'VISIBLE'
             WHERE a.resolved = FALSE
             ORDER BY a.created_at DESC
             LIMIT 80

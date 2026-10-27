@@ -357,4 +357,3 @@ private fun StoryPlayer(controller: StoriesController,story: Story,foreground:Bo
     }
     if(remove) AlertDialog(onDismissRequest={remove=false},title={Text("¿Eliminar esta historia?")},text={Text("Dejará de estar disponible para todas las personas.")},confirmButton={TextButton(onClick={controller.remove(story.id);remove=false}) { Text("Eliminar") }},dismissButton={TextButton(onClick={remove=false}) { Text("Cancelar") }})
 }
-

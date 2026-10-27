@@ -1,10 +1,10 @@
 import { createStoryListing } from './crm-stories.js?v=story-frame-1';
-import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn, isExpiredMfaChallenge } from './crm-core.js?v=stories-20261026';
+import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn, isExpiredMfaChallenge } from './crm-core.js?v=beta-candidate-20261027';
 import { createIdentity } from './crm-auth.js?v=tacho-1';
 
 const controlSections = [
   { id: 'resumen', label: 'Resumen', icon: 'qs_feed.svg', keys: null },
-  { id: 'usuarios', label: 'Usuarios', icon: 'qs_skills.svg', keys: ['Usuarios activos'] },
+  { id: 'usuarios', label: 'Usuarios', icon: 'qs_user.svg', view: 'listing' },
   { id: 'empresas', label: 'Empresas', icon: 'qs_form.svg', keys: ['Empresas', 'Empresas por verificar'] },
   { id: 'denuncias', label: 'Denuncias', icon: 'qs_notifications.svg', keys: ['Denuncias pendientes'] },
   { id: 'historias', label: 'Historias', icon: 'qs_anecdote.svg', view: 'stories' },
@@ -132,7 +132,7 @@ export async function start() {
   fields.append(factorLabel, begin, recaptcha, codeLabel, verify, cancel);
   challenge.append(fields); login.insertAdjacentElement('afterend', challenge);
   // El shell viaja en paralelo con Firebase. El ingreso no lo espera para pintar.
-  const workspaceReady = import('./crm-ui.js?v=stories-20261026-suggest-2');
+  const workspaceReady = import('./crm-ui.js?v=beta-candidate-20261027');
   const [appSdk, sdk] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),
@@ -355,14 +355,16 @@ export async function start() {
             searchLabel: 'Buscar publicación',
             bulk: canPosts ? { icon: 'qs_trash.png', label: 'Quitar selección' } : null,
             columns: ['Foto', 'Autor', 'Texto', 'Fecha', 'Estado', 'Acción'],
+            sortable: { Autor: 'author', Texto: 'text', Fecha: 'createdAt' },
             mark: true,
             emptyTitle: canPosts ? 'Sin publicaciones' : 'Sin acceso',
             emptyDetail: canPosts
               ? 'Ninguna publicación visible coincide con la búsqueda.'
               : 'No tenés permiso para administrar publicaciones.',
-            async load(query, cursor) {
+            advanced: true,
+            async load(query, cursor, orders = [{ by: 'createdAt', direction: 'desc' }], filters = {}) {
               if (!canPosts) return { items: [], nextCursor: null, suggestions: null };
-              const body = { query };
+              const body = { query, orders, filters };
               if (cursor) body.cursor = cursor;
               const data = await api('platform/posts/search', token, body, task.signal);
               const posts = Array.isArray(data.posts) ? data.posts : [];
@@ -388,7 +390,7 @@ export async function start() {
                 cells: [
                   image ? (cropped ? { image } : { image, frame }) : { text: '' },
                   { text: post.authorName || 'Alguien de la comunidad' },
-                  { text: post.body || '', clamp: true },
+                  { text: [post.animalTitle, post.body].filter(Boolean).join(' — '), clamp: true },
                   { text: when },
                   { badge: 'Visible', tone: 'calm' },
                 ],
@@ -399,8 +401,8 @@ export async function start() {
                   { icon: 'qs_trash.png', label: 'Quitar', name: 'remove' },
                 ] : [{ icon: 'qs_anecdote.svg', label: 'Ver publicación', name: 'open' }],
                 detail: {
-                  title: post.authorName || 'Alguien de la comunidad',
-                  meta: `${when} · Visible`,
+                  title: post.animalTitle || post.authorName || 'Alguien de la comunidad',
+                  meta: `${post.authorName || 'Alguien de la comunidad'} · ${when} · Visible`,
                   body: post.body || '',
                   image: editor,
                   frame,
@@ -475,8 +477,87 @@ export async function start() {
         } : {}),
       };
       const storyListing = createStoryListing(api, token, task.signal, canPosts, message);
+      const userStatus = { ACTIVE: 'Activo', PENDING: 'Pendiente', SUSPENDED: 'Suspendido', DELETED: 'Eliminado' };
+      const userRole = { USER: 'Usuario', COMPANY_ADMIN: 'Empresa', COMMUNITY_MODERATOR: 'Moderador' };
+      // Una sola política para acciones de cada fila y de selección múltiple.
+      const userActions = {
+        block: mode === 'control' && ['OWNER', 'TRUST_SAFETY'].includes(permission.platformRole),
+        delete: mode === 'control' && permission.platformRole === 'OWNER',
+      };
+      const userListing = {
+        advanced: true,
+        readOnly: true,
+        userProfile: true,
+        bulkReview: { icon: 'qs_eye.svg', label: 'Revisar seleccionados' },
+        userActions,
+        async bulkModerate(action, users, reason, confirm = '') {
+          return api('platform/users/moderate', token, {
+            action, userIds: users.map(user => user.id), reason, confirm,
+          }, task.signal);
+        },
+        noun: 'usuarios',
+        filterType: 'users',
+        defaultFilters: { statuses: [], roles: [], from: '', to: '' },
+        orderLabels: { createdAt: 'Alta', name: 'Nombre', status: 'Estado', role: 'Rol', lastSeenAt: 'Actividad' },
+        maxOrders: 4,
+        placeholder: 'Buscar usuario por nombre o ID',
+        searchLabel: 'Buscar usuario',
+        mark: true,
+        columns: ['Nombre', 'Estado', 'Rol', 'Alta', 'Última actividad', 'Acción'],
+        sortable: { Nombre: 'name', Estado: 'status', Rol: 'role', Alta: 'createdAt', 'Última actividad': 'lastSeenAt' },
+        emptyTitle: 'Sin usuarios',
+        emptyDetail: 'No se encontraron usuarios con estos criterios.',
+        async load(query, cursor, orders, filters) {
+          const body = { query, orders, filters };
+          if (cursor) body.cursor = cursor;
+          const data = await api('platform/users/list', token, body, task.signal);
+          return {
+            items: Array.isArray(data.users) ? data.users.filter(u => u && typeof u.id === 'string' && u.id) : [],
+            nextCursor: data.nextCursor || null,
+            suggestions: null,
+          };
+        },
+        async loadDetail(user) {
+          return api('platform/users/detail', token, { userId: user.id }, task.signal);
+        },
+        async loadUserPosts(user, cursor) {
+          return api('platform/users/posts', token, { userId: user.id, ...(cursor ? { cursor } : {}) }, task.signal);
+        },
+        present(user) {
+          if (!user || !user.id) return { hidden: true };
+          const state = userStatus[user.status] || user.status || 'No informado';
+          const role = userRole[user.role] || user.role || 'No informado';
+          const last = user.lastSeenAt ? formatWhen(user.lastSeenAt) : 'Sin actividad registrada';
+          const created = formatWhen(user.createdAt);
+          return {
+            key: user.id,
+            mark: true,
+            cells: [
+              { text: user.displayName || 'Sin nombre' },
+              { badge: user.canPublish === false ? 'Solo lectura' : state, tone: user.canPublish === false ? 'attention' : user.status === 'ACTIVE' ? 'calm' : 'neutral' },
+              { text: role },
+              { text: created },
+              { text: last },
+            ],
+            actions: [
+              { icon: 'qs_eye.svg', label: 'Ver usuario', name: 'view' },
+              ...(userActions.block ? [user.canPublish === false
+                ? { icon: 'qs_publish_allow.svg', label: 'Permitir publicaciones de ' + (user.displayName || 'usuario'), name: 'userUnblock' }
+                : { icon: 'qs_publish_block.svg', label: 'Bloquear publicaciones de ' + (user.displayName || 'usuario'), name: 'userBlock' }] : []),
+              ...(userActions.delete ? [
+                { icon: 'qs_trash.png', label: 'Eliminar usuario ' + (user.displayName || 'sin nombre'), name: 'userDelete', danger: true },
+              ] : []),
+            ],
+            detail: {
+              title: user.displayName || 'Sin nombre',
+              meta: state + (user.canPublish === false ? ' · Solo lectura' : '') + ' · ' + role,
+              body: 'Alta: ' + created + ' · Última actividad: ' + last,
+            },
+          };
+        },
+      };
       const sections = (mode === 'control' ? controlSections : empresaSections).map(section =>
-        section.view === 'stories' ? { ...section, listing: storyListing } : section.view === 'listing' ? { ...section, listing: postListing } : section
+        section.view === 'stories' ? { ...section, listing: storyListing } : section.view === 'listing' ? { ...section, listing: section.id === 'usuarios' ? userListing : postListing } : section
       );
       if (typeof desk?.dispose === 'function') desk.dispose();
       desk = null;

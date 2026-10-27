@@ -34,6 +34,10 @@ class CrmPostPolicyTest {
         assertTrue(CRM_VISIBLE_POST_SEARCH.contains("author_photo"))
         assertTrue(CRM_VISIBLE_POST_SEARCH.contains("Alguien de la comunidad"))
         assertTrue(CRM_VISIBLE_POST_SEARCH.contains("p.topic"))
+        assertTrue(CRM_VISIBLE_POST_SEARCH.contains("LEFT JOIN animal_listings a"))
+        assertTrue(CRM_VISIBLE_POST_SEARCH.contains("animal_title"))
+        assertTrue(CRM_VISIBLE_POST_SEARCH.contains("a.pet_name"))
+        assertTrue(CRM_VISIBLE_POST_SEARCH.contains("a.title"))
         assertTrue(CRM_VISIBLE_POST_SEARCH.contains("alt_text"))
         assertTrue(crmQueryUsesAppLabel("alguien"))
         assertTrue(crmQueryUsesAppLabel("Alguien de la comunidad"))
@@ -75,6 +79,58 @@ class CrmPostPolicyTest {
         assertNull(parseCrmPostCursor("no"))
         assertNull(parseCrmPostCursor("-1|$id"))
         assertNull(parseCrmPostCursor("10|not-a-uuid"))
+    }
+
+    @Test fun pageCursorRemembersOrderAndRejectsMalformedInput() {
+        val id = UUID.randomUUID().toString()
+        val cursor = CrmPostPageCursor("author", "asc", "ana", "2026-10-25T10:30:00.123456Z", id)
+        val encoded = crmEncodePostPageCursor(cursor)
+        assertEquals(cursor, parseCrmPostPageCursor(encoded))
+        assertNull(parseCrmPostPageCursor("v2.not-a-valid-cursor"))
+        assertFalse(crmValidPostSort("DROP TABLE posts", "asc"))
+        assertFalse(crmValidPostSort("author", "random"))
+        assertTrue(crmValidPostSort("createdAt", "desc"))
+        assertTrue(crmValidPostSort("text", "asc"))
+        assertEquals("createdAt", parseCrmPostPageCursor(crmPostCursor(1_700_000_000_000, id))?.sortBy)
+    }
+
+    @Test fun advancedFiltersValidateAndNormalizeUserValues() {
+        val filters = crmParsePostFilters(mapOf(
+            "topics" to listOf(" adopción ", "trueque"),
+            "authors" to listOf("Ana"),
+            "photo" to "yes",
+            "from" to "2026-10-01",
+            "to" to "2026-10-25",
+        ))
+        assertEquals(listOf("adopción", "trueque"), filters?.topics)
+        assertEquals(listOf("Ana"), filters?.authors)
+        assertEquals("yes", filters?.photo)
+        assertNull(crmParsePostFilters(mapOf("photo" to "DROP")))
+        assertNull(crmParsePostFilters(mapOf("topics" to listOf(""))))
+        assertNull(crmParsePostFilters(mapOf("from" to "2026-99-99")))
+        assertNull(crmParsePostFilters(mapOf("from" to "2026-10-30", "to" to "2026-10-01")))
+    }
+
+    @Test fun multilevelOrderUsesStableCursorAndRejectsInvalidShapes() {
+        val orders = crmParsePostOrders(listOf(
+            mapOf("by" to "author", "direction" to "asc"),
+            mapOf("by" to "createdAt", "direction" to "desc"),
+        ))!!
+        assertEquals(2, orders.size)
+        val keys = crmPostSortKeys(orders)
+        assertEquals(listOf("author", "date", "uuid"), keys.map { it.kind })
+        assertEquals(listOf("asc", "desc", "desc"), keys.map { it.direction })
+        assertNull(crmParsePostOrders(listOf(mapOf("by" to "text", "direction" to "sideways"))))
+        assertNull(crmParsePostOrders(listOf(
+            mapOf("by" to "text", "direction" to "asc"),
+            mapOf("by" to "text", "direction" to "desc"),
+        )))
+        val filters = CrmPostFilters(topics = listOf("adopción"), photo = "yes")
+        val values = listOf("ana", "2026-10-25T10:00:00.123456Z", UUID.randomUUID().toString())
+        val cursor = CrmPostMultiCursor("familia", filters, orders, values)
+        assertEquals(cursor, crmParsePostMultiCursor(crmEncodePostMultiCursor(cursor)))
+        assertNull(crmParsePostMultiCursor("v3.invalid"))
+        assertNull(crmParsePostMultiCursor("v2.invalid"))
     }
 
     @Test fun removalProjectsTheExistingPostNodeAsRemoved() {
