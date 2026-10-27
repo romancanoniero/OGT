@@ -2,6 +2,7 @@ package com.onlygoodthings.app.nav
 
 enum class OgtRoute(val title: String) {
     Splash("Splash"),
+    Landing("Presentación"),
     AnimatedSvg("Logo animado"),
     SplashSponsors("Splash con sponsors"),
     OnboardingFeatures("Onboarding: 4 funcionalidades"),

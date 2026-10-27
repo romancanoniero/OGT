@@ -775,6 +775,30 @@ class OgtLocalDatabaseTest {
     }
 
     @Test
+    fun reconciliaRetiradasSinBorrarOtrasPaginasNiPublicacionesPendientes() {
+        val db = OgtLocalDatabase.seeded()
+        val removed = OgtIds.PostTaller
+        val visible = OgtIds.PostArboles
+        val otherPage = OgtIds.PostBebederos
+        val pending = db.publishHelpExchange(OgtIds.Mariana, "Albañilería", "Pintura")!!
+        val pendingPost = "post-pub-${pending.createdAtEpochMs}"
+        val beforeTick = db.feedTick.value
+        db.reconcilePostVisibility(setOf(removed, visible), setOf(visible))
+        assertTrue(db.posts.none { it.id == removed })
+        assertTrue(db.postMedia.none { it.postId == removed })
+        assertTrue(db.comments.none { it.postId == removed })
+        assertTrue(db.posts.any { it.id == visible })
+        assertTrue(db.posts.any { it.id == otherPage })
+        assertTrue(db.posts.any { it.id == pendingPost })
+        assertTrue(db.feedTick.value > beforeTick)
+        val cached = db.exportSocialFeed(OgtIds.Mariana)
+        val restarted = OgtLocalDatabase()
+        restarted.importSocialFeed(cached)
+        assertTrue(restarted.posts.none { it.id == removed })
+        assertTrue(restarted.posts.any { it.id == pendingPost })
+    }
+
+    @Test
     fun laFotoVivaPisaLaCaraYElComentarioNoLaReviveVieja() {
         val db = OgtLocalDatabase.seeded()
         val ana = db.user(OgtIds.Ana)

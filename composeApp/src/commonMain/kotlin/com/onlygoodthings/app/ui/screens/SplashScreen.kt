@@ -35,7 +35,7 @@ import com.onlygoodthings.app.ui.components.OgtPrimaryButton
 import kotlinx.coroutines.delay
 
 @Composable
-fun SplashScreen(onContinue: () -> Unit) {
+fun LandingScreen(onContinue: () -> Unit) {
     val progress = remember { Animatable(0.12f) }
     var status by remember { mutableStateOf("Conectando tu comunidad…") }
     var ready by remember { mutableStateOf(false) }
@@ -61,10 +61,10 @@ fun SplashScreen(onContinue: () -> Unit) {
             OgtPill("Buenas noticias", OgtColors.sunset, OgtColors.sunsetText)
         }
         Spacer(Modifier.weight(1f))
-        OgtLogo(size = 168.dp, animated = true)
+        OgtLogo(size = 168.dp, animated = false)
         Spacer(Modifier.height(20.dp))
+        Text("Only Good Things", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = OgtColors.ink)
         Text("RED SOLIDARIA DE COMUNIDAD", color = OgtColors.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
-        Text("Only Good Things (OGT)", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = OgtColors.ink)
         OgtCaption("Las buenas noticias, la ayuda mutua y los actos solidarios de tu comunidad.")
         Spacer(Modifier.height(16.dp))
         AuthFeatureReel()

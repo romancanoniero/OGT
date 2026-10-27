@@ -45,6 +45,11 @@ class RestFeedRepository(
             family?.let { put("family", JsonPrimitive(it.name)) }
         })
 
+    suspend fun visiblePostIds(ids: List<String>): List<String> =
+        post("/api/v1/social/visibility", buildJsonObject {
+            put("postIds", buildJsonArray { ids.forEach { add(it) } })
+        })
+
     override suspend fun clapPost(postId: String): SocialPost =
         post("/api/v1/social/impact", buildJsonObject {
             put("postId", JsonPrimitive(postId))

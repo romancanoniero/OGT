@@ -374,7 +374,7 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: Realtime
                   (SELECT count(*) FROM companies),
                   (SELECT count(*) FROM companies WHERE verification_status = 'PENDING_REVIEW'),
                   (SELECT count(*) FROM content_reports WHERE status = 'PENDING_REVIEW'),
-                  (SELECT count(*) FROM social_posts WHERE moderation_status = 'VISIBLE')
+                  (SELECT count(*) FROM social_posts WHERE moderation_status = 'VISIBLE' AND NOT is_story)
             """.trimIndent()
             conn.prepareStatement(sql).use { stmt ->
                 stmt.executeQuery().use { rs ->
@@ -781,7 +781,7 @@ LEFT JOIN LATERAL (
   ORDER BY m.sort_order
   LIMIT 1
 ) photo ON true
-WHERE p.moderation_status = 'VISIBLE'
+WHERE p.moderation_status = 'VISIBLE' AND NOT p.is_story
 """
 
 /** La URL que ya guarda `post_media.url`. Sin esquema http no es una foto publicable. */

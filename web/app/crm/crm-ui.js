@@ -845,6 +845,11 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     field.focus();
   }
   async function openDialog(listing, item, view, reasonFocus) {
+    if (typeof listing.open === 'function') {
+      try { await listing.open(item, () => loadListing(listing, true)); }
+      catch (error) { listError.textContent = error.message || 'No se pudo abrir el contenido.'; listError.hidden = false; }
+      return;
+    }
     closeSuggest('dialog');
     const card = view.detail || {};
     dialogPostId = view.key;

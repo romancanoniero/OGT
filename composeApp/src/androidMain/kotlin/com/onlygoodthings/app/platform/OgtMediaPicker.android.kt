@@ -9,6 +9,8 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import kotlinx.coroutines.*
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,25 +26,36 @@ import java.io.File
 import java.util.UUID
 
 @Composable
-actual fun rememberOgtMediaPicker(remaining: Int, onPicked: (OgtPickedMedia) -> Unit): OgtMediaPicker {
+actual fun rememberPlatformOgtMediaPicker(remaining: Int, onPicked: (OgtPickedMedia) -> Unit): OgtMediaPicker {
     val context = pickerContext()
+    val pickerError = remember { mutableStateOf<String?>(null) }
+    val scope=rememberCoroutineScope()
+    val processing=remember { mutableStateOf(false) }
+    fun load(uris:List<Uri>,kind:MediaKind?) {
+        processing.value = true
+        scope.launch {
+            try { for(uri in uris.take(remaining.coerceAtLeast(0))) {
+                val media=withContext(Dispatchers.IO) { copyPicked(context,uri,kind ?: mediaKindOf(context,uri)) }
+                if(media!=null) onPicked(media) else pickerError.value="No se pudo copiar el archivo. Elegilo otra vez."
+            } } finally { processing.value = false }
+        }
+    }
+    var recording by remember { mutableStateOf(false) }
     var pendingCamera by remember { mutableStateOf<File?>(null) }
     val photo = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(PostMediaRules.MAX_ITEMS),
     ) { uris ->
-        uris.take(remaining.coerceAtLeast(0)).forEach { emitCopied(context, it, MediaKind.IMAGE, onPicked) }
+        load(uris,MediaKind.IMAGE)
     }
     val video = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(PostMediaRules.MAX_ITEMS),
     ) { uris ->
-        uris.take(remaining.coerceAtLeast(0)).forEach { emitCopied(context, it, MediaKind.VIDEO, onPicked) }
+        load(uris,MediaKind.VIDEO)
     }
     val library = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(PostMediaRules.MAX_ITEMS),
     ) { uris ->
-        uris.take(remaining.coerceAtLeast(0)).forEach { uri ->
-            emitCopied(context, uri, mediaKindOf(context, uri), onPicked)
-        }
+        load(uris,null)
     }
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         val file = pendingCamera
@@ -58,8 +71,24 @@ actual fun rememberOgtMediaPicker(remaining: Int, onPicked: (OgtPickedMedia) -> 
             )
         }
     }
+    val record = rememberLauncherForActivityResult(ActivityResultContracts.CaptureVideo()) { ok ->
+        val file=pendingCamera;pendingCamera=null
+        if(ok && file!=null && file.exists()) {
+            processing.value = true
+            scope.launch {
+                try {
+                    val poster=withContext(Dispatchers.IO) { videoPoster(context,file.absolutePath) }
+                    onPicked(OgtPickedMedia(file.absolutePath,MediaKind.VIDEO,file.absolutePath,true,poster))
+                } finally { processing.value = false }
+            }
+        }
+    }
     val askCamera = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (!granted || remaining <= 0) return@rememberLauncherForActivityResult
+        if (!granted) { pickerError.value="Habilitá el permiso de cámara en Ajustes o elegí un archivo de la galería.";return@rememberLauncherForActivityResult }
+        if(remaining<=0) return@rememberLauncherForActivityResult
+        if(recording) {
+            val file=newCacheFile(context,"mp4");pendingCamera=file;record.launch(fileProviderUri(context,file));return@rememberLauncherForActivityResult
+        }
         val file = newCacheFile(context, "jpg")
         pendingCamera = file
         camera.launch(fileProviderUri(context, file))
@@ -81,7 +110,15 @@ actual fun rememberOgtMediaPicker(remaining: Int, onPicked: (OgtPickedMedia) -> 
                     library.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
                 }
             },
+            errorMessage = pickerError,
+            isProcessing = processing,
+            recordVideo = {
+                recording=true
+                if(cameraGranted(context)) { val file=newCacheFile(context,"mp4");pendingCamera=file;record.launch(fileProviderUri(context,file)) }
+                else askCamera.launch(Manifest.permission.CAMERA)
+            },
             takeCamera = {
+                recording=false
                 if (remaining > 0) {
                     if (cameraGranted(context)) {
                         val file = newCacheFile(context, "jpg")
@@ -101,23 +138,9 @@ private fun mediaKindOf(context: Context, uri: Uri): MediaKind {
     return if (type.startsWith("video/")) MediaKind.VIDEO else MediaKind.IMAGE
 }
 
-private fun emitCopied(
-    context: Context,
-    uri: Uri,
-    kind: MediaKind,
-    onPicked: (OgtPickedMedia) -> Unit,
-) {
-    val ext = if (kind == MediaKind.VIDEO) "mp4" else "jpg"
-    val dest = copyUri(context, uri, ext) ?: return
-    onPicked(
-        OgtPickedMedia(
-            id = dest.absolutePath,
-            kind = kind,
-            path = dest.absolutePath,
-            fromDevice = true,
-            posterPath = if (kind == MediaKind.VIDEO) videoPoster(context, dest.absolutePath) else null,
-        ),
-    )
+private fun copyPicked(context:Context,uri:Uri,kind:MediaKind):OgtPickedMedia? {
+    val dest=copyUri(context,uri,if(kind==MediaKind.VIDEO) "mp4" else "jpg") ?: return null
+    return OgtPickedMedia(dest.absolutePath,kind,dest.absolutePath,true,if(kind==MediaKind.VIDEO) videoPoster(context,dest.absolutePath) else null)
 }
 
 private fun copyUri(context: Context, uri: Uri, ext: String): File? = runCatching {
@@ -129,15 +152,17 @@ private fun copyUri(context: Context, uri: Uri, ext: String): File? = runCatchin
 }.getOrNull()
 
 private fun videoPoster(context: Context, path: String): String? = runCatching {
-    val retriever = MediaMetadataRetriever()
-    retriever.setDataSource(path)
-    val frame = retriever.frameAtTime
-    retriever.release()
-    val dest = newCacheFile(context, "jpg")
-    dest.outputStream().use { out ->
-        frame?.compress(Bitmap.CompressFormat.JPEG, 86, out) ?: return null
-    }
-    dest.absolutePath
+    val retriever=MediaMetadataRetriever()
+    try {
+        retriever.setDataSource(path)
+        val original=retriever.frameAtTime ?: return null
+        val scale=minOf(1f,720f/maxOf(original.width,original.height))
+        val frame=Bitmap.createScaledBitmap(original,maxOf(1,(original.width*scale).toInt()),maxOf(1,(original.height*scale).toInt()),true)
+        if(frame!==original) original.recycle()
+        val dest=newCacheFile(context,"jpg")
+        try { dest.outputStream().use { frame.compress(Bitmap.CompressFormat.JPEG,82,it) } } finally { frame.recycle() }
+        dest.absolutePath
+    } finally { retriever.release() }
 }.getOrNull()
 
 private fun newCacheFile(context: Context, ext: String): File {

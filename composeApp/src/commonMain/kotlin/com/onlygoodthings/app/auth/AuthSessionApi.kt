@@ -27,6 +27,40 @@ class AuthSessionApi(private val session: SessionStore) {
         response.data
     }.getOrNull()
 
+    suspend fun uploadProfilePhoto(token: String, filename: String, bytes: ByteArray): com.onlygoodthings.shared.domain.UploadedMedia = uploadMedia(token, filename, bytes)
+
+    @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
+    suspend fun uploadMedia(token: String, filename: String, bytes: ByteArray): com.onlygoodthings.shared.domain.UploadedMedia {
+        val encoded = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            kotlin.io.encoding.Base64.encode(bytes)
+        }
+        val response: ApiResponse<com.onlygoodthings.shared.domain.UploadedMedia> =
+            client.post("${session.apiBaseUrl}/api/v1/media/upload") {
+                contentType(ContentType.Application.Json)
+                header("Authorization", "Bearer $token")
+                setBody(buildJsonObject {
+                    put("filename", JsonPrimitive(filename))
+                    put("bytesBase64", JsonPrimitive(encoded))
+                })
+            }.body()
+        return response.data?.takeIf { response.success }
+            ?: error(response.message ?: "No se pudo subir el archivo")
+    }
+
+    suspend fun updateProfilePhoto(token: String, name: String, url: String): com.onlygoodthings.shared.domain.NeighborCard {
+        val response: ApiResponse<com.onlygoodthings.shared.domain.NeighborCard> =
+            client.post("${session.apiBaseUrl}/api/v1/users/profile/update") {
+                contentType(ContentType.Application.Json)
+                header("Authorization", "Bearer $token")
+                setBody(buildJsonObject {
+                    put("displayName", JsonPrimitive(name))
+                    put("photoUrl", JsonPrimitive(url))
+                })
+            }.body()
+        return response.data?.takeIf { response.success }
+            ?: error(response.message ?: "No se pudo guardar la foto")
+    }
+
     /** Ping de presencia: actualiza users.home_location en el servidor. */
     suspend fun updateLocation(latitude: Double, longitude: Double, accuracyMeters: Double?): Boolean = runCatching {
         val token = session.firebaseJwt ?: return false

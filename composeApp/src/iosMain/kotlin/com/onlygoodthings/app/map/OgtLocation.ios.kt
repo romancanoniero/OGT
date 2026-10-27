@@ -1,5 +1,6 @@
 package com.onlygoodthings.app.map
 
+import kotlinx.coroutines.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -32,14 +33,15 @@ import platform.darwin.NSObject
 actual fun rememberOgtLocation(track: Boolean): OgtLocationState {
     val holder = IosLocationRuntime
     var permission by remember { mutableStateOf(holder.permission()) }
-    var servicesEnabled by remember { mutableStateOf(CLLocationManager.locationServicesEnabled()) }
+    var servicesEnabled by remember { mutableStateOf(holder.servicesEnabled) }
     var fix by remember { mutableStateOf(holder.lastFix) }
     var acquiring by remember { mutableStateOf(holder.acquiring) }
 
     DisposableEffect(track, permission, servicesEnabled) {
+        holder.trackingRequested=track
         holder.onChange = {
             permission = holder.permission()
-            servicesEnabled = CLLocationManager.locationServicesEnabled()
+            servicesEnabled = holder.servicesEnabled
             fix = holder.lastFix
             acquiring = holder.acquiring
         }
@@ -56,7 +58,8 @@ actual fun rememberOgtLocation(track: Boolean): OgtLocationState {
             null,
         ) { _ ->
             permission = holder.permission()
-            servicesEnabled = CLLocationManager.locationServicesEnabled()
+            holder.checkServices()
+            servicesEnabled = holder.servicesEnabled
             fix = holder.lastFix
             if (track && permission.isGranted() && servicesEnabled) holder.refresh()
         }
@@ -75,15 +78,12 @@ actual fun rememberOgtLocation(track: Boolean): OgtLocationState {
         requestPermission = { scope ->
             holder.request(scope)
             permission = holder.permission()
-            servicesEnabled = CLLocationManager.locationServicesEnabled()
+            servicesEnabled = holder.servicesEnabled
             if (permission.isGranted() && servicesEnabled) {
                 holder.start(background = scope == LocationScope.ALWAYS || permission == LocationPermissionState.GRANTED_ALWAYS)
             }
         },
-        ensureServices = {
-            servicesEnabled = CLLocationManager.locationServicesEnabled()
-            if (!servicesEnabled) holder.openSettings()
-        },
+        ensureServices = { holder.checkServices(openIfDisabled=true) },
         openSettings = { holder.openSettings() },
         refreshNow = {
             if (permission.isGranted()) {
@@ -92,8 +92,9 @@ actual fun rememberOgtLocation(track: Boolean): OgtLocationState {
             }
         },
         resync = {
+            holder.checkServices()
             permission = holder.permission()
-            servicesEnabled = CLLocationManager.locationServicesEnabled()
+            servicesEnabled = holder.servicesEnabled
             fix = holder.lastFix
             if (permission.isGranted() && servicesEnabled) holder.refresh()
             else if (!permission.isGranted()) {
@@ -112,6 +113,20 @@ internal object IosLocationRuntime {
     var pendingAlways: Boolean = false
     /** iOS solo muestra “Siempre” una vez; el segundo intento abre Ajustes. */
     var askedAlways: Boolean = false
+    var trackingRequested=false
+    var servicesEnabled=false
+        private set
+    private val scope=CoroutineScope(SupervisorJob()+Dispatchers.Main)
+    private var servicesJob:Job?=null
+    fun checkServices(openIfDisabled:Boolean=false) {
+        if(servicesJob?.isActive==true && !openIfDisabled) return
+        servicesJob?.cancel()
+        servicesJob=scope.launch {
+            servicesEnabled=withContext(Dispatchers.Default) { CLLocationManager.locationServicesEnabled() }
+            onChange?.invoke()
+            if(openIfDisabled && !servicesEnabled) openSettings()
+        }
+    }
     private val manager = CLLocationManager()
     private val delegate = IosLocationDelegate()
 
@@ -120,6 +135,7 @@ internal object IosLocationRuntime {
         manager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
         manager.distanceFilter = 5.0
         manager.pausesLocationUpdatesAutomatically = true
+        checkServices()
     }
 
     fun permission(): LocationPermissionState = mapStatus(manager.authorizationStatus)
@@ -204,9 +220,10 @@ private class IosLocationDelegate : NSObject(), CLLocationManagerDelegateProtoco
             manager.requestAlwaysAuthorization()
             return
         }
+        IosLocationRuntime.checkServices()
         IosLocationRuntime.onChange?.invoke()
-        if (IosLocationRuntime.permission().isGranted() &&
-            CLLocationManager.locationServicesEnabled()
+        if (IosLocationRuntime.trackingRequested && IosLocationRuntime.permission().isGranted() &&
+            IosLocationRuntime.servicesEnabled
         ) {
             IosLocationRuntime.start(
                 background = IosLocationRuntime.permission() == LocationPermissionState.GRANTED_ALWAYS,

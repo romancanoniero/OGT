@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(here, '../web/app');
+const root = path.resolve(here, process.env.OGT_QA_WEB_ROOT || '../web/app');
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg' };
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost:19082');

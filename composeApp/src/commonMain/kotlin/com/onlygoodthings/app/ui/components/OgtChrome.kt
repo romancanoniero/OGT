@@ -25,7 +25,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
@@ -53,10 +52,6 @@ import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.theme.OgtDimens
 import com.onlygoodthings.app.theme.OgtMotion
 import kotlin.math.abs
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 
 val LocalOgtChrome = staticCompositionLocalOf<OgtChromeHost?> { null }
@@ -85,15 +80,12 @@ data class OgtChromeSpec(
  * (Ivory / iOS 18 toolbarVisibility, no Material enterAlways).
  */
 @Stable
-class OgtChromeHost(
-    private val scope: CoroutineScope,
-) {
+class OgtChromeHost {
     private var layers by mutableStateOf<List<Pair<Any, OgtChromeSpec>>>(emptyList())
     var scrolling by mutableStateOf(false)
         private set
     var barHeightPx by mutableStateOf(0)
     private var hideAcc = 0f
-    private var revealJob: Job? = null
 
     val spec: OgtChromeSpec? get() = layers.lastOrNull()?.second
     val hosted: Boolean get() = spec != null
@@ -113,7 +105,6 @@ class OgtChromeHost(
     }
 
     fun revealNow() {
-        revealJob?.cancel()
         scrolling = false
         hideAcc = 0f
     }
@@ -125,7 +116,6 @@ class OgtChromeHost(
         if (hideAcc < OgtMotion.chromeHidePx) return
         hideAcc = 0f
         scrolling = true
-        scheduleReveal()
     }
 
     fun nestedScrollConnection(): NestedScrollConnection = object : NestedScrollConnection {
@@ -142,25 +132,16 @@ class OgtChromeHost(
         }
 
         override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-            scheduleReveal()
+            // Se ejecuta después de que el hijo termina la inercia, incluso con velocidad cero.
+            revealNow()
             return Velocity.Zero
-        }
-    }
-
-    private fun scheduleReveal() {
-        revealJob?.cancel()
-        revealJob = scope.launch {
-            delay(OgtMotion.chromeIdleMs)
-            scrolling = false
-            hideAcc = 0f
         }
     }
 }
 
 @Composable
 fun rememberOgtChromeHost(): OgtChromeHost {
-    val scope = rememberCoroutineScope()
-    return remember(scope) { OgtChromeHost(scope) }
+    return remember { OgtChromeHost() }
 }
 
 @Composable
@@ -232,11 +213,17 @@ internal fun OgtTopBarRow(spec: OgtChromeSpec, onBack: (() -> Unit)? = spec.onBa
         // Sin flecha: solo el logo. Con flecha: el título de la pantalla, nunca el wordmark.
         val wordmark = isAppWordmark(spec.title)
         if (onBack == null && (spec.branded || wordmark)) {
+            // Compara con la foto visible, descontando el borde de 1 dp a cada lado del avatar.
+            val logoHeight = OgtDimens.iconButton - 2.dp
             Image(
                 painterResource(Res.drawable.feed_logo),
                 contentDescription = "Inicio",
-                modifier = Modifier.size(36.dp),
-                contentScale = ContentScale.Fit,
+                // El PNG mide 512 px; el dibujo ocupa 300 px de alto. Recorta sus márgenes transparentes.
+                modifier = Modifier.size(
+                    width = logoHeight * (512f / 300f),
+                    height = logoHeight,
+                ),
+                contentScale = ContentScale.Crop,
             )
             Spacer(Modifier.weight(1f))
         } else if (!wordmark) {

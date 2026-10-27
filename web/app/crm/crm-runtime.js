@@ -1,4 +1,5 @@
-import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn, isExpiredMfaChallenge } from './crm-core.js?v=totp-timeout-1';
+import { createStoryListing } from './crm-stories.js?v=story-frame-1';
+import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn, isExpiredMfaChallenge } from './crm-core.js?v=stories-20261026';
 import { createIdentity } from './crm-auth.js?v=tacho-1';
 
 const controlSections = [
@@ -6,6 +7,7 @@ const controlSections = [
   { id: 'usuarios', label: 'Usuarios', icon: 'qs_skills.svg', keys: ['Usuarios activos'] },
   { id: 'empresas', label: 'Empresas', icon: 'qs_form.svg', keys: ['Empresas', 'Empresas por verificar'] },
   { id: 'denuncias', label: 'Denuncias', icon: 'qs_notifications.svg', keys: ['Denuncias pendientes'] },
+  { id: 'historias', label: 'Historias', icon: 'qs_anecdote.svg', view: 'stories' },
   { id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote.svg', view: 'listing' },
 ];
 const empresaSections = [
@@ -130,7 +132,7 @@ export async function start() {
   fields.append(factorLabel, begin, recaptcha, codeLabel, verify, cancel);
   challenge.append(fields); login.insertAdjacentElement('afterend', challenge);
   // El shell viaja en paralelo con Firebase. El ingreso no lo espera para pintar.
-  const workspaceReady = import('./crm-ui.js?v=suggest-2');
+  const workspaceReady = import('./crm-ui.js?v=stories-20261026-suggest-2');
   const [appSdk, sdk] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),
@@ -472,8 +474,9 @@ export async function start() {
           },
         } : {}),
       };
+      const storyListing = createStoryListing(api, token, task.signal, canPosts, message);
       const sections = (mode === 'control' ? controlSections : empresaSections).map(section =>
-        section.view === 'listing' ? { ...section, listing: postListing } : section
+        section.view === 'stories' ? { ...section, listing: storyListing } : section.view === 'listing' ? { ...section, listing: postListing } : section
       );
       if (typeof desk?.dispose === 'function') desk.dispose();
       desk = null;

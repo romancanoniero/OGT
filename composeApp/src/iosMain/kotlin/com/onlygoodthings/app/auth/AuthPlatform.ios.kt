@@ -146,6 +146,9 @@ actual class AuthPrefs actual constructor() {
             defaults.setObject(value, forKey = "ogt.feed.json")
             defaults.synchronize()
         }
+    actual var storyDraftsJson: String
+        get() = defaults.stringForKey("ogt.story.drafts").orEmpty()
+        set(value) { defaults.setObject(value, forKey = "ogt.story.drafts"); defaults.synchronize() }
     actual var honorReferrerConsumed: Boolean
         get() = defaults.boolForKey("ogt.honor.referrer")
         set(value) { defaults.setBool(value, forKey = "ogt.honor.referrer") }
@@ -157,4 +160,7 @@ actual class AuthPrefs actual constructor() {
         set(value) { defaults.setObject(value, forKey = "ogt.gps.scope") }
 }
 
-actual fun defaultApiBaseUrl(): String = OGT_DEFAULT_API_BASE
+actual fun defaultApiBaseUrl(): String =
+    if (platform.Foundation.NSBundle.mainBundle.bundleIdentifier == "com.onlygoodthings.app.qa" &&
+        platform.Foundation.NSProcessInfo.processInfo.environment["OGT_QA_MODE"] == "1") "http://127.0.0.1:19083"
+    else OGT_DEFAULT_API_BASE

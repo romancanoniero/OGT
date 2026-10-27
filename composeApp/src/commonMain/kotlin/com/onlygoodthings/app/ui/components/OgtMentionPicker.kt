@@ -13,7 +13,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.OutlinedTextField
+import com.onlygoodthings.app.ui.components.OgtOutlinedTextField as OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
@@ -90,7 +90,7 @@ fun OgtMentionPicker(
                 value = query,
                 onValueChange = { raw ->
                     val cleaned = raw.removePrefix("@")
-                    query = if (atPrefix) cleaned else titleCasePersonName(cleaned)
+                    query = cleaned
                     focused = true
                 },
                 modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
@@ -108,7 +108,7 @@ fun OgtMentionPicker(
                 },
                 shape = RoundedCornerShape(OgtDimens.buttonRadius),
                 colors = ogtOutlinedFieldColors(missing = missing),
-                keyboardOptions = KeyboardOptions(imeAction = if (allowNameOnly) ImeAction.Done else ImeAction.Default),
+                keyboardOptions = KeyboardOptions(capitalization=if(atPrefix) androidx.compose.ui.text.input.KeyboardCapitalization.None else androidx.compose.ui.text.input.KeyboardCapitalization.Words, imeAction = if (allowNameOnly) ImeAction.Done else ImeAction.Default),
                 keyboardActions = KeyboardActions(onDone = { confirmNameOnly() }),
             )
         } else if (single && selected.isNotEmpty()) {

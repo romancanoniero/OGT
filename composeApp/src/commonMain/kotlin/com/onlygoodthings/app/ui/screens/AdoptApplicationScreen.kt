@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
+import com.onlygoodthings.app.ui.components.OgtOutlinedTextField as OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -131,8 +131,8 @@ fun AdoptApplicationScreen(
                 if (es) "Formulario comunitario. Se envía a la casilla de quien publicó. No se publica en el feed."
                 else "Community form. It goes to the poster's inbox — not the feed.",
             )
-            AdoptField(if (es) "Tu nombre" else "Your name", if (es) "Nombre y apellido" else "Full name", name) { name = titleCasePersonName(it) }
-            AdoptField(if (es) "Teléfono" else "Phone", "11 0000 0000", phone) { phone = it }
+            AdoptField(if (es) "Tu nombre" else "Your name", if (es) "Nombre y apellido" else "Full name", name) { name = it }
+            AdoptField(if (es) "Teléfono" else "Phone", "11 0000 0000", phone, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Phone)) { phone = it }
             AdoptField(
                 if (es) "Domicilio" else "Address",
                 if (es) "Calle y altura · barrio" else "Street and neighborhood",
@@ -201,7 +201,7 @@ fun AdoptApplicationScreen(
                     viewer = me,
                     postId = postId,
                     listingId = listing?.id,
-                    applicantName = name,
+                    applicantName = titleCasePersonName(name),
                     phone = phone,
                     address = address,
                     homeKind = home,
@@ -224,12 +224,13 @@ fun AdoptApplicationScreen(
 }
 
 @Composable
-private fun AdoptField(label: String, hint: String, value: String, onChange: (String) -> Unit) {
+private fun AdoptField(label: String, hint: String, value: String, keyboardOptions: androidx.compose.foundation.text.KeyboardOptions = androidx.compose.foundation.text.KeyboardOptions(capitalization=androidx.compose.ui.text.input.KeyboardCapitalization.Sentences), onChange: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(label, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
         OutlinedTextField(
             value = value,
             onValueChange = onChange,
+            keyboardOptions = keyboardOptions,
             modifier = Modifier.fillMaxWidth(),
             placeholder = { Text(hint, color = OgtColors.muted) },
             singleLine = true,

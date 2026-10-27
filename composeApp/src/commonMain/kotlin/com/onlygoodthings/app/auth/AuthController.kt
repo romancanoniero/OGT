@@ -27,6 +27,7 @@ class AuthController(
     private val platform = AuthPlatform()
     private val prefs = AuthPrefs()
     private val api = AuthSessionApi(session)
+    val stories = com.onlygoodthings.app.data.StoriesController(session,prefs) { platform.idToken(false) }
     val honor = RestHonorRepository(createPlatformHttpClient(), session)
     val notices = RestNoticeRepository(createPlatformHttpClient(), session)
     val animals = RestAnimalsRepository(createPlatformHttpClient(), session)
@@ -56,7 +57,14 @@ class AuthController(
             platform.signOut()
             return AuthRestore.LoggedOut
         }
-        runCatching { finishSession(user) }
+        try {
+            finishSession(user)
+        } catch (cancel: kotlinx.coroutines.CancellationException) {
+            throw cancel
+        } catch (failure: Exception) {
+            error = failure.message ?: "No se pudo recuperar la sesión"
+            return AuthRestore.LoggedOut
+        }
         return if (prefs.onboardingDone) AuthRestore.Home else AuthRestore.FirstRun
     }
 
@@ -163,7 +171,54 @@ class AuthController(
         signOut()
     }
 
+    suspend fun uploadPostMedia(items: List<com.onlygoodthings.app.platform.OgtPickedMedia>, altText: String): List<com.onlygoodthings.shared.domain.PostMediaItem> {
+        ensureDevBearer()
+        val owner = preview.currentUserId
+        val refreshed = if (allowDevTokens) null else platform.idToken(false)
+        check(owner == preview.currentUserId) { "La sesión cambió. Volvé a intentarlo." }
+        if (!refreshed.isNullOrBlank()) session.firebaseJwt = refreshed
+        val token = session.firebaseJwt ?: error("Iniciá sesión para publicar.")
+        val media = com.onlygoodthings.app.platform.uploadPostMedia(items, altText,
+            read = { path -> kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { com.onlygoodthings.app.platform.readLocalFileBytes(path) } },
+            upload = { filename, bytes ->
+                check(owner == preview.currentUserId) { "La sesión cambió. Volvé a intentarlo." }
+                api.uploadMedia(token, filename, bytes)
+            },
+        )
+        check(owner == preview.currentUserId) { "La sesión cambió. Volvé a intentarlo." }
+        return media
+    }
+
+    suspend fun updateProfilePhoto(path: String) {
+        val ownerId = preview.currentUserId
+        val token = session.firebaseJwt ?: error("Iniciá sesión para guardar tu foto")
+        val name = preview.me().displayName
+        val before = preview.me().photoUrl
+        preview.applyProfilePhoto(path)
+        try {
+            val bytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                com.onlygoodthings.app.platform.readLocalFileBytes(path)
+                    ?: error("No se pudo leer la foto. Elegila nuevamente.")
+            }
+            val uploaded = api.uploadProfilePhoto(token, path.substringAfterLast('/'), bytes)
+            val card = api.updateProfilePhoto(token, name, uploaded.url)
+            if (preview.currentUserId == ownerId) {
+                db.applyUserLive(card.userId, card.displayName, card.photoUrl)
+                preview.applyProfilePhoto(card.photoUrl ?: uploaded.url)
+            }
+        } catch (failure: Throwable) {
+            if (preview.currentUserId == ownerId) {
+                val current = preview.me().copy(photoUrl = before)
+                val index = db.users.indexOfFirst { it.id == ownerId }
+                if (index >= 0) db.users[index] = current
+                preview.overlayUser = current
+            }
+            throw failure
+        }
+    }
+
     suspend fun signOut() {
+        stories.clear()
         runCatching { platform.signOut() }
         session.firebaseJwt = null
         pendingPhone = null
@@ -189,6 +244,8 @@ class AuthController(
 
     suspend fun hydratePublishedAnimals(db: OgtLocalDatabase) {
         ensureDevBearer()
+        // Restoration provisions the server account before any authenticated preload.
+        if (!allowDevTokens && !_signedIn.value) return
         val me = preview.me()
         db.claimPublishedAnimals(me.aliases() + me.id, me.id)
         runCatching { animals.openListings() }.getOrNull().orEmpty().forEach { remote ->
@@ -228,6 +285,7 @@ class AuthController(
         }
         val profile = api.openSession(session.firebaseJwt ?: token)
         attachLocal(user, profile)
+        stories.start(preview.currentUserId)
         ensureDevBearer()
         _signedIn.value = true
         error = null
@@ -239,17 +297,19 @@ class AuthController(
                 (user.email != null && it.email == user.email)
         }
         val local = existing?.copy(
-            displayName = user.displayName ?: existing.displayName,
+            id = profile?.id ?: existing.id,
+            firebaseUid = user.firebaseUid,
+            displayName = profile?.displayName ?: user.displayName ?: existing.displayName,
             email = user.email ?: existing.email,
             phoneE164 = user.phone ?: existing.phoneE164,
-            photoUrl = user.photoUrl ?: existing.photoUrl,
+            photoUrl = profile?.photoUrl ?: user.photoUrl ?: existing.photoUrl,
         ) ?: LocalUser(
-            id = user.firebaseUid,
+            id = profile?.id ?: user.firebaseUid,
             firebaseUid = user.firebaseUid,
             email = user.email,
             phoneE164 = user.phone,
-            displayName = user.displayName ?: user.email ?: "Alguien de la comunidad",
-            photoUrl = user.photoUrl,
+            displayName = profile?.displayName ?: user.displayName ?: user.email ?: "Alguien de la comunidad",
+            photoUrl = profile?.photoUrl ?: user.photoUrl,
             role = profile?.role ?: UserRole.USER,
             communityPoints = profile?.communityPoints ?: 0,
             inviteCode = profile?.inviteCode ?: (user.firebaseUid.take(8).uppercase() + "-GOOD"),

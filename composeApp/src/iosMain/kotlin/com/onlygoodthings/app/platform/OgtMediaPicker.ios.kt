@@ -2,6 +2,10 @@
 
 package com.onlygoodthings.app.platform
 
+import kotlinx.coroutines.*
+import androidx.compose.runtime.*
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import com.onlygoodthings.shared.domain.MediaKind
@@ -37,8 +41,9 @@ import platform.UIKit.UIViewController
 import platform.darwin.NSObject
 
 @Composable
-actual fun rememberOgtMediaPicker(remaining: Int, onPicked: (OgtPickedMedia) -> Unit): OgtMediaPicker {
+actual fun rememberPlatformOgtMediaPicker(remaining: Int, onPicked: (OgtPickedMedia) -> Unit): OgtMediaPicker {
     val holder = remember { IosPickerHolder() }
+    DisposableEffect(holder) { onDispose { holder.scope.cancel() } }
     return remember(onPicked, remaining) {
         OgtMediaPicker(
             pickPhoto = {
@@ -49,6 +54,15 @@ actual fun rememberOgtMediaPicker(remaining: Int, onPicked: (OgtPickedMedia) -> 
             },
             pickLibrary = {
                 presentPhPicker(holder, remaining, photosOnly = false, videosOnly = false, onPicked)
+            },
+            errorMessage=holder.error,
+            isProcessing=holder.processing,
+            recordVideo = {
+                if (remaining > 0) {
+                    val camera = UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera
+                    val source = if (UIImagePickerController.isSourceTypeAvailable(camera)) camera else UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypePhotoLibrary
+                    presentCamera(holder, source, onPicked, videoOnly = true)
+                }
             },
             takeCamera = {
                 if (remaining > 0) {
@@ -66,6 +80,9 @@ actual fun rememberOgtMediaPicker(remaining: Int, onPicked: (OgtPickedMedia) -> 
 }
 
 private class IosPickerHolder {
+    val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default)
+    val error=mutableStateOf<String?>(null)
+    val processing=mutableStateOf(false)
     var cameraDelegate: IosMediaPickerDelegate? = null
     var libraryDelegate: IosPhPickerDelegate? = null
 }
@@ -88,7 +105,7 @@ private fun presentPhPicker(
         )
     }
     val picker = PHPickerViewController(configuration = config)
-    val delegate = IosPhPickerDelegate(onPicked)
+    val delegate = IosPhPickerDelegate(holder,onPicked)
     holder.libraryDelegate = delegate
     picker.delegate = delegate
     topViewController()?.presentViewController(picker, animated = true, completion = null)
@@ -98,63 +115,66 @@ private fun presentCamera(
     holder: IosPickerHolder,
     source: UIImagePickerControllerSourceType,
     onPicked: (OgtPickedMedia) -> Unit,
+    videoOnly: Boolean = false,
 ) {
     val picker = UIImagePickerController()
     picker.sourceType = source
-    picker.mediaTypes = listOf("public.image", "public.movie")
+    picker.mediaTypes = if(videoOnly) listOf("public.movie") else listOf("public.image", "public.movie")
+    if(videoOnly) picker.videoMaximumDuration=30.0
     picker.allowsEditing = false
-    val delegate = IosMediaPickerDelegate(onPicked)
+    val delegate = IosMediaPickerDelegate(holder,onPicked)
     holder.cameraDelegate = delegate
     picker.delegate = delegate
     topViewController()?.presentViewController(picker, animated = true, completion = null)
 }
 
 private class IosPhPickerDelegate(
+    private val holder:IosPickerHolder,
     private val onPicked: (OgtPickedMedia) -> Unit,
 ) : NSObject(), PHPickerViewControllerDelegateProtocol {
 
     override fun picker(picker: PHPickerViewController, didFinishPicking: List<*>) {
-        picker.dismissViewControllerAnimated(true, completion = null)
-        didFinishPicking.forEach { item ->
-            val result = item as? PHPickerResult ?: return@forEach
-            loadPickerResult(result, onPicked)
+        holder.processing.value = didFinishPicking.isNotEmpty()
+        picker.dismissViewControllerAnimated(true) {
+            holder.scope.launch {
+                try { for(item in didFinishPicking) {
+                    val result=item as? PHPickerResult ?: continue
+                    try { val media=loadPickerResult(result);withContext(Dispatchers.Main) { onPicked(media) } }
+                    catch(cancel:CancellationException) { throw cancel }
+                    catch(_:Exception) { withContext(Dispatchers.Main) { holder.error.value="No se pudo copiar el archivo. Elegilo otra vez." } }
+                } } finally { withContext(NonCancellable + Dispatchers.Main) { holder.processing.value = false } }
+            }
         }
     }
 }
 
-private fun loadPickerResult(result: PHPickerResult, onPicked: (OgtPickedMedia) -> Unit) {
-    val provider = result.itemProvider
-    if (provider.hasItemConformingToTypeIdentifier("public.movie")) {
-        provider.loadFileRepresentationForTypeIdentifier("public.movie") { url, _ ->
-            val src = url?.path ?: return@loadFileRepresentationForTypeIdentifier
-            val dest = copyToCache(src, "mov")
-            onPicked(
-                OgtPickedMedia(
-                    id = dest,
-                    kind = MediaKind.VIDEO,
-                    path = dest,
-                    fromDevice = true,
-                    posterPath = videoPoster(dest),
-                ),
-            )
+private suspend fun loadPickerResult(result:PHPickerResult):OgtPickedMedia = suspendCancellableCoroutine { done ->
+    val provider=result.itemProvider
+    fun fail() { if(done.isActive) done.resumeWithException(IllegalArgumentException("No se pudo leer el archivo")) }
+    if(provider.hasItemConformingToTypeIdentifier("public.movie")) {
+        provider.loadFileRepresentationForTypeIdentifier("public.movie") { url,_ ->
+            try {
+                val src=url?.path ?: error("Archivo no disponible")
+                val dest=copyToCache(src,"mov")
+                // The editor generates a verified poster after trimming. Extracting
+                // it here delays opening the editor and reads the same asset twice.
+                val media=OgtPickedMedia(dest,MediaKind.VIDEO,dest,true)
+                if(done.isActive) done.resume(media)
+            } catch(_:Exception) { fail() }
         }
-        return
-    }
-    provider.loadDataRepresentationForTypeIdentifier("public.image") { data, _ ->
-        val image = data?.let { UIImage(data = it) } ?: return@loadDataRepresentationForTypeIdentifier
-        val dest = writeJpeg(image) ?: return@loadDataRepresentationForTypeIdentifier
-        onPicked(
-            OgtPickedMedia(
-                id = dest,
-                kind = MediaKind.IMAGE,
-                path = dest,
-                fromDevice = true,
-            ),
-        )
+    } else {
+        provider.loadDataRepresentationForTypeIdentifier("public.image") { data,_ ->
+            try {
+                val image=data?.let { UIImage(data=it) } ?: error("Imagen no disponible")
+                val dest=writeJpeg(image) ?: error("No se pudo copiar la imagen")
+                if(done.isActive) done.resume(OgtPickedMedia(dest,MediaKind.IMAGE,dest,true))
+            } catch(_:Exception) { fail() }
+        }
     }
 }
 
 private class IosMediaPickerDelegate(
+    private val holder:IosPickerHolder,
     private val onPicked: (OgtPickedMedia) -> Unit,
 ) : NSObject(), UIImagePickerControllerDelegateProtocol, UINavigationControllerDelegateProtocol {
 
@@ -162,23 +182,25 @@ private class IosMediaPickerDelegate(
         picker: UIImagePickerController,
         didFinishPickingMediaWithInfo: Map<Any?, *>,
     ) {
-        picker.dismissViewControllerAnimated(true, completion = null)
+        holder.processing.value = true
+        picker.dismissViewControllerAnimated(true) {
+        holder.scope.launch {
+        try {
         val type = didFinishPickingMediaWithInfo[UIImagePickerControllerMediaType] as? String
         val video = type?.contains("movie") == true || type?.contains("video") == true
         val media = if (video) {
             val url = didFinishPickingMediaWithInfo[UIImagePickerControllerMediaURL] as? NSURL
-            val src = url?.path ?: return
+            val src = url?.path ?: return@launch
             val dest = copyToCache(src, "mov")
             OgtPickedMedia(
                 id = dest,
                 kind = MediaKind.VIDEO,
                 path = dest,
                 fromDevice = true,
-                posterPath = videoPoster(dest),
             )
         } else {
-            val image = didFinishPickingMediaWithInfo[UIImagePickerControllerOriginalImage] as? UIImage ?: return
-            val dest = writeJpeg(image) ?: return
+            val image = didFinishPickingMediaWithInfo[UIImagePickerControllerOriginalImage] as? UIImage ?: return@launch
+            val dest = writeJpeg(image) ?: return@launch
             OgtPickedMedia(
                 id = dest,
                 kind = MediaKind.IMAGE,
@@ -186,7 +208,12 @@ private class IosMediaPickerDelegate(
                 fromDevice = true,
             )
         }
-        onPicked(media)
+        withContext(Dispatchers.Main) { onPicked(media) }
+        } catch(cancel:CancellationException) { throw cancel }
+        catch(_:Exception) { withContext(Dispatchers.Main) { holder.error.value="No se pudo preparar el archivo. Elegilo otra vez." } }
+        finally { withContext(NonCancellable + Dispatchers.Main) { holder.processing.value = false } }
+        }
+        }
     }
 
     override fun imagePickerControllerDidCancel(picker: UIImagePickerController) {
@@ -211,7 +238,7 @@ private fun writeJpeg(image: UIImage): String? {
 
 private fun copyToCache(src: String, ext: String): String {
     val dest = "${ensureCacheDir()}/${NSUUID.UUID().UUIDString}.$ext"
-    runCatching { NSFileManager.defaultManager.copyItemAtPath(src, dest, null) }
+    check(NSFileManager.defaultManager.copyItemAtPath(src,dest,null)) { "No se pudo copiar el archivo" }
     return dest
 }
 

@@ -41,6 +41,7 @@ kotlin {
             implementation(compose.ui)
             implementation(compose.components.resources)
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.androidx.lifecycle.runtime)
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.kotlinx.json)
@@ -62,6 +63,8 @@ kotlin {
             implementation(libs.play.services.location)
             implementation("com.google.android.gms:play-services-auth-api-phone:18.1.0")
             implementation("com.android.installreferrer:installreferrer:2.2")
+            implementation("androidx.media3:media3-transformer:1.9.3")
+            implementation("androidx.media3:media3-effect:1.9.3")
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

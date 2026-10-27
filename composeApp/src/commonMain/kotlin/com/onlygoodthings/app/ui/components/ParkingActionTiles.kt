@@ -1,17 +1,18 @@
 package com.onlygoodthings.app.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -21,8 +22,14 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
@@ -31,12 +38,15 @@ import com.onlygoodthings.app.resources.Res
 import com.onlygoodthings.app.resources.parking_action_find
 import com.onlygoodthings.app.resources.parking_action_parked
 import com.onlygoodthings.app.resources.parking_action_search
+import com.onlygoodthings.app.resources.parking_action_search_transparent
 import com.onlygoodthings.app.resources.parking_action_yield
 import com.onlygoodthings.app.theme.OgtColors
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
+import kotlin.math.roundToInt
 
 private val TileRadius = 16.dp
+private val TileLabelStyle = TextStyle(fontSize=12.sp,lineHeight=15.sp,fontWeight=FontWeight.SemiBold)
 
 enum class ParkingActionKind { PARKED, FIND, YIELD, SEARCH }
 
@@ -56,35 +66,20 @@ fun ParkingActionRow(
     showSearch: Boolean = true,
     showYield: Boolean = true,
     progress: Float = 0f,
+    searchLayoutLabels: List<String> = listOf(searchLabel),
     onParked: () -> Unit,
     onYield: () -> Unit,
     onSearch: () -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ParkingActionTile(
-            if (findParked) ParkingActionKind.FIND else ParkingActionKind.PARKED,
-            parkedLabel,
-            parkedEnabled,
-            progress,
-            Modifier.weight(1f),
-            onParked,
-            selected = findParked && !yieldSelected,
-        )
-        if (showYield) {
-            ParkingActionTile(
-                ParkingActionKind.YIELD,
-                yieldLabel,
-                yieldEnabled,
-                progress,
-                Modifier.weight(1f),
-                onYield,
-                selected = yieldSelected,
-            )
-        }
-        if (showSearch) {
-            ParkingActionTile(ParkingActionKind.SEARCH, searchLabel, searchEnabled, progress, Modifier.weight(1f), onSearch)
-        }
+    val tiles=buildList {
+        add(ActionTile(parkedLabel,
+            if(findParked) Res.drawable.parking_action_find else Res.drawable.parking_action_parked,
+            if(findParked) "Auto con lupa: dónde lo dejé" else "Auto estacionado junto al pin",
+            parkedEnabled,findParked && !yieldSelected,onParked))
+        if(showYield) add(ActionTile(yieldLabel,Res.drawable.parking_action_yield,"Ceder el lugar: llaves y dos autos",yieldEnabled,yieldSelected,onYield))
+        if(showSearch) add(ActionTile(searchLabel,Res.drawable.parking_action_search_transparent,"Radar de la comunidad buscando un lugar",searchEnabled,false,onSearch))
     }
+    AdaptiveActionTiles(tiles,progress,if(showSearch) searchLayoutLabels else emptyList())
 }
 
 @Composable
@@ -98,117 +93,94 @@ fun PlacePickRow(
     onAddress: () -> Unit,
     onMap: () -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OgtActionTile(
-            label = hereLabel,
-            art = Res.drawable.parking_action_search,
-            caption = "Marcar con la ubicación actual del GPS",
-            enabled = enabled,
-            selected = selected == PlacePickKind.HERE,
-            progress = 0f,
-            modifier = Modifier.weight(1f),
-            onClick = onHere,
-        )
-        OgtActionTile(
-            label = addressLabel,
-            art = Res.drawable.parking_action_find,
-            caption = "Buscar y normalizar una dirección",
-            enabled = enabled,
-            selected = selected == PlacePickKind.ADDRESS,
-            progress = 0f,
-            modifier = Modifier.weight(1f),
-            onClick = onAddress,
-        )
-        OgtActionTile(
-            label = mapLabel,
-            art = Res.drawable.parking_action_parked,
-            caption = "Ajustar el pin en el mapa",
-            enabled = enabled,
-            selected = selected == PlacePickKind.MAP,
-            progress = 0f,
-            modifier = Modifier.weight(1f),
-            onClick = onMap,
-        )
+    AdaptiveActionTiles(listOf(
+        ActionTile(hereLabel,Res.drawable.parking_action_search,"Marcar con la ubicación actual del GPS",enabled,selected==PlacePickKind.HERE,onHere),
+        ActionTile(addressLabel,Res.drawable.parking_action_find,"Buscar y normalizar una dirección",enabled,selected==PlacePickKind.ADDRESS,onAddress),
+        ActionTile(mapLabel,Res.drawable.parking_action_parked,"Ajustar el pin en el mapa",enabled,selected==PlacePickKind.MAP,onMap),
+    ),0f)
+}
+
+private data class ActionTile(
+    val label:String,val art:DrawableResource,val caption:String,
+    val enabled:Boolean,val selected:Boolean,val onClick:()->Unit,
+)
+
+/** Measure the actual translated text at the user's font scale, not a guessed device width. */
+@Composable
+private fun AdaptiveActionTiles(tiles:List<ActionTile>,progress:Float,layoutLabels:List<String> = emptyList()) {
+    val measurer=rememberTextMeasurer()
+    val density=LocalDensity.current
+    val labelStyle=LocalTextStyle.current.merge(TileLabelStyle)
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val widestWord=(tiles.map { it.label }+layoutLabels).maxOf { measurer.measure(it,style=labelStyle).multiParagraph.minIntrinsicWidth }
+        val cellWidth=(maxWidth-8.dp*(tiles.size-1))/tiles.size.toFloat()
+        val horizontal=with(density) { cellWidth < widestWord.toDp()+20.dp }
+        // Text is already transparent when the stacked layout folds into the
+        // original compact icon row. Expanding never clips incoming content.
+        AnimatedContent(
+            targetState=horizontal && progress.coerceIn(0f,1f)<.45f,
+            transitionSpec={ (fadeIn(tween(160)) togetherWith fadeOut(tween(80))).using(SizeTransform(clip=false)) },
+            label="parkingActionLayout",
+        ) { stacked ->
+            if(stacked) {
+                Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                    tiles.forEach { OgtActionTile(it,progress,Modifier.fillMaxWidth(),horizontal=true) }
+                }
+            } else {
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Max),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    tiles.forEach { OgtActionTile(it,progress,Modifier.weight(1f).fillMaxHeight(),horizontal=false) }
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun ParkingActionTile(
-    kind: ParkingActionKind,
-    label: String,
-    enabled: Boolean,
-    progress: Float,
-    modifier: Modifier,
-    onClick: () -> Unit,
-    selected: Boolean = false,
-) {
-    val art: DrawableResource = when (kind) {
-        ParkingActionKind.PARKED -> Res.drawable.parking_action_parked
-        ParkingActionKind.FIND -> Res.drawable.parking_action_find
-        ParkingActionKind.YIELD -> Res.drawable.parking_action_yield
-        ParkingActionKind.SEARCH -> Res.drawable.parking_action_search
-    }
-    val caption = when (kind) {
-        ParkingActionKind.PARKED -> "Auto estacionado junto al pin"
-        ParkingActionKind.FIND -> "Auto con lupa: dónde lo dejé"
-        ParkingActionKind.YIELD -> "Ceder el lugar: llaves y dos autos"
-        ParkingActionKind.SEARCH -> "Radar de la comunidad buscando un lugar"
-    }
-    OgtActionTile(label, art, caption, enabled, selected, progress, modifier, onClick)
-}
-
-@Composable
-private fun OgtActionTile(
-    label: String,
-    art: DrawableResource,
-    caption: String,
-    enabled: Boolean,
-    selected: Boolean,
-    progress: Float,
-    modifier: Modifier,
-    onClick: () -> Unit,
-) {
-    val fill = when {
-        !enabled -> OgtColors.disabledFill
-        selected -> OgtColors.stone
+private fun OgtActionTile(tile:ActionTile,progress:Float,modifier:Modifier,horizontal:Boolean) {
+    val fill=when {
+        !tile.enabled -> OgtColors.disabledFill
+        tile.selected -> OgtColors.stone
         else -> OgtColors.sand
     }
-    val ink = if (enabled) OgtColors.ink else OgtColors.disabledInk
-    val t = progress.coerceIn(0f, 1f)
-    val labelAlpha = (1f - t * 1.35f).coerceIn(0f, 1f)
-    val grayArt = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
-    Column(
-        modifier
-            .height(lerp(132.dp, 72.dp, t))
-            .clip(RoundedCornerShape(TileRadius))
-            .background(fill)
-            .border(1.dp, if (enabled) OgtColors.hairline else OgtColors.disabledLine, RoundedCornerShape(TileRadius))
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(lerp(10.dp, 6.dp, t)),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(lerp(6.dp, 2.dp, t), Alignment.CenterVertically),
-    ) {
-        Image(
-            painter = painterResource(art),
-            contentDescription = caption,
-            modifier = Modifier
-                .size(lerp(72.dp, 40.dp, t))
-                .graphicsLayer { alpha = if (enabled) 1f else 0.55f },
-            contentScale = ContentScale.Fit,
-            colorFilter = if (enabled) null else grayArt,
-        )
-        Text(
-            label,
-            modifier = Modifier
-                .clipToBounds()
-                .height(lerp(32.dp, 0.dp, t))
-                .graphicsLayer { alpha = labelAlpha },
-            color = ink,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-            lineHeight = 15.sp,
-            maxLines = 2,
-        )
+    val ink=if(tile.enabled) OgtColors.ink else OgtColors.disabledInk
+    val t=progress.coerceIn(0f,1f)
+    val labelAlpha=(1f-t/.45f).coerceIn(0f,1f)
+    val labelCollapse=((t-.45f)/.55f).coerceIn(0f,1f)
+    val grayArt=ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
+    val shell=modifier
+        .heightIn(min=if(horizontal) lerp(80.dp,56.dp,t) else lerp(132.dp,72.dp,t))
+        .clip(RoundedCornerShape(TileRadius))
+        .background(fill)
+        .border(1.dp,if(tile.enabled) OgtColors.hairline else OgtColors.disabledLine,RoundedCornerShape(TileRadius))
+        .semantics { contentDescription=tile.label }
+        .clickable(enabled=tile.enabled,role=Role.Button,onClick=tile.onClick)
+        .padding(lerp(10.dp,6.dp,t))
+    val art:@Composable ()->Unit = {
+        Image(painter=painterResource(tile.art),contentDescription=tile.caption,
+            modifier=Modifier.size(lerp(if(horizontal) 56.dp else 72.dp,40.dp,t))
+                .graphicsLayer { alpha=if(tile.enabled) 1f else .55f },
+            contentScale=androidx.compose.ui.layout.ContentScale.Fit,
+            colorFilter=if(tile.enabled) null else grayArt)
+    }
+    val label:@Composable (Modifier)->Unit = { labelModifier ->
+        Text(tile.label,style=TileLabelStyle,color=ink,
+            textAlign=if(horizontal) TextAlign.Start else TextAlign.Center,
+            // At rest, the full measured text determines the card height. Only the
+            // existing scroll transition collapses it after fading it out.
+            modifier=labelModifier.clipToBounds().layout { measurable,constraints ->
+                val placeable=measurable.measure(constraints)
+                val height=(placeable.height*(1f-labelCollapse)).roundToInt()
+                layout(placeable.width,height) { placeable.placeRelative(0,0) }
+            }.graphicsLayer { alpha=labelAlpha })
+    }
+    if(horizontal) {
+        Row(shell,verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+            art();label(Modifier.weight(1f))
+        }
+    } else {
+        Column(shell,horizontalAlignment=Alignment.CenterHorizontally,
+            verticalArrangement=Arrangement.spacedBy(lerp(6.dp,0.dp,t),Alignment.CenterVertically)) {
+            art();label(Modifier.fillMaxWidth())
+        }
     }
 }

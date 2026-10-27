@@ -109,6 +109,12 @@ class OgtPreviewSession(
         prefs.feedCacheJson = db.exportSocialFeed(me().id)
     }
 
+    /** Una retirada confirmada se guarda antes de esperar otra petición o salir de la pantalla. */
+    fun reconcileFeedVisibility(checkedIds: Set<String>, visibleIds: Set<String>) {
+        db.reconcilePostVisibility(checkedIds, visibleIds)
+        persistSocialFeed()
+    }
+
     fun rememberHonorToken(token: String?) {
         pendingHonorToken = token
         prefs.pendingHonorToken = token.orEmpty()
@@ -139,6 +145,18 @@ class OgtPreviewSession(
         prefs.locationScope = scope.prefCode()
     }
     fun me(): LocalUser = overlayUser ?: db.userOrNull(currentUserId) ?: guestSessionUser()
+
+    /** Feed y WS actualizan la misma identidad que leen cabecera, historias y Ajustes. */
+    suspend fun observeProfileUpdates() {
+        db.socialTick.collect {
+            val current = overlayUser
+            if (current != null && current.id == currentUserId) {
+                db.userOrNull(currentUserId)?.let { latest ->
+                    if (latest != current) overlayUser = latest
+                }
+            }
+        }
+    }
 
     /** La foto elegida en Ajustes se ve enseguida, antes de subirla. */
     fun applyProfilePhoto(path: String) {
@@ -259,6 +277,8 @@ fun OgtPreviewStore(content: @Composable () -> Unit) {
     val db = remember { OgtLocalDatabase() }
     val session = remember(db) { OgtPreviewSession(db) }
     val auth = remember(db, session) { AuthController(db, session) }
+    androidx.compose.runtime.DisposableEffect(auth) { onDispose { auth.stories.close() } }
+    LaunchedEffect(db, session) { session.observeProfileUpdates() }
     remember(auth) {
         auth.ensureDevBearer()
         if (!OgtSdk.isStarted()) {

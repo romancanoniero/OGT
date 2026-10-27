@@ -13,7 +13,7 @@ actual fun createPlatformHttpClient(): HttpClient = HttpClient(Js) {
     install(ContentNegotiation) {
         json(Json { ignoreUnknownKeys = true; encodeDefaults = true })
     }
-    install(Logging) { level = LogLevel.INFO }
+    install(Logging) { level = LogLevel.INFO; logger = OgtHttpLogger }
 }
 
 actual fun createTileHttpClient(): HttpClient = HttpClient(Js) {

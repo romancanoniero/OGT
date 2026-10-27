@@ -21,7 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
+import com.onlygoodthings.app.ui.components.OgtOutlinedTextField as OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -95,7 +95,8 @@ fun HonorInviteSheet(
                 )
                 OutlinedTextField(
                     value = name,
-                    onValueChange = { name = titleCasePersonName(it) },
+                    onValueChange = { name = it },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(capitalization=androidx.compose.ui.text.input.KeyboardCapitalization.Words),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     placeholder = { Text("Nombre con el que la mencionás", color = OgtColors.muted) },
@@ -124,13 +125,14 @@ fun HonorInviteSheet(
                     )
                     Spacer(Modifier.height(12.dp))
                     OgtPrimaryButton("Abrir WhatsApp", enabled = readyWhatsApp) {
-                        onSend(name.trim(), HonorChannel.WHATSAPP, HonorWhatsAppPicker)
+                        onSend(titleCasePersonName(name.trim()), HonorChannel.WHATSAPP, HonorWhatsAppPicker)
                     }
                 } else if (channel == HonorChannel.EMAIL) {
                     Text("Escribí el correo. Después se abre la hoja para enviarlo.", color = OgtColors.muted, fontSize = 13.sp)
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = contact,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Email,autoCorrectEnabled=false),
                         onValueChange = { contact = it },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
@@ -140,7 +142,7 @@ fun HonorInviteSheet(
                     )
                     Spacer(Modifier.height(12.dp))
                     OgtPrimaryButton("Enviar invitación", enabled = readyMail) {
-                        onSend(name.trim(), HonorChannel.EMAIL, contact)
+                        onSend(titleCasePersonName(name.trim()), HonorChannel.EMAIL, contact)
                     }
                 } else {
                     Text(
@@ -180,7 +182,7 @@ fun HonorInviteSheet(
                             } else {
                                 hits.forEach { hit ->
                                     ContactRow(hit) {
-                                        val mention = name.trim().ifBlank { hit.name }
+                                        val mention = titleCasePersonName(name.trim().ifBlank { hit.name })
                                         onSend(mention, channel, hit.phone)
                                     }
                                 }

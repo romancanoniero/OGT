@@ -33,6 +33,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
         )
         val objectMapper = JsonBody.objectMapper
         val dataMap = objectMapper.readValue(call.receiveText(), object : com.fasterxml.jackson.core.type.TypeReference<Map<String, Any?>>() {})
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         val pageSize = dataMap.optInt("pageSize", 20)
         val cursor = dataMap.optString("cursor")
         val mode = runCatching { FeedMode.valueOf((dataMap.optString("mode") ?: "HOME").uppercase()) }
@@ -47,12 +48,24 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
         call.respond(ApiResponse.ok(repository.feed(principal.userId, mode, pageSize, cursor, family)))
     }
 
+    post("/api/v1/social/visibility") {
+        call.principal<AuthPrincipal>() ?: return@post call.respond(
+            HttpStatusCode.Unauthorized, ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
+        )
+        val raw = JsonBody.receiveMap(call)["postIds"] as? List<*>
+        if (raw == null || raw.size > 100 || raw.any { it !is String || runCatching { java.util.UUID.fromString(it) }.isFailure }) {
+            return@post call.respond(HttpStatusCode.BadRequest, ApiResponse.fail<Unit>("Publicaciones inválidas", "BAD_REQUEST"))
+        }
+        call.respond(ApiResponse.ok(repository.visiblePostIds(raw.filterIsInstance<String>())))
+    }
+
     post("/api/v1/social/publish") {
         val principal = call.principal<AuthPrincipal>() ?: return@post call.respond(
             HttpStatusCode.Unauthorized,
             ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
         )
         val dataMap = JsonBody.receiveMap(call)
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         val media = dataMap.optMedia()
         val participants = (dataMap["participantUserIds"] as? List<*>)?.mapNotNull { it as? String }.orEmpty()
         val saved = repository.publish(
@@ -90,6 +103,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
         )
         val dataMap = JsonBody.receiveMap(call)
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         repository.follow(principal.userId, dataMap.reqString("userId"))
         call.respond(ApiResponse.ok("ok", "Ahora seguís a esa persona"))
     }
@@ -100,6 +114,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
         )
         val dataMap = JsonBody.receiveMap(call)
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         repository.unfollow(principal.userId, dataMap.reqString("userId"))
         call.respond(ApiResponse.ok("ok", "Dejaste de seguir"))
     }
@@ -118,6 +133,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
         )
         val dataMap = JsonBody.receiveMap(call)
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         call.respond(
             ApiResponse.ok(
                 repository.search(
@@ -135,6 +151,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
         )
         val dataMap = JsonBody.receiveMap(call)
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         call.respond(
             ApiResponse.ok(
                 repository.postsByAuthor(
@@ -153,6 +170,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
         )
         val dataMap = JsonBody.receiveMap(call)
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         val userId = dataMap.optString("userId")?.takeIf { it.isNotBlank() } ?: principal.userId
         val card = repository.neighborCard(principal.userId, userId)
             ?: return@post call.respond(HttpStatusCode.NotFound, ApiResponse.fail<Unit>("Vecino inexistente", "NOT_FOUND"))
@@ -165,6 +183,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
         )
         val dataMap = JsonBody.receiveMap(call)
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         val name = dataMap.optString("displayName")?.trim().orEmpty()
         if (name.length < 2) {
             return@post call.respond(
@@ -191,6 +210,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
         )
         val dataMap = JsonBody.receiveMap(call)
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         val updated = repository.spendReach(
             postId = dataMap.reqString("postId"),
             payerUserId = principal.userId,
@@ -208,6 +228,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
         )
         val dataMap = JsonBody.receiveMap(call)
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         val updated = repository.spendReach(
             postId = dataMap.reqString("postId"),
             payerUserId = principal.userId,
@@ -226,6 +247,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
         )
         val objectMapper = JsonBody.objectMapper
         val dataMap = objectMapper.readValue(call.receiveText(), object : com.fasterxml.jackson.core.type.TypeReference<Map<String, Any?>>() {})
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         val kind = runCatching { FeedEventKind.valueOf(dataMap.reqString("kind").uppercase()) }.getOrNull()
             ?: return@post call.respond(HttpStatusCode.BadRequest, ApiResponse.fail<Unit>("kind inválido", "BAD_REQUEST"))
         repository.recordFeedEvent(
@@ -244,6 +266,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
         )
         val objectMapper = JsonBody.objectMapper
         val dataMap = objectMapper.readValue(call.receiveText(), object : com.fasterxml.jackson.core.type.TypeReference<Map<String, Any?>>() {})
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         val postId = dataMap.reqString("postId")
         val updated = repository.clap(postId, principal.userId)
             ?: return@post call.respond(HttpStatusCode.NotFound, ApiResponse.fail<Unit>("Post inexistente", "NOT_FOUND"))
@@ -263,6 +286,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
         }
         val objectMapper = JsonBody.objectMapper
         val dataMap = objectMapper.readValue(call.receiveText(), object : com.fasterxml.jackson.core.type.TypeReference<Map<String, Any?>>() {})
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         call.respond(ApiResponse.ok(repository.comments(dataMap.reqString("postId"), dataMap.optString("anecdoteId"))))
     }
 
@@ -273,6 +297,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
         )
         val objectMapper = JsonBody.objectMapper
         val dataMap = objectMapper.readValue(call.receiveText(), object : com.fasterxml.jackson.core.type.TypeReference<Map<String, Any?>>() {})
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         val comment = repository.addComment(
             postId = dataMap.reqString("postId"),
             userId = principal.userId,
@@ -297,6 +322,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
         )
         val dataMap = JsonBody.receiveMap(call)
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         val comment = repository.editComment(
             commentId = dataMap.reqString("commentId"),
             userId = principal.userId,
@@ -316,6 +342,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
         )
         val dataMap = JsonBody.receiveMap(call)
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         repository.deleteComment(dataMap.reqString("commentId"), principal.userId)
         call.respond(ApiResponse.ok("ok", "Comentario borrado"))
     }
@@ -326,6 +353,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
         )
         val dataMap = JsonBody.receiveMap(call)
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         val anecdote = repository.addAnecdote(
             postId = dataMap.reqString("postId"),
             userId = principal.userId,
@@ -341,6 +369,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
         )
         val dataMap = JsonBody.receiveMap(call)
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         val anecdote = repository.editAnecdote(
             anecdoteId = dataMap.reqString("anecdoteId"),
             userId = principal.userId,
@@ -355,6 +384,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
         )
         val dataMap = JsonBody.receiveMap(call)
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         repository.deleteAnecdote(dataMap.reqString("anecdoteId"), principal.userId)
         call.respond(ApiResponse.ok("ok", "Anécdota borrada"))
     }
@@ -365,6 +395,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
         )
         val dataMap = JsonBody.receiveMap(call)
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         val anecdote = repository.clapAnecdote(dataMap.reqString("anecdoteId"), principal.userId)
         repository.countersOf(anecdote.postId)?.let { live ->
             hub.projectSocialPost(live.id, WsCodec.json.encodeToString(SocialLiveCounters.serializer(), live))
@@ -378,6 +409,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
         )
         val dataMap = JsonBody.receiveMap(call)
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         val anecdote = repository.heartAnecdote(dataMap.reqString("anecdoteId"), principal.userId)
         call.respond(ApiResponse.ok(anecdote, "Corazón registrado"))
     }
@@ -388,6 +420,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
         )
         val dataMap = JsonBody.receiveMap(call)
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         val saved = repository.repostAnecdote(dataMap.reqString("anecdoteId"), principal.userId)
         hub.projectSocialPost(
             saved.id,
@@ -415,6 +448,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
         )
         val objectMapper = JsonBody.objectMapper
         val dataMap = objectMapper.readValue(call.receiveText(), object : com.fasterxml.jackson.core.type.TypeReference<Map<String, Any?>>() {})
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         val updated = repository.editPost(
             postId = dataMap.reqString("postId"),
             userId = principal.userId,
@@ -447,6 +481,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
         )
         val objectMapper = JsonBody.objectMapper
         val dataMap = objectMapper.readValue(call.receiveText(), object : com.fasterxml.jackson.core.type.TypeReference<Map<String, Any?>>() {})
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         val postId = dataMap.reqString("postId")
         repository.deletePost(postId, principal.userId)
         hub.projectSocialPost(
@@ -466,6 +501,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
         )
         val objectMapper = JsonBody.objectMapper
         val dataMap = objectMapper.readValue(call.receiveText(), object : com.fasterxml.jackson.core.type.TypeReference<Map<String, Any?>>() {})
+        dataMap.optString("postId")?.let { repository.requireOrdinaryPost(it) }
         repository.report(
             reporterId = principal.userId,
             postId = dataMap.reqString("postId"),

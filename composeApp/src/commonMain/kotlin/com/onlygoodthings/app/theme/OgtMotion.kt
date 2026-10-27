@@ -40,11 +40,7 @@ object OgtMotion {
     const val clapPeak = 1.08f
     /** Mantener pulsado este tiempo arma el arrastre. */
     const val pressArmMs = 220
-    /**
-     * Tras este silencio el chrome vuelve (NN/G 300–400 ms, recortado a Quiet Studio).
-     * No reacciona a un toque de 2 px: hace falta [chromeHidePx].
-     */
-    const val chromeIdleMs = 260L
+    /** Evita ocultar la barra por movimientos mínimos; reaparece al finalizar el scroll. */
     const val chromeHidePx = 8f
     /** Pausa de un cuadro del reel de producto (login). No es chrome. */
     const val reelHoldMs = 2800L

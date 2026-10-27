@@ -90,6 +90,7 @@ const REPORTS = {
 
 /** Último feed: el detalle no tiene GET de un post. */
 let lastFeed = [];
+let disposeStories=()=>{};
 let lastListings = [];
 let me = { userId: "", role: "USER" };
 const following = new Set();
@@ -2320,12 +2321,15 @@ function bindFeedPills() {
 
 async function renderInicio() {
   const main = document.getElementById("main");
-  main.innerHTML = `<h1>Inicio</h1>${feedPillsHtml()}<div id="feed-list"><p class="empty">Cargando…</p></div>`;
+  disposeStories();
+  main.innerHTML = `<h1>Inicio</h1><section id="ephemeral-stories" class="ephemeral-stories"></section>${feedPillsHtml()}<div id="feed-list"><p class="empty">Cargando…</p></div>`;
   bindFeedPills();
   try {
     await loadSession();
     await loadFeed(feedType);
     paintFeedList();
+    const rail=document.getElementById("ephemeral-stories");
+    if(rail) import('./ephemeral-stories.js?v=2').then(({mountStories})=>{if(rail.isConnected)disposeStories=mountStories(rail,api);}).catch(()=>{if(rail.isConnected)rail.textContent='No pudimos cargar las historias.';});
   } catch (e) {
     const box = document.getElementById("feed-list");
     if (box) box.innerHTML = `<p class="err">${escapeHtml(e.message)}. ¿El API está en ${API}?</p>`;

@@ -174,6 +174,7 @@ fun MapScreen(onBack: () -> Unit = {}, onClaimed: (String) -> Unit = {}) {
                 }
                 BasicTextField(
                     value = query,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(capitalization=androidx.compose.ui.text.input.KeyboardCapitalization.Sentences),
                     onValueChange = { query = it },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,

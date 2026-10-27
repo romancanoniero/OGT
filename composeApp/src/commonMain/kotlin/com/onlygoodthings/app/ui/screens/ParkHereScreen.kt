@@ -15,7 +15,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
+import com.onlygoodthings.app.ui.components.OgtOutlinedTextField as OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -157,6 +157,7 @@ fun ParkHereScreen(onDone: () -> Unit, onBack: () -> Unit) {
             )
             OutlinedTextField(
                 value = plate,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(capitalization=androidx.compose.ui.text.input.KeyboardCapitalization.Characters,autoCorrectEnabled=false),
                 onValueChange = { plate = it.uppercase() },
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text(copy.vehiclePlateHint) },

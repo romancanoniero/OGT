@@ -4,8 +4,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.*
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -13,22 +15,26 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 actual fun rememberHonorInviteActions(): HonorInviteActions {
     var allowed by remember { mutableStateOf(false) }
     var contacts by remember { mutableStateOf<List<DeviceContact>>(emptyList()) }
-    fun refresh() {
-        contacts = parseContactsBlob(IosHonorInviteRuntime.host?.contactsBlob().orEmpty())
+    val scope=rememberCoroutineScope()
+    var refreshJob by remember { mutableStateOf<Job?>(null) }
+    fun refresh(ok:Boolean) {
+        refreshJob?.cancel()
+        refreshJob=scope.launch {
+            allowed=ok
+            contacts=if(ok) withContext(Dispatchers.Default) {
+                parseContactsBlob(IosHonorInviteRuntime.host?.contactsBlob().orEmpty())
+            } else emptyList()
+        }
     }
     LaunchedEffect(Unit) {
-        IosHonorInviteRuntime.host?.requestContacts { ok ->
-            allowed = ok
-            if (ok) refresh()
-        }
+        IosHonorInviteRuntime.host?.requestContacts { ok -> refresh(ok) }
     }
     return HonorInviteActions(
         contacts = contacts,
         contactsAllowed = allowed,
         requestContacts = {
             IosHonorInviteRuntime.host?.requestContacts { ok ->
-                allowed = ok
-                if (ok) refresh()
+                refresh(ok)
             }
         },
         shareWhatsApp = { phone, text ->

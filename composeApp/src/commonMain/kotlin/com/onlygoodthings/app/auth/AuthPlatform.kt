@@ -43,6 +43,7 @@ expect class AuthPrefs() {
     var publishedAnimalsJson: String
     /** Último feed social visto: se muestra hasta que llegue el REST. */
     var feedCacheJson: String
+    var storyDraftsJson: String
     /** Ya se leyó el referrer de Play para no reaplicar el claim. */
     var honorReferrerConsumed: Boolean
     /** El vecino encendió el GPS. Sin esto no hay tracking ni ping al servidor. */

@@ -57,9 +57,9 @@ fun SignUpScreen(onOtp: () -> Unit, onLogin: () -> Unit, onRegistered: () -> Uni
         AuthProviderRow { provider ->
             scope.launch { if (auth.signInProvider(provider)) onRegistered() }
         }
-        AuthField("Nombre y apellido", "Ej. Martín Soler", name) { name = titleCasePersonName(it) }
+        AuthField("Nombre y apellido", "Ej. Martín Soler", name, prose = true) { name = it }
         AuthField("Correo o teléfono", "correo@comunidad.org o ${AuthLab.TEST_PHONE_E164}", email) { email = it }
-        AuthField("Tu zona o comunidad", "Palermo Soho, Buenos Aires", barrio) { barrio = it }
+        AuthField("Tu zona o comunidad", "Palermo Soho, Buenos Aires", barrio, prose = true) { barrio = it }
         AuthField("Crear Contraseña segura", "••••••••", password, secret = true) { password = it }
         Row(verticalAlignment = Alignment.Top) {
             Checkbox(pact, { pact = it }, colors = CheckboxDefaults.colors(checkedColor = OgtColors.primary))

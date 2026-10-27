@@ -161,7 +161,6 @@ fun FeedScreen(
     val socialTick by db.socialTick.collectAsState()
     val feedTick by db.feedTick.collectAsState()
     val followed = remember { followedNeighbors() }
-    val stories = remember { storiesFrom(followed) }
     var feedMode by remember { mutableStateOf(FeedMode.HOME) }
     var feedFamily by remember { mutableStateOf<FeedTopicFamily?>(null) }
     val copy = LocalOgtCopy.current
@@ -171,14 +170,15 @@ fun FeedScreen(
     var refreshTick by remember { mutableStateOf(0) }
     var refreshing by remember { mutableStateOf(false) }
     var pullPx by remember { mutableStateOf(0f) }
-    var feedPosts by remember {
-        mutableStateOf(db.composeVisibleRiver(me.id, feedMode, feedFamily))
-    }
+    var initialSyncComplete by remember(me.id) { mutableStateOf(false) }
+    var feedPosts by remember(me.id) { mutableStateOf(emptyList<LocalSocialPost>()) }
     var lastRemoteOrder by remember { mutableStateOf<List<String>?>(null) }
     var incomingToast by remember { mutableStateOf(false) }
     var suppressIncomingToast by remember { mutableStateOf(false) }
     val seenPostIds = remember { mutableStateListOf<String>() }
     fun paintRiver(remoteOrder: List<String>? = lastRemoteOrder) {
+        // La caché aún no validada no debe aparecer por un instante al iniciar.
+        if (!initialSyncComplete) return
         feedPosts = db.composeVisibleRiver(me.id, feedMode, feedFamily, remoteOrder)
     }
     LaunchedEffect(feedMode, feedFamily) { page = 1 }
@@ -189,6 +189,19 @@ fun FeedScreen(
         paintRiver()
         auth.ensureDevBearer()
         val remote = try {
+            val serverId = Regex("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")
+            val cachedIds = db.feedPosts().map { it.id }.filter { serverId.matches(it) }
+            cachedIds.chunked(100).forEach { ids ->
+                // A failed check leaves the offline cache intact; never prune by page membership.
+                try {
+                    val visible = auth.feed.visiblePostIds(ids)
+                    session.reconcileFeedVisibility(ids.toSet(), visible.toSet())
+                } catch (cancel: CancellationException) {
+                    throw cancel
+                } catch (_: Exception) {
+                    // Keep feed loading compatible with servers that predate cache validation.
+                }
+            }
             auth.feed.loadFeed(cursor = "0", pageSize = 40, mode = feedMode, family = feedFamily)
         } catch (cancel: CancellationException) {
             throw cancel
@@ -198,8 +211,12 @@ fun FeedScreen(
         if (remote != null) {
             remote.forEach { db.upsertRemoteSocial(it, silent = true) }
             lastRemoteOrder = remote.map { it.id }
-            paintRiver(lastRemoteOrder)
             session.persistSocialFeed()
+        }
+        // También libera la caché si falla la red: mantiene el uso sin conexión.
+        initialSyncComplete = true
+        paintRiver(lastRemoteOrder)
+        if (remote != null) {
             val mediaUrls = remote.flatMap { post ->
                 post.media.flatMap { listOfNotNull(it.url, it.posterUrl) } + post.mediaUrls
             }
@@ -292,11 +309,9 @@ fun FeedScreen(
             }
         }
     }
-    var viewingStoryId by remember { mutableStateOf<String?>(null) }
     var sharePostId by remember { mutableStateOf<String?>(null) }
     var overflowPostId by remember { mutableStateOf<String?>(null) }
     var reportPostId by remember { mutableStateOf<String?>(null) }
-    val seenStoryIds = remember { mutableStateListOf<String>() }
     OgtTopBar(
         title = "",
         onNotifications = onNotifications,
@@ -311,11 +326,7 @@ fun FeedScreen(
             verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             item(key = "chrome-stories") {
-                FeedStories(
-                    stories = stories,
-                    seenIds = seenStoryIds,
-                    onOpen = { viewingStoryId = it },
-                )
+                StoriesRail()
             }
             item(key = "chrome-mode") {
                 FeedModeRow(mode = feedMode, onMode = { feedMode = it }, copy = copy)
@@ -323,7 +334,7 @@ fun FeedScreen(
             item(key = "chrome-family") {
                 FeedFamilyRow(family = feedFamily, onFamily = { feedFamily = it }, copy = copy)
             }
-            if (refreshing || pullPx > 16f) {
+            if (!initialSyncComplete || refreshing || pullPx > 16f) {
                 item(key = "chrome-refresh") {
                     Box(Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
                         OgtLoader(size = 28.dp)
@@ -474,27 +485,9 @@ fun FeedScreen(
                 },
             )
         }
-        viewingStoryId?.let { startId ->
-            Dialog(
-                onDismissRequest = { viewingStoryId = null },
-                properties = DialogProperties(usePlatformDefaultWidth = false),
-            ) {
-                StoryViewer(
-                    stories = stories,
-                    startId = startId,
-                    onSeen = { id -> if (id !in seenStoryIds) seenStoryIds += id },
-                    onClose = { viewingStoryId = null },
-                    onOpenAuthor = { userId ->
-                        viewingStoryId = null
-                        if (userId != null) onOpenNeighbor(userId) else onProfile()
-                    },
-                )
-            }
-        }
+
     }
 }
-
-private const val StoryRailPage = 5
 
 private data class FollowedNeighbor(
     val storyId: String,
@@ -511,50 +504,7 @@ private data class FollowedNeighbor(
     val verified: Boolean = false,
 )
 
-private data class FeedStoryItem(
-    val id: String,
-    val label: String,
-    val author: String,
-    val caption: String,
-    val timeLabel: String,
-    val avatar: DrawableResource,
-    val image: DrawableResource,
-    val mine: Boolean,
-    val recency: Int,
-    val userId: String? = null,
-)
-
-/** El riel no inventa vecinos. Las historias ajenas llegan con el feed de Postgres. */
 private fun followedNeighbors(): List<FollowedNeighbor> = emptyList()
-
-private fun storiesFrom(followed: List<FollowedNeighbor>): List<FeedStoryItem> {
-    val mine = FeedStoryItem(
-        id = "story-me",
-        label = "Tu historia",
-        author = "Vos",
-        caption = "Un recorte de lo bueno que viste o hiciste hoy.",
-        timeLabel = "Ahora",
-        avatar = Res.drawable.feed_avatar_me,
-        image = Res.drawable.feed_story_me,
-        mine = true,
-        recency = Int.MAX_VALUE,
-    )
-    val others = followed.map { row ->
-        FeedStoryItem(
-            id = row.storyId,
-            label = row.firstName,
-            author = row.fullName,
-            caption = row.storyCaption,
-            timeLabel = row.timeLabel,
-            avatar = row.avatar,
-            image = row.photo,
-            mine = false,
-            recency = row.recency,
-            userId = row.userId,
-        )
-    }
-    return listOf(mine) + others
-}
 
 private data class PostLook(
     val postId: String,
@@ -631,189 +581,6 @@ private fun ModeChip(label: String, selected: Boolean, onClick: () -> Unit) {
         Modifier.clip(CircleShape).background(fill).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
         Text(label, color = ink, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-    }
-}
-
-@Composable
-private fun FeedStories(
-    stories: List<FeedStoryItem>,
-    seenIds: List<String>,
-    onOpen: (String) -> Unit,
-) {
-    val mine = stories.first { it.mine }
-    val others = stories.filter { !it.mine }
-    var visibleOthers by remember { mutableStateOf(StoryRailPage.coerceAtMost(others.size)) }
-    val railScroll = rememberScrollState()
-    LaunchedEffect(railScroll.value, railScroll.maxValue, visibleOthers) {
-        val nearEnd = railScroll.maxValue > 0 && railScroll.value >= railScroll.maxValue - 96
-        if (nearEnd && visibleOthers < others.size) {
-            visibleOthers = (visibleOthers + StoryRailPage).coerceAtMost(others.size)
-        }
-    }
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(railScroll).padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        StoryCircle(mine, seen = mine.id in seenIds, onOpen = { onOpen(mine.id) })
-        others.take(visibleOthers).forEach { item ->
-            StoryCircle(item, seen = item.id in seenIds, onOpen = { onOpen(item.id) })
-        }
-    }
-}
-
-@Composable
-private fun StoryCircle(item: FeedStoryItem, seen: Boolean, onOpen: () -> Unit) {
-    Column(
-        Modifier.width(68.dp).clickable(onClick = onOpen),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            if (item.mine) {
-                Box(Modifier.size(64.dp).clip(CircleShape).background(OgtColors.sand), contentAlignment = Alignment.Center) {
-                    OgtSessionAvatar(
-                        contentDescription = "Tu historia",
-                        modifier = Modifier.size(60.dp).clip(CircleShape),
-                    )
-                }
-                Box(
-                    Modifier.align(Alignment.BottomEnd).offset(x = 2.dp, y = 2.dp)
-                        .size(20.dp).clip(CircleShape).background(OgtColors.primary),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("＋", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
-            } else {
-                val ring = if (seen) {
-                    Brush.linearGradient(listOf(Color(0xFFD4D1D6), Color(0xFFD4D1D6)))
-                } else {
-                    Brush.linearGradient(listOf(OgtColors.ink, OgtColors.secondary))
-                }
-                Box(
-                    Modifier.size(64.dp).clip(CircleShape).background(ring),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Box(Modifier.size(58.dp).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
-                        CirclePhoto(item.avatar, 54.dp)
-                    }
-                }
-            }
-        }
-        Text(item.label, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-@Composable
-private fun StoryViewer(
-    stories: List<FeedStoryItem>,
-    startId: String,
-    onSeen: (String) -> Unit,
-    onClose: () -> Unit,
-    onOpenAuthor: (String?) -> Unit,
-) {
-    val sequence = remember(startId, stories) {
-        val mine = stories.first { it.mine }
-        val others = stories.filter { !it.mine }
-        if (startId == mine.id) listOf(mine) + others else others
-    }
-    val startIndex = sequence.indexOfFirst { it.id == startId }.coerceAtLeast(0)
-    val pagerState = rememberPagerState(initialPage = startIndex) { sequence.size }
-    val scope = rememberCoroutineScope()
-    LaunchedEffect(pagerState.currentPage) {
-        onSeen(sequence[pagerState.currentPage].id)
-        delay(5200)
-        if (pagerState.currentPage < sequence.lastIndex) {
-            pagerState.animateScrollToPage(pagerState.currentPage + 1)
-        } else {
-            onClose()
-        }
-    }
-    Box(Modifier.fillMaxSize().background(Color(0xFF111113))) {
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-            val item = sequence[page]
-            Box(Modifier.fillMaxSize()) {
-                Image(
-                    painterResource(item.image),
-                    contentDescription = item.label,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
-                Box(
-                    Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x99000000), Color.Transparent, Color(0xB3000000)))),
-                )
-                // Las zonas de toque no cubren la barra superior: si no, se comen la X.
-                Row(Modifier.fillMaxSize().padding(top = 132.dp)) {
-                    Box(
-                        Modifier.weight(1f).fillMaxHeight().pointerInput(page) {
-                            detectTapGestures {
-                                if (pagerState.currentPage > 0) {
-                                    scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
-                                } else {
-                                    onClose()
-                                }
-                            }
-                        },
-                    )
-                    Box(
-                        Modifier.weight(2f).fillMaxHeight().pointerInput(page) {
-                            detectTapGestures {
-                                if (pagerState.currentPage < sequence.lastIndex) {
-                                    scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
-                                } else {
-                                    onClose()
-                                }
-                            }
-                        },
-                    )
-                }
-                Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 18.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        sequence.indices.forEach { index ->
-                            Box(
-                                Modifier.weight(1f).height(3.dp).clip(CircleShape)
-                                    .background(if (index <= page) Color.White else Color.White.copy(alpha = 0.28f)),
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Row(
-                        Modifier.zIndex(3f).clickable { onOpenAuthor(item.userId) },
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (item.mine) {
-                            OgtSessionAvatar(
-                                contentDescription = item.author,
-                                modifier = Modifier.size(36.dp).clip(CircleShape),
-                            )
-                        } else {
-                            CirclePhoto(item.avatar, 36.dp)
-                        }
-                        Spacer(Modifier.width(10.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(item.author, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                            Text(item.timeLabel, color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
-                        }
-                        Spacer(Modifier.size(48.dp))
-                    }
-                    Spacer(Modifier.weight(1f))
-                    Text(item.caption, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                    Spacer(Modifier.height(28.dp))
-                }
-                Box(
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .zIndex(2f)
-                        .padding(top = 28.dp, end = 8.dp)
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .clickable(onClick = onClose),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("✕", color = Color.White, fontSize = 20.sp)
-                }
-            }
-        }
     }
 }
 

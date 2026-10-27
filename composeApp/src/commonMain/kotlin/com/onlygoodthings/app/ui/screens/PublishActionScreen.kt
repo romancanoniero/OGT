@@ -21,7 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.OutlinedTextField
+import com.onlygoodthings.app.ui.components.OgtOutlinedTextField as OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -80,6 +80,7 @@ import com.onlygoodthings.shared.domain.PostMediaRules
 import com.onlygoodthings.shared.domain.PostPersonRole
 import com.onlygoodthings.shared.domain.honorShareText
 import com.onlygoodthings.shared.realtime.currentEpochMs
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.DrawableResource
@@ -162,6 +163,9 @@ fun PublishActionScreen(
     var includePlace by remember { mutableStateOf(false) }
     var spotIndex by remember { mutableStateOf(0) }
     var toast by remember { mutableStateOf(false) }
+    var publishing by remember { mutableStateOf(false) }
+    var mediaPreparing by remember { mutableStateOf(false) }
+    var publishError by remember { mutableStateOf<String?>(null) }
     val mentionPool = remember(me.id, db.follows.size) { db.mentionPool(me.id) }
     var protagonist by remember(kind) { mutableStateOf<MentionCandidate?>(null) }
     val neighbors = remember { mutableStateListOf<MentionCandidate>() }
@@ -202,6 +206,7 @@ fun PublishActionScreen(
     }
 
     fun publish() {
+        if (publishing || mediaPreparing || toast) return
         if ((honorForm || ternuraForm) && !canPublish) {
             triedPublish = true
             return
@@ -217,120 +222,67 @@ fun PublishActionScreen(
             toast = true
             return
         }
-        val now = currentEpochMs()
-        val postId = "post-pub-$now"
-        db.posts += LocalSocialPost(
-            id = postId,
-            authorKind = AuthorKind.USER,
-            authorUserId = me.id,
-            authorCompanyId = null,
-            place = when {
-                includePlace -> spot.title
-                ternuraForm -> ""
-                else -> me.barrio
-            },
-            timeLabel = "Ahora",
-            tag = tag,
-            body = story,
-            impactCount = 0,
-            commentCount = 0,
-            isStory = false,
-            storyLabel = null,
-            createdAtEpochMs = now,
-            honoreeName = protagonist
-                ?.takeIf { it.namedOnly }
-                ?.displayName,
-        )
-        db.postPeople += LocalPostPerson(postId, me.id, PostPersonRole.AUTHOR)
-        val heroId = when {
-            ternuraForm -> null
-            authorIsSelf -> me.id
-            else -> protagonist?.userId
-        }
-        if (!heroId.isNullOrBlank()) {
-            db.postPeople += LocalPostPerson(postId, heroId, PostPersonRole.PROTAGONIST)
-        }
-        neighbors.mapNotNull { it.userId }.distinct().forEach { uid ->
-            if (uid != me.id && uid != heroId) {
-                db.postPeople += LocalPostPerson(postId, uid, PostPersonRole.PARTICIPANT)
-            }
-        }
-        if (!ternuraForm && !authorIsSelf) {
-            protagonist?.honorId?.let { db.attachHonorToPost(postId, it, PostPersonRole.PROTAGONIST) }
-        }
-        neighbors.forEach { hit ->
-            hit.honorId?.let { db.attachHonorToPost(postId, it, PostPersonRole.PARTICIPANT) }
-        }
-        draftMedia.take(PostMediaRules.MAX_ITEMS).forEachIndexed { order, item ->
-            val video = item.kind == MediaKind.VIDEO
-            val url = if (item.fromDevice) "file://${item.path}" else "asset://${item.path}"
-            val poster = item.posterPath?.let { "file://$it" }
-            db.postMedia += LocalPostMedia(
-                id = "$postId-m$order",
-                postId = postId,
-                kind = item.kind,
-                url = url,
-                posterUrl = poster,
-                sortOrder = order,
-                assetKey = if (item.fromDevice || video) "" else item.path,
-                altText = tag,
-            )
-            if (item.fromDevice) {
-                OgtMediaCache.ingest(url)
-                poster?.let { OgtMediaCache.ingest(it) }
-            }
-        }
-        db.recordFeedEvent(me.id, postId, FeedEventKind.SHARE)
-        db.bumpFeed()
-        val published = db.post(postId)
-        scope.launch {
-            auth.ensureDevBearer()
-            val remote = runCatching {
-                auth.feed.publishPost(
-                    body = story,
-                    topic = tag,
-                    media = draftMedia.take(PostMediaRules.MAX_ITEMS).mapIndexed { order, item ->
-                        val video = item.kind == MediaKind.VIDEO
-                        PostMediaItem(
-                            id = "$postId-m$order",
-                            kind = item.kind,
-                            url = if (item.fromDevice) "file://${item.path}" else "asset://${item.path}",
-                            posterUrl = item.posterPath?.let { "file://$it" },
-                            sortOrder = order,
-                            altText = tag,
-                            assetKey = if (item.fromDevice || video) "" else item.path,
-                        )
-                    },
-                    protagonistUserId = heroId,
-                    participantUserIds = neighbors.mapNotNull { it.userId }.distinct(),
-                    honoreeName = protagonist?.takeIf { it.namedOnly }?.displayName,
-                )
-            }.getOrNull()
-            if (remote != null) db.upsertRemoteSocial(remote)
-            announcePublishedPost(db, published)
-        }
-        session.persistHonors()
+        // Capture one coherent draft. Failed requests keep all form inputs for retry.
+        val body = story
+        val selectedMedia = draftMedia.toList()
+        val selectedHero = protagonist
+        val selectedNeighbors = neighbors.toList()
+        val selfAuthor = authorIsSelf
+        val place = if (includePlace) spot.title else if (ternuraForm) "" else me.barrio
+        val heroId = when { ternuraForm -> null; selfAuthor -> me.id; else -> selectedHero?.userId }
         val mentionedIds = buildList {
-            if (!ternuraForm && !authorIsSelf) protagonist?.userId?.let(::add)
-            neighbors.mapNotNull { it.userId }.forEach(::add)
+            if (!ternuraForm && !selfAuthor) selectedHero?.userId?.let(::add)
+            selectedNeighbors.mapNotNull { it.userId }.forEach(::add)
         }
-        // En preview el destinatario comparte este dispositivo: el banner verifica el canal.
-        db.notifyMentionedUsers(me.id, postId, mentionedIds).forEach(::showSystemNotice)
         val honorHits = buildList {
-            if (!ternuraForm && !authorIsSelf) protagonist?.let { add(it to PostPersonRole.PROTAGONIST) }
-            neighbors.forEach { add(it to PostPersonRole.PARTICIPANT) }
+            if (!ternuraForm && !selfAuthor) selectedHero?.let { add(it to PostPersonRole.PROTAGONIST) }
+            selectedNeighbors.forEach { add(it to PostPersonRole.PARTICIPANT) }
         }
+        publishing = true
+        publishError = null
         scope.launch {
-            honorHits.forEach { (hit, role) ->
-                val token = db.honors.firstOrNull { it.id == hit.honorId }?.claimToken ?: return@forEach
-                auth.honor.attach(token, postId, role)
-            }
-            mentionedIds.distinct().filter { it != me.id }.forEach { rid ->
-                val role = if (rid == heroId) "PROTAGONIST" else "PARTICIPANT"
-                auth.notices.notifyMention(rid, postId, role)
-            }
+            try {
+                val uploaded = auth.uploadPostMedia(selectedMedia, tag)
+                check(session.currentUserId == me.id) { "La sesión cambió. Volvé a intentarlo." }
+                val remote = auth.feed.publishPost(
+                    body = body, topic = tag, media = uploaded,
+                    protagonistUserId = heroId,
+                    participantUserIds = selectedNeighbors.mapNotNull { it.userId }.distinct(),
+                    honoreeName = selectedHero?.takeIf { it.namedOnly }?.displayName,
+                )
+                check(session.currentUserId == me.id) { "La sesión cambió. Volvé a intentarlo." }
+                db.upsertRemoteSocial(remote)
+                val postId = remote.id
+                val index = db.posts.indexOfFirst { it.id == postId }
+                if (index >= 0) db.posts[index] = db.posts[index].copy(place = place, timeLabel = "Ahora")
+                db.postPeople.removeAll { it.postId == postId }
+                db.postPeople += LocalPostPerson(postId, me.id, PostPersonRole.AUTHOR)
+                if (!heroId.isNullOrBlank()) db.postPeople += LocalPostPerson(postId, heroId, PostPersonRole.PROTAGONIST)
+                selectedNeighbors.mapNotNull { it.userId }.distinct().filter { it != me.id && it != heroId }.forEach {
+                    db.postPeople += LocalPostPerson(postId, it, PostPersonRole.PARTICIPANT)
+                }
+                honorHits.forEach { (hit, role) -> hit.honorId?.let { db.attachHonorToPost(postId, it, role) } }
+                db.recordFeedEvent(me.id, postId, FeedEventKind.SHARE)
+                db.bumpFeed()
+                session.persistHonors()
+                session.persistSocialFeed()
+                announcePublishedPost(db, db.post(postId))
+                db.notifyMentionedUsers(me.id, postId, mentionedIds).forEach(::showSystemNotice)
+                // The post is already confirmed; auxiliary notifications cannot turn it into a failed draft.
+                scope.launch {
+                    honorHits.forEach { (hit, role) ->
+                        val token = db.honors.firstOrNull { it.id == hit.honorId }?.claimToken ?: return@forEach
+                        runCatching { auth.honor.attach(token, postId, role) }
+                    }
+                    mentionedIds.distinct().filter { it != me.id }.forEach { rid ->
+                        runCatching { auth.notices.notifyMention(rid, postId, if (rid == heroId) "PROTAGONIST" else "PARTICIPANT") }
+                    }
+                }
+                toast = true
+            } catch (cancel: CancellationException) { throw cancel }
+            catch (failure: Exception) { publishError = failure.message ?: "No se pudo publicar. Tu contenido sigue aquí para reintentar." }
+            finally { publishing = false }
         }
-        toast = true
     }
 
     LaunchedEffect(toast) {
@@ -491,6 +443,7 @@ fun PublishActionScreen(
                                 items = draftMedia,
                                 missing = showMissing && missingMedia,
                                 heroDescription = "Evidencia",
+                                onBusyChange = { mediaPreparing = it },
                             )
                         }
 
@@ -641,6 +594,8 @@ fun PublishActionScreen(
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             OgtPrimaryButton(
                                 when {
+                                    publishing -> "Subiendo publicación…"
+                                    mediaPreparing -> "Preparando video…"
                                     editing -> "Guardar cambios"
                                     kind == ComposePostKind.TERNURA -> "Compartir esta ternura"
                                     kind == ComposePostKind.HOMENAJE -> "Publicar el homenaje"
@@ -648,7 +603,9 @@ fun PublishActionScreen(
                                     else -> "Hacerlo visible en la comunidad"
                                 },
                                 onClick = ::publish,
+                                enabled = !publishing && !mediaPreparing && !toast,
                             )
+                            publishError?.let { Text(it, color = OgtColors.error, fontSize = 13.sp) }
                             if (showMissing && honorForm && missingHonorBits.isNotEmpty()) {
                                 Text(
                                     "Falta ${joinHonorMissing(missingHonorBits)}.",
@@ -684,6 +641,12 @@ fun PublishActionScreen(
                 }
                 Spacer(Modifier.height(32.dp))
             }
+            if (publishing) androidx.compose.material3.AlertDialog(
+                onDismissRequest = {},
+                title = { Text("Subiendo publicación") },
+                text = { Column(verticalArrangement = Arrangement.spacedBy(16.dp)) { androidx.compose.material3.CircularProgressIndicator(); Text("Estamos guardando tus archivos. Esperá un momento…") } },
+                confirmButton = {},
+            )
             if (toast) {
                 Box(
                     Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp)

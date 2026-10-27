@@ -10,12 +10,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.OutlinedTextField
+import com.onlygoodthings.app.ui.components.OgtOutlinedTextField as OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -39,6 +40,9 @@ import com.onlygoodthings.app.theme.OgtDimens
 import com.onlygoodthings.app.theme.OgtMotion
 import com.onlygoodthings.app.theme.ogtOutlinedFieldColors
 import com.onlygoodthings.shared.domain.GeoPoint
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
+import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -65,6 +69,7 @@ fun OgtPlaceSearchField(
     var searching by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var committed by remember { mutableStateOf("") }
+    var manualRevision by remember { mutableIntStateOf(0) }
     var fromGps by remember { mutableStateOf(false) }
 
     LaunchedEffect(query) {
@@ -77,7 +82,11 @@ fun OgtPlaceSearchField(
         delay(420)
         searching = true
         error = null
-        hits = runCatching { searchAddress(q, lang) }.getOrDefault(emptyList())
+        val results = try { searchAddress(q, lang) }
+            catch(cancel:CancellationException) { throw cancel }
+            catch(_:Exception) { emptyList() }
+        coroutineContext.ensureActive()
+        hits=results
         if (hits.isEmpty()) error = copy.noAddressHits
         searching = false
     }
@@ -85,9 +94,14 @@ fun OgtPlaceSearchField(
     var mapDraft by remember { mutableStateOf<GeoPoint?>(null) }
     LaunchedEffect(mapDraft, mapOpen) {
         val draft = mapDraft
+        val revision=manualRevision
         if (!mapOpen || draft == null) return@LaunchedEffect
         delay(480)
-        val hit = runCatching { reverseGeocode(draft, lang) }.getOrNull() ?: return@LaunchedEffect
+        val hit = try { reverseGeocode(draft, lang) }
+            catch(cancel:CancellationException) { throw cancel }
+            catch(_:Exception) { null } ?: return@LaunchedEffect
+        coroutineContext.ensureActive()
+        if(manualRevision!=revision) return@LaunchedEffect
         committed = hit.label
         fromGps = false
         onQueryChange(hit.label)
@@ -114,6 +128,7 @@ fun OgtPlaceSearchField(
                 value = query,
                 onValueChange = {
                     if (it.length <= 120) {
+                        manualRevision++
                         fromGps = false
                         onQueryChange(it)
                     }
@@ -130,6 +145,7 @@ fun OgtPlaceSearchField(
                 onClick = {
                     mapOpen = false
                     hits = emptyList()
+                    val revision=manualRevision
                     scope.launch {
                         busy = true
                         error = null
@@ -138,9 +154,11 @@ fun OgtPlaceSearchField(
                             session.askLocationScope = true
                             error = copy.needGps
                         } else {
-                            val hit = runCatching { reverseGeocode(fix, lang) }.getOrNull()
+                            val hit = try { reverseGeocode(fix, lang) }
+                                catch(cancel:CancellationException) { throw cancel }
+                                catch(_:Exception) { null }
                                 ?: AddressHit("${fix.latitude}, ${fix.longitude}", fix)
-                            applyHit(hit, gpsFix = true)
+                            if(manualRevision==revision) applyHit(hit, gpsFix = true)
                         }
                         busy = false
                     }

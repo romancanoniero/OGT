@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A100000000000006 /* OgtVideoEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000006; };
 		1C81D6F669B7BB6D2FFCCEB3 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = "TEMP_3590F640-3E35-40D9-B016-7774FDB5F347" /* FirebaseCore */; };
 		379D4C6DBBA934A8EF44CDDE /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = B6E18E1D8AEE3BF1FDA1E5E9 /* GoogleSignIn */; };
 		445C052442747365B7CB2124 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 16D66C9411832E1B7D572C76 /* FirebaseCore */; };
@@ -19,6 +20,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A200000000000006 /* OgtVideoEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OgtVideoEditor.swift; sourceTree = "<group>"; };
 		A200000000000001 /* iOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSApp.swift; sourceTree = "<group>"; };
 		A200000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A200000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -56,6 +58,7 @@
 			children = (
 				A200000000000001 /* iOSApp.swift */,
 				A200000000000002 /* ContentView.swift */,
+				A200000000000006 /* OgtVideoEditor.swift */,
 				A200000000000003 /* Info.plist */,
 				A200000000000005 /* Assets.xcassets */,
 				A55143988C4C8F291BE72E9A /* GoogleService-Info.plist */,
@@ -177,6 +180,7 @@
 			files = (
 				A100000000000001 /* iOSApp.swift in Sources */,
 				A100000000000002 /* ContentView.swift in Sources */,
+				A100000000000006 /* OgtVideoEditor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

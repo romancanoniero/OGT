@@ -1,0 +1,68 @@
+diff --git a/backend/src/main/kotlin/com/onlygoodthings/backend/social/SocialRepository.kt b/backend/src/main/kotlin/com/onlygoodthings/backend/social/SocialRepository.kt
+index 60db568..0f039c2 100644
+--- a/backend/src/main/kotlin/com/onlygoodthings/backend/social/SocialRepository.kt
++++ b/backend/src/main/kotlin/com/onlygoodthings/backend/social/SocialRepository.kt
+@@ -47,6 +47,22 @@ class SocialSqlRepository(private val db: Database) {
+         }
+     }
+ 
++    /** Exact cache validation; absence from a ranked page is not a deletion signal. */
++    fun visiblePostIds(ids: List<String>): List<String> {
++        if (ids.isEmpty()) return emptyList()
++        return db.withConnection { connection ->
++            connection.prepareStatement(
++                "SELECT id::text FROM social_posts WHERE id = ANY(?) AND moderation_status = 'VISIBLE'",
++            ).use { stmt ->
++                val array = connection.createArrayOf("uuid", ids.map { java.util.UUID.fromString(it) }.toTypedArray())
++                try {
++                    stmt.setArray(1, array)
++                    stmt.executeQuery().use { rs -> buildList { while (rs.next()) add(rs.getString(1)) } }
++                } finally { array.free() }
++            }
++        }
++    }
++
+     fun recordFeedEvent(viewerId: String, postId: String, kind: FeedEventKind, dwellMs: Int?) {
+         db.withConnection { connection ->
+             connection.prepareStatement(
+@@ -315,7 +331,7 @@ class SocialSqlRepository(private val db: Database) {
+             "carbonSaveMode" to data.optBoolean("carbonSaveMode", false),
+         )
+         val payload = com.onlygoodthings.backend.http.JsonBody.objectMapper.writeValueAsString(
+-            mapOf("settings" to settings),
++            settings.filterKeys { data.containsKey(it) },
+         )
+         db.withConnection { connection ->
+             connection.prepareStatement(
+@@ -323,7 +339,8 @@ class SocialSqlRepository(private val db: Database) {
+                 UPDATE users
+                 SET display_name = COALESCE(NULLIF(?, ''), display_name),
+                     photo_url = COALESCE(NULLIF(?, ''), photo_url),
+-                    metadata = metadata || ?::jsonb,
++                    metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{settings}',
++                        COALESCE(metadata->'settings', '{}'::jsonb) || ?::jsonb),
+                     updated_at = now()
+                 WHERE id = ?::uuid
+                 """.trimIndent(),
+diff --git a/backend/src/main/kotlin/com/onlygoodthings/backend/social/SocialRoutes.kt b/backend/src/main/kotlin/com/onlygoodthings/backend/social/SocialRoutes.kt
+index 1eb5001..ad6d829 100644
+--- a/backend/src/main/kotlin/com/onlygoodthings/backend/social/SocialRoutes.kt
++++ b/backend/src/main/kotlin/com/onlygoodthings/backend/social/SocialRoutes.kt
+@@ -47,6 +47,17 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
+         call.respond(ApiResponse.ok(repository.feed(principal.userId, mode, pageSize, cursor, family)))
+     }
+ 
++    post("/api/v1/social/visibility") {
++        call.principal<AuthPrincipal>() ?: return@post call.respond(
++            HttpStatusCode.Unauthorized, ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
++        )
++        val raw = JsonBody.receiveMap(call)["postIds"] as? List<*>
++        if (raw == null || raw.size > 100 || raw.any { it !is String || runCatching { java.util.UUID.fromString(it) }.isFailure }) {
++            return@post call.respond(HttpStatusCode.BadRequest, ApiResponse.fail<Unit>("Publicaciones inválidas", "BAD_REQUEST"))
++        }
++        call.respond(ApiResponse.ok(repository.visiblePostIds(raw.filterIsInstance<String>())))
++    }
++
+     post("/api/v1/social/publish") {
+         val principal = call.principal<AuthPrincipal>() ?: return@post call.respond(
+             HttpStatusCode.Unauthorized,

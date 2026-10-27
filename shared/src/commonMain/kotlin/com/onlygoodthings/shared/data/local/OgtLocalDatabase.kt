@@ -1012,6 +1012,18 @@ class OgtLocalDatabase {
         return (pinned + body).distinctBy { it.id }
     }
 
+    /** Remove only IDs explicitly checked with the server, preserving other pages and pending drafts. */
+    fun reconcilePostVisibility(checkedIds: Set<String>, visibleIds: Set<String>) {
+        val removed = checkedIds - visibleIds
+        if (removed.isEmpty()) return
+        if (!posts.removeAll { it.id in removed }) return
+        postMedia.removeAll { it.postId in removed }
+        comments.removeAll { it.postId in removed }
+        anecdotes.removeAll { it.postId in removed }
+        bumpFeed()
+        bumpSocial()
+    }
+
     fun exportSocialFeed(viewerId: String): String {
         val cached = feedPosts()
             .sortedByDescending { it.createdAtEpochMs }

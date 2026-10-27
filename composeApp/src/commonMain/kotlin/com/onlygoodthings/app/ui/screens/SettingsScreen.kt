@@ -25,7 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
+import com.onlygoodthings.app.ui.components.OgtOutlinedTextField as OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -341,6 +341,7 @@ fun SettingsScreen(
                     )
                     OutlinedTextField(
                         value = confirmText,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(capitalization=androidx.compose.ui.text.input.KeyboardCapitalization.Characters,autoCorrectEnabled=false),
                         onValueChange = { confirmText = it.uppercase().take(8) },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("BAJA", color = OgtColors.muted) },
@@ -382,6 +383,9 @@ private fun impactExport(me: LocalUser, db: OgtLocalDatabase): String = buildStr
 @Composable
 private fun ProfilePhotoEditor() {
     val session = LocalOgtSession.current
+    val auth = LocalAuth.current
+    val photoScope = rememberCoroutineScope()
+    var savingPhoto by remember { mutableStateOf(false) }
     var sheet by remember { mutableStateOf(false) }
     var afterClose by remember { mutableStateOf<(() -> Unit)?>(null) }
     var pendingPick by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -398,7 +402,18 @@ private fun ProfilePhotoEditor() {
             return@rememberOgtMediaPicker
         }
         photoError = null
-        session.applyProfilePhoto(picked.path)
+        if (!savingPhoto) photoScope.launch {
+            savingPhoto = true
+            try {
+                auth.updateProfilePhoto(picked.path)
+            } catch (cancel: kotlinx.coroutines.CancellationException) {
+                throw cancel
+            } catch (failure: Exception) {
+                photoError = failure.message ?: "No se pudo guardar la foto. Volvé a intentarlo."
+            } finally {
+                savingPhoto = false
+            }
+        }
     }
     Column(
         Modifier.fillMaxWidth().padding(top = 28.dp, bottom = 12.dp),
@@ -415,7 +430,7 @@ private fun ProfilePhotoEditor() {
             Modifier
                 .size(112.dp)
                 .scale(scale)
-                .clickable(interactionSource = press, indication = null) { sheet = true },
+                .clickable(enabled = !savingPhoto, interactionSource = press, indication = null) { sheet = true },
             contentAlignment = Alignment.Center,
         ) {
             OgtSessionAvatar(
@@ -442,6 +457,7 @@ private fun ProfilePhotoEditor() {
                 )
             }
         }
+        if (savingPhoto) Text("Guardando foto…", color = OgtColors.muted, fontSize = 13.sp)
         if (!photoError.isNullOrBlank()) {
             Text(
                 photoError.orEmpty(),

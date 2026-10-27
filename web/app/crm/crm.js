@@ -1,4 +1,4 @@
-import { start } from './crm-runtime.js?v=totp-timeout-1';
+import { start } from './crm-runtime.js?v=stories-20261026';
 
 start().catch(() => {
   document.body.dataset.crmView = 'auth';

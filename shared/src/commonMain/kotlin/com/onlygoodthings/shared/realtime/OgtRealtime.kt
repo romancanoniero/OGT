@@ -37,6 +37,11 @@ class OgtRealtime(
         snap.toSocialLiveCounters()
     }
 
+    fun observeStoryChanges(): Flow<Long> = observeChildren(OgtDbPaths.STORY_CHANGES) { snap ->
+        @Suppress("UNCHECKED_CAST")
+        ((snap.getValue() as? Map<String, Any?>)?.get("at") as? Number)?.toLong()
+    }
+
     fun observePostComments(postId: String): Flow<SocialComment> =
         observeChildren(OgtDbPaths.socialComments(postId)) { snap ->
             snap.toSocialComment(postId)

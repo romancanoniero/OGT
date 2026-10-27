@@ -64,6 +64,13 @@ class RealtimeHub(private val redis: RedisCache) {
         fanoutTree(path, payloadJson)
     }
 
+    fun projectStoryChange() {
+        val path = "${OgtDbPaths.STORY_CHANGES}/revision"
+        val payload = "{\"at\":${System.currentTimeMillis()}}"
+        redis.publish("ogt:tree:$path",payload)
+        fanoutTree(path,payload)
+    }
+
     fun projectUser(userId: String, payloadJson: String) {
         val path = OgtDbPaths.user(userId)
         redis.publish("ogt:tree:$path", payloadJson)

@@ -314,6 +314,9 @@ actual class AuthPrefs actual constructor() {
     actual var feedCacheJson: String
         get() = prefs.getString("feed_json", "").orEmpty()
         set(value) { prefs.edit().putString("feed_json", value).apply() }
+    actual var storyDraftsJson: String
+        get() = prefs.getString("story_drafts_json", "").orEmpty()
+        set(value) { prefs.edit().putString("story_drafts_json", value).apply() }
     actual var honorReferrerConsumed: Boolean
         get() = prefs.getBoolean("honor_referrer_done", false)
         set(value) { prefs.edit().putBoolean("honor_referrer_done", value).apply() }

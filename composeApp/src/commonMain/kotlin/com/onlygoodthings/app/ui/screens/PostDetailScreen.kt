@@ -38,7 +38,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
+import com.onlygoodthings.app.ui.components.OgtOutlinedTextField as OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -1501,7 +1501,7 @@ private fun CommentComposer(
             shape = RoundedCornerShape(OgtDimens.buttonRadius),
             colors = ogtOutlinedFieldColors(),
             minLines = 2,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+            keyboardOptions = KeyboardOptions(capitalization=androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,imeAction = ImeAction.Send),
             keyboardActions = KeyboardActions(onSend = { if (canSend) onSend() }),
         )
         Box(

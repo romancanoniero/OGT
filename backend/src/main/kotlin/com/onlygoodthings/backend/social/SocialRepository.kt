@@ -27,6 +27,11 @@ import java.util.UUID
 
 class SocialSqlRepository(private val db: Database) {
 
+    fun requireOrdinaryPost(id: String) {
+        val story=db.withConnection { c -> c.prepareStatement("SELECT is_story FROM social_posts WHERE id=?::uuid").use { s -> s.setString(1,id);s.executeQuery().use { it.next() && it.getBoolean(1) } } }
+        require(!story) { "Las historias se gestionan desde su sección" }
+    }
+
     fun feed(
         userId: String,
         mode: FeedMode,
@@ -44,6 +49,22 @@ class SocialSqlRepository(private val db: Database) {
             hydrated[item.postId]?.copy(discovery = item.discovery)
         }.filter { post ->
             !isAnecdoteShare(post.topic, post.sourceUrl, post.id) || post.authorId != userId
+        }
+    }
+
+    /** Exact cache validation; absence from a ranked page is not a deletion signal. */
+    fun visiblePostIds(ids: List<String>): List<String> {
+        if (ids.isEmpty()) return emptyList()
+        return db.withConnection { connection ->
+            connection.prepareStatement(
+                "SELECT id::text FROM social_posts WHERE id = ANY(?) AND moderation_status = 'VISIBLE' AND NOT is_story",
+            ).use { stmt ->
+                val array = connection.createArrayOf("uuid", ids.map { java.util.UUID.fromString(it) }.toTypedArray())
+                try {
+                    stmt.setArray(1, array)
+                    stmt.executeQuery().use { rs -> buildList { while (rs.next()) add(rs.getString(1)) } }
+                } finally { array.free() }
+            }
         }
     }
 
@@ -219,7 +240,7 @@ class SocialSqlRepository(private val db: Database) {
             connection.prepareStatement(
                 """
                 SELECT id::text FROM social_posts
-                WHERE author_user_id = ?::uuid AND moderation_status = 'VISIBLE'
+                WHERE author_user_id = ?::uuid AND moderation_status = 'VISIBLE' AND NOT is_story
                 ORDER BY created_at DESC
                 LIMIT ? OFFSET ?
                 """.trimIndent(),
@@ -248,7 +269,7 @@ class SocialSqlRepository(private val db: Database) {
                 SELECT p.id::text
                 FROM social_posts p
                 LEFT JOIN users u ON u.id = p.author_user_id
-                WHERE p.moderation_status = 'VISIBLE'
+                WHERE p.moderation_status = 'VISIBLE' AND NOT p.is_story
                   AND (
                     p.body ILIKE ?
                     OR COALESCE(p.topic, '') ILIKE ?
@@ -315,7 +336,7 @@ class SocialSqlRepository(private val db: Database) {
             "carbonSaveMode" to data.optBoolean("carbonSaveMode", false),
         )
         val payload = com.onlygoodthings.backend.http.JsonBody.objectMapper.writeValueAsString(
-            mapOf("settings" to settings),
+            settings.filterKeys { data.containsKey(it) },
         )
         db.withConnection { connection ->
             connection.prepareStatement(
@@ -323,7 +344,8 @@ class SocialSqlRepository(private val db: Database) {
                 UPDATE users
                 SET display_name = COALESCE(NULLIF(?, ''), display_name),
                     photo_url = COALESCE(NULLIF(?, ''), photo_url),
-                    metadata = metadata || ?::jsonb,
+                    metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{settings}',
+                        COALESCE(metadata->'settings', '{}'::jsonb) || ?::jsonb),
                     updated_at = now()
                 WHERE id = ?::uuid
                 """.trimIndent(),
@@ -1032,7 +1054,7 @@ class SocialSqlRepository(private val db: Database) {
                 LEFT JOIN companies c ON c.id = p.author_company_id
                 LEFT JOIN timebank_needs tn ON tn.post_id = p.id AND tn.open
                 LEFT JOIN skill_tags nt ON nt.id = tn.tag_id
-                WHERE p.id IN ($placeholders)
+                WHERE p.id IN ($placeholders) AND NOT p.is_story
                 """.trimIndent(),
             ).use { stmt ->
                 stmt.setString(1, viewerId)

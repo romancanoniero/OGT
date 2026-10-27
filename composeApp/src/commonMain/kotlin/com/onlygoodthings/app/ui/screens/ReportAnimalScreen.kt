@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
+import com.onlygoodthings.app.ui.components.OgtOutlinedTextField as OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -98,7 +98,7 @@ fun ReportAnimalScreen(
             Text("2. ¿Cómo se llama?", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
             OutlinedTextField(
                 value = name,
-                onValueChange = { if (it.length <= 40) name = titleCasePersonName(it) },
+                onValueChange = { if (it.length <= 40) name = it },
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Oliver", color = OgtColors.muted) },
                 shape = RoundedCornerShape(OgtDimens.buttonRadius),
@@ -166,7 +166,7 @@ fun ReportAnimalScreen(
                     db.updateAnimalListing(
                         author = me,
                         postId = existing.id,
-                        petName = name,
+                        petName = titleCasePersonName(name),
                         species = species,
                         size = size,
                         description = story,
@@ -180,7 +180,7 @@ fun ReportAnimalScreen(
                     db.publishAnimalListing(
                         author = me,
                         kind = "LOST",
-                        petName = name,
+                        petName = titleCasePersonName(name),
                         species = species,
                         size = size,
                         description = story,

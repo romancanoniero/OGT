@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.FilterChip
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -86,12 +87,15 @@ fun OgtDraftMediaStrip(
     items: MutableList<OgtPickedMedia>,
     missing: Boolean,
     heroDescription: String,
+    onBusyChange: (Boolean) -> Unit = {},
 ) {
     val remaining = (PostMediaRules.MAX_ITEMS - items.size).coerceAtLeast(0)
     val picker = rememberOgtMediaPicker(remaining) { picked ->
         if (items.size >= PostMediaRules.MAX_ITEMS) return@rememberOgtMediaPicker
         items += picked
     }
+    var editingVideo by remember { mutableStateOf(false) }
+    LaunchedEffect(picker.isProcessing.value, editingVideo) { onBusyChange(picker.isProcessing.value || editingVideo) }
     var sourceOpen by remember { mutableStateOf(false) }
     var heroBounds by remember { mutableStateOf(Rect.Zero) }
     var rootBounds by remember { mutableStateOf(Rect.Zero) }
@@ -101,6 +105,11 @@ fun OgtDraftMediaStrip(
     var overHero by remember { mutableStateOf(false) }
     val density = LocalDensity.current
     val cover = items.firstOrNull()
+    var toolsVideoId by remember { mutableStateOf<String?>(null) }
+    val videos = items.filter { it.kind == MediaKind.VIDEO && it.fromDevice }
+    val toolsVideo = videos.firstOrNull { it.id == toolsVideoId }
+        ?: cover?.takeIf { it.kind == MediaKind.VIDEO && it.fromDevice } ?: videos.firstOrNull()
+    LaunchedEffect(cover?.id) { if (cover?.kind == MediaKind.VIDEO) toolsVideoId = cover.id }
     LaunchedEffect(items.size) {
         if (items.isNotEmpty()) sourceOpen = false
     }
@@ -129,6 +138,7 @@ fun OgtDraftMediaStrip(
                 .padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            if (picker.isProcessing.value) OgtMediaImportProgress()
             Box(
                 Modifier
                     .ogtBleedHorizontal(10.dp)
@@ -254,6 +264,16 @@ fun OgtDraftMediaStrip(
                         }
                     }
                 }
+            }
+            if(videos.size > 1) LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                itemsIndexed(videos,key={_,video->video.id}) { index,video ->
+                    FilterChip(selected=video.id==toolsVideo?.id,onClick={toolsVideoId=video.id},enabled=!editingVideo,
+                        label={Text("Video ${index+1}")})
+                }
+            }
+            if(toolsVideo!=null) OgtVideoEditAction(toolsVideo, onBusyChange = { editingVideo = it }) { edited ->
+                val index=items.indexOfFirst { it.id==edited.id }
+                if(index>=0) items[index]=edited
             }
             AnimatedVisibility(
                 visible = sourceOpen,

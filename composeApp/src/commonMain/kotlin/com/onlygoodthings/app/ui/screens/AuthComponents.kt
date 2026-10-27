@@ -16,7 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
+import com.onlygoodthings.app.ui.components.OgtOutlinedTextField as OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -71,6 +71,7 @@ internal fun AuthField(
     value: String,
     secret: Boolean = false,
     otp: Boolean = false,
+    prose: Boolean = false,
     onChange: (String) -> Unit,
 ) {
     var passwordVisible by remember { mutableStateOf(false) }
@@ -87,6 +88,7 @@ internal fun AuthField(
             keyboardOptions = when {
                 otp -> KeyboardOptions(keyboardType = KeyboardType.Number)
                 secret -> KeyboardOptions(keyboardType = KeyboardType.Password)
+                prose -> KeyboardOptions(capitalization=androidx.compose.ui.text.input.KeyboardCapitalization.Sentences)
                 else -> KeyboardOptions.Default
             },
             trailingIcon = if (secret) {

@@ -396,6 +396,7 @@ fun ParkingScreen(
                 parkedLabel = if (parked) copy.findMyCar else copy.parkedHere,
                 yieldLabel = copy.yieldMySpot,
                 searchLabel = if (searching) copy.searchingParking else copy.searchParking,
+                searchLayoutLabels = listOf(copy.searchParking, copy.searchingParking),
                 parkedEnabled = chrome.parkedEnabled,
                 yieldEnabled = chrome.yieldEnabled,
                 searchEnabled = chrome.searchEnabled,

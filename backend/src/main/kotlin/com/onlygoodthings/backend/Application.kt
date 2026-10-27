@@ -1,6 +1,10 @@
 package com.onlygoodthings.backend
 
 import com.onlygoodthings.backend.crm.crmRoutes
+import com.onlygoodthings.backend.crm.crmStoryRoutes
+import com.onlygoodthings.backend.stories.*
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import com.onlygoodthings.backend.auth.AuthPrincipal
 import com.onlygoodthings.backend.auth.AuthSettings
 import com.onlygoodthings.backend.auth.CompositeTokenVerifier
@@ -87,6 +91,15 @@ fun Application.module() {
     val redis = RedisCache(redisUrl)
     val identity = IdentityStore(db)
     val hub = RealtimeHub(redis)
+    val stories = StorySqlRepository(db, StoryMediaStore(
+        Path.of(env("OGT_MEDIA_DIR", "data/media")), env("OGT_PUBLIC_BASE", "http://217.216.82.209:19080"),
+    ))
+    launch {
+        while (true) {
+            runCatching { stories.purgeExpiredMedia() }.onFailure { org.slf4j.LoggerFactory.getLogger("Stories").warn("Story media cleanup deferred", it) }
+            delay(15 * 60 * 1000L)
+        }
+    }
     redis.subscribeTree { channel, payload -> hub.ingestTreeChannel(channel, payload) }
     val verifier: FirebaseTokenVerifier = CompositeTokenVerifier(
         allowDev = allowDev,
@@ -153,10 +166,13 @@ fun Application.module() {
         publicAuthRoutes(verifier, identity)
         publicHonorRoutes(honors)
         publicMediaRoutes(mediaStore)
+        storyMediaRoutes(stories)
         dbGatewayRoutes(verifier, identity, hub)
         authenticate("firebase") {
             protectedAuthRoutes(identity)
             crmRoutes(db, verifier, hub, mediaStore)
+            crmStoryRoutes(db, verifier, stories, hub)
+            storyRoutes(stories, hub)
             parkingRoutes(ParkingSqlRepository(db), redis, hub, FootRoutingService.fromEnv(), parkingProximity)
             socialRoutes(SocialSqlRepository(db), hub)
             mediaRoutes(mediaStore)

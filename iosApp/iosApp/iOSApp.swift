@@ -218,25 +218,61 @@ private extension AppDelegate {
 
 @main
 struct iOSApp: App {
+    #if DEBUG
+    @State private var qaReady = false
+    @State private var qaFailure: String? = nil
+    private var qaMode: Bool { Bundle.main.bundleIdentifier == "com.onlygoodthings.app.qa" && ProcessInfo.processInfo.environment["OGT_QA_MODE"] == "1" }
+    #endif
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     init() {
+        #if DEBUG
+        if Bundle.main.bundleIdentifier == "com.onlygoodthings.app.qa", ProcessInfo.processInfo.environment["OGT_QA_MODE"] == "1",
+           let file = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"), let options = FirebaseOptions(contentsOfFile: file) {
+            options.projectID = "demo-ogt-qa"
+            options.apiKey = "AIzaSy" + String(repeating: "0", count: 33)
+            FirebaseApp.configure(options: options)
+            Auth.auth().useEmulator(withHost: "127.0.0.1", port: 19099)
+            UserDefaults.standard.set(true, forKey: "ogt.onboard")
+        } else { FirebaseApp.configure() }
+        #else
         FirebaseApp.configure()
+        #endif
         // Keep Firebase phone and MFA app verification enabled in all installable builds.
         IosAuthRuntime.shared.host = OgtFirebaseHost()
         OgtPushRuntime.shared.host = OgtIosPushHost()
         IosHonorInviteRuntime.shared.host = OgtIosHonorInviteHost()
+        IosVideoEditorRuntime.shared.host = OgtIosVideoEditorHost.shared
+        IosVideoToolsRuntime.shared.host = OgtIosVideoToolsHost.shared
     }
 
     var body: some Scene {
         WindowGroup {
+            #if DEBUG
+            if qaMode && !qaReady {
+                VStack { ProgressView("Preparando cuenta local de QA"); if let qaFailure { Text(qaFailure) } }
+                    .task {
+                        do {
+                            if let email = ProcessInfo.processInfo.environment["OGT_QA_EMAIL"], let password = ProcessInfo.processInfo.environment["OGT_QA_PASSWORD"] {
+                                _ = try await Auth.auth().signIn(withEmail: email, password: password)
+                                UserDefaults.standard.set(true, forKey: "ogt.keep")
+                            }
+                            qaReady = true
+                        } catch { qaFailure = "No se pudo iniciar la cuenta local de pruebas" }
+                    }
+            } else { appView }
+            #else
+            appView
+            #endif
+        }
+    }
+    private var appView: some View {
             ContentView()
                 .onOpenURL { url in
                     if GIDSignIn.sharedInstance.handle(url) { return }
                     if Auth.auth().canHandle(url) { return }
                     OgtIncomingLinks.shared.offer(uri: url.absoluteString)
                 }
-        }
     }
 }
 

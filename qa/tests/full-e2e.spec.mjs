@@ -51,7 +51,9 @@ test('register through Firebase, save compressed avatar, reload, sign out and si
   await expect(page).toHaveURL(/#\/inicio/);
   await page.goto('/#/ajustes');
   await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue('Persona QA Actualizada');
-  await expect(page.locator('#profile-form img').first()).toHaveJSProperty('src', saved.data.url);
+  const avatar = page.locator('#profile-form img').first();
+  await expect.poll(async () => new URL(await avatar.getAttribute('src'), page.url()).pathname).toBe(new URL(saved.data.url).pathname);
+  await expect.poll(() => avatar.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
 });
 
 test('real API rejects forged sessions, anonymous uploads and laboratory tokens', async ({ request }) => {
