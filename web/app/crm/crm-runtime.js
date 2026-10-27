@@ -165,7 +165,7 @@ export async function start() {
   }
   function showFactors(factors, prompt) {
     factor.replaceChildren();
-    for (const hint of factors) { const option = make('option', hint.label); option.value = hint.index; factor.append(option); }
+    for (const hint of factors) { const option = make('option', hint.kind === 'totp' ? `${hint.label} · aplicación autenticadora` : hint.label); option.value = hint.index; factor.append(option); }
     code.value = ''; code.removeAttribute('aria-invalid'); verify.disabled = true;
     login.hidden = true; googleLogin.hidden = true; signupToggle.hidden = true; refresh.hidden = true;
     challenge.hidden = false; showAuth();

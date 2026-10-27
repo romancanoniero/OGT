@@ -411,8 +411,11 @@ with sync_playwright() as pw:
     assert page.locator('#password').input_value()==''
     page.get_by_role('button',name='Cerrar sesi\u00f3n',exact=True).click();expect(page.locator('#crm-root')).to_be_empty()
     assert not errors,errors;context.close();results.append('TOTP login and logout')
-    context,page,state,errors=session();begin(page);finish(page,'111111')
-    expect(page.locator('#crm-status')).to_contain_text('no es v\u00e1lido');expect(page.locator('#crm-root')).to_be_empty()
+    context,page,state,errors=session();begin(page)
+    expect(page.locator('#crm-factor')).to_have_value('0')
+    expect(page.locator('#crm-factor')).to_contain_text('aplicaci\u00f3n autenticadora')
+    finish(page,'111111')
+    expect(page.locator('#crm-status')).to_contain_text('no es v\u00e1lido');expect(page.locator('#crm-status')).to_contain_text('fecha y hora autom\u00e1ticas');expect(page.locator('#crm-root')).to_be_empty()
     finish(page);expect(page.locator('#crm-root')).to_contain_text('Usuarios activos: 17');assert not errors,errors;context.close();results.append('Invalid MFA code rejected, valid retry succeeds')
     context,page,state,errors=session('empresas')
     begin(page)
