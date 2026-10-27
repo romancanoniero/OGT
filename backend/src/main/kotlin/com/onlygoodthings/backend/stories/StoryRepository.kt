@@ -24,13 +24,14 @@ class StorySqlRepository(private val db: Database, val media: StoryMediaStore) {
     fun list(viewer: String, cursor: String? = null, admin: Boolean = false, query: String = ""): StoryPage = db.withConnection { c ->
         val now = System.currentTimeMillis()
         val offset = cursor?.toIntOrNull()?.coerceIn(0,10000) ?: 0
+        val order = if(admin) "(SELECT count(*) FROM content_reports r WHERE r.post_id=p.id AND r.status='PENDING_REVIEW') DESC,p.created_at DESC,p.id DESC" else "p.created_at DESC,p.id DESC"
         val where = if(admin) "TRUE" else "p.moderation_status='VISIBLE' AND p.story_expires_at>now() AND $readPermission"
         val found = c.prepareStatement("""SELECT $fields,
             EXISTS(SELECT 1 FROM story_views v WHERE v.post_id=p.id AND v.viewer_id=?::uuid) AS seen,
             (SELECT count(*) FROM story_views v WHERE v.post_id=p.id) AS views
             FROM social_posts p JOIN story_details d ON d.post_id=p.id JOIN users u ON u.id=p.author_user_id
             WHERE p.is_story AND $where AND (p.body ILIKE ? OR u.display_name ILIKE ? OR p.id::text ILIKE ?)
-            ORDER BY p.created_at DESC,p.id DESC LIMIT 101 OFFSET ?""").use { s ->
+            ORDER BY $order LIMIT 101 OFFSET ?""").use { s ->
             var index = 1
             s.setString(index++,viewer)
             if(!admin) repeat(3) { s.setString(index++,viewer) }
@@ -113,6 +114,65 @@ class StorySqlRepository(private val db: Database, val media: StoryMediaStore) {
         require(canRead(id,viewer)) { "La historia no está disponible" }
         db.withConnection { c -> c.prepareStatement("INSERT INTO story_views(post_id,viewer_id) SELECT ?::uuid,?::uuid WHERE NOT EXISTS (SELECT 1 FROM social_posts WHERE id=?::uuid AND author_user_id=?::uuid) ON CONFLICT DO NOTHING").use { s->s.setString(1,id);s.setString(2,viewer);s.setString(3,id);s.setString(4,viewer);s.executeUpdate() } }
     }
+    /** Reports are private, retry-safe, and never make content visible to a new audience. */
+    fun report(id:String,viewer:String,reason:String,details:String?) {
+        UUID.fromString(id)
+        validateStoryReport(reason,details)
+        db.withConnection { c ->
+            c.autoCommit=false
+            try {
+                c.prepareStatement("SELECT pg_advisory_xact_lock(hashtext(?))").use { q -> q.setString(1,"story-report:$id:$viewer");q.execute() }
+                val allowed=c.prepareStatement("""SELECT p.author_user_id::text FROM social_posts p
+                    JOIN story_details d ON d.post_id=p.id JOIN users u ON u.id=p.author_user_id
+                    WHERE p.id=?::uuid AND p.is_story AND p.moderation_status='VISIBLE'
+                    AND p.story_expires_at>now() AND $readPermission FOR SHARE OF p""").use { q ->
+                    q.setString(1,id);repeat(3) { q.setString(it+2,viewer) }
+                    q.executeQuery().use { r -> r.next() && r.getString(1)!=viewer }
+                }
+                require(allowed) { "La historia no está disponible para denunciar" }
+                c.prepareStatement("""INSERT INTO content_reports(reporter_id,post_id,reason,details)
+                    SELECT ?::uuid,?::uuid,?,? WHERE NOT EXISTS
+                    (SELECT 1 FROM content_reports WHERE reporter_id=?::uuid AND post_id=?::uuid)""").use { q ->
+                    q.setString(1,viewer);q.setString(2,id);q.setString(3,reason);q.setString(4,details)
+                    q.setString(5,viewer);q.setString(6,id);q.executeUpdate()
+                }
+                c.commit()
+            } catch(error:Exception) { c.rollback();throw error } finally { c.autoCommit=true }
+        }
+    }
+    fun reportCounts(ids:List<String>):Map<String,Int> = db.withConnection { c ->
+        c.prepareStatement("SELECT post_id::text,count(*) FROM content_reports WHERE post_id=ANY(?::uuid[]) AND status='PENDING_REVIEW' GROUP BY post_id").use { q ->
+            q.setArray(1,c.createArrayOf("uuid",ids.toTypedArray()));q.executeQuery().use { r -> buildMap { while(r.next()) put(r.getString(1),r.getInt(2)) } }
+        }
+    }
+    fun reports(id:String):List<StoryModerationReport> = db.withConnection { c ->
+        UUID.fromString(id)
+        c.prepareStatement("""SELECT r.id::text,r.reason,r.details,r.status::text,
+            (extract(epoch from r.created_at)*1000)::bigint FROM content_reports r
+            JOIN social_posts p ON p.id=r.post_id WHERE p.id=?::uuid AND p.is_story
+            ORDER BY r.created_at DESC LIMIT 100""").use { q ->
+            q.setString(1,id);q.executeQuery().use { r -> buildList {
+                while(r.next()) {
+                    val code=r.getString(2)
+                    add(StoryModerationReport(r.getString(1),code,r.getString(3),r.getString(4),r.getLong(5),PostReportCatalog.byCode(code)?.label ?: "Otro motivo"))
+                }
+            } }
+        }
+    }
+    fun dismissReports(id:String,actor:String,reason:String) {
+        UUID.fromString(id);require(reason.trim().length in 3..500)
+        db.withConnection { c ->
+            c.autoCommit=false
+            try {
+                val changed=c.prepareStatement("""UPDATE content_reports r SET status='HIDDEN'
+                    WHERE r.post_id=?::uuid AND r.status='PENDING_REVIEW'
+                    AND EXISTS(SELECT 1 FROM social_posts p WHERE p.id=r.post_id AND p.is_story)""").use { q -> q.setString(1,id);q.executeUpdate() }
+                if(changed>0)c.prepareStatement("""INSERT INTO crm_audit_events(actor_user_id,action,target_type,target_id,reason,outcome)
+                    VALUES(?::uuid,'STORY_REPORT_DISMISS','story',?,?,'SUCCESS')""").use { q ->q.setString(1,actor);q.setString(2,id);q.setString(3,reason.trim());q.executeUpdate() }
+                c.commit()
+            } catch(error:Exception) { c.rollback();throw error } finally { c.autoCommit=true }
+        }
+    }
     fun remove(id: String, actor: String, admin: Boolean=false, reason: String="Retirada por el autor") {
         UUID.fromString(id)
         db.withConnection { c ->
@@ -126,12 +186,28 @@ class StorySqlRepository(private val db: Database, val media: StoryMediaStore) {
                 c.prepareStatement("UPDATE story_details SET removal_reason=?,removed_by=?::uuid WHERE post_id=?::uuid").use { s->s.setString(1,reason);s.setString(2,actor);s.setString(3,id);s.executeUpdate() }
                 if(admin) c.prepareStatement("""INSERT INTO crm_audit_events(actor_user_id,action,target_type,target_id,reason,outcome)
                     VALUES(?::uuid,'STORY_REMOVE','story',?,?,'SUCCESS')""").use { s->s.setString(1,actor);s.setString(2,id);s.setString(3,reason);s.executeUpdate() }
+                c.prepareStatement("UPDATE content_reports SET status='REMOVED' WHERE post_id=?::uuid AND status='PENDING_REVIEW'").use { q -> q.setString(1,id);q.executeUpdate() }
                 c.commit()
             } catch(e:Exception) { c.rollback();throw e } finally { c.autoCommit=true }
+        }
+    }
+    fun purgeErasedMedia() {
+        val ids=db.withConnection { c -> c.createStatement().use { q -> q.executeQuery("SELECT story_id::text FROM erased_story_media WHERE processed_at IS NULL ORDER BY created_at LIMIT 100").use { r ->buildList { while(r.next())add(r.getString(1)) } } } }
+        ids.forEach { id ->
+            media.delete(id)
+            db.withConnection { c -> c.prepareStatement("UPDATE erased_story_media SET processed_at=now() WHERE story_id=?::uuid").use { q ->q.setString(1,id);q.executeUpdate() } }
         }
     }
     fun purgeExpiredMedia() {
         val ids=db.withConnection { c->c.prepareStatement("SELECT id::text FROM social_posts WHERE is_story AND story_expires_at<now()-interval '1 hour'").use { s->s.executeQuery().use { buildList { while(it.next()) add(it.getString(1)) } } } }
         ids.forEach { media.delete(it) }
     }
+}
+
+@kotlinx.serialization.Serializable
+data class StoryModerationReport(val id:String,val reason:String,val details:String?,val status:String,val createdAtEpochMs:Long,val reasonLabel:String)
+
+internal fun validateStoryReport(reason:String,details:String?) {
+    require(PostReportCatalog.byCode(reason)!=null) { "Motivo de denuncia inválido" }
+    require(details==null || details.length<=500) { "El detalle supera 500 caracteres" }
 }

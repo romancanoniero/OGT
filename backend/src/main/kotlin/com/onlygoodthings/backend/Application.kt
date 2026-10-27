@@ -5,6 +5,9 @@ import com.onlygoodthings.backend.crm.crmStoryRoutes
 import com.onlygoodthings.backend.stories.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import com.onlygoodthings.shared.protocol.WsCodec
+import com.onlygoodthings.shared.domain.SocialLiveCounters
 import com.onlygoodthings.backend.crm.crmContributionPath
 import com.onlygoodthings.backend.auth.AuthPrincipal
 import com.onlygoodthings.backend.auth.AuthSettings
@@ -71,7 +74,7 @@ import org.slf4j.event.Level
 import kotlin.time.Duration.Companion.seconds
 
 fun main() {
-    embeddedServer(Netty, port = System.getenv("PORT")?.toIntOrNull() ?: 8080, module = Application::module)
+    embeddedServer(Netty, host = if(System.getenv("OGT_ENV")=="test")"127.0.0.1" else "0.0.0.0", port = System.getenv("PORT")?.toIntOrNull() ?: 8080, module = Application::module)
         .start(wait = true)
 }
 
@@ -145,6 +148,18 @@ fun Application.module() {
         pingPeriod = 15.seconds
         timeout = 30.seconds
     }
+    val accountErasure=com.onlygoodthings.backend.auth.AccountErasureService(db)
+    launch(kotlinx.coroutines.Dispatchers.IO) {
+        while(isActive) {
+            runCatching { com.onlygoodthings.backend.crm.crmPurgeErasedMedia(db,mediaStore) }
+                .onFailure { org.slf4j.LoggerFactory.getLogger("Privacy").warn("Media deletion retry deferred") }
+            runCatching { stories.purgeErasedMedia() }
+                .onFailure { org.slf4j.LoggerFactory.getLogger("Privacy").warn("Story deletion retry deferred") }
+            runCatching { accountErasure.processPending() }
+                .onFailure { org.slf4j.LoggerFactory.getLogger("Privacy").warn("Identity deletion retry deferred") }
+            delay(15_000)
+        }
+    }
     install(Authentication) {
         bearer("firebase") {
             realm = "OnlyGoodThings"
@@ -171,7 +186,7 @@ fun Application.module() {
         val honors = HonorSqlRepository(db)
         publicAuthRoutes(verifier, identity)
         publicHonorRoutes(honors)
-        publicMediaRoutes(mediaStore)
+        publicMediaRoutes(mediaStore) { com.onlygoodthings.backend.crm.crmPublicMediaAvailable(db,it) }
         storyMediaRoutes(stories)
         dbGatewayRoutes(verifier, identity, hub)
         authenticate("firebase") {
@@ -185,13 +200,21 @@ fun Application.module() {
                     finish()
                 }
             }
-            protectedAuthRoutes(identity)
+            protectedAuthRoutes(identity) { removed ->
+                removed.forEach { id -> hub.projectSocialPost(id,WsCodec.json.encodeToString(
+                    SocialLiveCounters.serializer(),com.onlygoodthings.backend.crm.crmRemovedPostLive(id))) }
+                hub.projectStoryChange()
+            }
             crmRoutes(db, verifier, hub, mediaStore)
             crmStoryRoutes(db, verifier, stories, hub)
             storyRoutes(stories, hub)
             parkingRoutes(ParkingSqlRepository(db), redis, hub, FootRoutingService.fromEnv(), parkingProximity)
             socialRoutes(SocialSqlRepository(db), hub)
-            mediaRoutes(mediaStore)
+            mediaRoutes(mediaStore) { owner,name ->
+                db.withConnection { c -> c.prepareStatement("INSERT INTO uploaded_media_owners(stored_name,uploader_user_id) VALUES(?,?::uuid)").use { q ->
+                    q.setString(1,name);q.setString(2,owner);q.executeUpdate()
+                } }
+            }
             honorRoutes(honors)
             noticeRoutes(NoticeSqlRepository(db))
             referralRoutes(db)

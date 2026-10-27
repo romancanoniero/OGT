@@ -49,12 +49,12 @@ internal data class CrmUserMutation(
 
 /** A single transaction: any unsupported FK, protected account, or missing ID aborts the entire batch. */
 internal fun crmModerateUsers(
-    db: Database, actorId: String, ids: List<String>, action: String, reason: String,
+    db: Database, actorId: String, ids: List<String>, action: String, reason: String, selfDelete:Boolean=false,
 ): CrmUserMutation = db.withConnection { conn ->
     require(ids.isNotEmpty() && ids.size <= 25 && ids.distinct().size == ids.size)
     require(ids.all { runCatching { UUID.fromString(it) }.isSuccess })
     require(reason.length in 10..500)
-    require(actorId !in ids) { "No podés moderar tu propia cuenta" }
+    require(actorId !in ids || (selfDelete && action=="DELETE" && ids==listOf(actorId))) { "No podés moderar tu propia cuenta" }
     require(action in setOf("BLOCK", "UNBLOCK", "DELETE"))
     val oldAutoCommit = conn.autoCommit
     conn.autoCommit = false
@@ -111,9 +111,11 @@ internal fun crmModerateUsers(
                      UNION ALL SELECT m.poster_url FROM post_media m
                        JOIN social_posts p ON p.id = m.post_id
                        WHERE p.author_user_id = ANY(?::uuid[])
+                     UNION ALL SELECT '/media/u/' || stored_name FROM uploaded_media_owners
+                       WHERE uploader_user_id = ANY(?::uuid[])
                    ) source WHERE source.url IS NOT NULL"""
             ).use { stmt ->
-                for (n in 1..6) stmt.setArray(n, conn.createArrayOf("uuid", ids.toTypedArray()))
+                for (n in 1..7) stmt.setArray(n, conn.createArrayOf("uuid", ids.toTypedArray()))
                 stmt.executeQuery().use { rs ->
                     buildSet {
                         while (rs.next()) crmLocalMediaName(rs.getString(1))?.let { add(it) }
@@ -129,6 +131,9 @@ internal fun crmModerateUsers(
                     stmt.setString(1, name)
                     stmt.executeUpdate()
                 }
+            }
+            conn.queryIds("SELECT id::text FROM social_posts WHERE is_story AND author_user_id=ANY(?::uuid[])",ids).forEach { id ->
+                conn.prepareStatement("INSERT INTO erased_story_media(story_id) VALUES(?::uuid) ON CONFLICT DO NOTHING").use { q ->q.setString(1,id);q.executeUpdate() }
             }
             removedPosts.addAll(conn.queryIds(
                 "SELECT id::text FROM social_posts WHERE author_user_id = ANY(?::uuid[])", ids,
@@ -178,6 +183,12 @@ internal fun crmModerateUsers(
                     stmt.setString(2, actorId)
                     stmt.setString(3, reason)
                     stmt.executeUpdate()
+                }
+            }
+            rows.forEach { row ->
+                conn.prepareStatement("""INSERT INTO account_erasure_jobs(uid_hash,firebase_uid)
+                    VALUES(?,?) ON CONFLICT(uid_hash) DO NOTHING""").use { q ->
+                    q.setString(1,crmFirebaseTombstoneHash(row.second));q.setString(2,row.second);q.executeUpdate()
                 }
             }
             // Preserve other people's replies to deleted comments on posts that remain.
@@ -237,8 +248,8 @@ internal fun crmModerateUsers(
                    (actor_user_id, action, target_type, target_id, reason, outcome)
                    VALUES (?::uuid, ?, 'user', ?, ?, 'SUCCESS')"""
             ).use { stmt ->
-                stmt.setString(1, actorId)
-                stmt.setString(2, "USER_" + action)
+                if(selfDelete)stmt.setNull(1,java.sql.Types.OTHER) else stmt.setString(1, actorId)
+                stmt.setString(2, if(selfDelete)"ACCOUNT_SELF_DELETE" else "USER_" + action)
                 stmt.setString(3, row.first)
                 stmt.setString(4, reason)
                 stmt.executeUpdate()
@@ -319,21 +330,7 @@ internal fun crmPurgeErasedMedia(db: Database, media: com.onlygoodthings.backend
     }
     pending.forEach { name ->
         try {
-            val shared = db.withConnection { conn ->
-                conn.prepareStatement(
-                    """SELECT
-                       EXISTS(SELECT 1 FROM users WHERE photo_url LIKE ?)
-                       OR EXISTS(SELECT 1 FROM social_posts
-                         WHERE array_to_string(media_urls, '|') LIKE ?)
-                       OR EXISTS(SELECT 1 FROM post_media
-                         WHERE url LIKE ? OR original_url LIKE ? OR poster_url LIKE ?)
-                       OR EXISTS(SELECT 1 FROM animal_listings
-                         WHERE array_to_string(photo_urls, '|') LIKE ?)"""
-                ).use { stmt ->
-                    for (n in 1..6) stmt.setString(n, "%/media/u/$name%")
-                    stmt.executeQuery().use { rs -> rs.next(); rs.getBoolean(1) }
-                }
-            }
+            val shared = crmMediaStillReferenced(db,name)
             val outcome = when {
                 shared -> "SHARED"
                 media.resolvePublic(name) == null -> "UNREFERENCED"
@@ -354,4 +351,31 @@ internal fun crmPurgeErasedMedia(db: Database, media: com.onlygoodthings.backend
             // Keep the durable pending record; never pretend the file was purged.
         }
     }
+}
+
+internal fun crmMediaStillReferenced(db:Database,name:String):Boolean = db.withConnection { conn ->
+                conn.prepareStatement(
+                    """SELECT
+                       EXISTS(SELECT 1 FROM users WHERE photo_url LIKE ?)
+                       OR EXISTS(SELECT 1 FROM social_posts
+                         WHERE array_to_string(media_urls, '|') LIKE ?)
+                       OR EXISTS(SELECT 1 FROM post_media
+                         WHERE url LIKE ? OR original_url LIKE ? OR poster_url LIKE ?)
+                       OR EXISTS(SELECT 1 FROM animal_listings
+                         WHERE array_to_string(photo_urls, '|') LIKE ?)
+                       OR EXISTS(SELECT 1 FROM uploaded_media_owners o JOIN users u ON u.id=o.uploader_user_id
+                         WHERE o.stored_name=? AND u.status='ACTIVE')"""
+                ).use { stmt ->
+                    for (n in 1..6) stmt.setString(n, "%/media/u/$name%")
+                    stmt.setString(7,name)
+                    stmt.executeQuery().use { rs -> rs.next(); rs.getBoolean(1) }
+                }
+            }
+
+/** Pending journal entries revoke delivery even if disk cleanup temporarily fails. */
+internal fun crmPublicMediaAvailable(db:Database,name:String):Boolean {
+    val erased=db.withConnection { c -> c.prepareStatement("SELECT EXISTS(SELECT 1 FROM crm_erased_media WHERE stored_name=?)").use { q ->
+        q.setString(1,name);q.executeQuery().use { r ->r.next();r.getBoolean(1) }
+    } }
+    return !erased || crmMediaStillReferenced(db,name)
 }

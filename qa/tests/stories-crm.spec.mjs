@@ -2,21 +2,44 @@ import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 test.skip(process.env.OGT_FULL_E2E !== '1','Requires isolated QA services and test grants.');
-test('CRM inspects and removes a real story without exposing normal post tools',async({page,request})=>{
+test('viewer reports a real story and CRM resolves it without exposing normal post tools',async({page,request},info)=>{
  const a=JSON.parse(await readFile(new URL('../../build/stories-qa-account.json',import.meta.url),'utf8'));
  const id=randomUUID(),caption=`Historia CRM QA ${id} <script>window.storyInjected=true</script>`;
  const r=await request.post('http://127.0.0.1:19083/api/v1/stories/publish',{headers:{Authorization:`Bearer ${a.token}`},data:{requestId:id,kind:'IMAGE',audience:'COMMUNITY',caption,bytesBase64:(await readFile(new URL('../artifacts/story-photo.png',import.meta.url))).toString('base64')}});
  expect(r.ok()).toBe(true);const story=(await r.json()).data;
  await page.goto('/privacy.html');
+ await page.addStyleTag({url:'/styles.css'});
+ await page.evaluate(async({token,id,ownerId})=>{
+  document.body.replaceChildren();const root=document.createElement('main');document.body.append(root);
+  const {mountStories}=await import('/ephemeral-stories.js');
+  const api=async(path,data)=>{
+   const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify(data)});
+   const body=await response.json();if(!response.ok||!body.success)throw new Error(body.message||'Error de QA');
+   return path.endsWith('/list')?{...body.data,stories:body.data.stories.filter(row=>row.id===id),nextCursor:null}:body.data;
+  };
+  window.disposeQaStories=mountStories(root,api,{ownerId});
+ },{token:a.otherToken,id,ownerId:'qa-viewer'});
+ await page.getByRole('button',{name:/Ver historias de/}).click();
+ await page.getByRole('button',{name:'Denunciar historia',exact:true}).click();
+ const report=page.getByRole('dialog',{name:'Denunciar historia',exact:true});
+ await expect(report).toBeVisible();
+ await report.getByLabel('Motivo',{exact:true}).selectOption('HARM');
+ await report.getByLabel('Detalles opcionales').fill('Denuncia QA <script>window.storyInjected=true</script>');
+ await page.screenshot({path:info.outputPath('report-story.png')});
+ await report.getByRole('button',{name:'Enviar denuncia',exact:true}).click();
+ await expect(report).toHaveCount(0);
+ await expect(page.getByRole('status')).toContainText('Denuncia recibida');
+ await page.getByRole('button',{name:'Cerrar',exact:true}).click();
+ await page.evaluate(()=>window.disposeQaStories());
  await page.evaluate(async({token})=>{
   document.body.replaceChildren();const root=document.createElement('main');document.body.append(root);
   const [{createApi},{createStoryListing},{mountWorkspace}]=await Promise.all([import('/crm/crm-core.js'),import('/crm/crm-stories.js'),import('/crm/crm-ui.js')]);
   const listing=createStoryListing(createApi(window.fetch.bind(window)),token,undefined,true,()=>{});
   mountWorkspace(root,{title:'Control QA',brand:'Only Good Things',lede:'',rows:[],sections:[{id:'historias',label:'Historias',icon:'qs_anecdote.svg',view:'listing',listing}],initialSection:'historias'});
  },{token:a.adminToken});
- const row=page.getByRole('row').filter({hasText:caption});await expect(row).toBeVisible();
+ const row=page.getByRole('row').filter({hasText:caption});await expect(row).toBeVisible();await expect(row.getByRole('cell').nth(4)).toHaveText('1');
  await row.getByRole('button',{name:'Ver historia',exact:true}).click();
- const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();await expect(dialog).toContainText(caption);
+ const dialog=page.getByRole('dialog');await expect(dialog).toBeVisible();await expect(dialog).toContainText(caption);await expect(dialog.getByRole('region',{name:'Denuncias de la historia'})).toContainText('Daño a una persona o animal');
  expect(await page.evaluate(()=>Boolean(window.storyInjected))).toBe(false);
  await expect(dialog.getByRole('button',{name:'Cambiar autoría'})).toHaveCount(0);
  await dialog.getByLabel('Motivo de la retirada').fill('Prueba de moderación de historias');

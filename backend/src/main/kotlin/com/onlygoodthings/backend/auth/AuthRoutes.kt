@@ -38,7 +38,7 @@ fun Route.publicAuthRoutes(verifier: FirebaseTokenVerifier, identity: IdentitySt
 
 }
 
-fun Route.protectedAuthRoutes(identity: IdentityStore) {
+fun Route.protectedAuthRoutes(identity: IdentityStore,onErased:(List<String>)->Unit={}) {
     post("/api/v1/auth/me") {
         val principal = call.principal<AuthPrincipal>() ?: return@post call.respond(
             HttpStatusCode.Unauthorized,
@@ -111,7 +111,11 @@ fun Route.protectedAuthRoutes(identity: IdentityStore) {
                 ApiResponse.fail<Unit>("Confirmación requerida", "CONFIRM_REQUIRED"),
             )
         }
-        identity.eraseAccount(principal.userId)
+        val removed=identity.eraseAccount(principal.userId)
+        // A realtime outage cannot turn an already committed deletion into an apparent failure.
+        runCatching { onErased(removed) }.onFailure {
+            org.slf4j.LoggerFactory.getLogger("Privacy").warn("Deletion committed; realtime notification deferred")
+        }
         call.respond(ApiResponse.ok(mapOf("deleted" to true), "Cuenta dada de baja"))
     }
 }

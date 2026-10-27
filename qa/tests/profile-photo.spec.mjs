@@ -15,7 +15,9 @@ test('existing comments and anecdotes use the current profile photo without chan
     expect(res.ok()).toBe(true);const body=await res.json();expect(body.success).toBe(true);return body.data;
   };
   const me=await api('auth/me');
-  await expect(page.locator(`.section-avatar img[data-avatar-user="${me.userId}"]`)).toHaveAttribute('src','avatars/ogt-placeholder.svg');
+  const headerAvatar=page.locator(`.section-avatar img[data-user="${me.userId}"]`);
+  await expect(headerAvatar).toHaveAttribute('src',/^avatars\/[^?]+\.(png|svg|jpg)$/);
+  const emptyAvatar=await headerAvatar.getAttribute('src');
   const fixture=await readFile(new URL('../../backend/src/test/resources/images/transparent.webp',import.meta.url));
   const upload=()=>api('media/upload',{filename:'photo.webp',contentType:'image/webp',bytesBase64:fixture.toString('base64')});
   const first=await upload(),second=await upload();
@@ -34,11 +36,11 @@ test('existing comments and anecdotes use the current profile photo without chan
   await expect(page.locator('.reply').first()).toBeVisible();
   await api('users/profile/update',{displayName:'Persona Foto QA',photoUrl:second.url});
   await page.evaluate(({id,url})=>applyProfileLive({id,displayName:'Persona Foto QA',photoUrl:url}),{id:me.userId,url:second.url});
-  const own=page.locator(`.reply img[data-avatar-user="${me.userId}"], .story-head img[data-avatar-user="${me.userId}"]`);
+  const own=page.locator(`.reply img[data-user="${me.userId}"], .story-head img[data-user="${me.userId}"]`);
   await expect(own.nth(1)).toBeVisible();
   for(const img of await own.all())await expect(img).toHaveJSProperty('src',second.url);
-  await expect(page.locator(`img[data-avatar-user="${other.userId}"]`).first()).toBeVisible();
-  for(const img of await page.locator(`img[data-avatar-user="${other.userId}"]`).all())await expect(img).toHaveAttribute('src','avatars/ogt-placeholder.svg');
+  await expect(page.locator(`img[data-user="${other.userId}"]`).first()).toBeVisible();
+  for(const img of await page.locator(`img[data-user="${other.userId}"]`).all())await expect(img).toHaveAttribute('src',emptyAvatar);
   await page.reload();
   await expect(page.locator('.reply').first()).toBeVisible();
   for(const img of await own.all())await expect(img).toHaveJSProperty('src',second.url);

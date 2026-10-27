@@ -22,6 +22,9 @@ class RestStoriesRepository(private val client: HttpClient, private val session:
     }
     suspend fun list(cursor: String? = null): StoryPage = post("list",buildJsonObject { cursor?.let { put("cursor",it) } })
     suspend fun seen(id: String): String = post("seen",buildJsonObject { put("storyId",id) })
+    suspend fun report(id:String,reason:String,details:String?):String = post("report",buildJsonObject {
+        put("storyId",id);put("reason",reason);details?.let { put("details",it) }
+    })
     suspend fun remove(id: String): String = post("remove",buildJsonObject { put("storyId",id) })
     @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
     suspend fun publish(draft: StoryDraft, bytes: ByteArray, poster: ByteArray?): Story = post("publish",buildJsonObject {

@@ -337,7 +337,7 @@ fun SettingsScreen(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OgtCaption(
-                        "Se borra esta cuenta y lo que publicaste con ella: avisos, comentarios y el resto del contenido cuyo autor sos vos. No queda visible ni a nombre de otra persona. No se borra la copia que otro vecino ya tenga en su chat o en una exportación, un resguardo técnico corto, ni lo que haya que conservar por un reclamo o un pedido de autoridad. Esos restos no se reutilizan. El ingreso de Firebase sigue existiendo hasta que lo borres en Google.",
+                        "Se borra esta cuenta y lo que publicaste con ella: avisos, comentarios y el resto del contenido cuyo autor sos vos. No queda visible ni a nombre de otra persona. No se borra la copia que otro vecino ya tenga en su chat o en una exportación, un resguardo técnico corto, ni lo que haya que conservar por un reclamo o un pedido de autoridad. Esos restos no se reutilizan. También se elimina tu acceso a OGT. Si hay una interrupción, el proceso continúa automáticamente.",
                     )
                     OutlinedTextField(
                         value = confirmText,

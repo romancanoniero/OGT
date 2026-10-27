@@ -17,7 +17,7 @@ class IdentityStore(private val db: Database) {
             stmt.setString(1, com.onlygoodthings.backend.crm.crmFirebaseTombstoneHash(verified.firebaseUid))
             stmt.executeQuery().use { rs -> rs.next(); rs.getBoolean(1) }
         }
-        check(!erased) { "Cuenta eliminada administrativamente" }
+        check(!erased) { "Cuenta eliminada" }
 
         val existing = connection.prepareStatement(
             "SELECT id, firebase_uid, display_name, photo_url, role, community_points, invite_code FROM users WHERE firebase_uid = ?",
@@ -182,40 +182,9 @@ class IdentityStore(private val db: Database) {
      * (los posts no pueden quedar con autor nulo) y las entregas de estacionamiento
      * que no tienen ON DELETE. El resto cae por cascada o queda anonimizado.
      */
-    fun eraseAccount(userId: String) {
-        db.withConnection { connection ->
-            val previous = connection.autoCommit
-            connection.autoCommit = false
-            try {
-                connection.prepareStatement(
-                    "DELETE FROM parking_handoffs WHERE owner_user_id = ?::uuid OR claimant_user_id = ?::uuid",
-                ).use { stmt ->
-                    stmt.setString(1, userId)
-                    stmt.setString(2, userId)
-                    stmt.executeUpdate()
-                }
-                connection.prepareStatement(
-                    "DELETE FROM social_posts WHERE author_user_id = ?::uuid",
-                ).use { stmt ->
-                    stmt.setString(1, userId)
-                    stmt.executeUpdate()
-                }
-                val deleted = connection.prepareStatement(
-                    "DELETE FROM users WHERE id = ?::uuid",
-                ).use { stmt ->
-                    stmt.setString(1, userId)
-                    stmt.executeUpdate()
-                }
-                if (deleted != 1) error("No se pudo dar de baja la cuenta")
-                connection.commit()
-            } catch (failure: Exception) {
-                connection.rollback()
-                throw failure
-            } finally {
-                connection.autoCommit = previous
-            }
-        }
-    }
+    fun eraseAccount(userId: String):List<String> = com.onlygoodthings.backend.crm.crmModerateUsers(
+        db,userId,listOf(userId),"DELETE","Solicitud de baja del titular",selfDelete=true,
+    ).removedPosts
 
     private fun textRows(connection: Connection, sql: String, userId: String): List<AccountTextRow> =
         connection.prepareStatement(sql).use { stmt ->

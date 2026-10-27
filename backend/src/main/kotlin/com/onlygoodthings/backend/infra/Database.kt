@@ -5,7 +5,7 @@ import com.zaxxer.hikari.HikariDataSource
 import java.sql.Connection
 import java.sql.ResultSet
 
-class Database(jdbcUrl: String, user: String, password: String) {
+class Database(jdbcUrl: String, user: String, password: String):AutoCloseable {
     private val dataSource = HikariDataSource(
         HikariConfig().apply {
             this.jdbcUrl = jdbcUrl
@@ -16,6 +16,8 @@ class Database(jdbcUrl: String, user: String, password: String) {
             addDataSourceProperty("reWriteBatchedInserts", "true")
         },
     )
+
+    override fun close() { dataSource.close() }
 
     fun <T> withConnection(block: (Connection) -> T): T =
         dataSource.connection.use(block)

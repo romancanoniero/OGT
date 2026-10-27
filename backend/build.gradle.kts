@@ -47,5 +47,15 @@ dependencies {
 }
 
 tasks.test {
-    useJUnitPlatform()
+    useJUnitPlatform { excludeTags("integration") }
+}
+
+val sourceSets=the<SourceSetContainer>()
+tasks.register<Test>("accountErasureIntegrationTest") {
+    group="verification"
+    description="Checks durable deletion retries and concurrency against a dedicated local QA database."
+    testClassesDirs=sourceSets["test"].output.classesDirs
+    classpath=sourceSets["test"].runtimeClasspath
+    useJUnitPlatform { includeTags("integration") }
+    shouldRunAfter(tasks.test)
 }

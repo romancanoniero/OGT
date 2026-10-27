@@ -2329,7 +2329,7 @@ async function renderInicio() {
     await loadFeed(feedType);
     paintFeedList();
     const rail=document.getElementById("ephemeral-stories");
-    if(rail) import('./ephemeral-stories.js?v=2').then(({mountStories})=>{if(rail.isConnected)disposeStories=mountStories(rail,api);}).catch(()=>{if(rail.isConnected)rail.textContent='No pudimos cargar las historias.';});
+    if(rail) import('./ephemeral-stories.js?v=2').then(({mountStories})=>{if(rail.isConnected)disposeStories=mountStories(rail,api,{ownerId:me.userId});}).catch(()=>{if(rail.isConnected)rail.textContent='No pudimos cargar las historias.';});
   } catch (e) {
     const box = document.getElementById("feed-list");
     if (box) box.innerHTML = `<p class="err">${escapeHtml(e.message)}. ¿El API está en ${API}?</p>`;

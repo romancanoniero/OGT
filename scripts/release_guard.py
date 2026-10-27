@@ -22,6 +22,10 @@ REQUIRED = (
     "database/migrations/25_post_media_original.sql",
     "database/migrations/26_crm_publication_index.sql",
     "database/migrations/28_crm_user_moderation.sql",
+    "database/migrations/29_stories.sql", "database/migrations/30_story_frame.sql",
+    "database/migrations/31_account_erasure.sql",
+    "web-app/ephemeral-stories.js", "web-app/story-frame.js", "web-app/story-playback.js",
+    "web-app/crm/crm-stories.js",
 )
 
 

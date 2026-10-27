@@ -2,7 +2,7 @@ import {createStoryMediaCache,storyBookProgress,storyDuration} from './story-pla
 import { createStoryViewport } from './story-frame.js?v=2';
 
 /** Read-only stories UI with an account/session-private media cache. */
-export function mountStories(root, api) {
+export function mountStories(root, api, {ownerId=null}={}) {
   let rows=[], active=null, activeId=null, disposed=false, lastRefresh=0,openingVersion=0;
   const cache=createStoryMediaCache();
   root.setAttribute('aria-label','Historias de la comunidad');
@@ -37,12 +37,32 @@ export function mountStories(root, api) {
     let index=queue.findIndex(s=>s.id===id);if(index<0){refresh();return;}
     const dialog=document.createElement('dialog');dialog.className='ephemeral-story-dialog';dialog.setAttribute('aria-label','Historias');
     let cleanupMedia=()=>{},tick=0,elapsed=0,previous=0,paused=false,held=false,ready=false,failed=false;
-    let row,media,progress,time,viewport,turnCleanup=()=>{},showVersion=0,turning=false;
-    const close=()=>dialog.close();
+    let row,media,progress,time,viewport,reportDialog=null,turnCleanup=()=>{},showVersion=0,turning=false;
+    const close=()=>{reportDialog?.close();dialog.close();};
     const visibility=()=>{if(document.hidden){if(media?.pause)media.pause();}else if(!paused && !held && !turning && media?.play)media.play().catch(()=>{paused=true;});previous=performance.now();};
     const key=e=>{if(e.key==='ArrowRight'){e.preventDefault();next();}else if(e.key==='ArrowLeft'){e.preventDefault();show(index-1);} };
     const isPlaying=()=>!document.hidden && !paused && !held && !failed;
     function next(){show(index+1);}
+    function reportStory(){
+      const storyId=row.id, version=showVersion, wasPaused=paused;paused=true;media?.pause?.();
+      const panel=document.createElement('dialog');reportDialog=panel;panel.className='ephemeral-story-report';panel.setAttribute('aria-label','Denunciar historia');
+      const title=document.createElement('h2');title.textContent='Denunciar historia';
+      const form=document.createElement('form');const reasonLabel=document.createElement('label');reasonLabel.textContent='Motivo';
+      const reason=document.createElement('select');reason.setAttribute('aria-label','Motivo');
+      for(const [value,text] of [['OFF_TOPIC','No corresponde a la comunidad'],['FALSE','Información falsa'],['SCAM','Estafa o pedido de dinero'],['HARM','Acoso, contenido sexual o daño'],['OTHER','Otro motivo']]){const option=document.createElement('option');option.value=value;option.textContent=text;reason.append(option);}
+      reasonLabel.append(reason);
+      const detailsLabel=document.createElement('label');detailsLabel.textContent='Detalles opcionales';const details=document.createElement('textarea');details.maxLength=500;detailsLabel.append(details);
+      const status=document.createElement('p');status.setAttribute('role','alert');
+      const send=button('Enviar denuncia',()=>{});send.type='submit';const cancel=button('Cancelar',()=>panel.close());
+      form.append(reasonLabel,detailsLabel,status,send,cancel);panel.append(title,form);
+      form.addEventListener('submit',async event=>{
+        event.preventDefault();send.disabled=true;status.textContent='Enviando…';
+        try{await api('/api/v1/stories/report',{storyId,reason:reason.value,details:details.value.trim()||null});if(panel.isConnected){if(version===showVersion)time.textContent='Denuncia recibida. El equipo de moderación la revisará.';panel.close();}}
+        catch(error){if(panel.isConnected){status.textContent=error.message||'No se pudo enviar la denuncia. Reintentá.';send.disabled=false;}}
+      });
+      panel.addEventListener('close',()=>{panel.remove();if(reportDialog===panel)reportDialog=null;if(version===showVersion && dialog.open){paused=wasPaused;visibility();}},{once:true});
+      document.body.append(panel);panel.showModal();reason.focus();
+    }
     async function show(at){
       if(at>=queue.length){close();return;}if(at<0)return;
       const version=++showVersion;
@@ -66,6 +86,7 @@ export function mountStories(root, api) {
       const controls=document.createElement('div');controls.className='ephemeral-story-controls';
       const pause=button('Pausar',()=>{paused=!paused;pause.textContent=paused?'Reproducir':'Pausar';visibility();if(paused && media.pause)media.pause();});
       controls.append(button('Anterior',()=>show(index-1)),...(row.kind==='VIDEO'?[]:[pause]),button('Siguiente',next));
+      if(row.authorId!==ownerId)controls.append(button('Denunciar historia',reportStory));
       const footer=document.createElement('footer');footer.append(caption,time,...(built.controls?[built.controls]:[]),controls);
       dialog.replaceChildren(built.viewport,head,progress,footer);
       turning=!!oldViewport;
@@ -103,7 +124,7 @@ export function mountStories(root, api) {
       };tick=requestAnimationFrame(advance);
     }
     document.addEventListener('visibilitychange',visibility);dialog.addEventListener('keydown',key);
-    dialog.addEventListener('close',()=>{showVersion++;turnCleanup();cleanupMedia();cancelAnimationFrame(tick);document.removeEventListener('visibilitychange',visibility);window.removeEventListener('hashchange',close);dialog.remove();if(active===close){active=null;activeId=null;}refresh();},{once:true});
+    dialog.addEventListener('close',()=>{showVersion++;reportDialog?.close();turnCleanup();cleanupMedia();cancelAnimationFrame(tick);document.removeEventListener('visibilitychange',visibility);window.removeEventListener('hashchange',close);dialog.remove();if(active===close){active=null;activeId=null;}refresh();},{once:true});
     window.addEventListener('hashchange',close,{once:true});document.body.append(dialog);dialog.showModal();show(index);dialog.querySelector('button')?.focus();active=close;
   }
   const poll=setInterval(()=>{if(!root.isConnected){dispose();return;}if(!document.hidden && Date.now()-lastRefresh>30000)refresh();},10000);

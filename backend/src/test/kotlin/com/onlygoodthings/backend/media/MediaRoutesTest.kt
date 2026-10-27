@@ -68,4 +68,21 @@ class MediaRoutesTest {
         }
         assertEquals(HttpStatusCode.NotFound, client.get("/media/u/not-found.jpg").status)
     }
+    @Test fun `revocation and cleanup racing a read return not found rather than an error`() = testApplication {
+        val store=MediaStore(root,"http://localhost")
+        val original=javaClass.getResourceAsStream("/images/rotated.jpg")!!.use { it.readBytes() }
+        val revoked=store.save(original,"portrait.jpg","image/jpeg")
+        val racing=store.save(original,"portrait.jpg","image/jpeg")
+        environment { config=MapApplicationConfig() }
+        application {
+            routing { publicMediaRoutes(store) { name ->
+                if(name==racing.filename)store.deleteLocal(racing.url)
+                name!=revoked.filename
+            } }
+        }
+        assertEquals(HttpStatusCode.NotFound,client.get("/media/u/${revoked.filename}").status)
+        assertNotNull(store.resolvePublic(revoked.filename))
+        assertEquals(HttpStatusCode.NotFound,client.get("/media/u/${racing.filename}").status)
+    }
+
 }

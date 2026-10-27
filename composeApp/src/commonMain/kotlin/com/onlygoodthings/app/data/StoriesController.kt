@@ -173,6 +173,10 @@ class StoriesController(private val session: SessionStore, private val prefs: Au
             catch(_:Exception) { /* Leave unread so the next viewing retries. */ }
         }
     }
+    suspend fun report(id:String,reason:String,details:String?) {
+        val user=owner;val version=generation
+        accountApi(user,version).report(id,reason,details)
+    }
     fun remove(id: String) {
         val user=owner
         val version=generation

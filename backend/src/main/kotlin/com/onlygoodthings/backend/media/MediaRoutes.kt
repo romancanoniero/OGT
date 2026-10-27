@@ -21,19 +21,24 @@ import java.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-fun Route.publicMediaRoutes(store: MediaStore) {
+fun Route.publicMediaRoutes(store: MediaStore,available:(String)->Boolean={true}) {
     get("/media/u/{name}") {
         val name = call.parameters["name"].orEmpty()
         val file = store.resolvePublic(name)
             ?: return@get call.respond(HttpStatusCode.NotFound, ApiResponse.fail<Unit>("Archivo inexistente", "NOT_FOUND"))
-        call.response.header(HttpHeaders.CacheControl, "public, max-age=31536000, immutable")
-        call.respondBytes(Files.readAllBytes(file), ContentType.parse(store.contentTypeOf(name)))
+        val bytes=withContext(Dispatchers.IO) {
+            if(!available(name)) null
+            else try { Files.readAllBytes(file) } catch (_: java.nio.file.NoSuchFileException) { null }
+        }
+            ?: return@get call.respond(HttpStatusCode.NotFound)
+        call.response.header(HttpHeaders.CacheControl, "public, max-age=300, must-revalidate")
+        call.respondBytes(bytes, ContentType.parse(store.contentTypeOf(name)))
     }
 }
 
-fun Route.mediaRoutes(store: MediaStore) {
+fun Route.mediaRoutes(store: MediaStore,onUploaded:(String,String)->Unit={_,_->}) {
     post("/api/v1/media/upload") {
-        call.principal<AuthPrincipal>() ?: return@post call.respond(
+        val principal=call.principal<AuthPrincipal>() ?: return@post call.respond(
             HttpStatusCode.Unauthorized,
             ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
         )
@@ -48,7 +53,11 @@ fun Route.mediaRoutes(store: MediaStore) {
         val bytes = runCatching { Base64.getDecoder().decode(raw) }.getOrElse {
             return@post call.respond(HttpStatusCode.BadRequest, ApiResponse.fail<Unit>("bytesBase64 inválido", "BAD_REQUEST"))
         }
-        val saved = withContext(Dispatchers.IO) { store.save(bytes, filename, contentType) }
+        val saved = withContext(Dispatchers.IO) {
+            val uploaded=store.save(bytes, filename, contentType)
+            try { onUploaded(principal.userId,uploaded.filename);uploaded }
+            catch(error:Exception) { store.deleteLocal(uploaded.url);throw error }
+        }
         call.respond(ApiResponse.ok(saved, "Archivo listo, como una foto subida"))
     }
 }

@@ -255,8 +255,11 @@ private fun StoryPlayer(controller: StoriesController,story: Story,foreground:Bo
     var elapsed by remember(story.id) { mutableStateOf(0L) }
     var failure by remember(story.id) { mutableStateOf<String?>(null) }
     var retry by remember(story.id) { mutableStateOf(0) }
+    var reporting by remember(story.id) { mutableStateOf(false) }
+    var reportSending by remember(story.id) { mutableStateOf(false) }
+    var reportMessage by remember(story.id) { mutableStateOf<String?>(null) }
     var remove by remember(story.id) { mutableStateOf(false) }
-    val playing=foreground && !hold && !remove && failure==null && outgoing==null
+    val playing=foreground && !hold && !remove && !reporting && !reportSending && failure==null && outgoing==null
     LaunchedEffect(story.id,retry) {
         try {
             val previous=visual
@@ -344,6 +347,8 @@ private fun StoryPlayer(controller: StoriesController,story: Story,foreground:Bo
             }
             Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha=.45f)).padding(16.dp)) {
                 Text(story.caption,color=Color.White)
+                if(story.authorId!=owner) TextButton(onClick={reporting=true},enabled=!reportSending) { Text(if(reportSending) "Enviando denuncia…" else "Denunciar historia",color=Color.White) }
+                reportMessage?.let { Text(it,color=Color.White,fontSize=13.sp) }
                 if(story.authorId==owner) {
                     Text("${story.viewCount} vistas",color=Color.White,fontSize=12.sp)
                     TextButton(onClick={remove=true}) { Text("Eliminar historia",color=Color.White) }
@@ -355,5 +360,14 @@ private fun StoryPlayer(controller: StoriesController,story: Story,foreground:Bo
             }
         }
     }
+    if(reporting) com.onlygoodthings.app.ui.components.PostReportSheet(onDismiss={reporting=false},onSubmit={reason,details ->
+        reporting=false;reportSending=true;reportMessage=null
+        scope.launch {
+            try { controller.report(story.id,reason,details);reportMessage="Denuncia recibida. El equipo de moderación la revisará." }
+            catch(cancel:CancellationException) { throw cancel }
+            catch(error:Exception) { reportMessage=error.message ?: "No se pudo enviar la denuncia. Volvé a intentarlo." }
+            finally { reportSending=false }
+        }
+    })
     if(remove) AlertDialog(onDismissRequest={remove=false},title={Text("¿Eliminar esta historia?")},text={Text("Dejará de estar disponible para todas las personas.")},confirmButton={TextButton(onClick={controller.remove(story.id);remove=false}) { Text("Eliminar") }},dismissButton={TextButton(onClick={remove=false}) { Text("Cancelar") }})
 }

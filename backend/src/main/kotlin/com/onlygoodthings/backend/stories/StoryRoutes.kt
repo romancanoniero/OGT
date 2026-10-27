@@ -49,6 +49,12 @@ fun Route.storyRoutes(repository: StorySqlRepository, hub: RealtimeHub) {
         repository.markSeen(JsonBody.receiveMap(call).reqString("storyId"),viewer.userId)
         call.respond(ApiResponse.ok("ok"))
     }
+    post("/api/v1/stories/report") {
+        val viewer=call.principal<AuthPrincipal>() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+        val body=JsonBody.receiveMap(call)
+        withContext(Dispatchers.IO) { repository.report(body.reqString("storyId"),viewer.userId,body.reqString("reason"),body.optString("details")?.trim()?.takeIf { it.isNotEmpty() }) }
+        call.respond(ApiResponse.ok("ok","Denuncia recibida. El equipo de moderación la revisará."))
+    }
     post("/api/v1/stories/remove") {
         val viewer=call.principal<AuthPrincipal>() ?: return@post call.respond(HttpStatusCode.Unauthorized)
         repository.remove(JsonBody.receiveMap(call).reqString("storyId"),viewer.userId)

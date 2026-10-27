@@ -31,7 +31,18 @@ fun Route.crmStoryRoutes(db: Database, verifier: FirebaseTokenVerifier, reposito
     post("/api/v1/crm/platform/stories/search") {
         val auth=authorized(call) ?: return@post
         val data=JsonBody.receiveMap(call)
-        call.respond(ApiResponse.ok(repository.list(auth.userId,data.optString("cursor"),true,data.optString("query").orEmpty())))
+        val page=repository.list(auth.userId,data.optString("cursor"),true,data.optString("query").orEmpty())
+        call.respond(ApiResponse.ok(CrmStorySearchPage(page.stories,page.serverNowEpochMs,page.nextCursor,repository.reportCounts(page.stories.map { it.id }))))
+    }
+    post("/api/v1/crm/platform/stories/reports") {
+        authorized(call) ?: return@post
+        call.respond(ApiResponse.ok(repository.reports(JsonBody.receiveMap(call).reqString("storyId"))))
+    }
+    post("/api/v1/crm/platform/stories/reports/dismiss") {
+        val auth=authorized(call) ?: return@post
+        val body=JsonBody.receiveMap(call)
+        repository.dismissReports(body.reqString("storyId"),auth.userId,body.reqString("reason"))
+        call.respond(ApiResponse.ok("ok"))
     }
     post("/api/v1/crm/platform/stories/remove") {
         val auth=authorized(call) ?: return@post
@@ -43,3 +54,6 @@ fun Route.crmStoryRoutes(db: Database, verifier: FirebaseTokenVerifier, reposito
         call.respond(ApiResponse.ok("ok"))
     }
 }
+
+@kotlinx.serialization.Serializable
+private data class CrmStorySearchPage(val stories:List<com.onlygoodthings.shared.domain.Story>,val serverNowEpochMs:Long,val nextCursor:String?,val reportCounts:Map<String,Int>)

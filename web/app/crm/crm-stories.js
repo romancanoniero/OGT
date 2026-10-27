@@ -5,17 +5,17 @@ export function createStoryListing(api, token, signal, canManage, message) {
   const state = row => ({ VISIBLE: 'Visible', EXPIRED: 'Vencida', REMOVED: 'Retirada' })[row.status] || row.status;
   return {
     placeholder: 'Autor, texto o id de historia', searchLabel: 'Buscar historia',
-    columns: ['Vista previa', 'Autor', 'Texto', 'Vence', 'Estado', 'Acción'],
+    columns: ['Vista previa', 'Autor', 'Texto', 'Vence', 'Denuncias', 'Estado', 'Acción'],
     emptyTitle: canManage ? 'Sin historias' : 'Sin acceso', emptyDetail: 'No hay historias disponibles que coincidan con la búsqueda.',
     async load(query, cursor) {
       if (!canManage) return { items: [], nextCursor: null };
       const page = await api('platform/stories/search', token, { query, cursor }, signal);
-      return { items: page.stories || [], nextCursor: page.nextCursor || null };
+      return { items: (page.stories || []).map(row=>({...row,reportCount:page.reportCounts?.[row.id]||0})), nextCursor: page.nextCursor || null };
     },
     present(row) {
       const image = row.posterUrl || (row.kind === 'IMAGE' ? row.mediaUrl : '');
       return { key: row.id, cells: [image ? { image } : { text: 'Video' }, { text: row.authorName }, { text: row.caption, clamp: true },
-        { text: when(row.expiresAtEpochMs) }, { badge: state(row), tone: row.status === 'VISIBLE' ? 'calm' : 'muted' }],
+        { text: when(row.expiresAtEpochMs) }, { text: String(row.reportCount||0) }, { badge: state(row), tone: row.status === 'VISIBLE' ? 'calm' : 'muted' }],
         actions: [{ icon: 'qs_anecdote.svg', label: 'Ver historia', name: 'open' }] };
     },
     async open(row, changed) {
@@ -31,6 +31,23 @@ export function createStoryListing(api, token, signal, canManage, message) {
       const failure = node('p'); failure.setAttribute('role', 'status');
       media.addEventListener('error', () => { failure.textContent = 'El archivo ya no está disponible. Cerrá y volvé a abrir la historia para renovar el acceso.'; });
       dialog.append(heading, close, metadata, viewport, ...(controls?[controls]:[]), node('p', row.caption), failure);
+      const reportSection=node('section');reportSection.setAttribute('aria-label','Denuncias de la historia');
+      reportSection.append(node('h3','Denuncias'));
+      let reports=[], reportsLoaded=false;
+      try {reports=await api('platform/stories/reports',token,{storyId:row.id},signal);reportsLoaded=true;}
+      catch(error){reportSection.append(node('p',error.message||'No se pudieron cargar las denuncias'));}
+      for(const report of reports){
+        const item=node('p');item.textContent=`${when(report.createdAtEpochMs)} · ${report.reasonLabel||"Otro motivo"} · ${report.status==='PENDING_REVIEW'?'Pendiente':report.status==='REMOVED'?'Resuelta con retirada':'Revisada'}${report.details?' · '+report.details:''}`;reportSection.append(item);
+      }
+      if(reportsLoaded && !reports.length)reportSection.append(node('p','Sin denuncias registradas.'));
+      dialog.append(reportSection);
+      if (reports.some(report=>report.status==='PENDING_REVIEW') && canManage) {
+        const label=node('label','Motivo para descartar las denuncias');const reason=node('textarea');reason.className='crm-input';reason.maxLength=500;label.append(reason);
+        const dismiss=node('button','Descartar denuncias y conservar historia');dismiss.className='crm-btn';dismiss.disabled=true;
+        reason.addEventListener('input',()=>{dismiss.disabled=reason.value.trim().length<3;});
+        dismiss.addEventListener('click',async()=>{dismiss.disabled=true;try{await api('platform/stories/reports/dismiss',token,{storyId:row.id,reason:reason.value.trim()},signal);message('Denuncias revisadas. La historia conserva su estado.','ok');dialog.close();await changed();}catch(error){failure.textContent=error.message;dismiss.disabled=false;}});
+        dialog.append(label,dismiss);
+      }
       if (row.status === 'VISIBLE' && canManage) {
         const label = node('label', 'Motivo de la retirada');
         const reason = node('textarea'); reason.className = 'crm-input'; reason.maxLength = 500; label.append(reason);
