@@ -16,10 +16,14 @@ el registro histórico: no reemplazan la evidencia de la revisión actual.
 - iOS: compilación firmada para dispositivo, `build/launch-final-ios-device.log`.
 - Android: AAB release firmado en `composeApp/build/outputs/bundle/release/`;
   firma verificada. Estos resultados no significan subida a las tiendas ni deploy.
-- Mercado Pago: cuenta de prueba verificada y checkout sandbox creado sin pago.
-  Reintentos, duplicados, devoluciones y deuda se prueban contra un proveedor
-  controlado en las pruebas SQL. El pago real del sandbox y la entrega de
-  una notificación firmada por Mercado Pago todavía requieren aceptación.
+- Mercado Pago: comprador y receptor de prueba verificados. En el navegador
+  integrado se aprobó un pago ficticio de ARS 1.000 y se acreditó una sola vez.
+  Su devolución se confirmó con el proveedor y se reflejó automáticamente en
+  OGT: un crédito, una reversión, saldo y deuda cero, conciliación consistente.
+  Se recibieron notificaciones firmadas válidas. Los fondos y permisos de la
+  empresa preexistente permanecieron iguales. Los cobros reales siguen
+  deshabilitados; la aceptación específica de contracargos del proveedor sigue
+  pendiente, aunque sus transiciones se comprueban en SQL.
 - Apple: proveedor configurado; compilaciones y pruebas de contrato aprobadas.
   Ingreso, vinculación, reingreso y baja con una cuenta Apple real pendientes.
 
@@ -104,6 +108,16 @@ SQL comprueba una sola acreditación ante reintentos, compradores no admitidos,
 receptores o importes diferentes y una devolución posterior. Pasaron 62 pruebas
 de backend y 9 de negocio con esquema completo en una base nueva; registros
 `build/mp-sandbox-compat-{unit,database}-20261028.log`.
+
+Tras publicar la corrección se reprogramó únicamente el trabajo de la notificación
+firmada que había quedado rechazado por la señal de entorno. El proceso normal
+volvió a consultar el pago a Mercado Pago; no se editaron saldos ni el estado del
+pedido. La UI mostró ARS 1.000 acreditados y un solo asiento. La devolución total
+del mismo pago ficticio usó una clave de idempotencia persistida; una nueva
+notificación del proveedor provocó su reversión automática, sin reprogramación
+manual. Se comprobaron tres notificaciones firmadas aceptadas en la versión
+corregida y el rechazo de avisos sin firma válida o ajenos al contrato. Evidencia:
+`build/mp-sandbox-e2e-20261028.json`, capturas y recibos privados del ensayo.
 
 ## Cómo repetir las comprobaciones actuales
 
