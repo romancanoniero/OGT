@@ -34,6 +34,7 @@ export function createIdentity(sdk, auth, makeRecaptcha) {
     signInGoogle() {
       const provider = new sdk.GoogleAuthProvider();
       provider.addScope('email');
+      provider.setCustomParameters({ prompt: 'select_account' });
       return authenticate(() => sdk.signInWithPopup(auth, provider));
     },
     register(email, password) {
@@ -43,7 +44,9 @@ export function createIdentity(sdk, auth, makeRecaptcha) {
       const user = auth.currentUser;
       if (!user) throw new CrmError('Iniciá sesión primero.', 'UNAUTHENTICATED');
       const uid = user.uid;
-      const result = await sdk.linkWithPopup(user, new sdk.GoogleAuthProvider());
+      const provider = new sdk.GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const result = await sdk.linkWithPopup(user, provider);
       if (result.user.uid !== uid) throw new CrmError('La vinculación cambió la identidad.', 'ACCOUNT_MISMATCH');
       return result.user;
     },

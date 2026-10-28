@@ -48,14 +48,15 @@ test('unsupported and out-of-range factors are rejected', async () => { const f 
 test('normal credential failure does not start MFA or invent identity', async () => { const f = fixture('totp', { signInWithEmailAndPassword: async () => { throw { code: 'auth/invalid-credential' }; } }); await assert.rejects(f.identity.signIn('email','password'), { code: 'auth/invalid-credential' }); await assert.rejects(f.identity.beginFactor(0), { code: 'INVALID_FACTOR' }); });
 test('sign out clears Firebase identity and MFA state', async () => { const f = fixture(); await f.identity.signIn('email','password'); await f.identity.beginFactor(0); await f.identity.signOut(); assert.equal(f.identity.currentUser(), null); assert.throws(() => f.identity.token(), { code: 'UNAUTHENTICATED' }); await assert.rejects(f.identity.verify('123456'), { code: 'INVALID_CODE' }); });
 
-test('Google sign-in uses Firebase popup and the same MFA resolver', async () => {
+test('Google sign-in requests an account choice and keeps the same MFA resolver', async () => {
   let popupCalls = 0;
-  class GoogleAuthProvider { addScope(scope) { assert.equal(scope, 'email'); } }
+  class GoogleAuthProvider { addScope(scope) { assert.equal(scope, 'email'); } setCustomParameters(parameters){this.parameters=parameters;} }
   const f = fixture('totp', {
     GoogleAuthProvider,
     signInWithPopup: async (auth, provider) => {
       popupCalls++;
       assert.ok(provider instanceof GoogleAuthProvider);
+      assert.deepEqual(provider.parameters,{prompt:'select_account'});
       throw { code: 'auth/multi-factor-auth-required' };
     },
   });
@@ -80,7 +81,7 @@ test('email registration creates Firebase identity, never grants platform privil
 });
 test('linking Google and email password preserves exact Firebase UID', async () => {
   let linked = 0;
-  class GoogleAuthProvider {}
+  class GoogleAuthProvider {setCustomParameters(parameters){this.parameters=parameters;}}
   const f = fixture('totp', {
     GoogleAuthProvider,
     EmailAuthProvider: { credential: (email, password) => ({ email, password }) },
@@ -88,6 +89,7 @@ test('linking Google and email password preserves exact Firebase UID', async () 
       linked++;
       assert.equal(user.uid, 'test');
       assert.ok(provider instanceof GoogleAuthProvider);
+      assert.deepEqual(provider.parameters,{prompt:'select_account'});
       return { user };
     },
     linkWithCredential: async (user, credential) => {
@@ -105,10 +107,20 @@ test('linking Google and email password preserves exact Firebase UID', async () 
 });
 test('Google link rejects an unexpected changed identity', async () => {
   const f = fixture('totp', {
-    GoogleAuthProvider: class {},
+    GoogleAuthProvider: class {setCustomParameters(){}},
     linkWithPopup: async () => ({ user: { uid: 'other-uid' } }),
   });
   await assert.rejects(f.identity.linkGoogle(), { code: 'ACCOUNT_MISMATCH' });
+});
+test('cancelling the Google account chooser preserves the existing identity',async()=>{
+  const f=fixture('totp',{
+    GoogleAuthProvider:class {addScope(){} setCustomParameters(parameters){assert.deepEqual(parameters,{prompt:'select_account'});}},
+    signInWithPopup:async()=>{throw {code:'auth/popup-closed-by-user'};},
+    signOut:async()=>assert.fail('Choosing an account must not clear the existing session'),
+  });
+  const original=f.identity.currentUser();
+  await assert.rejects(f.identity.signInGoogle(),{code:'auth/popup-closed-by-user'});
+  assert.equal(f.identity.currentUser(),original);
 });
 test('TOTP enrollment needs verified email and checks the code with Firebase', async () => {
   let enrollment = null;

@@ -64,6 +64,17 @@ test('requests obtain the refreshed Firebase token and logout clears it', async 
   assert.equal(api.token(), '');
   assert.equal(await api.ensureSession(), false);
 });
+test('Google account choice opens the session with the chosen account credential',async()=>{
+  class GoogleAuthProvider {
+    addScope(scope){assert.equal(scope,'email');}
+    setCustomParameters(parameters){this.parameters=Object.fromEntries(Object.entries(parameters));}
+  }
+  const selected={uid:'qa-selected-google',getIdToken:async force=>{assert.equal(force,true);return 'selected.google.jwt';}};
+  const {api,calls}=setup({firebaseAuth:{GoogleAuthProvider},popupImpl:async provider=>{
+    assert.deepEqual(provider.parameters,{prompt:'select_account'});return {user:selected};
+  }});
+  await api.signInGoogle();assert.deepEqual(calls,[{token:'selected.google.jwt'}]);
+});
 
 test('el segundo factor TOTP no deja el mensaje de Firebase en inglés', async () => {
   const hint = { factorId: 'totp', uid: 'factor-1', displayName: 'Aplicación autenticadora' };
@@ -85,7 +96,7 @@ test('el segundo factor TOTP no deja el mensaje de Firebase en inglés', async (
     popupImpl: async () => { throw mfaError; },
     firebaseAuth: {
       TotpMultiFactorGenerator: { assertionForSignIn: (id, code) => ({ totp: { id, code } }) },
-      GoogleAuthProvider: function GoogleAuthProvider() { this.addScope = () => {}; },
+      GoogleAuthProvider: function GoogleAuthProvider() { this.addScope = () => {}; this.setCustomParameters = parameters => assert.deepEqual(Object.fromEntries(Object.entries(parameters)),{prompt:'select_account'}); },
     },
   });
   await assert.rejects(api.signInEmail('qa@example.test', 'password'), (err) => {

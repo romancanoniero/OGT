@@ -285,6 +285,7 @@
       return wrap(async () => {
         const provider = new firebase.auth.GoogleAuthProvider();
         provider.addScope("email");
+        provider.setCustomParameters({ prompt: 'select_account' });
         const cred = await auth().signInWithPopup(provider);
         await openSession(cred.user);
       });

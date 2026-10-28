@@ -46,6 +46,17 @@ sola cuenta de Control habilitada para revisar. No se creó un permiso empresari
 para completar el ensayo. La baja con Apple sigue pendiente de una identidad de
 prueba que permita verificarla sin borrar la cuenta habitual.
 
+## Selección de cuenta Google (28/10/2026)
+
+La web y ambos CRM solicitan `prompt=select_account` al ingresar con Google.
+La vinculación de Google también muestra el selector y conserva la comprobación
+del UID. Se mantienen los scopes previos, MFA y el tratamiento de cancelación;
+no se cierran las sesiones de Google para cambiar de cuenta. Pasaron 101 pruebas
+Node y los cuatro recorridos de acceso en Chromium/WebKit. El primer arranque
+frío del navegador superó el tiempo global del ensayo; la repetición conservó
+las mismas aserciones y terminó en 9,6 segundos. La verificación del selector
+real se realiza después de publicar el candidato privado.
+
 ## Cómo repetir las comprobaciones actuales
 
 Conservar las credenciales fuera de Git y usar exclusivamente el entorno aislado
