@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {readFile,writeFile} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
 const base='http://127.0.0.1:19083',checks=[];
 async function account(name){
  const email=`qa-block-${name}-${randomUUID()}@example.test`;
@@ -12,6 +13,15 @@ async function account(name){
  return {token,request,api,email,id:me.id};
 }
 const a=await account('A'),b=await account('B'),c=await account('C');
+const removedLabel='Encuadernación QA '+Date.now();
+const removedNeed=(await a.api('timebank/need',{label:removedLabel,note:'Pedido retirado por moderación de prueba'})).mine[0];
+assert.match(removedNeed.postId,/^[0-9a-f-]{36}$/);
+execFileSync('docker',['exec','-i','ogt-qa-postgres-1','psql','-X','-qAt','-v','ON_ERROR_STOP=1','-U','ogt','-d','onlygoodthings'],{input:`UPDATE social_posts SET moderation_status='REMOVED' WHERE id='${removedNeed.postId}';`,encoding:'utf8'});
+assert.ok(!(await a.api('timebank/board')).mine.some(n=>n.needId===removedNeed.needId));
+const renewed=(await a.api('timebank/need',{label:removedLabel,note:'Nuevo pedido explícito después de la moderación'})).mine.find(n=>n.tag===removedNeed.tag);
+assert.ok(renewed&&renewed.needId!==removedNeed.needId&&renewed.postId!==removedNeed.postId);
+assert.deepEqual(await a.api('social/visibility',{postIds:[removedNeed.postId]}),[]);
+checks.push('an explicit fresh need works after moderation without reviving the removed publication');
 const bytes=(await readFile('backend/src/test/resources/images/transparent.webp')).toString('base64');
 const uploaded=await a.api('media/upload',{filename:'qa.webp',contentType:'image/webp',bytesBase64:bytes});
 const publish=(user,text)=>user.api('social/publish',{body:text,topic:'Comunidad',media:[{kind:'IMAGE',url:uploaded.url}]});

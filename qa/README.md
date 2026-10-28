@@ -12,7 +12,7 @@ el registro histórico: no reemplazan la evidencia de la revisión actual.
 - Cliente Android: 47 pruebas JVM portables y las **56 pruebas comunes dentro
   de Android**, incluyendo las de imagen, sesión y archivos que requieren SO real.
 - Node: 99; Python: 114. Sin fallos en estas ejecuciones.
-- API de historias: 13 grupos; bloqueo personal: 6; empresas: 5.
+- API de historias: 13 grupos; bloqueo personal: 7; empresas: 5.
 - iOS: compilación firmada para dispositivo, `build/launch-final-ios-device.log`.
 - Android: AAB release firmado en `composeApp/build/outputs/bundle/release/`;
   firma verificada. Estos resultados no significan subida a las tiendas ni deploy.

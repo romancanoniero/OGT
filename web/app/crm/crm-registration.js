@@ -8,7 +8,7 @@ function field(form,label,name,{multiline=false,required=true,max=160}={}){
 function button(text,primary=false){const e=node('button',text);e.type='button';e.className='crm-btn '+(primary?'crm-btn-primary':'crm-btn-secondary');return e;}
 /** New applicants complete the same real MFA gate, without acquiring a company grant. */
 export function mountCompanyApplication(root,{actorId,request,onAccess=()=>{}}){
-  const abort=new AbortController();root.className='crm-business';const content=node('div'),status=node('p');status.setAttribute('role','status');root.replaceChildren(status,content);
+  const abort=new AbortController(),originalClass=root.className;root.className='crm-business';const content=node('div'),status=node('p');status.setAttribute('role','status');root.replaceChildren(status,content);
   const call=(path,data={})=>request('csr/registration/'+path,data,abort.signal),alive=()=>!abort.signal.aborted&&root.isConnected;
   async function load(){
     status.textContent='Consultando tus solicitudes…';
@@ -44,11 +44,11 @@ export function mountCompanyApplication(root,{actorId,request,onAccess=()=>{}}){
       status.textContent='Solicitudes confirmadas por el servidor.';
     }catch(error){if(alive()){status.textContent=error.message;const retry=button('Reintentar');retry.addEventListener('click',()=>void load());status.append(retry);}}
   }
-  void load();return()=>abort.abort();
+  void load();return()=>{abort.abort();root.className=originalClass;};
 }
 /** Staff must make and justify the verification decision; no automatic approval. */
 export function mountCompanyReview(root,{actorId,request,companies,pendingCompanies}){
-  const abort=new AbortController();root.className='crm-business';const status=node('p'),content=node('div');status.setAttribute('role','status');root.replaceChildren(status,content);
+  const abort=new AbortController(),originalClass=root.className;root.className='crm-business';const status=node('p'),content=node('div');status.setAttribute('role','status');root.replaceChildren(status,content);
   const call=(path,data={})=>request('csr/registration/'+path,data,abort.signal),alive=()=>!abort.signal.aborted&&root.isConnected;
   async function load(){
     status.textContent='Cargando solicitudes…';
@@ -74,5 +74,5 @@ export function mountCompanyReview(root,{actorId,request,companies,pendingCompan
       status.textContent='Solicitudes pendientes confirmadas por el servidor.';
     }catch(error){if(alive()){status.textContent=error.message;const retry=button('Reintentar');retry.addEventListener('click',()=>void load());status.append(retry);}}
   }
-  void load();return()=>abort.abort();
+  void load();return()=>{abort.abort();root.className=originalClass;};
 }

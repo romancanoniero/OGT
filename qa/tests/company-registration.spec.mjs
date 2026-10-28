@@ -12,7 +12,7 @@ test('company applies through UI, stays unauthorized and gets access only after 
  async function mount(kind,bearer,actor){
   await page.goto('/crm/empresas/qa-registration.html');await page.evaluate(async({kind,bearer,actor})=>{
    const {createApi}=await import('/crm/crm-core.js'),{mountCompanyApplication,mountCompanyReview}=await import('/crm/crm-registration.js'),api=createApi(fetch.bind(window));
-   (kind==='applicant'?mountCompanyApplication:mountCompanyReview)(document.getElementById('root'),{actorId:actor,request:(path,data,signal)=>api(path,bearer,data,signal)});
+   window.qaRegistrationDispose=(kind==='applicant'?mountCompanyApplication:mountCompanyReview)(document.getElementById('root'),{actorId:actor,request:(path,data,signal)=>api(path,bearer,data,signal)});
   },{kind,bearer,actor});
  }
  await mount('applicant',mfa,user);
@@ -30,4 +30,7 @@ test('company applies through UI, stays unauthorized and gets access only after 
  await mount('applicant',mfa,user);await expect(page.getByText('Aprobada',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Verificar acceso a mi empresa',exact:true})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:info.outputPath('company-application-approved.png'),fullPage:true});
+ await page.evaluate(async()=>{window.qaRegistrationDispose();const {mountWorkspace}=await import('/crm/crm-ui.js');mountWorkspace(document.getElementById('root'),{title:'Empresa habilitada',brand:'OGT Empresas',rows:[],sections:[{id:'resumen',label:'Resumen',icon:'qs_feed.svg'}]});});
+ await expect(page.locator('#root')).not.toHaveClass(/crm-business/);await expect(page.getByRole('heading',{name:'Empresa habilitada',exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
