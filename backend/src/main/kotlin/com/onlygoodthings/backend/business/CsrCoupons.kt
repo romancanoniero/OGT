@@ -28,9 +28,9 @@ fun CsrRepository.companyCoupons(actor:String,company:String):List<CsrCoupon> = 
     access(c,actor,company,campaignRoles+financeRoles)
     c.prepareStatement("SELECT $couponFields FROM promo_codes p JOIN companies c ON c.id=p.company_id WHERE p.company_id=?::uuid ORDER BY p.created_at DESC LIMIT 200").use { q ->q.setString(1,company);q.executeQuery().use { r ->buildList {while(r.next())add(r.coupon())} } }
 }
-fun CsrRepository.ownCoupons(actor:String):List<CsrCoupon> = db.withConnection { c ->ownCoupons(c,actor)}
-internal fun CsrRepository.ownCoupons(c:java.sql.Connection,actor:String):List<CsrCoupon> {
-    return c.prepareStatement("SELECT $couponFields FROM promo_codes p JOIN companies c ON c.id=p.company_id WHERE p.issued_to_user=?::uuid ORDER BY p.created_at DESC LIMIT 200").use { q ->q.setString(1,actor);q.executeQuery().use { r ->buildList {while(r.next())add(r.coupon())} } }
+fun CsrRepository.ownCoupons(actor:String):List<CsrCoupon> = db.withConnection { c ->ownCoupons(c,actor,forUi=true)}
+internal fun CsrRepository.ownCoupons(c:java.sql.Connection,actor:String,forUi:Boolean=false):List<CsrCoupon> {
+    return c.prepareStatement("SELECT $couponFields FROM promo_codes p JOIN companies c ON c.id=p.company_id WHERE p.issued_to_user=?::uuid ORDER BY p.created_at DESC ${if(forUi)"LIMIT 200" else ""}").use { q ->q.setString(1,actor);q.executeQuery().use { r ->buildList {while(r.next())add(r.coupon())} } }
 }
 fun CsrRepository.claimCoupon(actor:String,rawCode:String):CsrActionResult {
     val code=rawCode.trim().uppercase();require(code.matches(Regex("[A-Z0-9-]{6,60}"))){ "Código inválido" }

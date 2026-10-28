@@ -127,6 +127,10 @@ class CsrIntegrationTest {
         val campaign=r.saveCampaign(f.actor,f.company,id(),null,"Gracias al barrio","Descuento por una meta sin acciones pendientes",0,0).id
         r.transition(f.actor,f.company,id(),campaign,"ACTIVE")
         val coupon=r.issueCoupon(f.actor,f.company,id(),campaign,1000,f.reader,"")
+        // The screen's page size must never truncate the person's data export.
+        db.withConnection{c ->c.prepareStatement("INSERT INTO promo_codes(campaign_id,company_id,code,discount_bps,issued_to_user,expires_at) SELECT ?::uuid,?::uuid,?||n::text,1000,?::uuid,now()+interval '30 days' FROM generate_series(1,205) n").use{q ->q.setString(1,campaign);q.setString(2,f.company);q.setString(3,"QA-"+id()+"-");q.setString(4,f.reader);q.executeUpdate()}}
+        assertEquals(200,r.ownCoupons(f.reader).size)
+        assertEquals(206,com.onlygoodthings.backend.infra.IdentityStore(db).exportAccount(f.reader)!!.coupons.size)
         val source="qa-personal-audit:"+id()
         db.withConnection{c ->r.ledger(c,f.company,null,null,f.reader,"QA_AUDIT",source=source,note="Synthetic audit entry")}
         assertThrows(java.sql.SQLException::class.java){db.withConnection{c ->c.prepareStatement("DELETE FROM csr_ledger WHERE company_id=?::uuid AND source_key=?").use{q ->q.setString(1,f.company);q.setString(2,source);q.executeUpdate()}}}
