@@ -19,6 +19,10 @@ for relation in users companies company_admins campaigns content_reports social_
 done
 for file in docker-compose.yml Dockerfile web-nginx.conf; do test -s "$ROOT/$file"; done
 test -d web-app && test -d backend-dist
+# Persistent operational state is separate from immutable application files.
+test ! -L operations && test ! -L operations-runtime
+mkdir -p operations operations-runtime
+chmod 700 operations operations-runtime
 # Validate candidate routing before interrupting any running service.
 docker run --rm --network ogt -v "$RELEASE/web-nginx.conf:/etc/nginx/conf.d/default.conf:ro" nginx:1.28-alpine nginx -t
 docker build -t "ogt-backend:$ID" "$RELEASE"
@@ -29,6 +33,7 @@ tar -czf "$BACKUP/application.tgz" web-app backend-dist docker-compose.yml Docke
 OLD_IMAGE="$(docker inspect -f '{{.Image}}' ogt-api)"
 docker tag "$OLD_IMAGE" "ogt-backend:before-$ID"
 printf '%s\n' "$OLD_IMAGE" > "$BACKUP/previous-image.txt"
+python3 "$RELEASE/scripts/install_ogt_operations.py" "$RELEASE"
 # From this point failures leave web/API stopped rather than expose mixed versions.
 trap 'code=$?; if [ "$code" -ne 0 ]; then docker stop ogt-web ogt-api >/dev/null 2>&1 || true; echo "Release failed. OGT web/API remain stopped. Recovery material: $BACKUP" >&2; fi' EXIT
 docker stop ogt-web ogt-api
@@ -81,5 +86,7 @@ for spec in 'ogt-api 8080/tcp' 'ogt-web 80/tcp'; do
 done
 test "$(docker inspect -f '{{index .Config.Labels "traefik.http.routers.ogt-web.middlewares"}}' ogt-web)" = ogt-prelaunch@docker
 cp "$RELEASE/release-manifest.json" "$ROOT/current-release.json"
+python3 "$ROOT/operations-runtime/ogt_backup.py" --if-due || echo "OGT database backup needs operational review"
+python3 "$ROOT/operations-runtime/ogt_operations.py" || test "$?" = 2
 printf '%s\n' 'DEPLOYED_PRIVATE_CANDIDATE: local health, files and anonymous denials verified.'
 printf '%s\n' 'Still required: HTTPS from an allowed network, live MFA, roles and operational acceptance.'

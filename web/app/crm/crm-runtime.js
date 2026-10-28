@@ -1,3 +1,4 @@
+import { mountOperations } from './crm-operations.js?v=ops-1';
 import { mountTeam, mountTeamInbox } from './crm-team.js?v=team-1';
 import { mountBusiness } from './crm-business.js?v=csr-1';
 import { mountCompanyApplication, mountCompanyReview } from './crm-registration.js?v=registration-1';
@@ -7,6 +8,7 @@ import { createIdentity } from './crm-auth.js?v=tacho-1';
 
 const controlSections = [
   { id: 'resumen', label: 'Resumen', icon: 'qs_feed.svg', keys: null },
+  { id: 'operacion', label: 'Estado del servicio', icon: 'qs_notifications.svg', operations: true },
   { id: 'usuarios', label: 'Usuarios', icon: 'qs_user.svg', view: 'listing' },
   { id: 'empresas', label: 'Empresas', icon: 'qs_form.svg', keys: ['Empresas', 'Empresas por verificar'] },
   { id: 'denuncias', label: 'Denuncias', icon: 'qs_notifications.svg', keys: ['Denuncias pendientes'] },
@@ -575,7 +577,8 @@ export async function start() {
           };
         },
       };
-      const sections = (mode === 'control' ? controlSections : empresaSections).map(section =>
+      const sections = (mode === 'control' ? controlSections : empresaSections).filter(section=>!section.operations||['OWNER','OPERATIONS'].includes(permission.platformRole)).map(section =>
+        section.operations ? {...section,mount:container=>mountOperations(container,{request:(path,data,signal)=>api(path,token,data,signal)})} :
         section.team ? {...section,mount:container=>mountTeam(container,{companyId:chosen,actorId:identity.currentUser().uid,request:(path,data,signal)=>api(path,token,data,signal),onAccess:()=>void checkAccess()})} :
         section.registration ? {...section,mount:container=>mountCompanyApplication(container,{actorId:identity.currentUser().uid,request:(path,data,signal)=>api(path,token,data,signal),onAccess:()=>void checkAccess()})} :
         mode==='control'&&section.id==='empresas'&&['OWNER','OPERATIONS'].includes(permission.platformRole) ? {...section,mount:container=>mountCompanyReview(container,{actorId:identity.currentUser().uid,companies:summary.companies,pendingCompanies:summary.pendingCompanies,request:(path,data,signal)=>api(path,token,data,signal)})} :

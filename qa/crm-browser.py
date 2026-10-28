@@ -115,6 +115,8 @@ with sync_playwright() as pw:
                         'lastSeenAt':None,
                     } for n in range(index,26 if index==21 else 21) if f'{n:08d}-1111-4111-8111-111111111111' not in state['deleted_ids']]
                     data={'users':values,'nextCursor':'users-fixture-cursor' if index==1 else None}
+                elif url.endswith('/platform/operations'):
+                    data={'schemaVersion':1,'checkedAtEpochSeconds':int(time.time()),'status':'healthy','stale':False,'checks':{},'alerts':[]}
                 elif url.endswith('/company/summary'):
                     cid=body['companyId']
                     data={'companyId': B if state['mismatch'] else cid,'tradeName':'Empresa Uno' if cid==A else 'Empresa Dos','verificationStatus':'VERIFIED','campaigns':2,'activeCampaigns':1,'issuedCoupons':3,'balanceCents':0,'impactScore':10}
@@ -179,6 +181,17 @@ with sync_playwright() as pw:
         assert not errors,errors
         context.close()
         results.append(mode+' full navigation: '+', '.join(sections))
+    for role in ['OWNER','OPERATIONS','SUPPORT','ANALYST']:
+        context,page,state,errors=session('control');state['platform_role']=role
+        begin(page);finish(page)
+        expect(page.locator('#crm-root .crm-workspace')).to_be_visible()
+        section=page.locator('.crm-nav-btn[data-section="operacion"]')
+        if role in ['OWNER','OPERATIONS']:
+            expect(section).to_be_visible();section.click()
+            expect(page.get_by_role('heading',name='Servicio saludable',exact=True)).to_be_visible()
+        else:expect(section).to_have_count(0)
+        assert not errors,errors
+        context.close();results.append('Operational status role boundary: '+role)
     # Filters, order and pagination update rows without rebuilding the CRM.
     context,page,state,errors=session('control')
     state['user_fixture']=True

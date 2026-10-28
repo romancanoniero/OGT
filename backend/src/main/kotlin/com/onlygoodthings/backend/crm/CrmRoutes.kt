@@ -365,6 +365,15 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: Realtime
             stepUpValidUntilEpochSeconds = auth.authTimeSeconds + CRM_STEP_UP_WINDOW_SECONDS,
         )))
     }
+    val operations=CrmOperations()
+    post("/api/v1/crm/platform/operations") {
+        val auth=crmContext(call,db,verifier) ?: return@post
+        if(auth.platformRole !in setOf("OWNER","OPERATIONS")) {
+            return@post call.respond(HttpStatusCode.Forbidden,ApiResponse.fail<Unit>("Solo personal de operaciones autorizado","FORBIDDEN"))
+        }
+        val snapshot=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){operations.read()}
+        call.respond(ApiResponse.ok(snapshot))
+    }
     post("/api/v1/crm/platform/summary") {
         val auth = crmContext(call, db, verifier) ?: return@post
         if (auth.platformRole == null) {

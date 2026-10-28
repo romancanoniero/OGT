@@ -37,6 +37,7 @@ services:
       OGT_PUBLIC_BASE: https://onlygoodthings.lat
     volumes:
       - ./media:/app/media
+      - ./operations:/run/ogt-operations:ro
       - /home/iankmp/ogt-secrets/firebase-admin.json:/run/secrets/ogt-firebase-admin.json:ro
       - /home/iankmp/ogt-secrets/mercadopago:/run/secrets/mercadopago:ro
     ports: ["127.0.0.1:19080:8080"]

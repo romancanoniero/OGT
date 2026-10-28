@@ -27,6 +27,25 @@ el registro histórico: no reemplazan la evidencia de la revisión actual.
 - Apple: proveedor configurado; compilaciones y pruebas de contrato aprobadas.
   Ingreso, vinculación, reingreso y baja con una cuenta Apple real pendientes.
 
+## Preparación operativa (28/10/2026)
+
+La supervisión y recuperación están descritas en `docs/OPERATIONS.md`. La vista
+Estado del servicio se limita a OWNER/OPERATIONS con MFA; la base y las colas se
+consultan sin datos personales. Los avisos distinguen una lectura fallida, un
+incidente sostenido y una muestra vencida. Los trabajos previos del servidor se
+conservan al instalar únicamente el bloque programado de OGT.
+
+La recuperación de aplicación prepara los archivos antes de detener servicios,
+exige contratos de esquema idénticos y no restaura la base, Redis, medios ni
+credenciales. Su modo de laboratorio rechaza la instalación productiva.
+
+La prueba local de carga realizó 240 lecturas autenticadas de feed y finanzas,
+con ocho peticiones simultáneas: cero errores, p95 de 113 ms en feed y 53 ms en
+finanzas. Es una medición de la Mac y servicios de QA, no una garantía de capacidad
+de la VPS. La inspección real encontró entre 2 y 5 % de memoria disponible en
+el servidor compartido de 12 GB; OGT utiliza aproximadamente 342 MiB. La capacidad
+productiva debe resolverse antes de la apertura pública.
+
 ## Aceptación con sesión real (28/10/2026)
 
 Se comprobó el acceso con correo verificado y MFA, el envío de una solicitud

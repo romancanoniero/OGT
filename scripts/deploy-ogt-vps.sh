@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 MODE="${1:---check}"
-case "$MODE" in --check|--deploy) ;; *) echo 'Use --check or --deploy' >&2; exit 2;; esac
+case "$MODE" in --check|--deploy|--prepare) ;; *) echo 'Use --check, --prepare or --deploy' >&2; exit 2;; esac
 REMOTE_URL="$(git remote get-url origin)"
 case "$REMOTE_URL" in https://github.com/romancanoniero/OGT|https://github.com/romancanoniero/OGT.git|git@github.com:romancanoniero/OGT.git) ;; *) echo 'Wrong repository' >&2; exit 1;; esac
 SHA="$(git rev-parse HEAD)"
@@ -77,13 +77,18 @@ cp deploy/vps/Dockerfile deploy/vps/docker-compose.yml "$WORK/release/"
 cp web/app/nginx.conf "$WORK/release/web-nginx.conf"
 # Existing application schema is a prerequisite; never replay demo seed migrations.
 cp database/migrations/23_crm_foundations.sql database/migrations/24_post_media_frame.sql database/migrations/25_post_media_original.sql database/migrations/26_crm_publication_index.sql database/migrations/28_crm_user_moderation.sql database/migrations/29_stories.sql database/migrations/30_story_frame.sql database/migrations/31_account_erasure.sql database/migrations/32_user_blocks.sql database/migrations/33_csr_operations.sql database/migrations/34_company_registration.sql database/migrations/35_company_teams.sql "$WORK/release/database/migrations/"
-cp scripts/release_guard.py scripts/activate-ogt-release.sh "$WORK/release/scripts/"
+cp scripts/release_guard.py scripts/activate-ogt-release.sh scripts/ogt_operations.py scripts/ogt_backup.py scripts/install_ogt_operations.py scripts/restore_ogt_application.py "$WORK/release/scripts/"
 printf '{"sdkCommit":"%s"}\n' "$SDK_SHA" > "$WORK/release/build-inputs.json"
 python3 scripts/release_guard.py manifest "$WORK/release" "$SHA"
 python3 scripts/release_guard.py verify "$WORK/release" "$SHA"
 ID="$SHA-$(date -u +%Y%m%dT%H%M%SZ)"
 "${SSH[@]}" "$HOST" "mkdir -p ogt/releases/$ID"
 rsync -az -e 'ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15' "$WORK/release/" "$HOST:ogt/releases/$ID/"
+if [ "$MODE" = --prepare ]; then
+  echo "PREPARED_RELEASE_ID=$ID"
+  echo 'The sealed package is uploaded; no application services were changed.'
+  exit 0
+fi
 "${SSH[@]}" "$HOST" "bash ogt/releases/$ID/scripts/activate-ogt-release.sh $ID $SHA"
 echo 'Private first-version deployment finished. Public launch and real-account acceptance remain separate.'
 echo 'OGT: https://onlygoodthings.lat/'
