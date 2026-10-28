@@ -12,6 +12,7 @@ data class CsrRegistration(
     val id:String,val applicantUserId:String,val applicantName:String,
     val legalName:String,val tradeName:String,val taxId:String,val websiteUrl:String,
     val note:String,val status:String,val companyId:String?,val reviewReason:String?,val createdAtEpochMs:Long,
+    val canReview:Boolean=false,
 )
 
 /** Personal requests and staff review deliberately have separate authorization. */
@@ -47,7 +48,7 @@ class CsrRegistrations(private val db:Database) {
     fun own(actor:String)=db.withConnection {own(it,actor,forUi=true)}
     fun pending(actor:String):List<CsrRegistration> = db.withConnection { c ->
         reviewer(c,actor)
-        val result=c.prepareStatement("SELECT $fields FROM csr_company_registrations r JOIN users u ON u.id=r.applicant_user_id WHERE r.status='PENDING_REVIEW' ORDER BY r.created_at LIMIT 200").use { q ->q.executeQuery().use { r ->buildList {while(r.next())add(r.row())} } }
+        val result=c.prepareStatement("SELECT $fields FROM csr_company_registrations r JOIN users u ON u.id=r.applicant_user_id WHERE r.status='PENDING_REVIEW' ORDER BY r.created_at LIMIT 200").use { q ->q.executeQuery().use { r ->buildList {while(r.next()){val row=r.row();add(row.copy(canReview=row.applicantUserId!=actor))}} } }
         audit(c,actor,"COMPANY_APPLICATION_LIST",null,"Revisión de solicitudes empresariales pendientes")
         result
     }

@@ -23,8 +23,17 @@ test('company applies through UI, stays unauthorized and gets access only after 
  await page.getByRole('button',{name:'Enviar solicitud',exact:true}).click();await expect(page.getByText('En revisión',{exact:true})).toBeVisible();await expect(page.locator('form')).toHaveCount(0);
  const access=()=>request.post('/api/v1/crm/access',{headers:{Authorization:'Bearer '+mfa},data:{}});expect((await access()).status()).toBe(403);
  await page.screenshot({path:info.outputPath('company-application-pending.png'),fullPage:true});
+ const ownName='Solicitud propia QA '+randomUUID().slice(0,6),ownTax='QA'+randomUUID().replaceAll('-','').slice(0,18).toUpperCase();
+ const ownResponse=await request.post('/api/v1/csr/registration/submit',{headers:{Authorization:'Bearer '+staff.token},data:{requestId:randomUUID(),legalName:ownName,tradeName:'Prueba de revisión propia',taxId:ownTax,note:'Esta solicitud comprueba que una persona no revisa su propia incorporación.'}});
+ expect(ownResponse.ok()).toBe(true);const ownId=(await ownResponse.json()).data.id;
  await mount('control',staff.token,staff.id);page.on('dialog',d=>d.accept());
+ await page.getByLabel('Solicitud a revisar',{exact:true}).selectOption({label:ownName+' · '+ownTax});
+ await expect(page.getByText('Esta solicitud es tuya. Debe revisarla otra persona autorizada de Control.',{exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Aprobar empresa',exact:true})).toBeDisabled();await expect(page.getByRole('button',{name:'Rechazar solicitud',exact:true})).toBeDisabled();
+ await expect(page.getByLabel('Fundamento de la revisión',{exact:true})).toBeDisabled();
  await page.getByLabel('Solicitud a revisar',{exact:true}).selectOption({label:name+' · '+tax});await expect(page.getByText('Queremos apoyar acciones verificadas de nuestra comunidad.',{exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Aprobar empresa',exact:true})).toBeEnabled();await expect(page.getByLabel('Fundamento de la revisión',{exact:true})).toBeEnabled();
+ const withdrawal=await request.post('/api/v1/csr/registration/withdraw',{headers:{Authorization:'Bearer '+staff.token},data:{applicationId:ownId}});expect(withdrawal.ok()).toBe(true);
  await page.getByLabel('Fundamento de la revisión',{exact:true}).pressSequentially('Verificamos la documentación y la representación en este ensayo.');await page.getByRole('button',{name:'Aprobar empresa',exact:true}).click();await expect(page.getByRole('status')).toHaveText(/Bandeja actualizada\.|Solicitudes pendientes confirmadas por el servidor\./);await expect(page.getByRole('option',{name:name+' · '+tax,exact:true})).toHaveCount(0);
  const granted=await access();expect(granted.ok()).toBe(true);const companies=(await granted.json()).data.companies;expect(companies).toHaveLength(1);expect(companies[0].role).toBe('OWNER');
  await mount('applicant',mfa,user);await expect(page.getByText('Aprobada',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Verificar acceso a mi empresa',exact:true})).toBeVisible();

@@ -23,6 +23,29 @@ el registro histórico: no reemplazan la evidencia de la revisión actual.
 - Apple: proveedor configurado; compilaciones y pruebas de contrato aprobadas.
   Ingreso, vinculación, reingreso y baja con una cuenta Apple real pendientes.
 
+## Aceptación con sesión real (28/10/2026)
+
+Se comprobó el acceso con correo verificado y MFA, el envío de una solicitud
+sintética desde Empresas, su persistencia al recargar, la recepción en Control
+y su retiro. Se registró una auditoría de envío y otra de retiro; las empresas,
+los permisos, los saldos y los pagos existentes permanecieron iguales.
+
+La prueba detectó que Control ofrecía revisar una solicitud propia aunque el
+servidor ya lo rechazaba. La respuesta ahora informa si la persona puede revisar
+esa solicitud; la interfaz deshabilita fundamento, aprobación y rechazo en el
+caso propio y explica que necesita otro revisor. Se conserva la comprobación del
+servidor. El cambio pasó 60 pruebas de backend, 8 de negocio en una base nueva,
+99 de Node y los 50 casos completos Chromium/WebKit, incluyendo el cambio entre
+una solicitud propia y una ajena. El ensayo anterior sobre una base de negocio
+reutilizada falló por trabajos de pago sintéticos de ejecuciones antiguas; no se
+eliminaron esos datos ni se redujeron las aserciones. Para repetir estos tests,
+usar una base de integración nueva y separada de la API de QA.
+
+La aprobación con dos personas reales sigue pendiente: actualmente existe una
+sola cuenta de Control habilitada para revisar. No se creó un permiso empresarial
+para completar el ensayo. La baja con Apple sigue pendiente de una identidad de
+prueba que permita verificarla sin borrar la cuenta habitual.
+
 ## Cómo repetir las comprobaciones actuales
 
 Conservar las credenciales fuera de Git y usar exclusivamente el entorno aislado

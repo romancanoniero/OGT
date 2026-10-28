@@ -148,6 +148,7 @@ class CsrIntegrationTest {
         val first=registrations.submit(f.reader,application,"Empresa vecinal QA","Comunidad QA",tax,"https://example.test","Queremos apoyar acciones verificadas de la comunidad.")
         assertEquals(first,registrations.submit(f.reader,application,"Empresa vecinal QA","Comunidad QA",tax,"https://example.test","Queremos apoyar acciones verificadas de la comunidad."))
         assertEquals("PENDING_REVIEW",first.status)
+        assertTrue(registrations.pending(f.actor).single{it.id==application}.canReview)
         assertThrows(IllegalArgumentException::class.java){registrations.submit(f.reader,application,"Otra razón social","",tax,"","Queremos apoyar a la comunidad.")}
         assertThrows(BusinessAccessDenied::class.java){registrations.pending(f.reader)}
         assertThrows(BusinessAccessDenied::class.java){registrations.review(f.outsider,id(),application,true,"La documentación fue contrastada en QA.")}
@@ -165,6 +166,7 @@ class CsrIntegrationTest {
         val duplicate=id();registrations.submit(f.outsider,duplicate,"Empresa con identificación existente","",tax,"","Solicitamos una revisión de la empresa de prueba.")
         assertThrows(IllegalArgumentException::class.java){registrations.review(f.actor,id(),duplicate,true,"La duplicación no debe asignar acceso a una empresa ajena.")}
         val own=id();registrations.submit(f.actor,own,"Solicitud del revisor","",id().replace("-","").take(20),"","Esta solicitud no puede aprobarla su propio titular.")
+        assertFalse(registrations.pending(f.actor).single{it.id==own}.canReview)
         assertThrows(IllegalArgumentException::class.java){registrations.review(f.actor,id(),own,true,"Nadie puede aprobar su propia solicitud empresarial.")}
     }
     @Test fun pendingCompanyRequestsCanBeWithdrawnExportedAndErasedByTheirOwner():Unit=database().use{db ->

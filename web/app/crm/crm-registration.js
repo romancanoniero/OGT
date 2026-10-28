@@ -59,17 +59,20 @@ export function mountCompanyReview(root,{actorId,request,companies,pendingCompan
       if(!rows.length){content.append(node('p','No hay solicitudes pendientes.'));status.textContent='Bandeja actualizada.';return;}
       const form=node('form');form.className='crm-business-form';const wrap=node('div');wrap.className='crm-field';const label=node('label','Solicitud a revisar'),select=node('select');select.className='crm-input';select.id='company-review-'+crypto.randomUUID();label.htmlFor=select.id;select.required=true;
       for(const row of rows){const option=node('option',row.legalName+' · '+row.taxId);option.value=row.id;select.append(option);}wrap.append(label,select);form.append(wrap);
-      const detail=node('article');form.append(detail);const reason=field(form,'Fundamento de la revisión','reason',{multiline:true,max:500});reason.minLength=10;
-      const choose=()=>{const row=rows.find(r=>r.id===select.value);detail.replaceChildren(node('h3',row.tradeName||row.legalName),node('p','Solicitante: '+row.applicantName),node('p','Identificación fiscal: '+row.taxId),node('p','Sitio declarado: '+(row.websiteUrl||'Sin sitio')),node('p',row.note));reason.value='';};select.addEventListener('change',choose);choose();
-      const approve=button('Aprobar empresa',true),reject=button('Rechazar solicitud');approve.type=reject.type='submit';approve.value='APPROVE';reject.value='REJECT';form.append(approve,reject);content.append(form);
+      const detail=node('article');form.append(detail);const reviewNotice=node('p','Esta solicitud es tuya. Debe revisarla otra persona autorizada de Control.');reviewNotice.className='crm-note';reviewNotice.setAttribute('role','note');form.append(reviewNotice);
+      const reason=field(form,'Fundamento de la revisión','reason',{multiline:true,max:500});reason.minLength=10;
+      const approve=button('Aprobar empresa',true),reject=button('Rechazar solicitud');approve.type=reject.type='submit';approve.value='APPROVE';reject.value='REJECT';
+      let busy=false;
+      const availability=()=>{const allowed=rows.find(r=>r.id===select.value)?.canReview===true;approve.disabled=reject.disabled=busy||!allowed;reason.disabled=busy||!allowed;select.disabled=busy;reviewNotice.hidden=allowed;};
+      const choose=()=>{const row=rows.find(r=>r.id===select.value);detail.replaceChildren(node('h3',row.tradeName||row.legalName),node('p','Solicitante: '+row.applicantName),node('p','Identificación fiscal: '+row.taxId),node('p','Sitio declarado: '+(row.websiteUrl||'Sin sitio')),node('p',row.note));reason.value='';availability();};select.addEventListener('change',choose);choose();form.append(approve,reject);content.append(form);
       form.addEventListener('submit',async event=>{
-        event.preventDefault();if(approve.disabled)return;const decision=event.submitter?.value;if(!['APPROVE','REJECT'].includes(decision))return;
+        event.preventDefault();if(busy||approve.disabled)return;const decision=event.submitter?.value;if(!['APPROVE','REJECT'].includes(decision))return;
         const row=rows.find(r=>r.id===select.value);
         if(!window.confirm(decision==='APPROVE'?`¿Aprobar ${row.legalName} y habilitar a ${row.applicantName} como titular?`:`¿Rechazar la solicitud de ${row.legalName}?`))return;
         const payload={applicationId:row.id,decision,reason:reason.value},key='ogt.registration.review:'+actorId+':'+row.id;
-        const requestId=pendingOperation(sessionStorage,key,payload);approve.disabled=reject.disabled=true;status.textContent='Registrando revisión…';
+        const requestId=pendingOperation(sessionStorage,key,payload);busy=true;availability();status.textContent='Registrando revisión…';
         try{await call('review',{...payload,requestId});sessionStorage.removeItem(key);if(alive())await load();}
-        catch(error){if(alive())status.textContent=error.message+' La revisión conserva su fundamento para reintentar.';}finally{approve.disabled=reject.disabled=false;}
+        catch(error){if(alive())status.textContent=error.message+' La revisión conserva su fundamento para reintentar.';}finally{busy=false;availability();}
       });
       status.textContent='Solicitudes pendientes confirmadas por el servidor.';
     }catch(error){if(alive()){status.textContent=error.message;const retry=button('Reintentar');retry.addEventListener('click',()=>void load());status.append(retry);}}
