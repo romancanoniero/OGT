@@ -80,7 +80,10 @@ no se sobrescriben datos recientes con un respaldo antiguo.
 
 El modo de laboratorio solo permite directorios temporales con prefijo fijo,
 contenedores etiquetados y puertos de loopback. Usa una base y Redis propios,
-red interna, credenciales sintéticas y ningún acceso a Firebase o pagos reales.
+red interna para backend/datos y un frente web publicado solo en loopback.
+Usa Firebase Auth emulado con identidades y claims de verificación/MFA sintéticos;
+no utiliza cuentas de Firebase ni pagos reales. Este ensayo no sustituye la
+aceptación humana del ingreso/MFA con proveedores reales.
 El ensayo cambia de candidata a anterior y vuelve a candidata, comprobando
 campañas, permisos, reservas, conciliación, reintentos idempotentes y escrituras
 realizadas mientras estaba activa la versión anterior. Retira únicamente los
@@ -94,3 +97,20 @@ La medición local de carga usa solo la API de QA, PostGIS/Redis separados y
 Firebase emulado. No constituye una garantía de capacidad de la VPS, de cargas
 de video o de proveedores externos. Antes de abrir al público deben resolverse
 las alertas de capacidad reales y acordarse el volumen esperado de uso.
+
+
+La aceptación del 28/10/2026 se realizó en Docker local, porque la VPS compartida
+tenía menos del 5 % de memoria disponible. Las imágenes se construyeron con los
+JAR sellados de `39a7bcd` y `d564257`; solo la configuración del laboratorio cambia
+red, autenticación emulada y puertos. El recorrido candidata → anterior → candidata
+conservó campañas y titularidad, una reserva inicial de 3.000 centavos, su reintento
+sin duplicación y otra reserva de 1.000 centavos realizada en la versión anterior.
+El saldo final fue 46.000 disponibles y 4.000 reservados, conciliado. No se restauró
+la base durante este recorrido y los recursos temporales fueron retirados.
+
+El respaldo programado `scheduled-20261028T211719Z` también fue restaurado en una
+base temporal separada: coincidieron 14 usuarios, 42 publicaciones, dos empresas,
+dos membresías, tres asientos contables y 64 tablas. La base atendida por la app
+conservó su estado y la copia temporal fue eliminada. Son dos comprobaciones
+diferentes: recuperación de aplicación con datos recientes y restauración del
+archivo de respaldo. Los recibos privados están en `build/operations-*.json`.
