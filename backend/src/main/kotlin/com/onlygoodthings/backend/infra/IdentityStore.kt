@@ -177,6 +177,7 @@ class IdentityStore(private val db: Database) {
         profile.copy(
             blockedUsers=blocks,
             coupons=com.onlygoodthings.backend.business.CsrRepository(db).ownCoupons(connection,userId),
+            companyTeam=com.onlygoodthings.backend.business.CsrTeam(com.onlygoodthings.backend.business.CsrRepository(db)).export(connection,userId),
             companyApplications=com.onlygoodthings.backend.business.CsrRegistrations(db).own(connection,userId),
             posts = textRows(connection, "SELECT id::text, body, created_at::text FROM social_posts WHERE author_user_id = ?::uuid ORDER BY created_at", userId),
             comments = textRows(connection, "SELECT id::text, body, created_at::text FROM post_comments WHERE author_user_id = ?::uuid ORDER BY created_at", userId),

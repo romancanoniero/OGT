@@ -36,6 +36,7 @@ private suspend fun businessActor(call:ApplicationCall,verifier:FirebaseTokenVer
 /** The same tenant and step-up boundary protects both corporate interfaces. */
 fun Route.businessRoutes(repository:CsrRepository,verifier:FirebaseTokenVerifier,payments:CsrPayments?) {
     val registrations=CsrRegistrations(repository.db)
+    val team=CsrTeam(repository)
     fun endpoint(path:String,action:(String,Map<String,Any?>)->Any) {
         post("/api/v1/csr/$path") {
             val actor=businessActor(call,verifier) ?: return@post
@@ -47,6 +48,17 @@ fun Route.businessRoutes(repository:CsrRepository,verifier:FirebaseTokenVerifier
             val result=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){action(actor,data)}
             call.respondText(JsonBody.objectMapper.writeValueAsString(mapOf("success" to true,"data" to result)),io.ktor.http.ContentType.Application.Json)
         }
+    }
+    endpoint("team/inbox") {actor,_ ->team.inbox(actor)}
+    endpoint("team/list") {actor,d ->team.desk(actor,d.uuid("companyId"))}
+    endpoint("team/invite") {actor,d ->team.invite(actor,d.uuid("companyId"),d.uuid("requestId"),d.text("email"),d.text("role"))}
+    endpoint("team/role") {actor,d ->team.member(actor,d.uuid("companyId"),d.uuid("requestId"),d.uuid("userId"),d.text("role"))}
+    endpoint("team/remove") {actor,d ->team.member(actor,d.uuid("companyId"),d.uuid("requestId"),d.uuid("userId"),null)}
+    endpoint("team/leave") {actor,d ->team.member(actor,d.uuid("companyId"),d.uuid("requestId"),actor,null,leave=true)}
+    endpoint("team/transfer") {actor,d ->team.propose(actor,d.uuid("companyId"),d.uuid("requestId"),d.uuid("userId"))}
+    endpoint("team/decide") {actor,d ->
+        val kind=d.text("kind");require(kind in setOf("INVITATION","TRANSFER")){"Tipo de invitación inválido"}
+        team.decide(actor,d.uuid("requestId"),d.uuid("id"),kind=="TRANSFER",d.text("decision"))
     }
     endpoint("campaigns/manage") {actor,d ->repository.campaigns(actor,d.uuid("companyId"))}
     endpoint("registration/mine") {actor,_ ->registrations.own(actor)}

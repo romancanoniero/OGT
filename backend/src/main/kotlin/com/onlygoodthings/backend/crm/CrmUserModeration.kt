@@ -76,16 +76,13 @@ internal fun crmModerateUsers(
         val privileged = conn.prepareStatement(
             """SELECT EXISTS(SELECT 1 FROM crm_platform_staff
                               WHERE user_id = ANY(?::uuid[]) OR approved_by = ANY(?::uuid[]))
-                   OR EXISTS(SELECT 1 FROM crm_company_members
-                             WHERE user_id = ANY(?::uuid[]) AND member_role = 'OWNER'
-                               AND status = 'ACTIVE')
-                   OR EXISTS(SELECT 1 FROM company_admins
-                             WHERE user_id = ANY(?::uuid[]) AND is_primary)"""
+                   OR EXISTS(SELECT 1 FROM crm_company_access
+                             WHERE user_id = ANY(?::uuid[]) AND member_role = 'OWNER')"""
         ).use { stmt ->
-            for (i in 1..4) stmt.setArray(i, conn.createArrayOf("uuid", ids.toTypedArray()))
+            for (i in 1..3) stmt.setArray(i, conn.createArrayOf("uuid", ids.toTypedArray()))
             stmt.executeQuery().use { rs -> rs.next(); rs.getBoolean(1) }
         }
-        require(!privileged) { "No se pueden modificar cuentas administrativas ni titulares de empresas" }
+        require(!privileged) { "Las cuentas de Control están protegidas. Si sos titular de una empresa, transferí primero su titularidad desde Empresas → Equipo." }
 
         val removedPosts = mutableListOf<String>()
         val removedComments = mutableListOf<CrmRemovedUserComment>()
@@ -207,6 +204,9 @@ internal fun crmModerateUsers(
             // A deleted owner's unspent coupon must not become an unassigned,
             // claimable coupon when the foreign key is anonymized.
             conn.executeForIds("UPDATE promo_codes SET status='REVOKED' WHERE issued_to_user=ANY(?::uuid[]) AND status='ISSUED'",ids)
+            // An erased sender cannot leave apparently usable team offers behind.
+            conn.executeForIds("UPDATE csr_team_invitations SET status='REVOKED',decided_at=now() WHERE invited_by=ANY(?::uuid[]) AND status='PENDING'",ids)
+            conn.executeForIds("UPDATE csr_ownership_transfers SET status='CANCELLED',decided_at=now() WHERE status='PENDING' AND (proposed_by=ANY(?::uuid[]) OR recipient_id=ANY(?::uuid[]))",ids,count=2)
             val deleted = conn.executeForIds("DELETE FROM users WHERE id = ANY(?::uuid[])", ids)
             check(deleted == ids.size) { "La eliminación no fue completa" }
             // Cascades removed comments, impacts, anecdotes and their likes. Repair counters

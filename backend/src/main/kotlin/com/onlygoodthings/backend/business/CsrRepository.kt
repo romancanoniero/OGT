@@ -15,17 +15,21 @@ class CsrRepository(internal val db:Database) {
     internal data class Company(val id:String,val verified:Boolean,val available:Long,val debt:Long)
     internal fun access(c:Connection,actor:String,company:String,roles:Set<String>,lock:Boolean=false):Company {
         UUID.fromString(company)
+        // Lock first, then read permissions in a fresh statement. A waiting writer
+        // must not keep the grant snapshot taken before a concurrent revocation.
+        if(lock)c.prepareStatement("SELECT id FROM companies WHERE id=?::uuid FOR UPDATE").use { q ->
+            q.setString(1,company);q.executeQuery().use {if(!it.next())throw BusinessAccessDenied()}
+        }
         return c.prepareStatement("""SELECT c.id::text,c.verification_status::text,c.campaign_balance_cents,c.payment_debt_cents
-            FROM companies c WHERE c.id=?::uuid AND EXISTS(SELECT 1 FROM users u WHERE u.id=?::uuid AND u.status='ACTIVE')
-            AND (EXISTS(SELECT 1 FROM company_admins a WHERE a.company_id=c.id AND a.user_id=?::uuid)
-              OR EXISTS(SELECT 1 FROM crm_company_members m WHERE m.company_id=c.id AND m.user_id=?::uuid
-                AND m.status='ACTIVE' AND m.accepted_at IS NOT NULL AND m.member_role=ANY(?)))
-            ${if(lock)"FOR UPDATE OF c" else ""}""").use { q ->
-            q.setString(1,company);repeat(3){q.setString(it+2,actor)};q.setArray(5,c.createArrayOf("text",roles.toTypedArray()))
+            FROM companies c JOIN crm_company_access a ON a.company_id=c.id
+            JOIN users u ON u.id=a.user_id
+            WHERE c.id=?::uuid AND a.user_id=?::uuid AND u.status='ACTIVE' AND a.member_role=ANY(?)""").use { q ->
+            q.setString(1,company);q.setString(2,actor);q.setArray(3,c.createArrayOf("text",roles.toTypedArray()))
             q.executeQuery().use { r ->if(!r.next())throw BusinessAccessDenied()
                 Company(r.getString(1),r.getString(2)=="VERIFIED",r.getLong(3),r.getLong(4)) }
         }
     }
+
     internal fun operation(actor:String,company:String,requestId:String,kind:String,parameters:JsonObject,roles:Set<String>,body:(Connection,Company)->CsrActionResult):CsrActionResult {
         UUID.fromString(requestId)
         val digest=MessageDigest.getInstance("SHA-256").digest((kind+Json.encodeToString(JsonObject.serializer(),parameters)).toByteArray()).joinToString(""){"%02x".format(it)}

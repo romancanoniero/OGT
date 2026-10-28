@@ -10,7 +10,7 @@ case "$REMOTE_URL" in https://github.com/romancanoniero/OGT|https://github.com/r
 SHA="$(git rev-parse HEAD)"
 test -z "$(git status --porcelain --untracked-files=normal)" || { echo 'Commit or remove local changes before building a release' >&2; exit 1; }
 for tool in node python3 git; do command -v "$tool" >/dev/null; done
-for path in web/app/crm/control/index.html web/app/crm/empresas/index.html backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmRoutes.kt database/migrations/23_crm_foundations.sql database/migrations/24_post_media_frame.sql database/migrations/25_post_media_original.sql database/migrations/26_crm_publication_index.sql database/migrations/28_crm_user_moderation.sql database/migrations/29_stories.sql database/migrations/30_story_frame.sql database/migrations/31_account_erasure.sql database/migrations/32_user_blocks.sql database/migrations/33_csr_operations.sql database/migrations/34_company_registration.sql; do
+for path in web/app/crm/control/index.html web/app/crm/empresas/index.html backend/src/main/kotlin/com/onlygoodthings/backend/crm/CrmRoutes.kt database/migrations/23_crm_foundations.sql database/migrations/24_post_media_frame.sql database/migrations/25_post_media_original.sql database/migrations/26_crm_publication_index.sql database/migrations/28_crm_user_moderation.sql database/migrations/29_stories.sql database/migrations/30_story_frame.sql database/migrations/31_account_erasure.sql database/migrations/32_user_blocks.sql database/migrations/33_csr_operations.sql database/migrations/34_company_registration.sql database/migrations/35_company_teams.sql; do
   test -s "$path" || { echo "Missing integrated component: $path" >&2; exit 1; }
 done
 node --check web/app/app.js
@@ -76,7 +76,7 @@ test -s "$WORK/release/web-app/ogt-sdk.js"
 cp deploy/vps/Dockerfile deploy/vps/docker-compose.yml "$WORK/release/"
 cp web/app/nginx.conf "$WORK/release/web-nginx.conf"
 # Existing application schema is a prerequisite; never replay demo seed migrations.
-cp database/migrations/23_crm_foundations.sql database/migrations/24_post_media_frame.sql database/migrations/25_post_media_original.sql database/migrations/26_crm_publication_index.sql database/migrations/28_crm_user_moderation.sql database/migrations/29_stories.sql database/migrations/30_story_frame.sql database/migrations/31_account_erasure.sql database/migrations/32_user_blocks.sql database/migrations/33_csr_operations.sql database/migrations/34_company_registration.sql "$WORK/release/database/migrations/"
+cp database/migrations/23_crm_foundations.sql database/migrations/24_post_media_frame.sql database/migrations/25_post_media_original.sql database/migrations/26_crm_publication_index.sql database/migrations/28_crm_user_moderation.sql database/migrations/29_stories.sql database/migrations/30_story_frame.sql database/migrations/31_account_erasure.sql database/migrations/32_user_blocks.sql database/migrations/33_csr_operations.sql database/migrations/34_company_registration.sql database/migrations/35_company_teams.sql "$WORK/release/database/migrations/"
 cp scripts/release_guard.py scripts/activate-ogt-release.sh "$WORK/release/scripts/"
 printf '{"sdkCommit":"%s"}\n' "$SDK_SHA" > "$WORK/release/build-inputs.json"
 python3 scripts/release_guard.py manifest "$WORK/release" "$SHA"

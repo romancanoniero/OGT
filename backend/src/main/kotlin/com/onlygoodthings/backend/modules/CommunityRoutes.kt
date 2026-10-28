@@ -548,18 +548,15 @@ fun Route.csrRoutes(db: Database) {
 
     post("/api/v1/companies/mine") {
         val principal = requireUser(call) ?: return@post
-        if (principal.role != UserRole.COMPANY_ADMIN) {
-            return@post call.respond(HttpStatusCode.Forbidden, ApiResponse.fail<Unit>("Solo COMPANY_ADMIN", "FORBIDDEN"))
-        }
         val card = db.withConnection { connection ->
             connection.prepareStatement(
                 """
                 SELECT c.id::text, c.legal_name, c.trade_name, c.verification_status::text,
                        c.campaign_balance_cents, c.impact_score, c.logo_url, c.tax_id
                 FROM companies c
-                JOIN company_admins a ON a.company_id = c.id
+                JOIN crm_company_access a ON a.company_id = c.id
                 WHERE a.user_id = ?::uuid
-                ORDER BY a.is_primary DESC
+                ORDER BY (a.member_role='OWNER') DESC, c.id
                 LIMIT 1
                 """.trimIndent(),
             ).use { stmt ->
@@ -592,15 +589,12 @@ fun Route.csrRoutes(db: Database) {
 
     post("/api/v1/csr/campaigns") {
         val principal = requireUser(call) ?: return@post
-        if (principal.role.name != "COMPANY_ADMIN") {
-            return@post call.respond(HttpStatusCode.Forbidden, ApiResponse.fail<Unit>("Solo COMPANY_ADMIN", "FORBIDDEN"))
-        }
         val rows = db.withConnection { connection ->
             connection.prepareStatement(
                 """
                 SELECT c.id::text, c.title, c.status::text, c.social_goal, c.social_progress, c.budget_cents, c.spent_cents
                 FROM campaigns c
-                JOIN company_admins a ON a.company_id = c.company_id
+                JOIN crm_company_access a ON a.company_id = c.company_id
                 WHERE a.user_id = ?::uuid
                 ORDER BY c.created_at DESC
                 """.trimIndent(),

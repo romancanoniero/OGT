@@ -1,7 +1,8 @@
+import { mountTeam, mountTeamInbox } from './crm-team.js?v=team-1';
 import { mountBusiness } from './crm-business.js?v=csr-1';
 import { mountCompanyApplication, mountCompanyReview } from './crm-registration.js?v=registration-1';
 import { createStoryListing } from './crm-stories.js?v=story-frame-1';
-import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn, isExpiredMfaChallenge } from './crm-core.js?v=beta-candidate-20261027';
+import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn, isExpiredMfaChallenge } from './crm-core.js?v=teams-20261028';
 import { createIdentity } from './crm-auth.js?v=tacho-1';
 
 const controlSections = [
@@ -14,6 +15,7 @@ const controlSections = [
 ];
 const empresaSections = [
   { id: 'resumen', label: 'Resumen', icon: 'qs_feed.svg', keys: null },
+  { id: 'equipo', label: 'Equipo e invitaciones', icon: 'qs_user.svg', team: true },
   { id: 'solicitud', label: 'Solicitudes de alta', icon: 'qs_form.svg', registration: true },
   { id: 'campanas', label: 'Campañas', icon: 'qs_invite.svg', business: true },
   { id: 'cupones', label: 'Cupones', icon: 'qs_wallet.svg', business: true },
@@ -297,8 +299,10 @@ export async function start() {
         await api('csr/registration/mine',token,{},task.signal);if(!task.current())return;
         if(typeof desk?.dispose==='function')desk.dispose();
         login.hidden=true;challenge.hidden=true;googleLogin.hidden=true;signupToggle.hidden=true;onboarding.hidden=true;refresh.hidden=false;showLinkMethods();
-        const dispose=mountCompanyApplication(root,{actorId:identity.currentUser().uid,request:(path,data,signal)=>api(path,token,data,signal),onAccess:()=>void checkAccess()});
-        desk={dispose};showApp();message('Podés solicitar la incorporación de tu empresa. Control debe revisarla antes de habilitar operaciones.');return;
+        const invitations=make('section'),application=make('section');root.replaceChildren(invitations,application);
+        const options={actorId:identity.currentUser().uid,request:(path,data,signal)=>api(path,token,data,signal),onAccess:()=>void checkAccess()};
+        const disposeApplication=mountCompanyApplication(application,options),disposeInbox=mountTeamInbox(invitations,options);
+        desk={dispose(){disposeApplication();disposeInbox();}};showApp();message('Podés solicitar la incorporación de tu empresa. Control debe revisarla antes de habilitar operaciones.');return;
       }
       if (!task.current()) return;
       access = permission;
@@ -572,6 +576,7 @@ export async function start() {
         },
       };
       const sections = (mode === 'control' ? controlSections : empresaSections).map(section =>
+        section.team ? {...section,mount:container=>mountTeam(container,{companyId:chosen,actorId:identity.currentUser().uid,request:(path,data,signal)=>api(path,token,data,signal),onAccess:()=>void checkAccess()})} :
         section.registration ? {...section,mount:container=>mountCompanyApplication(container,{actorId:identity.currentUser().uid,request:(path,data,signal)=>api(path,token,data,signal),onAccess:()=>void checkAccess()})} :
         mode==='control'&&section.id==='empresas'&&['OWNER','OPERATIONS'].includes(permission.platformRole) ? {...section,mount:container=>mountCompanyReview(container,{actorId:identity.currentUser().uid,companies:summary.companies,pendingCompanies:summary.pendingCompanies,request:(path,data,signal)=>api(path,token,data,signal)})} :
         section.business && (section.id !== 'impacto' || ['OWNER','ADMIN','FINANCE','ANALYST'].includes(permission.companies.find(item => item.companyId === chosen).role)) && (section.id !== 'cupones' || ['OWNER','ADMIN','FINANCE','CAMPAIGN_MANAGER'].includes(permission.companies.find(item => item.companyId === chosen).role)) ? { ...section, mount: container => mountBusiness(container, { section: section.id, companyId: chosen, role: permission.companies.find(item => item.companyId === chosen).role, actorId: identity.currentUser().uid, request: (path, data, signal) => api(path, token, data, signal) }) } : section.view === 'stories' ? { ...section, listing: storyListing } : section.view === 'listing' ? { ...section, listing: section.id === 'usuarios' ? userListing : postListing } : section

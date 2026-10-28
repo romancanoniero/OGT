@@ -155,7 +155,7 @@ contienen tokens exclusivamente de QA, no deben imprimirse ni entrar en Git.
 Las afirmaciones MFA de esas identidades son fixtures del emulador: no certifican
 el enrolamiento de segundo factor del proveedor real.
 
-Para las ocho pruebas transaccionales, crear una base separada en el PostGIS de
+Para las pruebas transaccionales, crear una base separada en el PostGIS de
 QA, con nombre `ogt_business_qa_<sufijo>`, aplicar las migraciones de esquema
 excluyendo la importación editorial 14 y ejecutar:
 
@@ -201,9 +201,39 @@ aprobación crea una empresa verificada y un titular, y rechazar o retirar no
 concede permisos. Reintentos, fiscal duplicado, aprobación propia, exportación y
 baja se verifican en la base aislada. La migración aditiva es la 34.
 
-Siguen pendientes la gestión completa de roles y transferencia de titularidad,
-aceptación de proveedores y dispositivos reales, distribución de una revisión
-única, despliegue privado, restauración ensayada y aceptación operativa. Conservar
+La gestión de equipos usa la migración aditiva 35. Las membresías expresas
+prevalecen sobre los permisos heredados, incluso al suspender o retirar acceso;
+los administradores heredados sin membresía conservan su acceso. El titular puede
+invitar y administrar roles; Administración gestiona únicamente roles inferiores.
+La titularidad se propone a un integrante activo y cambia solo cuando este acepta.
+No se puede retirar ni eliminar a un titular antes del traspaso. El titular anterior
+conserva Administración y luego puede salir o darse de baja sin borrar la empresa.
+
+Las invitaciones aparecen dentro de Empresas y requieren una cuenta OGT existente,
+correo verificado y MFA; no se envían correos automáticamente. Vencen en siete días;
+los traspasos, en 48 horas. Cambiar o retirar el rol de un gestor revoca sus ofertas
+pendientes; la baja de su cuenta también las cierra. Los reintentos, conflictos,
+revocaciones, expiraciones, aislamiento entre empresas y concurrencia con bajas se
+verifican en PostGIS. La exportación incluye únicamente los registros del propio
+usuario, sin el listado de otros integrantes.
+
+Para verificar el recorrido HTTP y preparar identidades sintéticas para las
+pruebas de navegador (solo servicios locales de QA):
+
+```sh
+node qa/scripts/team-e2e.mjs
+cd qa
+OGT_FULL_E2E=1 npx playwright test company-team.spec.mjs
+```
+
+La cobertura incluye escritorio y WebKit móvil, escritura letra por letra,
+conservación del correo aún no enviado al operar otro formulario, aceptación de
+invitaciones y traspasos, y salida del antiguo titular. Las afirmaciones MFA del
+emulador prueban la autorización del servidor, no el enrolamiento real del proveedor.
+
+Siguen pendientes la aceptación real de Apple con una identidad dedicada, la
+sincronización con GitHub y su CI y la distribución en tiendas, sus fichas de
+privacidad, la habilitación de pagos reales y la aceptación operativa final. Conservar
 el acceso privado de prelaunch; estas pruebas no autorizan abrir la aplicación.
 
 ## Registro histórico y procedimientos anteriores

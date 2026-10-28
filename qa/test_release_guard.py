@@ -142,6 +142,8 @@ class DeploymentContractTests(unittest.TestCase):
         self.assertIn('32_user_blocks.sql', source)
         self.assertIn('33_csr_operations.sql', source)
         self.assertIn('34_company_registration.sql', source)
+        self.assertIn('35_company_teams.sql', source)
+        self.assertLess(source.index('34_company_registration.sql'), source.index('35_company_teams.sql'))
         self.assertLess(source.index('33_csr_operations.sql'), source.index('34_company_registration.sql'))
         self.assertLess(source.index('31_account_erasure.sql'), source.index('32_user_blocks.sql'))
         self.assertLess(source.index('32_user_blocks.sql'), source.index('33_csr_operations.sql'))

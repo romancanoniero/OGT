@@ -334,11 +334,10 @@ private suspend fun crmContext(
             stmt.executeQuery().use { rs -> if (rs.next()) rs.getString(1) else null }
         }
         val companies = conn.prepareStatement(
-            """SELECT m.company_id::text, m.member_role FROM crm_company_members m
+            """SELECT m.company_id::text, m.member_role FROM crm_company_access m
                JOIN users u ON u.id = m.user_id
                JOIN companies c ON c.id = m.company_id
                WHERE m.user_id = ?::uuid AND u.status = 'ACTIVE'
-                 AND m.status = 'ACTIVE' AND m.accepted_at IS NOT NULL
                ORDER BY m.company_id LIMIT 100"""
         ).use { stmt ->
             stmt.setString(1, principal.userId)
