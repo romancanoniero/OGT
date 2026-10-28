@@ -23,7 +23,9 @@ REQUIRED = (
     "database/migrations/26_crm_publication_index.sql",
     "database/migrations/28_crm_user_moderation.sql",
     "database/migrations/29_stories.sql", "database/migrations/30_story_frame.sql",
-    "database/migrations/31_account_erasure.sql",
+    "database/migrations/31_account_erasure.sql", "database/migrations/32_user_blocks.sql", "database/migrations/33_csr_operations.sql", "database/migrations/34_company_registration.sql",
+    "web-app/apple-continue-es.png", "web-app/coupon-wallet.js", "web-app/crm/crm-business.js", "web-app/crm/crm-registration.js",
+    "web-app/user-safety.js",
     "web-app/ephemeral-stories.js", "web-app/story-frame.js", "web-app/story-playback.js",
     "web-app/crm/crm-stories.js",
 )
@@ -60,6 +62,18 @@ def validate_env(values):
         raise ValueError("This release targets the existing ogt database owner")
     if values.get("OGT_LAUNCH_MODE") != "prelaunch":
         raise ValueError("OGT_LAUNCH_MODE must be prelaunch; public launch is a separate approval")
+    payment_mode=values.get("OGT_MP_MODE","disabled")
+    if payment_mode not in ("disabled","sandbox") or values.get("OGT_MP_LIVE_PAYMENTS","false")!="false":
+        raise ValueError("This candidate permits only disabled or sandbox payments")
+    if payment_mode=="sandbox":
+        if not re.fullmatch(r"[0-9]{1,30}",values.get("OGT_MP_COLLECTOR_ID","")):
+            raise ValueError("Missing test Mercado Pago receiver")
+        for key in ("OGT_MP_ACCESS_TOKEN_FILE","OGT_MP_WEBHOOK_SECRET_FILE"):
+            path=values.get(key,"")
+            if not path.startswith("/run/secrets/mercadopago/") or ".." in path or path.endswith("/"):
+                raise ValueError("Payment credentials must use private mounted files")
+        if values.get("OGT_MP_PUBLIC_BASE") not in (None,"",BASE_URL):
+            raise ValueError("Unexpected payment callback origin")
     cidrs = values.get("OGT_PRELAUNCH_CIDRS", "").split(",")
     if not cidrs or not all(item.strip() for item in cidrs):
         raise ValueError("OGT_PRELAUNCH_CIDRS must identify the reviewer's allowed networks")
@@ -86,7 +100,7 @@ def inventory(root):
             raise ValueError("Release packages must not contain symlinks")
         if path.is_file() and path != root / "release-manifest.json":
             rel = path.relative_to(root).as_posix()
-            if path.name.startswith(".env") or path.suffix in {".pem", ".key"}:
+            if path.name.startswith(".env") or path.suffix in {".pem", ".key", ".p8", ".p12", ".jks", ".keystore", ".mobileprovision"} or path.name in {"access-token-test","webhook-secret-test","firebase-admin.json","service-account.json"}:
                 raise ValueError("A credential-like file was found in the release")
             files[rel] = sha256(path)
     for item in REQUIRED:

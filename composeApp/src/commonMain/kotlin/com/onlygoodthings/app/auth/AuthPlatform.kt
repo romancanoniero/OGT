@@ -10,6 +10,9 @@ expect class AuthPlatform() {
     suspend fun startPhoneAuth(phoneE164: String): PendingPhoneAuth
     suspend fun confirmPhone(pending: PendingPhoneAuth, code: String): AuthUser
     suspend fun signInGoogle(): AuthUser
+    suspend fun signInApple(): AuthUser
+    /** Revokes the Apple grant, when linked, before requesting durable server deletion. */
+    suspend fun prepareAccountDeletion()
     suspend fun unlockBiometric(): Boolean
     suspend fun canUseBiometric(): Boolean
     suspend fun signOut()

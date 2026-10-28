@@ -377,7 +377,7 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: Realtime
                 SELECT
                   (SELECT count(*) FROM users WHERE status = 'ACTIVE'),
                   (SELECT count(*) FROM companies),
-                  (SELECT count(*) FROM companies WHERE verification_status = 'PENDING_REVIEW'),
+                  (SELECT count(*) FROM companies WHERE verification_status = 'PENDING_REVIEW') + (SELECT count(*) FROM csr_company_registrations WHERE status='PENDING_REVIEW'),
                   (SELECT count(*) FROM content_reports WHERE status = 'PENDING_REVIEW'),
                   (SELECT count(*) FROM social_posts WHERE moderation_status = 'VISIBLE' AND NOT is_story)
             """.trimIndent()

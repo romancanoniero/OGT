@@ -1,4 +1,6 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSetTree
 import java.util.Properties
 
 plugins {
@@ -14,7 +16,11 @@ plugins {
  * UI compartida Android + iOS: pantallas en commonMain (Compose Multiplatform).
  */
 kotlin {
+    @OptIn(ExperimentalKotlinGradlePluginApi::class)
     androidTarget {
+        // Include common assertions on devices without disabling the default
+        // hierarchy that connects iosMain/iosTest to their native targets.
+        instrumentedTestVariant { sourceSetTree.set(KotlinSourceSetTree.test) }
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
@@ -41,6 +47,7 @@ kotlin {
             implementation(compose.ui)
             implementation(compose.components.resources)
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.datetime)
             implementation(libs.androidx.lifecycle.runtime)
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.content.negotiation)
@@ -69,6 +76,9 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
         }
+        androidInstrumentedTest {
+            dependencies { implementation("androidx.test:runner:1.7.0") }
+        }
     }
 }
 
@@ -94,6 +104,9 @@ android {
         targetSdk = 36
         versionCode = 5
         versionName = "1.0"
+        testInstrumentationRunner = "com.onlygoodthings.app.qa.QaTestRunner"
+        manifestPlaceholders["ogtAppLabel"] = "Only Good Things"
+        manifestPlaceholders["ogtFcmAutoInit"] = true
     }
     signingConfigs {
         if (ogtReleaseProps.isNotEmpty()) {
@@ -112,6 +125,13 @@ android {
         }
     }
     buildTypes {
+        getByName("debug") {
+            if(providers.gradleProperty("ogt.instrumentedQa").orNull=="true") {
+                applicationIdSuffix=".qa"
+                manifestPlaceholders["ogtAppLabel"]="Only Good Things QA"
+                manifestPlaceholders["ogtFcmAutoInit"]=false
+            }
+        }
         getByName("release") {
             signingConfigs.findByName("release")?.let { signingConfig = it }
             isMinifyEnabled = false
@@ -123,7 +143,21 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
+}
+
+// These exact assertions also run in commonTest on iOS and on Android devices.
+// The JVM's android.jar cannot decode bitmaps or create an Application context.
+tasks.withType<Test>().configureEach {
+    filter {
+        excludeTestsMatching("com.onlygoodthings.app.platform.StoryBitmapTest")
+        excludeTestsMatching("com.onlygoodthings.app.data.SessionProfileTest")
+        excludeTestsMatching("com.onlygoodthings.app.data.StoryMediaCacheTest")
+    }
+}
+tasks.matching { it.name.startsWith("connected") && it.name.endsWith("AndroidTest") }.configureEach {
+    doFirst { check(providers.gradleProperty("ogt.instrumentedQa").orNull=="true") { "Device tests require the isolated .qa package; use -Pogt.instrumentedQa=true -I qa/android-instrumented.init.gradle" } }
 }
 
 compose {

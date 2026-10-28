@@ -39,6 +39,24 @@ class ReleaseGuardTests(unittest.TestCase):
         values = self.env(); values['OGT_PRELAUNCH_CIDRS'] = '2001:db8::1/128'
         self.assertTrue(guard.validate_env(values))
 
+    def test_payment_candidate_cannot_enable_real_money_or_inline_credentials(self):
+        values=self.env();values.update(OGT_MP_MODE='sandbox',OGT_MP_COLLECTOR_ID='12345',
+            OGT_MP_ACCESS_TOKEN_FILE='/run/secrets/mercadopago/access-token-test',
+            OGT_MP_WEBHOOK_SECRET_FILE='/run/secrets/mercadopago/webhook-secret-test')
+        self.assertTrue(guard.validate_env(values))
+        for key,value in [('OGT_MP_MODE','live'),('OGT_MP_LIVE_PAYMENTS','true'),
+                          ('OGT_MP_ACCESS_TOKEN_FILE','/tmp/token'),('OGT_MP_COLLECTOR_ID',''),
+                          ('OGT_MP_PUBLIC_BASE','https://another.example')]:
+            invalid=dict(values);invalid[key]=value
+            with self.subTest(key=key),self.assertRaises(ValueError):guard.validate_env(invalid)
+
+    def test_webhook_exception_does_not_open_the_rest_of_the_app(self):
+        source=(ROOT/'deploy/vps/docker-compose.yml').read_text()
+        self.assertIn('Path(`/api/v1/payments/mercadopago/webhook`) && Method(`POST`)',source)
+        self.assertIn('ogt-mp.middlewares=ogt-mp-rate@docker,ogt-mp-body@docker',source)
+        self.assertIn('ogt-mp-body.buffering.maxRequestBodyBytes=65536',source)
+        self.assertIn('ogt-web.middlewares=ogt-prelaunch@docker',source)
+
     def fixture(self, folder):
         root = Path(folder)
         for name in guard.REQUIRED:
@@ -75,7 +93,7 @@ class ReleaseGuardTests(unittest.TestCase):
             with self.assertRaises(ValueError): guard.verify_manifest(root, SHA)
 
     def test_private_files_are_rejected(self):
-        for name in ['.env', 'key.pem', 'private.key']:
+        for name in ['.env', 'key.pem', 'private.key', 'AuthKey.p8', 'signing.p12', 'app.jks', 'access-token-test', 'webhook-secret-test', 'firebase-admin.json']:
             with self.subTest(name=name), tempfile.TemporaryDirectory() as folder:
                 root = self.fixture(folder); (root / name).write_text('fixture')
                 with self.assertRaises(ValueError): guard.make_manifest(root, SHA)
@@ -111,6 +129,12 @@ class DeploymentContractTests(unittest.TestCase):
         self.assertIn('29_stories.sql', source)
         self.assertIn('30_story_frame.sql', source)
         self.assertIn('31_account_erasure.sql', source)
+        self.assertIn('32_user_blocks.sql', source)
+        self.assertIn('33_csr_operations.sql', source)
+        self.assertIn('34_company_registration.sql', source)
+        self.assertLess(source.index('33_csr_operations.sql'), source.index('34_company_registration.sql'))
+        self.assertLess(source.index('31_account_erasure.sql'), source.index('32_user_blocks.sql'))
+        self.assertLess(source.index('32_user_blocks.sql'), source.index('33_csr_operations.sql'))
         self.assertLess(source.index('28_crm_user_moderation.sql'), source.index('29_stories.sql'))
         self.assertLess(source.index('29_stories.sql'), source.index('30_story_frame.sql'))
         self.assertLess(source.index('30_story_frame.sql'), source.index('31_account_erasure.sql'))

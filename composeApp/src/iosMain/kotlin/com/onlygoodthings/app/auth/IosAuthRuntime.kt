@@ -13,6 +13,9 @@ interface IosAuthHost {
     fun startPhoneAuth(phoneE164: String, onResult: (String?, String?) -> Unit)
     fun confirmPhone(verificationId: String, code: String, onResult: (AuthUser?, String?) -> Unit)
     fun signInGoogle(onResult: (AuthUser?, String?) -> Unit)
+    fun signInApple(onResult: (AuthUser?, String?) -> Unit)
+    fun prepareAccountDeletion(onResult: (String?) -> Unit)
+    fun appleSignInButton(onClick: () -> Unit): platform.UIKit.UIView
     fun unlockBiometric(onResult: (Boolean) -> Unit)
     fun canUseBiometric(): Boolean
     fun signOut()

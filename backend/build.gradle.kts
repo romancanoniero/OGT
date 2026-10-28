@@ -47,10 +47,18 @@ dependencies {
 }
 
 tasks.test {
-    useJUnitPlatform { excludeTags("integration") }
+    useJUnitPlatform { excludeTags("integration","business-integration") }
 }
 
 val sourceSets=the<SourceSetContainer>()
+tasks.register<Test>("businessIntegrationTest") {
+    group="verification"
+    description="Verifies company isolation, transactional balances, coupons and payment retries in the isolated QA database."
+    testClassesDirs=sourceSets["test"].output.classesDirs
+    classpath=sourceSets["test"].runtimeClasspath
+    useJUnitPlatform { includeTags("business-integration") }
+}
+
 tasks.register<Test>("accountErasureIntegrationTest") {
     group="verification"
     description="Checks durable deletion retries and concurrency against a dedicated local QA database."

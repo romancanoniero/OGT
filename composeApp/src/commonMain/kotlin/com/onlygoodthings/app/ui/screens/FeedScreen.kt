@@ -467,6 +467,7 @@ fun FeedScreen(
             val mine = db.isOwnPost(post, me.aliases())
             PostOverflowSheet(
                 isAuthor = mine,
+                blockUserId=post.authorUserId,
                 canEdit = canEditSocialPost(mine, post.authorKind, post.tag, listing?.kind, post.sourceUrl),
                 onDismiss = { overflowPostId = null },
                 onHide = {

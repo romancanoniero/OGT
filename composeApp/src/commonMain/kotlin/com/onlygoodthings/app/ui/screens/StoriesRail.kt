@@ -348,6 +348,7 @@ private fun StoryPlayer(controller: StoriesController,story: Story,foreground:Bo
             Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha=.45f)).padding(16.dp)) {
                 Text(story.caption,color=Color.White)
                 if(story.authorId!=owner) TextButton(onClick={reporting=true},enabled=!reportSending) { Text(if(reportSending) "Enviando denuncia…" else "Denunciar historia",color=Color.White) }
+                if(story.authorId!=owner) com.onlygoodthings.app.ui.components.BlockUserButton(story.authorId,contentColor=Color.White,onBlocked=onClose)
                 reportMessage?.let { Text(it,color=Color.White,fontSize=13.sp) }
                 if(story.authorId==owner) {
                     Text("${story.viewCount} vistas",color=Color.White,fontSize=12.sp)

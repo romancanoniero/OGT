@@ -78,6 +78,13 @@ class StoriesController(private val session: SessionStore, private val prefs: Au
             }
         }
     }
+    fun excludeAuthor(id:String) {
+        refreshJob?.cancel()
+        val remaining=stories.filterNot { it.authorId==id }
+        stories=remaining
+        val user=owner
+        scope.launch { mediaCache.authorize(user,remaining,now) }
+    }
     fun refresh() {
         if(owner.isBlank() || refreshJob?.isActive==true) return
         val user=owner

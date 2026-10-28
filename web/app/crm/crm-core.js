@@ -5,6 +5,7 @@ export class CrmError extends Error {
   }
 }
 const routes = new Set(['platform/stories/reports', 'platform/stories/reports/dismiss', 'platform/stories/search', 'platform/stories/remove', 'access', 'platform/summary', 'company/summary', 'platform/posts/search', 'platform/posts/detail', 'platform/posts/remove', 'platform/posts/comments/remove', 'platform/posts/anecdotes/remove', 'platform/users/search', 'platform/posts/reassign', 'platform/posts/frame', 'platform/users/list', 'platform/users/detail', 'platform/users/posts', 'platform/users/moderate']);
+const businessRoutes = new Set(['csr/registration/mine','csr/registration/submit','csr/registration/withdraw','csr/registration/pending','csr/registration/review','csr/campaigns/manage','csr/campaigns/save','csr/campaigns/state','csr/finance/summary','csr/finance/outcomes','csr/finance/reserve','csr/finance/release','csr/finance/fund-outcome','csr/payments/create','csr/payments/list','csr/promo/list','csr/promo/create','csr/promo/redeem','csr/promo/revoke']);
 const staffRoles = new Set(['OWNER','OPERATIONS','TRUST_SAFETY','FINANCE','SUPPORT','ANALYST']);
 const companyRoles = new Set(['OWNER','ADMIN','CAMPAIGN_MANAGER','FINANCE','ANALYST','VIEWER']);
 /** La ventana ya venció y el segundo factor está registrado: hay que ingresar de nuevo. */
@@ -36,15 +37,15 @@ export function sessionGate() {
 }
 export function createApi(fetcher, timeoutMs = 15000) {
   return async (route, token, body = {}, signal) => {
-    if (!routes.has(route)) throw new CrmError('Ruta no permitida.', 'INVALID_ROUTE');
+    if (!routes.has(route) && !businessRoutes.has(route)) throw new CrmError('Ruta no permitida.', 'INVALID_ROUTE');
     if (typeof token !== 'string' || !token || token.startsWith('dev.')) throw new CrmError('Inici\u00e1 sesi\u00f3n.', 'UNAUTHENTICATED', 401);
     const controller = new AbortController(); let timeout = false;
     const abort = () => controller.abort();
     if (signal?.aborted) abort(); else signal?.addEventListener('abort', abort, { once: true });
-    const timer = setTimeout(() => { timeout = true; abort(); }, timeoutMs);
+    const timer = setTimeout(() => { timeout = true; abort(); }, route === 'csr/payments/create' ? Math.max(timeoutMs, 35000) : timeoutMs);
     try {
       if (controller.signal.aborted) throw new CrmError('Solicitud cancelada.', 'ABORTED');
-      const response = await fetcher('/api/v1/crm/' + route, {
+      const response = await fetcher((businessRoutes.has(route) ? '/api/v1/' : '/api/v1/crm/') + route, {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
         body: JSON.stringify(body), cache: 'no-store', credentials: 'omit', redirect: 'error', signal: controller.signal,
       });

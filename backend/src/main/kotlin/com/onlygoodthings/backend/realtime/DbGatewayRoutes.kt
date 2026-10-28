@@ -32,6 +32,7 @@ fun Route.dbGatewayRoutes(
     verifier: FirebaseTokenVerifier,
     identity: IdentityStore,
     hub: RealtimeHub,
+    canReceive:(String,String)->Boolean={_,_->true},
 ) {
     webSocket("/db") {
         var authed = false
@@ -49,6 +50,8 @@ fun Route.dbGatewayRoutes(
         val session = this
         val treeHandler: (String, String) -> Unit = { path, payload ->
             session.launch {
+                val viewer=viewerId ?: return@launch
+                if(!kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { canReceive(viewer,path) })return@launch
                 mutex.withLock {
                     listens.forEach { (id, listenPath) ->
                         when {
@@ -93,7 +96,7 @@ fun Route.dbGatewayRoutes(
                         }
                         val id = obj["id"]?.jsonPrimitive?.longOrNull ?: continue
                         val path = obj["path"]?.jsonPrimitive?.contentOrNull?.trim('/').orEmpty()
-                        if (!dbListenAllowed(path, ownerId)) {
+                        if (!dbListenAllowed(path, ownerId) || !canReceive(ownerId,path)) {
                             emit(errorMsg(id = id, code = "PERMISSION_DENIED", message = "Path no autorizado"))
                             continue
                         }

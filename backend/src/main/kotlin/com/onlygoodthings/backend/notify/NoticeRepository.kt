@@ -34,7 +34,7 @@ class NoticeSqlRepository(private val db: Database) {
     }
 
     fun notifyMention(actorId: String, recipientId: String, postId: String): Int {
-        if (actorId == recipientId) return 0
+        if (actorId == recipientId || !com.onlygoodthings.backend.community.UserBlocks(db).allowed(actorId,recipientId)) return 0
         val actorName = displayName(actorId) ?: "Alguien de la comunidad"
         val title = "$actorName te mencionó"
         val body = "Contó algo bueno que hiciste. Tocá para verlo en la comunidad."

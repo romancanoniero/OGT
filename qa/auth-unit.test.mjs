@@ -4,16 +4,17 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 const source = readFileSync(new URL('../web/app/auth.js', import.meta.url), 'utf8');
-function setup({ hostname = 'onlygoodthings.lat', stored = '', fail = false, dev = false, user = true, signInImpl, popupImpl, firebaseAuth, document, onFetch } = {}) {
+function setup({ hostname = 'onlygoodthings.lat', stored = '', fail = false, dev = false, user = true, signInImpl, popupImpl, firebaseAuth, document, onFetch, userProps={}, authProps={} } = {}) {
   const calls = [];
   const storage = new Map(stored ? [['ogt.token', stored]] : []);
-  const firebaseUser = { uid: 'qa', getIdToken: async force => force ? 'verified.jwt' : 'renewed.jwt' };
+  const firebaseUser = { uid: 'qa', getIdToken: async force => force ? 'verified.jwt' : 'renewed.jwt', ...userProps };
   const auth = {
     currentUser: user ? firebaseUser : null,
     onAuthStateChanged(cb) { queueMicrotask(cb); return () => {}; },
     signInWithEmailAndPassword: signInImpl || (async () => ({ user: firebaseUser })),
     signInWithPopup: popupImpl || (async () => ({ user: firebaseUser })),
     signOut: async () => { auth.currentUser = null; },
+    ...authProps,
   };
   function authFactory() { return auth; }
   Object.assign(authFactory, firebaseAuth || {});
@@ -196,4 +197,28 @@ test('sin hints el error de Firebase no llega crudo a la interfaz', async () => 
     assert.equal(/Proof of ownership|Firebase:/.test(String(err.message)), false);
     return true;
   });
+});
+
+test('Apple popup opens the same verified server session and preserves its identity',async()=>{
+ const {api,calls}=setup({firebaseAuth:{OAuthProvider:class {constructor(id){this.providerId=id;this.scopes=[];}addScope(scope){this.scopes.push(scope);}}},popupImpl:async provider=>{
+  assert.equal(provider.providerId,'apple.com');assert.deepEqual(Array.from(provider.scopes),['email','name']);return {user:{getIdToken:async()=> 'apple.verified'}};
+ }});
+ await api.signInApple();assert.equal(api.token(),'apple.verified');assert.deepEqual(calls,[{token:'apple.verified'}]);
+});
+test('Apple grant is reauthenticated and revoked before the deletion caller can proceed',async()=>{
+ const events=[];
+ const {api}=setup({firebaseAuth:{OAuthProvider:class {}},userProps:{providerData:[{providerId:'apple.com'}],
+  reauthenticateWithPopup:async()=>{events.push('reauth');return {user:{uid:'qa'},credential:{accessToken:'qa-apple-grant'}};},
+  getIdToken:async()=>{events.push('refresh');return 'fresh.jwt';}},
+  authProps:{revokeAccessToken:async grant=>{assert.equal(grant,'qa-apple-grant');events.push('revoke');}}});
+ await api.prepareAccountDeletion();assert.deepEqual(events,['reauth','revoke','refresh']);assert.equal(api.token(),'fresh.jwt');
+});
+test('missing Apple authorization preserves the account and does not revoke another grant',async()=>{
+ let revoked=false;
+ const {api}=setup({firebaseAuth:{OAuthProvider:class {}},userProps:{providerData:[{providerId:'apple.com'}],reauthenticateWithPopup:async()=>({user:{uid:'qa'}})},authProps:{revokeAccessToken:async()=>{revoked=true;}}});
+ await assert.rejects(api.prepareAccountDeletion());assert.equal(revoked,false);
+});
+test('non Apple accounts keep their existing deletion flow',async()=>{
+ const {api}=setup({userProps:{providerData:[{providerId:'google.com'}],reauthenticateWithPopup:async()=>{throw new Error('must not open');}}});
+ await api.prepareAccountDeletion();
 });

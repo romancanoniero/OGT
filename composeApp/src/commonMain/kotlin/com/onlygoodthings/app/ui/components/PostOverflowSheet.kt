@@ -27,6 +27,7 @@ fun PostOverflowSheet(
     onReport: () -> Unit,
     onEdit: () -> Unit = {},
     onDelete: () -> Unit = {},
+    blockUserId:String?=null,
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
     OgtBottomSheet(onDismiss = onDismiss, maxHeight = 420.dp) { sheet ->
@@ -58,6 +59,7 @@ fun PostOverflowSheet(
                 onHide()
                 sheet.close()
             }
+            if (!isAuthor && blockUserId!=null)BlockUserButton(blockUserId) { sheet.closeNow() }
             if (!isAuthor) {
                 OverflowChoice("Reportar") {
                     onReport()

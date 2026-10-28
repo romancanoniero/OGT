@@ -204,6 +204,9 @@ internal fun crmModerateUsers(
                 ids, count = 2,
             )
             conn.executeForIds("DELETE FROM social_posts WHERE author_user_id = ANY(?::uuid[])", ids)
+            // A deleted owner's unspent coupon must not become an unassigned,
+            // claimable coupon when the foreign key is anonymized.
+            conn.executeForIds("UPDATE promo_codes SET status='REVOKED' WHERE issued_to_user=ANY(?::uuid[]) AND status='ISSUED'",ids)
             val deleted = conn.executeForIds("DELETE FROM users WHERE id = ANY(?::uuid[])", ids)
             check(deleted == ids.size) { "La eliminación no fue completa" }
             // Cascades removed comments, impacts, anecdotes and their likes. Repair counters

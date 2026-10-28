@@ -1,6 +1,7 @@
 package com.onlygoodthings.backend.infra
 
 import com.onlygoodthings.backend.auth.AccountExport
+import com.onlygoodthings.backend.business.ownCoupons
 import com.onlygoodthings.backend.auth.AccountTextRow
 import com.onlygoodthings.backend.auth.VerifiedFirebaseUser
 import com.onlygoodthings.shared.domain.UserProfile
@@ -170,7 +171,13 @@ class IdentityStore(private val db: Database) {
                 )
             }
         }
+        val blocks=connection.prepareStatement("SELECT u.id::text,u.display_name,(extract(epoch FROM b.created_at)*1000)::bigint FROM user_blocks b JOIN users u ON u.id=b.blocked_id WHERE b.blocker_id=?::uuid ORDER BY b.created_at").use { q ->
+            q.setString(1,userId);q.executeQuery().use { r ->buildList { while(r.next())add(com.onlygoodthings.shared.domain.BlockedUser(r.getString(1),r.getString(2),r.getLong(3))) } }
+        }
         profile.copy(
+            blockedUsers=blocks,
+            coupons=com.onlygoodthings.backend.business.CsrRepository(db).ownCoupons(connection,userId),
+            companyApplications=com.onlygoodthings.backend.business.CsrRegistrations(db).own(connection,userId),
             posts = textRows(connection, "SELECT id::text, body, created_at::text FROM social_posts WHERE author_user_id = ?::uuid ORDER BY created_at", userId),
             comments = textRows(connection, "SELECT id::text, body, created_at::text FROM post_comments WHERE author_user_id = ?::uuid ORDER BY created_at", userId),
             messagesSent = textRows(connection, "SELECT id::text, body, created_at::text FROM timebank_messages WHERE sender_id = ?::uuid ORDER BY created_at", userId),

@@ -29,6 +29,11 @@ firebase-adminsdk*.json
 *.jks
 *.keystore
 key.properties
+*.p8
+*.p12
+*.jks
+*.keystore
+*.mobileprovision
 
 # Kotlin / Native
 *.xcuserstate

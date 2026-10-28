@@ -1,0 +1,23 @@
+import {test,expect} from '@playwright/test';
+import {readFile} from 'node:fs/promises';
+test.skip(process.env.OGT_FULL_E2E!=='1','Requires isolated QA services and synthetic accounts.');
+test('personal blocking works from a profile and can be undone in settings without deleting content',async({page,context,request},info)=>{
+ await context.route('**/*',r=>['localhost','127.0.0.1'].includes(new URL(r.request().url()).hostname)?r.continue():r.abort());
+ const a=JSON.parse(await readFile(new URL('../../build/user-blocks-qa-account.json',import.meta.url),'utf8'));
+ await page.goto('/#/entrar');
+ if(await page.getByRole('button',{name:'Saltar',exact:true}).isVisible())await page.getByRole('button',{name:'Saltar',exact:true}).click();
+ await page.getByLabel('Correo electrónico',{exact:true}).fill(a.email);
+ await page.getByLabel('Contraseña',{exact:true}).fill(a.password);
+ await page.getByRole('button',{name:'Ingresar',exact:true}).click();await expect(page).toHaveURL(/#\/inicio/);
+ await page.goto('/#/perfil/'+a.authorId);
+ await page.getByRole('button',{name:'Bloquear usuario',exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:'Bloquear usuario',exact:true});await expect(dialog).toBeVisible();
+ await page.screenshot({path:info.outputPath('block-confirmation.png')});
+ await dialog.getByRole('button',{name:'Bloquear',exact:true}).click();await expect(dialog).toHaveCount(0);await expect(page).toHaveURL(/#\/inicio/);
+ const hidden=await request.post('/api/v1/users/profile',{headers:{Authorization:`Bearer ${a.token}`},data:{userId:a.authorId}});expect(hidden.status()).toBe(404);
+ await page.goto('/#/ajustes');
+ await page.getByRole('button',{name:'Desbloquear a Persona Bloqueo A',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Desbloquear a Persona Bloqueo A',exact:true})).toHaveCount(0);
+ await page.goto('/#/perfil/'+a.authorId);await expect(page.getByRole('button',{name:'Bloquear usuario',exact:true})).toBeVisible();
+ await expect(page.locator('#profile-posts')).toContainText('Contenido posterior bloqueado');
+});

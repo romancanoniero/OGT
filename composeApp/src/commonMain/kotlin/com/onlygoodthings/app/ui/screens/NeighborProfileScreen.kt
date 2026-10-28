@@ -116,6 +116,7 @@ fun NeighborProfileScreen(
             Text(user.displayName, fontWeight = FontWeight.Bold, fontSize = 15.sp)
             Text(user.levelLabel, color = OgtColors.primary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             Text("${user.barrio}  ·  ${user.honorTag}", color = OgtColors.muted, fontSize = 13.sp)
+            if(!mine)com.onlygoodthings.app.ui.components.BlockUserButton(userId,onBlocked=onBack)
             Spacer(Modifier.height(14.dp))
             if (mine) {
                 Box(

@@ -51,6 +51,14 @@ actual class AuthPlatform actual constructor() {
     }
 
     actual suspend fun signInGoogle(): AuthUser = awaitUser { host().signInGoogle(it) }
+    actual suspend fun signInApple(): AuthUser = awaitUser { host().signInApple(it) }
+    actual suspend fun prepareAccountDeletion(): Unit = suspendCancellableCoroutine { cont ->
+        host().prepareAccountDeletion { error ->
+            if (cont.isActive) {
+                if(error!=null)cont.resumeWithException(AuthException(error)) else cont.resume(Unit)
+            }
+        }
+    }
 
 
     actual suspend fun unlockBiometric(): Boolean = suspendCancellableCoroutine { cont ->
@@ -66,6 +74,7 @@ actual class AuthPlatform actual constructor() {
     private suspend fun awaitUser(block: ((AuthUser?, String?) -> Unit) -> Unit): AuthUser =
         suspendCancellableCoroutine { cont ->
             block { user, err ->
+                if (!cont.isActive) return@block
                 when {
                     err != null -> cont.resumeWithException(AuthException(err))
                     user != null -> cont.resume(user)

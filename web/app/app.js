@@ -1,3 +1,6 @@
+// Keep the established classic-script entry point and its public callbacks.
+async function confirmUserBlock(...args) { return (await import('./user-safety.js?v=1')).confirmUserBlock(...args); }
+async function mountBlockedUsers(root,api) { return (await import('./user-safety.js?v=1')).mountBlockedUsers(root,api); }
 const API = window.OGT_API_BASE ?? "";
 
 function authToken() {
@@ -1129,6 +1132,7 @@ function actionsFor(post, { onDetail = false } = {}) {
   }
   items.push(["hide", "Ocultar de mi inicio"]);
   if (!mine) items.push(["report", "Reportar"]);
+  if (!mine && post.authorKind!=="COMPANY" && post.authorId)items.push(["block-user","Bloquear usuario"]);
   if (kind === "LOST_PET" && mine && !(listingOf(post)?.resolved || post.listingResolved)) {
     items.push(["resolve", "Lo encontramos"]);
   }
@@ -1384,6 +1388,9 @@ async function runAction(id, post, onDetail) {
       persistHidden();
       toast("Oculta de tu inicio");
       removePostCard(post.id);
+      return;
+    case "block-user":
+      confirmUserBlock(api,post.authorId);
       return;
     case "report":
       renderReport(post);
@@ -3913,6 +3920,9 @@ async function renderBilletera() {
         : `<p class="empty">Todavía no hay hechos verificados.</p>`}
       <p class="hint section">Quienes más suman</p>
       ${(w.ranking || []).map(personRow).join("")}`;
+    const couponHost=document.createElement('section');
+    document.querySelector('.page').append(couponHost);
+    import('./coupon-wallet.js?v=csr-1').then(module=>{if(couponHost.isConnected)module.mountCouponWallet(couponHost,api);});
   } catch (e) {
     document.querySelector(".page").innerHTML = `<p class="err">${escapeHtml(e.message)}</p>`;
   }
@@ -3945,6 +3955,7 @@ async function renderPerfil(userId) {
           ${card.inviteCode ? `<p class="hint">Invitación ${escapeHtml(card.inviteCode)}</p>` : ""}
         </div>
         ${followBtn}
+        ${!mine?`<button type="button" class="ghost-cta" id="block-user-btn">Bloquear usuario</button>`:""}
       </div>
       <p class="stats">${card.postsCount} publicaciones · ${card.followerCount} seguidores · ${card.followingCount} seguidos</p>
       <p class="hint section">${mine ? "Qué podés dar" : "Puede dar"}</p>
@@ -3954,6 +3965,7 @@ async function renderPerfil(userId) {
       }</div>`;
     bindSocial(document.getElementById("profile-posts"));
     paintProfileSkills(id, mine);
+    document.getElementById("block-user-btn")?.addEventListener("click",()=>confirmUserBlock(api,id,()=>{location.hash="#/inicio";}));
     document.getElementById("follow-btn")?.addEventListener("click", async () => {
       try {
         if (card.viewerFollows) {
@@ -4122,10 +4134,11 @@ async function renderAjustes() {
       <button type="submit" class="publish-cta" id="save-profile">Guardar</button>
       <p class="save-ok" id="profile-ok" hidden>Perfil actualizado</p>
     </form>
+    <section class="profile-edit" id="blocked-users"></section>
     <form class="profile-edit" id="delete-account">
       <div class="pref-block">
         <h2>Borrar cuenta</h2>
-        <p class="hint">Se borra esta cuenta y lo que publicaste con ella: avisos, comentarios y el resto del contenido cuyo autor sos vos. No queda visible ni a nombre de otra persona. No se borra la copia que otro vecino ya tenga en su chat o en una exportación, un resguardo técnico corto, ni lo que haya que conservar por un reclamo o un pedido de autoridad. Esos restos no se reutilizan. El ingreso de Firebase sigue existiendo hasta que lo borres en Google.</p>
+        <p class="hint">Se borra esta cuenta y lo que publicaste con ella: avisos, comentarios y el resto del contenido cuyo autor sos vos. No queda visible ni a nombre de otra persona. No se borra la copia que otro vecino ya tenga en su chat o en una exportación, un resguardo técnico corto, ni lo que haya que conservar por un reclamo o un pedido de autoridad. Esos restos no se reutilizan. El ingreso de Firebase se elimina automáticamente; si el proveedor tarda en responder, el servidor reintenta la tarea.</p>
         <label class="field">Escribí BAJA para confirmar
           <input name="confirm" type="text" autocomplete="off" maxlength="8" placeholder="BAJA" spellcheck="false">
         </label>
@@ -4145,6 +4158,7 @@ async function renderAjustes() {
     pendingPhoto = file;
     preview.src = URL.createObjectURL(file);
   });
+  mountBlockedUsers(document.getElementById("blocked-users"),api);
   document.getElementById("profile-form")?.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const form = ev.currentTarget;
@@ -4213,6 +4227,7 @@ async function renderAjustes() {
     deleteBtn.textContent = "Borrando…";
     if (deleteErr) deleteErr.hidden = true;
     try {
+      await window.OgtAuth.prepareAccountDeletion();
       await api("/api/v1/account/delete", { confirm: "BAJA" });
       await clearClientSession();
       location.replace("/borrar-cuenta?hecha=1");
@@ -4644,6 +4659,7 @@ function authProviders() {
   const google = `<img class="auth-social-mark" src="/google-logo.svg" alt="" width="20" height="20">`;
   return `<p class="auth-or"><span>O CONTINUÁ</span></p>
     <div class="auth-providers">
+      <button type="button" class="auth-social auth-social-apple" data-prov="apple" aria-label="Continuar con Apple"><img src="/apple-continue-es.png" alt="" width="320" height="52"></button>
       <button type="button" class="auth-social" data-prov="google">${google}<span>Continuar con Google</span></button>
     </div>`;
 }
@@ -4997,6 +5013,7 @@ function bindAuth(page) {
         if (!auth) throw new Error("Auth no cargó");
         setAuthBusy(true, "Ingresando…");
         if (btn.dataset.prov === "google") await auth.signInGoogle();
+        else if (btn.dataset.prov === "apple") await auth.signInApple();
         else throw new Error("Proveedor no soportado");
         await enterAfterAuth();
       } catch (e) { fail(e); }
@@ -5137,15 +5154,17 @@ async function renderEmpresaCampanas() {
         <label class="field">Nota <input name="conditionNote" placeholder="Meta comunitaria alcanzada"></label>
         <button type="submit" class="publish-cta">Emitir cupón</button>
       </form>
-      <p id="desk-msg" class="hint"></p>`;
+      <p id="desk-msg" class="hint"></p><p class="hint"><a href="/crm/empresas/">Administrar campañas, saldo y cupones con segundo factor</a></p>`;
     document.getElementById("finance-form")?.addEventListener("submit", async (ev) => {
       ev.preventDefault();
       const data = Object.fromEntries(new FormData(ev.target));
       try {
         await api("/api/v1/csr/finance-action", {
+          requestId: ev.target.dataset.requestId ||= crypto.randomUUID(),
           campaignId: data.campaignId,
           amountCents: Math.round(Number(data.amount) * 100),
         });
+        delete ev.target.dataset.requestId;
         document.getElementById("desk-msg").textContent = "Presupuesto reservado. El sello llega cuando se verifica el hecho.";
       } catch (e) {
         document.getElementById("desk-msg").textContent = e.message;
@@ -5156,10 +5175,12 @@ async function renderEmpresaCampanas() {
       const data = Object.fromEntries(new FormData(ev.target));
       try {
         const out = await api("/api/v1/csr/promo/issue", {
+          requestId: ev.target.dataset.requestId ||= crypto.randomUUID(),
           campaignId: data.campaignId,
           discountBps: 1000,
           conditionNote: data.conditionNote || "Meta comunitaria alcanzada",
         });
+        delete ev.target.dataset.requestId;
         document.getElementById("desk-msg").textContent = `Cupón ${out.code || out}`;
       } catch (e) {
         document.getElementById("desk-msg").textContent = e.message;
@@ -5298,4 +5319,10 @@ Promise.resolve(window.OgtAuth && window.OgtAuth.ready).catch(() => {}).then(asy
     return enterAfterAuth();
   }
   return show();
+});
+
+window.addEventListener('ogt-user-block-changed',event=>{
+ const id=event.detail?.userId;if(!id)return;
+ if(event.detail.blocked){lastFeed=lastFeed.filter(post=>post.authorId!==id);lastInbox=lastInbox.filter(thread=>thread.peerUserId!==id);following.delete(id);}
+ if(location.hash==='#/inicio')renderInicio();
 });

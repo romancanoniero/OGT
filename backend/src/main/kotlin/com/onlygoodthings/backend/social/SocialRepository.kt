@@ -24,9 +24,22 @@ import com.onlygoodthings.shared.feed.FeedRanker
 import com.onlygoodthings.shared.feed.ViewerContext
 import java.sql.ResultSet
 import java.util.UUID
+import com.onlygoodthings.backend.community.guardedContactWrite
+import com.onlygoodthings.backend.community.UserBlocks
+import com.onlygoodthings.backend.community.interactionSql
 
 class SocialSqlRepository(private val db: Database) {
 
+    private val blocks=UserBlocks(db)
+    fun requireContentInteraction(viewer:String,postId:String?,commentId:String?,anecdoteId:String?) {
+        val refs=listOfNotNull(postId?.let { Triple("social_posts","author_user_id",it) },commentId?.let { Triple("post_comments","author_user_id",it) },anecdoteId?.let { Triple("post_anecdotes","author_user_id",it) })
+        for((table,author,id) in refs) {
+            UUID.fromString(id)
+            db.withConnection { c -> c.prepareStatement("SELECT ogt_users_can_interact(?::uuid,$author) FROM $table WHERE id=?::uuid").use { q ->
+                q.setString(1,viewer);q.setString(2,id);q.executeQuery().use { r ->require(!r.next() || r.getBoolean(1)) { "Esta interacción no está disponible" } }
+            } }
+        }
+    }
     fun requireOrdinaryPost(id: String) {
         val story=db.withConnection { c -> c.prepareStatement("SELECT is_story FROM social_posts WHERE id=?::uuid").use { s -> s.setString(1,id);s.executeQuery().use { it.next() && it.getBoolean(1) } } }
         require(!story) { "Las historias se gestionan desde su sección" }
@@ -41,7 +54,8 @@ class SocialSqlRepository(private val db: Database) {
     ): List<SocialPost> {
         val offset = cursor?.toIntOrNull() ?: 0
         val viewer = loadViewer(userId)
-        val candidates = (loadCandidates() + loadMatchedFriendNeeds(viewer)).distinctBy { it.postId }
+        val excluded=blocks.excluded(userId)
+        val candidates = (loadCandidates() + loadMatchedFriendNeeds(viewer)).distinctBy { it.postId }.filter { it.authorUserId !in excluded }
         val ranked = FeedRanker.rank(candidates, viewer, mode, System.currentTimeMillis(), offset, pageSize, family)
         if (ranked.isEmpty()) return emptyList()
         val hydrated = hydratePosts(ranked.map { it.postId }, userId).associateBy { it.id }
@@ -53,11 +67,11 @@ class SocialSqlRepository(private val db: Database) {
     }
 
     /** Exact cache validation; absence from a ranked page is not a deletion signal. */
-    fun visiblePostIds(ids: List<String>): List<String> {
+    fun visiblePostIds(ids: List<String>,viewerId:String): List<String> {
         if (ids.isEmpty()) return emptyList()
         return db.withConnection { connection ->
             connection.prepareStatement(
-                "SELECT id::text FROM social_posts WHERE id = ANY(?) AND moderation_status = 'VISIBLE' AND NOT is_story",
+                "SELECT id::text FROM social_posts WHERE id = ANY(?) AND moderation_status = 'VISIBLE' AND NOT is_story AND ${interactionSql(viewerId,"author_user_id")}",
             ).use { stmt ->
                 val array = connection.createArrayOf("uuid", ids.map { java.util.UUID.fromString(it) }.toTypedArray())
                 try {
@@ -196,8 +210,9 @@ class SocialSqlRepository(private val db: Database) {
     }
 
     fun follow(followerId: String, followedId: String) {
+        blocks.requireAllowed(followerId,followedId)
         require(followerId != followedId) { "No podés seguirte a vos" }
-        db.withConnection { connection ->
+        guardedContactWrite { db.withConnection { connection ->
             connection.prepareStatement(
                 """
                 INSERT INTO follows (follower_id, followed_id)
@@ -209,7 +224,7 @@ class SocialSqlRepository(private val db: Database) {
                 stmt.setString(2, followedId)
                 stmt.executeUpdate()
             }
-        }
+        } }
     }
 
     fun unfollow(followerId: String, followedId: String) {
@@ -290,7 +305,7 @@ class SocialSqlRepository(private val db: Database) {
                 """
                 SELECT id::text, display_name, photo_url, community_points, role::text
                 FROM users
-                WHERE status = 'ACTIVE' AND display_name ILIKE ?
+                WHERE status = 'ACTIVE' AND display_name ILIKE ? AND ${interactionSql(viewerId,"id")}
                 ORDER BY community_points DESC
                 LIMIT 12
                 """.trimIndent(),
@@ -369,7 +384,7 @@ class SocialSqlRepository(private val db: Database) {
                        (SELECT COUNT(*) FROM follows f WHERE f.follower_id = u.id) AS following,
                        EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ?::uuid AND f.followed_id = u.id) AS viewer_follows
                 FROM users u
-                WHERE u.id = ?::uuid AND u.status = 'ACTIVE'
+                WHERE u.id = ?::uuid AND u.status = 'ACTIVE' AND ${interactionSql(viewerId,"u.id")}
                 """.trimIndent(),
             ).use { stmt ->
                 stmt.setString(1, viewerId)
@@ -493,8 +508,9 @@ class SocialSqlRepository(private val db: Database) {
         return byId(postId, userId)
     }
 
-    fun comments(postId: String, anecdoteId: String? = null): List<SocialComment> = db.withConnection { connection ->
-        nest(loadComments(connection, postId, anecdoteId))
+    fun comments(postId: String, anecdoteId: String? = null,viewerId:String?=null): List<SocialComment> {
+        val excluded=viewerId?.let { blocks.excluded(it) }.orEmpty()
+        return db.withConnection { connection ->filterBlockedComments(nest(loadComments(connection,postId,anecdoteId)),excluded) }
     }
 
     fun addComment(
@@ -998,6 +1014,7 @@ class SocialSqlRepository(private val db: Database) {
     private fun hydratePosts(ids: List<String>, viewerId: String): List<SocialPost> {
         if (ids.isEmpty()) return emptyList()
         val placeholders = ids.joinToString(",") { "?::uuid" }
+        val excluded=blocks.excluded(viewerId)
         return db.withConnection { connection ->
             connection.prepareStatement(
                 """
@@ -1054,7 +1071,7 @@ class SocialSqlRepository(private val db: Database) {
                 LEFT JOIN companies c ON c.id = p.author_company_id
                 LEFT JOIN timebank_needs tn ON tn.post_id = p.id AND tn.open
                 LEFT JOIN skill_tags nt ON nt.id = tn.tag_id
-                WHERE p.id IN ($placeholders) AND NOT p.is_story
+                WHERE p.id IN ($placeholders) AND NOT p.is_story AND ${interactionSql(viewerId,"p.author_user_id")}
                 """.trimIndent(),
             ).use { stmt ->
                 stmt.setString(1, viewerId)
@@ -1072,7 +1089,7 @@ class SocialSqlRepository(private val db: Database) {
                     post.copy(
                         media = items,
                         mediaUrls = items.map { it.url }.ifEmpty { post.mediaUrls },
-                        anecdotes = anecdotes[post.id].orEmpty(),
+                        anecdotes = anecdotes[post.id].orEmpty().filter { it.authorUserId !in excluded }.map { it.copy(comments=filterBlockedComments(it.comments,excluded)) },
                     )
                 }
             }
@@ -1454,4 +1471,11 @@ class SocialSqlRepository(private val db: Database) {
         viewerHasImpacted = runCatching { getBoolean("viewer_hit") }.getOrDefault(false),
         viewerHasHearted = runCatching { getBoolean("viewer_heart") }.getOrDefault(false),
     )
+}
+
+/** Keep replies by unblocked people even when their parent author is hidden. */
+internal fun filterBlockedComments(rows:List<SocialComment>,excluded:Set<String>):List<SocialComment> = rows.flatMap { row ->
+    val replies=filterBlockedComments(row.replies,excluded)
+    if(row.authorUserId in excluded)replies.map { it.copy(parentCommentId=row.parentCommentId) }
+    else listOf(row.copy(replies=replies))
 }

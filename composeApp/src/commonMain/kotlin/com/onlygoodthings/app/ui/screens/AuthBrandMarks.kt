@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -26,14 +27,21 @@ import org.jetbrains.compose.resources.painterResource
 const val GoogleSignInLabel = "Continuar con Google"
 
 @Composable
-fun AuthProviderRow(onPick: (String) -> Unit = {}) {
-    AuthProviderChip(GoogleSignInLabel, Modifier.fillMaxWidth(), onClick = { onPick("google") })
+fun AuthProviderRow(enabled: Boolean = true, onPick: (String) -> Unit = {}) {
+    Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        AppleSignInButton(enabled) { onPick("apple") }
+        AuthProviderChip(GoogleSignInLabel, Modifier.fillMaxWidth(), enabled, onClick = { onPick("google") })
+    }
 }
+
+@Composable
+expect fun AppleSignInButton(enabled:Boolean, onClick:()->Unit)
 
 @Composable
 private fun AuthProviderChip(
     label: String,
     modifier: Modifier,
+    enabled:Boolean,
     onClick: () -> Unit,
 ) {
     Row(
@@ -42,7 +50,7 @@ private fun AuthProviderChip(
             .clip(AuthCorner)
             .background(OgtColors.surface)
             .border(1.dp, OgtColors.stone, AuthCorner)
-            .clickable(onClick = onClick),
+            .clickable(enabled=enabled,onClick = onClick),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {

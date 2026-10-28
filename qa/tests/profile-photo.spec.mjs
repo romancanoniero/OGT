@@ -49,8 +49,10 @@ test('existing comments and anecdotes use the current profile photo without chan
   const posts=await api('social/posts-by-author',{userId:me.userId});
   const fresh=posts.find(p=>p.id===post.id).anecdotes.find(a=>a.id===story.id);
   expect(fresh.authorPhotoUrl).toBe(second.url);expect(fresh.comments[0].authorPhotoUrl).toBe(second.url);
-  await api('timebank/skill',{tagSlug:'carpinteria',offered:true,requested:false});
-  await api('timebank/skill',{tagSlug:'carpinteria',offered:false,requested:true},otherToken);
+  const label='Encuadernación QA '+Date.now();
+  const tags=await api('timebank/tag/create',{label});
+  const tag=tags.find(t=>t.offered&&t.label.toLocaleLowerCase('es')===label.toLocaleLowerCase('es'));expect(tag).toBeTruthy();
+  await api('timebank/skill',{tagSlug:tag.slug,offered:false,requested:true},otherToken);
   const board=await api('timebank/board',{},otherToken);
   expect(board.helpers.find(h=>h.userId===me.userId)?.photoUrl).toBe(second.url);
   await page.screenshot({path:info.outputPath('current-avatars.png'),fullPage:true});

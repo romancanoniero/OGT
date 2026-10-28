@@ -20,4 +20,7 @@ data class AccountExport(
     val posts: List<AccountTextRow> = emptyList(),
     val comments: List<AccountTextRow> = emptyList(),
     val messagesSent: List<AccountTextRow> = emptyList(),
+    val blockedUsers:List<com.onlygoodthings.shared.domain.BlockedUser> = emptyList(),
+    val coupons:List<com.onlygoodthings.shared.domain.BusinessCoupon> = emptyList(),
+    val companyApplications:List<com.onlygoodthings.backend.business.CsrRegistration> = emptyList(),
 )

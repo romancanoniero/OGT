@@ -49,7 +49,7 @@ fun LoginScreen(onEnter: () -> Unit, onSignUp: () -> Unit, onRecover: () -> Unit
             OgtSectionTitle("Bienvenido de vuelta")
             OgtCaption("Seguí multiplicando las buenas acciones e historias de tu comunidad.")
         }
-        AuthProviderRow { provider ->
+        AuthProviderRow(enabled=!auth.busy) { provider ->
             scope.launch {
                 if (auth.signInProvider(provider)) onEnter()
             }

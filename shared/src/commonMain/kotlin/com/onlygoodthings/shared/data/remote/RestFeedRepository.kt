@@ -32,6 +32,16 @@ class RestFeedRepository(
 ) : FeedRepository {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
+    suspend fun ownCoupons():List<com.onlygoodthings.shared.domain.BusinessCoupon> = post("/api/v1/coupons/mine",buildJsonObject {})
+    suspend fun claimCoupon(code:String) {
+        post<JsonObject>("/api/v1/coupons/claim",buildJsonObject {put("code",JsonPrimitive(code))})
+    }
+
+    suspend fun blockedUsers():List<com.onlygoodthings.shared.domain.BlockedUser> = post("/api/v1/users/blocks",buildJsonObject {})
+    suspend fun setUserBlocked(id:String,blocked:Boolean) {
+        post<String>("/api/v1/users/${if(blocked)"block" else "unblock"}",buildJsonObject { put("userId",JsonPrimitive(id)) })
+    }
+
     override suspend fun loadFeed(
         cursor: String?,
         pageSize: Int,

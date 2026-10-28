@@ -53,6 +53,7 @@ fun WalletScreen(onBack: () -> Unit = {}) {
                 Box(Modifier.fillMaxWidth(progress).height(8.dp).clip(CircleShape).background(OgtColors.primary))
             }
             OgtCaption("Meta ${formatPts(nextGoal)} pts")
+            com.onlygoodthings.app.ui.components.CouponWallet()
             PrefCategory("Comercios que agradecen", "Un canje es un gracias, no reputación comprada.")
             PrefGroup {
                 db.rewards.forEachIndexed { index, reward ->

@@ -1,10 +1,10 @@
 package com.onlygoodthings.shared.data
 
-/** API en la VPS. HTTP de lab, como la demo de Dentastic. */
+/** Default production endpoints use TLS; laboratory endpoints are explicit overrides. */
 const val OGT_DEFAULT_API_BASE = "https://onlygoodthings.lat"
 
 class SessionStore {
     var firebaseJwt: String? = null
     var apiBaseUrl: String = OGT_DEFAULT_API_BASE
-    var socketUrl: String = "ws://217.216.82.209:19080/ws"
+    var socketUrl: String = "wss://onlygoodthings.lat/db"
 }

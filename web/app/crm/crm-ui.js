@@ -239,7 +239,9 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   const detailNote = node('p', 'El servidor informó este total. Desde acá no se editan permisos ni registros.');
   detail.append(detailTitle, detailLine, detailNote);
   panel.append(panelTitle, bulkBar, tableWrap, entityWrap, listCount, more, listError, empty.box, detail);
-  main.append(header, tools, queryChips, kpis, panel);
+  const custom = node('section'); custom.hidden = true;
+  let disposeCustom = null;
+  main.append(header, tools, queryChips, kpis, panel, custom);
   workspace.append(nav, main);
   const dialog = node('dialog');
   dialog.className = 'crm-dialog';
@@ -1929,7 +1931,15 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     markCurrent();
   }
   function paint() {
+    disposeCustom?.(); disposeCustom = null;
     const section = sectionOf(current);
+    custom.hidden = true; custom.replaceChildren();
+    panel.hidden = false; tools.hidden = false;
+    if (typeof section?.mount === 'function') {
+      heading.textContent = section.label; tools.hidden = true; panel.hidden = true;
+      kpis.hidden = true; queryChips.hidden = true; custom.hidden = false;
+      disposeCustom = section.mount(custom); markCurrent(); return;
+    }
     if (workspaceView(section, listings) === 'listing') {
       const listing = listingOf(current);
       if (!listing) {
@@ -2090,6 +2100,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     if (!suggestBox.hidden) closeSuggest('window');
   }, dismiss);
   function dispose() {
+    disposeCustom?.(); disposeCustom = null;
     closeQueryPanel();
     closeSuggest('session');
     suggestListeners.abort();

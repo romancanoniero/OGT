@@ -70,8 +70,9 @@ controles para evitar una aprobacion. No se utilizan valores OGT_STAGING_*.
 ## Proteccion de datos y despliegue
 
 El activador exige la instalacion existente saludable y las tablas previas; no
-inicializa una nueva DB ni adivina migraciones ausentes. La revision inicial solo
-aplica 23_crm_foundations.sql, aditiva e idempotente. Nunca vuelve a ejecutar los
+inicializa una nueva DB ni adivina migraciones ausentes. El paquete actual aplica una lista explícita de migraciones aditivas e
+idempotentes: 23–26 y 28–34. La 27 ya es un requisito de la instalación
+existente; no se reemplaza por un barrido de SQL históricos. Nunca vuelve a ejecutar los
 SQL historicos con usuarios y conversaciones de demostracion. Los datos demo que
 ya existan no se eliminan automaticamente: requieren una revision separada.
 
@@ -92,14 +93,19 @@ database.dump, database-toc.txt y previous-image.txt. La imagen anterior queda
 etiquetada como ogt-backend:before-<release-id>. Un operador debe revisar la fase
 de fallo antes de restaurar archivos/imagen y, solo si corresponde, la DB. No
 usar docker compose down -v ni restaurar un dump sobre datos nuevos sin revision.
-No se ha ensayado todavia esta recuperacion en el servidor real.
+El 27/10 se restauró un respaldo real en una base temporal separada del mismo
+PostGIS: coincidieron las cantidades de usuarios, publicaciones, campañas y tablas;
+se verificaron PostGIS y salud de la API. La base original permaneció intacta y
+se retiró únicamente la copia temporal. Esto prueba recuperación del respaldo,
+no un rollback de aplicación ni recuperación ante pérdida completa del servidor.
 
 ## Condiciones para dar por terminado el lanzamiento
 
 CI de fuentes/browser, build/test backend, migracion real, respaldo/recuperacion,
 HTTPS desde la red permitida, MFA real, cuentas autorizadas, permisos negativos
-entre empresas y funciones de negocio deben verificarse por separado. Los tests
-de navegador usan mocks. Un job verde de fuentes no certifica el servidor.
+entre empresas y funciones de negocio deben verificarse por separado. La regresión de QA combina tests de componentes con API simulada y 50 recorridos
+de navegador contra API/PostGIS/Redis locales y Firebase emulado. Ninguno certifica
+los proveedores reales ni el servidor desplegado. Un job verde de fuentes no certifica el servidor.
 
 ## Solicitud de publicación del CRM Control (25/10/2026)
 

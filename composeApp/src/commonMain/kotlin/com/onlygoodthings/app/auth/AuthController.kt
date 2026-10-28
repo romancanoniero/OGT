@@ -129,6 +129,7 @@ class AuthController(
     suspend fun signInProvider(provider: String): Boolean = wrap {
         val user = when (provider) {
             "google" -> platform.signInGoogle()
+            "apple" -> platform.signInApple()
             else -> error("Proveedor no soportado")
         }
         finishSession(user, keep = true)
@@ -165,8 +166,24 @@ class AuthController(
     }
 
     /** Borra la fila de OGT y el contenido de esta cuenta, y después cierra la sesión local. */
+    suspend fun setUserBlocked(userId:String,blocked:Boolean) {
+        feed.setUserBlocked(userId,blocked)
+        if(blocked) {
+            db.posts.removeAll { it.authorUserId==userId }
+            db.inbox.removeAll { it.peerUserId==userId }
+            db.comments.removeAll { it.authorUserId==userId }
+            db.anecdotes.removeAll { it.authorUserId==userId }
+            db.follows.removeAll { (it.followerId==preview.currentUserId && it.followedId==userId) || (it.followerId==userId && it.followedId==preview.currentUserId) }
+            stories.excludeAuthor(userId)
+            preview.persistSocialFeed()
+        }
+        db.bumpFeed();db.bumpSocial();stories.refresh()
+    }
+
     suspend fun deleteAccount(): Boolean = wrap {
         if (session.firebaseJwt.isNullOrBlank()) error("Iniciá sesión para borrar la cuenta")
+        platform.prepareAccountDeletion()
+        platform.idToken(true)?.let { session.firebaseJwt = it }
         api.deleteAccount()
         signOut()
     }
@@ -348,11 +365,14 @@ class AuthController(
     }
 
     private suspend fun wrap(block: suspend () -> Unit): Boolean {
+        if (busy) return false
         busy = true
         error = null
         return try {
             block()
             true
+        } catch (cancel: kotlinx.coroutines.CancellationException) {
+            throw cancel
         } catch (e: AuthException) {
             error = e.message
             false

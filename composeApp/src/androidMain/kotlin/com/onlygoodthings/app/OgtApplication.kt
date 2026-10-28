@@ -12,13 +12,18 @@ import com.onlygoodthings.app.auth.AuthPrefs
 import com.onlygoodthings.app.map.OgtBackgroundLocation
 import java.lang.ref.WeakReference
 
-class OgtApplication : Application() {
+open class OgtApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        initializePlatformServices()
+    }
+
+    /** Device tests supply an isolated host; ordinary app startup keeps these services. */
+    protected open fun initializePlatformServices() {
         FirebaseApp.initializeApp(this)
         // Emuladores: sin SafetyNet/Play Integrity. El SMS real se reemplaza por números de prueba.
-        FirebaseAuth.getInstance().firebaseAuthSettings.setAppVerificationDisabledForTesting(true)
+        FirebaseAuth.getInstance().firebaseAuthSettings.setAppVerificationDisabledForTesting(BuildConfig.DEBUG)
         if (AuthPrefs().gpsEnabled && hasForegroundLocation()) {
             runCatching { OgtBackgroundLocation.start() }
         }

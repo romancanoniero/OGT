@@ -17,6 +17,7 @@
 		F100000000000001 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = F100000000000002 /* FirebaseMessaging */; };
 		C87B4FA04BDA1DA04158D48E /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = A55143988C4C8F291BE72E9A /* GoogleService-Info.plist */; };
 		A100000000000005 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A200000000000005 /* Assets.xcassets */; };
+		A100000000000007 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A200000000000007; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,6 +28,8 @@
 		A200000000000004 /* iosApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iosApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A55143988C4C8F291BE72E9A /* GoogleService-Info.plist */ = {isa = PBXFileReference; explicitFileType = text.plist; lastKnownFileType = text.plist; name = "GoogleService-Info.plist"; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		A200000000000005 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A200000000000007 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		A200000000000008 /* Info-Debug.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info-Debug.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -60,6 +63,8 @@
 				A200000000000002 /* ContentView.swift */,
 				A200000000000006 /* OgtVideoEditor.swift */,
 				A200000000000003 /* Info.plist */,
+				A200000000000008 /* Info-Debug.plist */,
+				A200000000000007 /* PrivacyInfo.xcprivacy */,
 				A200000000000005 /* Assets.xcassets */,
 				A55143988C4C8F291BE72E9A /* GoogleService-Info.plist */,
 			);
@@ -146,6 +151,7 @@
 			files = (
 				C87B4FA04BDA1DA04158D48E /* GoogleService-Info.plist in Resources */,
 				A100000000000005 /* Assets.xcassets in Resources */,
+				A100000000000007 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -233,7 +239,7 @@
 				ENABLE_PREVIEWS = YES;
 				FRAMEWORK_SEARCH_PATHS = "$(SRCROOT)/../composeApp/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)";
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = iosApp/Info.plist;
+				INFOPLIST_FILE = iosApp/Info-Debug.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

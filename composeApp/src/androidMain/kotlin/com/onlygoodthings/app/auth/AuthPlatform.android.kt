@@ -18,6 +18,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.OAuthProvider
+import com.google.firebase.auth.OAuthCredential
 import com.google.firebase.auth.PhoneAuthCredential
 import com.google.firebase.auth.PhoneAuthOptions
 import com.google.firebase.auth.PhoneAuthProvider
@@ -139,6 +140,19 @@ actual class AuthPlatform actual constructor() {
         throw AuthException("La cuenta de Google no devolvió un token válido")
     }
 
+
+    actual suspend fun signInApple(): AuthUser = signInOAuth("apple.com", listOf("email", "name"))
+
+    actual suspend fun prepareAccountDeletion() {
+        val user=auth.currentUser ?: throw AuthException("Iniciá sesión para borrar la cuenta")
+        if(user.providerData.none { it.providerId=="apple.com" })return
+        val provider=OAuthProvider.newBuilder("apple.com").setScopes(listOf("email","name")).build()
+        val result=user.startActivityForReauthenticateWithProvider(AndroidAuthHost.requireActivity(),provider).await()
+        check(result.user?.uid==user.uid && auth.currentUser?.uid==user.uid) { "La sesión cambió. Volvé a solicitar la baja." }
+        val accessToken=(result.credential as? OAuthCredential)?.accessToken
+            ?: throw AuthException("Apple no devolvió la autorización necesaria para la baja. Tu cuenta se conserva.")
+        auth.revokeAccessToken(accessToken).await()
+    }
 
     actual suspend fun unlockBiometric(): Boolean {
         val activity = AndroidAuthHost.requireActivity()

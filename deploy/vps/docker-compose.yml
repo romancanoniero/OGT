@@ -38,6 +38,7 @@ services:
     volumes:
       - ./media:/app/media
       - /home/iankmp/ogt-secrets/firebase-admin.json:/run/secrets/ogt-firebase-admin.json:ro
+      - /home/iankmp/ogt-secrets/mercadopago:/run/secrets/mercadopago:ro
     ports: ["127.0.0.1:19080:8080"]
     depends_on:
       postgres:
@@ -66,6 +67,17 @@ services:
       # Same installation, temporarily restricted to the reviewer's networks.
       # No forwarded-header IP strategy: do not trust client-supplied X-Forwarded-For.
       - traefik.http.routers.ogt-web.middlewares=ogt-prelaunch@docker
+      # Only this signed notification endpoint is reachable outside review networks.
+      - traefik.http.routers.ogt-mp.entrypoints=websecure
+      - traefik.http.routers.ogt-mp.rule=Host(`onlygoodthings.lat`) && Path(`/api/v1/payments/mercadopago/webhook`) && Method(`POST`)
+      - traefik.http.routers.ogt-mp.tls.certresolver=le
+      - traefik.http.routers.ogt-mp.priority=100
+      - traefik.http.routers.ogt-mp.service=ogt-web
+      - traefik.http.routers.ogt-mp.middlewares=ogt-mp-rate@docker,ogt-mp-body@docker
+      - traefik.http.middlewares.ogt-mp-rate.ratelimit.average=20
+      - traefik.http.middlewares.ogt-mp-rate.ratelimit.burst=40
+      - traefik.http.middlewares.ogt-mp-body.buffering.maxRequestBodyBytes=65536
+      - traefik.http.middlewares.ogt-mp-body.buffering.memRequestBodyBytes=65536
       - traefik.http.middlewares.ogt-prelaunch.ipallowlist.sourcerange=${OGT_PRELAUNCH_CIDRS:-127.0.0.1/32,::1/128}
 volumes:
   ogt_pg_data:

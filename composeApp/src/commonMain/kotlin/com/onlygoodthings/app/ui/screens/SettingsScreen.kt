@@ -247,6 +247,7 @@ fun SettingsScreen(
             }
 
             PrefCategory("Privacidad")
+            com.onlygoodthings.app.ui.components.BlockedUsersControl()
             PrefGroup {
                 PrefSwitch(
                     title = "Ubicación exacta en matches",

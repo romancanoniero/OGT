@@ -1,3 +1,117 @@
+# OGT: verificación del candidato integrado
+
+Actualización: 27/10/2026 (Argentina). Rama `codex/beta-candidate-20261027`;
+SDK `0a881b7a15c9a7d99b77da8547aabe2dd493a8b0`. Los apartados inferiores conservan
+el registro histórico: no reemplazan la evidencia de la revisión actual.
+
+## Evidencia actual
+
+- Regresión completa: **50/50** Chromium y WebKit móvil, API/PostGIS/Redis reales
+  locales y Firebase emulado. Informe: `build/launch-candidate-e2e.json`.
+- Backend: 60 pruebas; dominio compartido: 142; negocio con base aislada: 8.
+- Cliente Android: 47 pruebas JVM portables y las **56 pruebas comunes dentro
+  de Android**, incluyendo las de imagen, sesión y archivos que requieren SO real.
+- Node: 99; Python: 114. Sin fallos en estas ejecuciones.
+- API de historias: 13 grupos; bloqueo personal: 6; empresas: 5.
+- iOS: compilación firmada para dispositivo, `build/launch-final-ios-device.log`.
+- Android: AAB release firmado en `composeApp/build/outputs/bundle/release/`;
+  firma verificada. Estos resultados no significan subida a las tiendas ni deploy.
+- Mercado Pago: cuenta de prueba verificada y checkout sandbox creado sin pago.
+  Reintentos, duplicados, devoluciones y deuda se prueban contra un proveedor
+  controlado en las pruebas SQL. El pago real del sandbox y la entrega de
+  una notificación firmada por Mercado Pago todavía requieren aceptación.
+- Apple: proveedor configurado; compilaciones y pruebas de contrato aprobadas.
+  Ingreso, vinculación, reingreso y baja con una cuenta Apple real pendientes.
+
+## Cómo repetir las comprobaciones actuales
+
+Conservar las credenciales fuera de Git y usar exclusivamente el entorno aislado
+descrito más abajo. No usar datos de producción para satisfacer fixtures.
+El SDK local debe estar en la revisión indicada al principio. No regenerar la
+instalación de backend mientras la API de QA usa sus archivos: detener solo ese
+proceso antes de `:backend:installDist` y reiniciarlo después.
+
+```sh
+node --test qa/*.test.mjs
+python3 -m unittest discover -s qa -p 'test_*.py'
+./gradlew :backend:test :shared:jvmTest :composeApp:testDebugUnitTest
+```
+
+Con API en 19083, web en 19082 y emulador Auth en 19099, generar identidades
+sintéticas para los casos de historias, bloqueo y negocio:
+
+```sh
+node qa/scripts/stories-e2e.mjs
+node qa/scripts/user-blocks-e2e.mjs
+node qa/scripts/business-e2e.mjs
+cd qa
+OGT_FULL_E2E=1 npm test
+```
+
+La restauración de un respaldo de Contabo se ensayó en una base temporal separada:
+coincidieron usuarios, publicaciones, campañas y cantidad de tablas; PostGIS y
+salud del backend se comprobaron. La base temporal se retiró sin modificar la
+base original. El recibo privado está en `build/launch-restore-rehearsal.log`.
+
+`business-e2e.mjs` requiere la configuración sandbox de Mercado Pago en la API;
+crea un checkout sin pagar. Los archivos `build/*-qa-account.json` son privados,
+contienen tokens exclusivamente de QA, no deben imprimirse ni entrar en Git.
+Las afirmaciones MFA de esas identidades son fixtures del emulador: no certifican
+el enrolamiento de segundo factor del proveedor real.
+
+Para las ocho pruebas transaccionales, crear una base separada en el PostGIS de
+QA, con nombre `ogt_business_qa_<sufijo>`, aplicar las migraciones de esquema
+excluyendo la importación editorial 14 y ejecutar:
+
+```sh
+OGT_BUSINESS_TEST_JDBC=jdbc:postgresql://127.0.0.1:19432/ogt_business_qa_local \
+./gradlew :backend:businessIntegrationTest
+```
+
+Para Android, las pruebas de almacenamiento se instalan exclusivamente bajo
+`com.onlygoodthings.app.qa`, con Firebase sintético y servicios externos apagados.
+No se ejecutan dentro del paquete del usuario:
+
+```sh
+ANDROID_SERIAL=<emulador-Android> ./gradlew -Pogt.instrumentedQa=true \
+-I qa/android-instrumented.init.gradle :composeApp:connectedDebugAndroidTest
+```
+
+La configuración utiliza el árbol de pruebas de Kotlin; conserva la jerarquía
+normal de `iosMain`/`iosTest`. No sustituirla por una dependencia manual que
+suprima esa jerarquía. La configuración Firebase y la clave release reales se
+usan únicamente al generar la distribución, nunca para el paquete de QA.
+
+## Límites y diferencias intencionales
+
+La empresa debe operar con MFA y permisos vigentes por organización. Las cargas,
+reservas, cambios de campaña y cupones llevan identificador de operación; las
+versiones antiguas que intenten mover saldo sin él reciben una solicitud de
+actualización. El historial permite retomar pagos pendientes; nunca acredita
+saldo basándose en el regreso del navegador. La consulta del historial funciona
+incluso si el proveedor está temporalmente deshabilitado. Los códigos de cupón
+quedan restringidos a los operadores autorizados, conservando los indicadores
+para lectores. Las actualizaciones de saldo conservan los campos escritos.
+
+La verificación Android de SMS permanece habilitada en release; la excepción de
+emulador se limita a Debug. Release usa HTTPS; Debug conserva el acceso HTTP de
+laboratorio. Se agregó el manifiesto iOS de APIs con motivos requeridos y se
+registraron en Firebase las huellas públicas de la firma local release, manteniendo
+las de Play. El manifiesto no sustituye los formularios de privacidad de las tiendas.
+
+El alta por solicitud y revisión independiente de Control está implementada y
+probada por HTTP y en ambos navegadores: la solicitud no concede acceso, la
+aprobación crea una empresa verificada y un titular, y rechazar o retirar no
+concede permisos. Reintentos, fiscal duplicado, aprobación propia, exportación y
+baja se verifican en la base aislada. La migración aditiva es la 34.
+
+Siguen pendientes la gestión completa de roles y transferencia de titularidad,
+aceptación de proveedores y dispositivos reales, distribución de una revisión
+única, despliegue privado, restauración ensayada y aceptación operativa. Conservar
+el acceso privado de prelaunch; estas pruebas no autorizan abrir la aplicación.
+
+## Registro histórico y procedimientos anteriores
+
 # OGT: verificación de lanzamiento
 
 Base de producción recuperada: `recovery/vps-baseline-20261019` (`3a726d6`).

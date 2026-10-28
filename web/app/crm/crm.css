@@ -1062,3 +1062,21 @@ body[data-crm-view="pending"] #crm-root { display: none !important; }
 }
 .crm-user-moderation-dialog .crm-field { margin-top: 12px; }
 .crm-user-moderation-footer > .crm-btn { margin-top: 0; }
+
+.crm-business { display:grid; grid-template-columns:minmax(0,1fr); gap:20px; width:100%; min-width:0; overflow-x:clip; }
+.crm-business > div { display:grid; grid-template-columns:minmax(0,1fr); gap:20px; min-width:0; }
+.crm-business-form { display:grid; grid-template-columns:minmax(0,1fr); min-width:0; width:100%; box-sizing:border-box; gap:14px; padding:24px; border:1px solid var(--crm-line,#dce2e5); border-radius:20px; background:var(--crm-surface,#fff); max-width:760px; }
+.crm-business-form h4 { margin:0; font-size:18px; }
+.crm-business-form .crm-input { width:100%; min-width:0; max-width:100%; box-sizing:border-box; }
+.crm-business-form .crm-btn { white-space:normal; min-height:44px; overflow-wrap:anywhere; }
+.crm-business-form textarea { min-height:112px; resize:vertical; }
+.crm-business-form .crm-note { margin:0; overflow-wrap:anywhere; }
+.crm-business-form .crm-note a { display:inline-flex; margin:8px 12px 8px 0; }
+.crm-business .crm-table-wrap { max-width:100%; }
+.crm-business .crm-table td { overflow-wrap:anywhere; }
+@media(max-width:600px) { .crm-business-form { padding:18px; } }
+
+.crm-business-metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; }
+.crm-business-metrics article { background:var(--ogt-canvas,#fff); border:1px solid var(--ogt-hairline,#dce2e5); border-radius:16px; padding:18px; min-width:0; }
+.crm-business-metrics p { font-size:13px; color:var(--ogt-muted,#66717b); margin:0 0 10px; }
+.crm-business-metrics strong { font-size:22px; overflow-wrap:anywhere; }

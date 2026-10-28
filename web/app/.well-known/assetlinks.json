@@ -1,11 +1,14 @@
 [
   {
-    "relation": ["delegate_permission/common.handle_all_urls"],
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
     "target": {
       "namespace": "android_app",
       "package_name": "com.onlygoodthings.app",
       "sha256_cert_fingerprints": [
-        "0D:B7:97:43:4D:57:AC:85:F0:22:00:8D:A0:68:95:36:82:A3:81:3D:89:E3:98:6D:3B:8E:07:15:0A:70:D2:44"
+        "0D:B7:97:43:4D:57:AC:85:F0:22:00:8D:A0:68:95:36:82:A3:81:3D:89:E3:98:6D:3B:8E:07:15:0A:70:D2:44",
+        "29:C9:91:15:DF:EE:A4:10:33:D0:48:3D:E2:7B:7C:5A:08:93:DB:43:FF:FA:43:62:5F:AD:EC:B1:8A:6A:B1:33"
       ]
     }
   }

@@ -1,3 +1,4 @@
+import {confirmUserBlock} from "./user-safety.js?v=1";
 import {createStoryMediaCache,storyBookProgress,storyDuration} from './story-playback.js?v=1';
 import { createStoryViewport } from './story-frame.js?v=2';
 
@@ -86,7 +87,7 @@ export function mountStories(root, api, {ownerId=null}={}) {
       const controls=document.createElement('div');controls.className='ephemeral-story-controls';
       const pause=button('Pausar',()=>{paused=!paused;pause.textContent=paused?'Reproducir':'Pausar';visibility();if(paused && media.pause)media.pause();});
       controls.append(button('Anterior',()=>show(index-1)),...(row.kind==='VIDEO'?[]:[pause]),button('Siguiente',next));
-      if(row.authorId!==ownerId)controls.append(button('Denunciar historia',reportStory));
+      if(row.authorId!==ownerId){controls.append(button('Denunciar historia',reportStory),button('Bloquear usuario',()=>{paused=true;media?.pause?.();confirmUserBlock(api,row.authorId,close);}));}
       const footer=document.createElement('footer');footer.append(caption,time,...(built.controls?[built.controls]:[]),controls);
       dialog.replaceChildren(built.viewport,head,progress,footer);
       turning=!!oldViewport;
@@ -129,5 +130,6 @@ export function mountStories(root, api, {ownerId=null}={}) {
   }
   const poll=setInterval(()=>{if(!root.isConnected){dispose();return;}if(!document.hidden && Date.now()-lastRefresh>30000)refresh();},10000);
   function dispose(){if(disposed)return;disposed=true;openingVersion++;clearInterval(poll);active?.();cache.dispose();}
-  refresh();return dispose;
+  const blockChanged=()=>{active?.();refresh();};window.addEventListener("ogt-user-block-changed",blockChanged);
+  const originalDispose=dispose;refresh();return()=>{window.removeEventListener("ogt-user-block-changed",blockChanged);originalDispose();};
 }

@@ -590,35 +590,6 @@ fun Route.csrRoutes(db: Database) {
         call.respond(ApiResponse.ok(card))
     }
 
-    post("/api/v1/csr/finance-action") {
-        val principal = requireUser(call) ?: return@post
-        if (principal.role != UserRole.COMPANY_ADMIN) {
-            return@post call.respond(HttpStatusCode.Forbidden, ApiResponse.fail<Unit>("Solo COMPANY_ADMIN", "FORBIDDEN"))
-        }
-        val dataMap = JsonBody.receiveMap(call)
-        val campaignId = dataMap.reqString("campaignId")
-        val amountCents = (dataMap["amountCents"] as? Number)?.toLong() ?: error("Campo requerido: amountCents")
-        require(amountCents > 0)
-        db.withConnection { connection ->
-            connection.prepareStatement(
-                """
-                INSERT INTO money_ledgers (kind, amount_cents, payer_user_id, company_id, campaign_id, note)
-                SELECT 'ACTION_FINANCE', ?, ?::uuid, c.company_id, c.id, 'Financia un hecho. El sello llega cuando se verifica.'
-                FROM campaigns c
-                JOIN company_admins a ON a.company_id = c.company_id
-                WHERE c.id = ?::uuid AND a.user_id = ?::uuid
-                """.trimIndent(),
-            ).use { stmt ->
-                stmt.setLong(1, amountCents)
-                stmt.setString(2, principal.userId)
-                stmt.setString(3, campaignId)
-                stmt.setString(4, principal.userId)
-                val rows = stmt.executeUpdate()
-                if (rows == 0) error("Campaña inexistente o no es tuya")
-            }
-        }
-        call.respond(ApiResponse.ok("ok", "Presupuesto reservado. Empresa que suma se gana al verificarse el hecho."))
-    }
     post("/api/v1/csr/campaigns") {
         val principal = requireUser(call) ?: return@post
         if (principal.role.name != "COMPANY_ADMIN") {
@@ -657,46 +628,7 @@ fun Route.csrRoutes(db: Database) {
         call.respond(ApiResponse.ok(rows))
     }
 
-    post("/api/v1/csr/promo/issue") {
-        val principal = requireUser(call) ?: return@post
-        if (principal.role != UserRole.COMPANY_ADMIN) {
-            return@post call.respond(HttpStatusCode.Forbidden, ApiResponse.fail<Unit>("Solo COMPANY_ADMIN", "FORBIDDEN"))
-        }
-        val dataMap = JsonBody.receiveMap(call)
-        val campaignId = dataMap.reqString("campaignId")
-        val discountBps = dataMap.optInt("discountBps", 1000)
-        require(discountBps in 1..10000) { "Descuento fuera de rango" }
-        val issuedTo = dataMap.optString("issuedToUser")
-        if (issuedTo != null) runCatching { UUID.fromString(issuedTo) }
-            .getOrElse { throw IllegalArgumentException("Destinatario inválido") }
-        val note = dataMap.optString("conditionNote")?.trim()?.takeIf { it.isNotBlank() }
-            ?: "Meta comunitaria alcanzada"
-        require(note.length <= 500) { "La condición supera 500 caracteres" }
-        val code = "OGT-" + UUID.randomUUID().toString().take(8).uppercase()
-        val inserted = db.withConnection { connection ->
-            connection.prepareStatement(
-                """
-                INSERT INTO promo_codes (campaign_id, company_id, code, discount_bps, issued_to_user, expires_at, condition_note)
-                SELECT c.id, c.company_id, ?, ?, ?::uuid, now() + interval '30 days', ?
-                FROM campaigns c
-                JOIN company_admins a ON a.company_id = c.company_id
-                WHERE c.id = ?::uuid AND c.status = 'ACTIVE' AND a.user_id = ?::uuid
-                """.trimIndent(),
-            ).use { stmt ->
-                stmt.setString(1, code)
-                stmt.setInt(2, discountBps)
-                if (issuedTo == null) stmt.setNull(3, java.sql.Types.OTHER) else stmt.setString(3, issuedTo)
-                stmt.setString(4, note)
-                stmt.setString(5, campaignId)
-                stmt.setString(6, principal.userId)
-                stmt.executeUpdate()
-            }
-        }
-        if (inserted == 0) {
-            return@post call.respond(HttpStatusCode.Forbidden, ApiResponse.fail<Unit>("Campaña no disponible", "FORBIDDEN"))
-        }
-        call.respond(ApiResponse.ok(PromoIssued(code), "Cupón emitido"))
-    }
+
 }
 
 fun Route.crowdfundingRoutes(db: Database) {

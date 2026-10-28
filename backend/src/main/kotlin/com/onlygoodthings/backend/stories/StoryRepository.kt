@@ -13,7 +13,7 @@ class StorySqlRepository(private val db: Database, val media: StoryMediaStore) {
         }
     }
     private val readPermission = """(p.author_user_id=?::uuid OR (
-        u.status='ACTIVE' AND (COALESCE((u.metadata->'settings'->>'publicProfileVisible')::boolean,true)
+        u.status='ACTIVE' AND ogt_users_can_interact(?::uuid,p.author_user_id) AND (COALESCE((u.metadata->'settings'->>'publicProfileVisible')::boolean,true)
           OR EXISTS(SELECT 1 FROM follows f WHERE f.follower_id=?::uuid AND f.followed_id=p.author_user_id))
         AND (d.audience='COMMUNITY' OR EXISTS(SELECT 1 FROM follows f WHERE f.follower_id=?::uuid AND f.followed_id=p.author_user_id))))"""
     private val fields = """p.id::text,p.author_user_id::text,u.display_name,u.photo_url,p.body,
@@ -34,7 +34,7 @@ class StorySqlRepository(private val db: Database, val media: StoryMediaStore) {
             ORDER BY $order LIMIT 101 OFFSET ?""").use { s ->
             var index = 1
             s.setString(index++,viewer)
-            if(!admin) repeat(3) { s.setString(index++,viewer) }
+            if(!admin) repeat(4) { s.setString(index++,viewer) }
             s.setString(index++,"%${query.take(120)}%")
             s.setString(index++,"%${query.take(120)}%")
             s.setString(index++,"%${query.take(120)}%")
@@ -105,7 +105,7 @@ class StorySqlRepository(private val db: Database, val media: StoryMediaStore) {
             else "p.moderation_status='VISIBLE' AND p.story_expires_at>now() AND $readPermission"
         c.prepareStatement("""SELECT 1 FROM social_posts p JOIN story_details d ON d.post_id=p.id
             JOIN users u ON u.id=p.author_user_id WHERE p.id=?::uuid AND p.is_story AND $permission""").use { s->
-            s.setString(1,id);repeat(if(admin) 1 else 3) { s.setString(it+2,viewer) };s.executeQuery().use { it.next() }
+            s.setString(1,id);repeat(if(admin) 1 else 4) { s.setString(it+2,viewer) };s.executeQuery().use { it.next() }
         }
     }
     fun mediaType(id: String): String = db.withConnection { c -> c.prepareStatement("SELECT content_type FROM story_details WHERE post_id=?::uuid").use { s->s.setString(1,id);s.executeQuery().use { if(it.next()) it.getString(1) else "application/octet-stream" } } }
@@ -126,7 +126,7 @@ class StorySqlRepository(private val db: Database, val media: StoryMediaStore) {
                     JOIN story_details d ON d.post_id=p.id JOIN users u ON u.id=p.author_user_id
                     WHERE p.id=?::uuid AND p.is_story AND p.moderation_status='VISIBLE'
                     AND p.story_expires_at>now() AND $readPermission FOR SHARE OF p""").use { q ->
-                    q.setString(1,id);repeat(3) { q.setString(it+2,viewer) }
+                    q.setString(1,id);repeat(4) { q.setString(it+2,viewer) }
                     q.executeQuery().use { r -> r.next() && r.getString(1)!=viewer }
                 }
                 require(allowed) { "La historia no está disponible para denunciar" }

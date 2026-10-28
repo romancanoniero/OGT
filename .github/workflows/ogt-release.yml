@@ -39,6 +39,10 @@ jobs:
         run: python qa/run_automated_tests.py --syntax
       - name: QA automation self-tests
         run: python -m unittest discover -s qa -p 'test_qa_automation.py' -v
+      - name: Validate Apple provider setup without account access
+        run: |
+          python3 -m pip install -r scripts/requirements-identity.txt
+          python3 -m unittest qa.test_ogt_apple_provider_config -v
       - name: Source checks; no server access
         run: bash scripts/deploy-ogt-vps.sh --check
       - name: Shell syntax
@@ -47,6 +51,20 @@ jobs:
     needs: checks
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    services:
+      business-db:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: ogt
+          POSTGRES_PASSWORD: ogt_qa_local_only
+          POSTGRES_DB: ogt_business_qa_ci
+        ports:
+          - 19432:5432
+        options: >-
+          --health-cmd "pg_isready -U ogt -d ogt_business_qa_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     steps:
       - uses: actions/checkout@v5
         with:
@@ -62,9 +80,23 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Compile and run backend tests before merging or publishing
+      - name: Initialize isolated business schema without production editorial data
+        env:
+          PGPASSWORD: ogt_qa_local_only
         run: |
-          ./gradlew "-Pogt.dbKmpSdkPath=$GITHUB_WORKSPACE/_sdk" :backend:test --no-daemon
+          if ! command -v psql >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y postgresql-client
+          fi
+          for migration in database/migrations/*.sql; do
+            case "$migration" in */14_elpidio_homenaje.sql) continue;; esac
+            psql -h 127.0.0.1 -p 19432 -U ogt -d ogt_business_qa_ci -X -v ON_ERROR_STOP=1 --single-transaction -f "$migration"
+          done
+      - name: Compile and run backend tests before merging or publishing
+        env:
+          OGT_BUSINESS_TEST_JDBC: jdbc:postgresql://127.0.0.1:19432/ogt_business_qa_ci
+        run: |
+          ./gradlew "-Pogt.dbKmpSdkPath=$GITHUB_WORKSPACE/_sdk" :backend:test :backend:businessIntegrationTest --no-daemon
   database:
     needs: checks
     runs-on: ubuntu-24.04

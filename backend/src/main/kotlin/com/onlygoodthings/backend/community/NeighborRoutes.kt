@@ -58,6 +58,7 @@ fun Route.neighborRoutes(db: Database, hub: RealtimeHub) {
         val principal = requireNeighbor(call) ?: return@post
         val dataMap = runCatching { JsonBody.receiveMap(call) }.getOrDefault(emptyMap())
         val target = dataMap.optString("userId")?.takeIf { it.isNotBlank() } ?: principal.userId
+        if(!UserBlocks(db).allowed(principal.userId,target))return@post call.respond(HttpStatusCode.NotFound,ApiResponse.fail<Unit>("Perfil no disponible","NOT_FOUND"))
         call.respond(ApiResponse.ok(skillTags(db, target)))
     }
 
@@ -259,7 +260,7 @@ private fun walletSummary(db: Database, userId: String): WalletSummary = db.with
         """
         SELECT id::text, display_name, photo_url, community_points, role::text
         FROM users
-        WHERE status = 'ACTIVE'
+        WHERE status = 'ACTIVE' AND ${interactionSql(userId,"users.id")}
         ORDER BY community_points DESC, display_name
         LIMIT 12
         """.trimIndent(),
@@ -320,7 +321,7 @@ private fun noticeInbox(db: Database, userId: String): List<CommunityNotice> = d
             LEFT JOIN users u ON u.id = p.author_user_id
             WHERE pp.user_id = ?::uuid AND pp.role IN ('PROTAGONIST', 'PARTICIPANT')
               AND p.author_user_id IS DISTINCT FROM ?::uuid
-              AND p.moderation_status = 'VISIBLE'
+              AND p.moderation_status = 'VISIBLE' AND ${interactionSql(userId,"p.author_user_id")}
             UNION ALL
             SELECT
                 'alert:' || a.id::text,
@@ -347,7 +348,7 @@ private fun noticeInbox(db: Database, userId: String): List<CommunityNotice> = d
             FROM timebank_matches m
             JOIN skill_tags t ON t.id = m.tag_id
             JOIN users peer ON peer.id = CASE WHEN m.requester_id = ?::uuid THEN m.provider_id ELSE m.requester_id END
-            WHERE m.requester_id = ?::uuid OR m.provider_id = ?::uuid
+            WHERE (m.requester_id = ?::uuid OR m.provider_id = ?::uuid) AND ogt_users_can_interact(m.requester_id,m.provider_id)
             UNION ALL
             SELECT
                 'support:' || s.need_id::text || ':' || s.user_id::text,
@@ -362,7 +363,7 @@ private fun noticeInbox(db: Database, userId: String): List<CommunityNotice> = d
             JOIN timebank_needs n ON n.id = s.need_id AND n.open
             JOIN skill_tags t ON t.id = n.tag_id
             JOIN users u ON u.id = s.user_id
-            WHERE n.user_id = ?::uuid
+            WHERE n.user_id = ?::uuid AND ${interactionSql(userId,"s.user_id")}
             UNION ALL
             SELECT
                 'invite:' || i.need_id::text || ':' || i.inviter_id::text,
@@ -377,7 +378,7 @@ private fun noticeInbox(db: Database, userId: String): List<CommunityNotice> = d
             JOIN timebank_needs n ON n.id = i.need_id AND n.open
             JOIN skill_tags t ON t.id = n.tag_id
             JOIN users u ON u.id = i.inviter_id
-            WHERE i.invitee_id = ?::uuid
+            WHERE i.invitee_id = ?::uuid AND ${interactionSql(userId,"i.inviter_id")}
               AND NOT EXISTS (
                   SELECT 1 FROM timebank_need_supports s
                   WHERE s.need_id = i.need_id AND s.user_id = i.invitee_id
@@ -521,8 +522,9 @@ private fun upsertSkill(db: Database, userId: String, slug: String, offered: Boo
 
 private fun startMatch(db: Database, me: String, peerId: String, slug: String): TimebankThread? {
     if (me == peerId) return null
+    UserBlocks(db).requireAllowed(me,peerId)
     if (slug == MENSAJE_TAG) ensureMensajeTag(db)
-    return db.withConnection { connection ->
+    return guardedContactWrite { db.withConnection { connection ->
         val tag = connection.prepareStatement("SELECT id::text, label FROM skill_tags WHERE slug = ?").use { stmt ->
             stmt.setString(1, slug)
             stmt.executeQuery().use { rs ->
@@ -571,7 +573,7 @@ private fun startMatch(db: Database, me: String, peerId: String, slug: String): 
             tagLabel = tag.second,
             status = "ACTIVE",
         )
-    }
+    } }
 }
 
 private fun timebankInbox(db: Database, userId: String): List<TimebankThread> = db.withConnection { connection ->
@@ -591,7 +593,7 @@ private fun timebankInbox(db: Database, userId: String): List<TimebankThread> = 
         FROM timebank_matches m
         JOIN skill_tags t ON t.id = m.tag_id
         JOIN users peer ON peer.id = CASE WHEN m.requester_id = ?::uuid THEN m.provider_id ELSE m.requester_id END
-        WHERE m.requester_id = ?::uuid OR m.provider_id = ?::uuid
+        WHERE (m.requester_id = ?::uuid OR m.provider_id = ?::uuid) AND ogt_users_can_interact(m.requester_id,m.provider_id)
         ORDER BY last_ms DESC
         """.trimIndent(),
     ).use { stmt ->
@@ -619,7 +621,7 @@ private fun timebankInbox(db: Database, userId: String): List<TimebankThread> = 
 
 private fun canSeeMatch(db: Database, userId: String, matchId: String): Boolean = db.withConnection { connection ->
     connection.prepareStatement(
-        "SELECT 1 FROM timebank_matches WHERE id = ?::uuid AND (requester_id = ?::uuid OR provider_id = ?::uuid)",
+        "SELECT 1 FROM timebank_matches WHERE id = ?::uuid AND (requester_id = ?::uuid OR provider_id = ?::uuid) AND ogt_users_can_interact(requester_id,provider_id)",
     ).use { stmt ->
         stmt.setString(1, matchId)
         stmt.setString(2, userId)
@@ -665,7 +667,7 @@ private fun timebankMessages(db: Database, userId: String, matchId: String): Lis
 
 private fun sendTimebankMessage(db: Database, userId: String, matchId: String, body: String): TimebankMessageDto {
     val id = UUID.randomUUID().toString()
-    db.withConnection { connection ->
+    guardedContactWrite { db.withConnection { connection ->
         connection.prepareStatement(
             "INSERT INTO timebank_messages (id, match_id, sender_id, body) VALUES (?::uuid, ?::uuid, ?::uuid, ?)",
         ).use { stmt ->
@@ -675,7 +677,7 @@ private fun sendTimebankMessage(db: Database, userId: String, matchId: String, b
             stmt.setString(4, body.take(800))
             stmt.executeUpdate()
         }
-    }
+    } }
     return timebankMessages(db, userId, matchId).last { it.id == id }
 }
 
@@ -696,6 +698,13 @@ private fun publishNeed(
 ): TimebankBoard {
     val slug = ensureSkillTag(db, rawLabel)
     val label = skillLabel(db, slug)
+    // A removed publication remains removed. A fresh, explicit request can open
+    // a new need instead of reviving or getting stuck behind that hidden row.
+    db.withConnection { c ->c.prepareStatement("""UPDATE timebank_needs n SET open=false
+        WHERE n.user_id=?::uuid AND n.tag_id=(SELECT id FROM skill_tags WHERE slug=?) AND n.open
+        AND EXISTS(SELECT 1 FROM social_posts p WHERE p.id=n.post_id AND p.moderation_status<>'VISIBLE')""").use{q ->
+        q.setString(1,userId);q.setString(2,slug);q.executeUpdate()
+    } }
     val extraGive = rawGive?.trim()?.takeIf { it.isNotEmpty() }
     if (!extraGive.isNullOrBlank() && !SkillCanon.sameTrade(label, extraGive)) {
         createOfferedSkill(db, userId, extraGive)
@@ -812,9 +821,10 @@ private fun supportNeed(db: Database, userId: String, needId: String, join: Bool
             }
         }
     } ?: error("Ese pedido no está")
+    if(join)UserBlocks(db).requireAllowed(userId,need.first)
     if (need.first == userId) error("No podés apoyar tu propio pedido")
     if (!need.third) error("Ese pedido ya se cerró")
-    db.withConnection { connection ->
+    guardedContactWrite { db.withConnection { connection ->
         if (join) {
             connection.prepareStatement(
                 """
@@ -836,7 +846,7 @@ private fun supportNeed(db: Database, userId: String, needId: String, join: Bool
                 stmt.executeUpdate()
             }
         }
-    }
+    } }
     if (join) {
         val offered = currentSkillFlag(db, userId, need.second, offered = true)
         upsertSkill(db, userId, need.second, offered = offered, requested = true)
@@ -847,6 +857,7 @@ private fun supportNeed(db: Database, userId: String, needId: String, join: Bool
 }
 
 private fun inviteNeed(db: Database, me: String, needId: String, inviteeId: String): TimebankBoard {
+    UserBlocks(db).requireAllowed(me,inviteeId)
     if (me == inviteeId) error("Invitá a otra persona")
     val need = db.withConnection { connection ->
         connection.prepareStatement(
@@ -883,7 +894,7 @@ private fun inviteNeed(db: Database, me: String, needId: String, inviteeId: Stri
         }
     }
     if (already) error("Esa persona ya apoyó el pedido")
-    db.withConnection { connection ->
+    guardedContactWrite { db.withConnection { connection ->
         connection.prepareStatement(
             """
             INSERT INTO timebank_need_invites (need_id, invitee_id, inviter_id)
@@ -898,7 +909,7 @@ private fun inviteNeed(db: Database, me: String, needId: String, inviteeId: Stri
             stmt.setString(3, me)
             stmt.executeUpdate()
         }
-    }
+    } }
     return timebankBoard(db, me)
 }
 
@@ -910,7 +921,7 @@ private fun inviteCandidates(db: Database, userId: String, query: String): List<
             SELECT u.id::text AS user_id, u.display_name, u.photo_url, u.community_points, u.role::text AS role
             FROM follows f
             JOIN users u ON u.id = f.followed_id AND u.status = 'ACTIVE'
-            WHERE f.follower_id = ?::uuid AND u.id <> ?::uuid
+            WHERE f.follower_id = ?::uuid AND u.id <> ?::uuid AND ${interactionSql(userId,"u.id")}
             ORDER BY u.display_name
             LIMIT 12
             """.trimIndent()
@@ -918,7 +929,7 @@ private fun inviteCandidates(db: Database, userId: String, query: String): List<
             """
             SELECT u.id::text AS user_id, u.display_name, u.photo_url, u.community_points, u.role::text AS role
             FROM users u
-            WHERE u.status = 'ACTIVE' AND u.id <> ?::uuid AND u.display_name ILIKE ?
+            WHERE u.status = 'ACTIVE' AND u.id <> ?::uuid AND u.display_name ILIKE ? AND ${interactionSql(userId,"u.id")}
             ORDER BY u.community_points DESC, u.display_name
             LIMIT 12
             """.trimIndent()
@@ -1084,7 +1095,8 @@ private fun loadNeedPosts(db: Database, userId: String): List<TimebankNeedPost> 
             JOIN skill_tags t ON t.id = n.tag_id
             JOIN users u ON u.id = n.user_id
             LEFT JOIN social_posts p ON p.id = n.post_id
-            WHERE n.open
+            WHERE n.open AND u.status='ACTIVE' AND ${interactionSql(userId,"u.id")}
+              AND (p.id IS NULL OR p.moderation_status='VISIBLE')
             ORDER BY matches_me DESC, n.created_at DESC
             LIMIT 50
             """.trimIndent(),
@@ -1116,8 +1128,8 @@ private fun loadNeedPosts(db: Database, userId: String): List<TimebankNeedPost> 
         }
     }
     val ids = rows.map { it.needId }
-    val labels = loadGiveLabelsByNeed(db, ids)
-    val supports = loadSupportsByNeed(db, ids)
+    val labels = loadGiveLabelsByNeed(db, ids, userId)
+    val supports = loadSupportsByNeed(db, ids, userId)
     val invited = loadInvitedNeedIds(db, userId, ids)
     return rows.map { row ->
         val offers = labels[row.needId].orEmpty()
@@ -1153,7 +1165,7 @@ private fun loadInvitedNeedIds(db: Database, userId: String, ids: List<String>):
     }
 }
 
-private fun loadGiveLabelsByNeed(db: Database, ids: List<String>): Map<String, List<String>> {
+private fun loadGiveLabelsByNeed(db: Database, ids: List<String>, viewer:String): Map<String, List<String>> {
     if (ids.isEmpty()) return emptyMap()
     val placeholders = ids.joinToString(",") { "?::uuid" }
     return db.withConnection { connection ->
@@ -1172,7 +1184,7 @@ private fun loadGiveLabelsByNeed(db: Database, ids: List<String>): Map<String, L
             ) people ON people.need_id = n.id
             JOIN user_skills us ON us.user_id = people.uid AND us.offered
             JOIN skill_tags t ON t.id = us.tag_id AND t.slug <> 'mensaje'
-            WHERE n.id IN ($placeholders) AND us.tag_id IS DISTINCT FROM n.tag_id
+            WHERE n.id IN ($placeholders) AND us.tag_id IS DISTINCT FROM n.tag_id AND ${interactionSql(viewer,"people.uid")}
             ORDER BY t.label
             """.trimIndent(),
         ).use { stmt ->
@@ -1190,7 +1202,7 @@ private fun loadGiveLabelsByNeed(db: Database, ids: List<String>): Map<String, L
     }
 }
 
-private fun loadSupportsByNeed(db: Database, ids: List<String>): Map<String, List<TimebankNeedSupport>> {
+private fun loadSupportsByNeed(db: Database, ids: List<String>, viewer:String): Map<String, List<TimebankNeedSupport>> {
     if (ids.isEmpty()) return emptyMap()
     val placeholders = ids.joinToString(",") { "?::uuid" }
     return db.withConnection { connection ->
@@ -1199,7 +1211,7 @@ private fun loadSupportsByNeed(db: Database, ids: List<String>): Map<String, Lis
             SELECT s.need_id::text AS need_id, u.id::text AS user_id, u.display_name, u.photo_url
             FROM timebank_need_supports s
             JOIN users u ON u.id = s.user_id
-            WHERE s.need_id IN ($placeholders)
+            WHERE s.need_id IN ($placeholders) AND ${interactionSql(viewer,"u.id")}
             ORDER BY s.created_at
             """.trimIndent(),
         ).use { stmt ->
@@ -1231,7 +1243,7 @@ private fun helpersForRequested(db: Database, userId: String): List<TimebankMatc
             AND offered.offered = TRUE
             AND offered.user_id <> req.user_id
         JOIN users u ON u.id = offered.user_id AND u.status = 'ACTIVE'
-        WHERE req.user_id = ?::uuid AND req.requested = TRUE
+        WHERE req.user_id = ?::uuid AND req.requested = TRUE AND ${interactionSql(userId,"u.id")}
         LIMIT 20
         """.trimIndent(),
     ).use { stmt ->
@@ -1264,7 +1276,7 @@ private fun seekersForMyOffers(db: Database, userId: String): List<TimebankMatch
         JOIN user_skills mine ON mine.tag_id = req.tag_id
             AND mine.user_id = ?::uuid AND mine.offered = TRUE
         JOIN users u ON u.id = req.user_id AND u.status = 'ACTIVE'
-        WHERE req.requested = TRUE AND req.user_id <> ?::uuid
+        WHERE req.requested = TRUE AND req.user_id <> ?::uuid AND ${interactionSql(userId,"u.id")}
         LIMIT 20
         """.trimIndent(),
     ).use { stmt ->

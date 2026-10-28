@@ -1,6 +1,10 @@
 package com.onlygoodthings.backend
 
+import com.onlygoodthings.backend.business.paymentWebhook
+import com.onlygoodthings.backend.business.businessRoutes
 import com.onlygoodthings.backend.crm.crmRoutes
+import com.onlygoodthings.backend.community.userBlockRoutes
+import com.onlygoodthings.backend.community.canReceiveTree
 import com.onlygoodthings.backend.crm.crmStoryRoutes
 import com.onlygoodthings.backend.stories.*
 import kotlinx.coroutines.launch
@@ -137,6 +141,12 @@ fun Application.module() {
         allowMethod(HttpMethod.Options)
     }
     install(StatusPages) {
+        exception<com.onlygoodthings.backend.business.BusinessAccessDenied> { call, _ ->
+            call.respond(HttpStatusCode.Forbidden, ApiResponse.fail<Unit>("No tenés permiso para operar esta empresa", "FORBIDDEN"))
+        }
+        exception<com.onlygoodthings.backend.business.PaymentProviderFailure> { call, _ ->
+            call.respond(HttpStatusCode.ServiceUnavailable, ApiResponse.fail<Unit>("Mercado Pago no respondió. Podés reintentar la misma operación.", "PAYMENT_RETRY"))
+        }
         exception<IllegalArgumentException> { call, cause ->
             call.respond(HttpStatusCode.BadRequest, ApiResponse.fail<Unit>(cause.message ?: "Bad request", "BAD_REQUEST"))
         }
@@ -148,6 +158,11 @@ fun Application.module() {
         pingPeriod = 15.seconds
         timeout = 30.seconds
     }
+    val csr=com.onlygoodthings.backend.business.CsrRepository(db)
+    val paymentMode=System.getenv("OGT_MP_MODE").orEmpty().ifBlank{"disabled"}
+    val mercadoPago=runCatching {com.onlygoodthings.backend.business.MercadoPagoConfiguration.fromEnv()}
+        .onFailure {org.slf4j.LoggerFactory.getLogger("Payments").error("Corporate payments unavailable: review private configuration")}.getOrNull()
+    val payments=mercadoPago?.let{com.onlygoodthings.backend.business.CsrPayments(csr,it.provider)}
     val accountErasure=com.onlygoodthings.backend.auth.AccountErasureService(db)
     launch(kotlinx.coroutines.Dispatchers.IO) {
         while(isActive) {
@@ -157,6 +172,17 @@ fun Application.module() {
                 .onFailure { org.slf4j.LoggerFactory.getLogger("Privacy").warn("Story deletion retry deferred") }
             runCatching { accountErasure.processPending() }
                 .onFailure { org.slf4j.LoggerFactory.getLogger("Privacy").warn("Identity deletion retry deferred") }
+            delay(15_000)
+        }
+    }
+    launch(kotlinx.coroutines.Dispatchers.IO) {
+        while(isActive) {
+            runCatching { mercadoPago?.provider?.verifyAccount() }
+                .onFailure { org.slf4j.LoggerFactory.getLogger("Payments").warn("Payment provider verification deferred") }
+            runCatching { payments?.discoverPending() }
+                .onFailure { org.slf4j.LoggerFactory.getLogger("Payments").warn("Payment lookup retry deferred") }
+            runCatching { payments?.processPending() }
+                .onFailure { org.slf4j.LoggerFactory.getLogger("Payments").warn("Payment reconciliation retry deferred") }
             delay(15_000)
         }
     }
@@ -181,14 +207,18 @@ fun Application.module() {
 
     routing {
         get("/health") {
-            call.respond(ApiResponse.ok(mapOf("service" to "ogt-backend", "status" to "up")))
+            call.respond(ApiResponse.ok(mapOf("service" to "ogt-backend", "status" to "up",
+                "payments" to (if(mercadoPago!=null)paymentMode else if(paymentMode=="disabled")"disabled" else "unavailable"),
+                "paymentsReady" to (mercadoPago?.provider?.ready==true).toString())))
         }
         val honors = HonorSqlRepository(db)
+        paymentWebhook(payments,mercadoPago?.webhookSecret)
         publicAuthRoutes(verifier, identity)
         publicHonorRoutes(honors)
         publicMediaRoutes(mediaStore) { com.onlygoodthings.backend.crm.crmPublicMediaAvailable(db,it) }
         storyMediaRoutes(stories)
-        dbGatewayRoutes(verifier, identity, hub)
+        val blocks=com.onlygoodthings.backend.community.UserBlocks(db)
+        dbGatewayRoutes(verifier, identity, hub) { viewer,path ->blocks.canReceiveTree(db,viewer,path) }
         authenticate("firebase") {
             // One security boundary for web, Android and iOS. Reading, reports,
             // account exports and removal of own content remain possible.
@@ -210,6 +240,7 @@ fun Application.module() {
             storyRoutes(stories, hub)
             parkingRoutes(ParkingSqlRepository(db), redis, hub, FootRoutingService.fromEnv(), parkingProximity)
             socialRoutes(SocialSqlRepository(db), hub)
+            userBlockRoutes(com.onlygoodthings.backend.community.UserBlocks(db),hub)
             mediaRoutes(mediaStore) { owner,name ->
                 db.withConnection { c -> c.prepareStatement("INSERT INTO uploaded_media_owners(stored_name,uploader_user_id) VALUES(?,?::uuid)").use { q ->
                     q.setString(1,name);q.setString(2,owner);q.executeUpdate()
@@ -223,6 +254,7 @@ fun Application.module() {
             timebankRoutes(db)
             neighborRoutes(db, hub)
             csrRoutes(db)
+            businessRoutes(csr,verifier,payments)
             crowdfundingRoutes(db)
         }
     }

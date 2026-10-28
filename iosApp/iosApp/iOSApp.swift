@@ -5,6 +5,9 @@ import FirebaseAuth
 import FirebaseMessaging
 import GoogleSignIn
 import LocalAuthentication
+import AuthenticationServices
+import CryptoKit
+import Security
 import UserNotifications
 import Contacts
 import MessageUI
@@ -276,7 +279,114 @@ struct iOSApp: App {
     }
 }
 
-final class OgtFirebaseHost: NSObject, IosAuthHost {
+final class OgtFirebaseHost: NSObject, IosAuthHost, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+    private var appleController: ASAuthorizationController?
+    private var appleCompletion: ((AuthUser?, String?) -> Void)?
+    private var appleNonce: String?
+    private var appleState: String?
+    private var appleDeletionUid: String?
+    private var appleWindow: UIWindow?
+
+    func appleSignInButton(onClick: @escaping () -> Void) -> UIView {
+        let button = ASAuthorizationAppleIDButton(type: .continue, style: .black)
+        button.cornerRadius = 14
+        button.addAction(UIAction { _ in onClick() }, for: .touchUpInside)
+        return button
+    }
+
+    func signInApple(onResult: @escaping (AuthUser?, String?) -> Void) {
+        beginApple(deletingUid: nil, onResult: onResult)
+    }
+
+    func prepareAccountDeletion(onResult: @escaping (String?) -> Void) {
+        guard let user = Auth.auth().currentUser else { onResult("Iniciá sesión para borrar la cuenta"); return }
+        guard user.providerData.contains(where: { $0.providerID == "apple.com" }) else { onResult(nil); return }
+        beginApple(deletingUid: user.uid) { _, error in onResult(error) }
+    }
+
+    private func beginApple(deletingUid: String?, onResult: @escaping (AuthUser?, String?) -> Void) {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { self.beginApple(deletingUid: deletingUid, onResult: onResult) }
+            return
+        }
+        guard appleCompletion == nil else { onResult(nil, "Ya hay un ingreso con Apple en curso"); return }
+        guard let window = Self.topController()?.view.window else {
+            onResult(nil, "No hay una ventana disponible para ingresar con Apple"); return
+        }
+        var bytes = [UInt8](repeating: 0, count: 32)
+        guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else {
+            onResult(nil, "No se pudo preparar el ingreso seguro. Volvé a intentarlo."); return
+        }
+        let nonce = bytes.map { String(format: "%02x", $0) }.joined()
+        let state = UUID().uuidString
+        let request = ASAuthorizationAppleIDProvider().createRequest()
+        request.requestedScopes = [.fullName, .email]
+        request.nonce = SHA256.hash(data: Data(nonce.utf8)).map { String(format: "%02x", $0) }.joined()
+        request.state = state
+        appleNonce = nonce; appleState = state; appleDeletionUid = deletingUid
+        appleCompletion = onResult; appleWindow = window
+        let controller = ASAuthorizationController(authorizationRequests: [request])
+        controller.delegate = self; controller.presentationContextProvider = self
+        appleController = controller
+        controller.performRequests()
+    }
+
+    private func finishApple(_ user: User? = nil, _ message: String? = nil) {
+        let completion = appleCompletion
+        appleCompletion = nil; appleNonce = nil; appleState = nil; appleDeletionUid = nil
+        appleController = nil; appleWindow = nil
+        completion?(user.map(Self.map), message)
+    }
+
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        // Retained from the foreground window before starting the request.
+        appleWindow ?? ASPresentationAnchor()
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        guard controller === appleController else { return }
+        if (error as NSError).domain == ASAuthorizationError.errorDomain,
+           (error as NSError).code == ASAuthorizationError.canceled.rawValue {
+            finishApple(nil, "Ingreso con Apple cancelado")
+        } else { finishApple(nil, "No se pudo completar el ingreso con Apple. Volvé a intentarlo.") }
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        guard controller === appleController else { return }
+        guard let apple = authorization.credential as? ASAuthorizationAppleIDCredential,
+              apple.state == appleState, let nonce = appleNonce,
+              let tokenData = apple.identityToken, let token = String(data: tokenData, encoding: .utf8) else {
+            finishApple(nil, "Apple no devolvió una respuesta de ingreso válida"); return
+        }
+        let credential = OAuthProvider.appleCredential(withIDToken: token, rawNonce: nonce, fullName: apple.fullName)
+        if let uid = appleDeletionUid {
+            guard let user = Auth.auth().currentUser, user.uid == uid,
+                  let codeData = apple.authorizationCode, let code = String(data: codeData, encoding: .utf8) else {
+                finishApple(nil, "La sesión cambió. Volvé a solicitar la baja."); return
+            }
+            user.reauthenticate(with: credential) { [weak self] result, error in
+                guard let self else { return }
+                guard error == nil, result?.user.uid == uid, Auth.auth().currentUser?.uid == uid else {
+                    self.finishApple(nil, "No se pudo confirmar la identidad para borrar la cuenta"); return
+                }
+                Auth.auth().revokeToken(withAuthorizationCode: code) { [weak self] error in
+                    guard let self else { return }
+                    guard error == nil else {
+                        self.finishApple(nil, "No se pudo revocar el acceso de Apple. Tu cuenta se conserva; volvé a intentarlo."); return
+                    }
+                    self.finishApple(user)
+                }
+            }
+        } else {
+            Auth.auth().signIn(with: credential) { [weak self] result, error in
+                guard let self else { return }
+                if let error { self.finishApple(nil, Self.mensaje(error)) }
+                else if let user = result?.user { self.finishApple(user) }
+                else { self.finishApple(nil, "No se pudo autenticar con Apple") }
+            }
+        }
+    }
+
     func currentUser() -> AuthUser? {
         guard let user = Auth.auth().currentUser else { return nil }
         return Self.map(user)

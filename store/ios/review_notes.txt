@@ -1,13 +1,26 @@
-Build de prueba interna. Demo sin backend de producción: el feed arranca con datos de comunidad (Mariana).
+Borrador para el candidato integrado 1.0; completar antes de enviarlo a revisión.
 
-Login de laboratorio (si pide cuenta):
-correo: vecino.emulador@goodthings.test
-clave: GoodThings123
-teléfono Firebase de prueba: +5491112345678
-OTP: 123456
+Only Good Things permite compartir publicaciones e historias, solicitar y ofrecer
+ayuda comunitaria, colaborar con animales y compartir estacionamiento. Utiliza
+Firebase Authentication y el backend de onlygoodthings.lat. No es una demo local.
 
-Universal Links: https://onlygoodthings.lat/h/{token}
-Scheme: ogt://h/{token}
+PENDIENTE: preparar una cuenta de revisión sin privilegios administrativos,
+verificarla en el build exacto y cargar sus datos únicamente en App Review
+Information. Las antiguas credenciales de laboratorio no son válidas para esta
+revisión. El acceso de red prelaunch debe revisarse para que Apple pueda ingresar.
 
-GPS: usar simulación de ubicación en Buenos Aires.
-Contactos: opcional, solo para SMS de invitación.
+Ingreso: correo/contraseña, Google, teléfono y Apple. Completar las comprobaciones
+reales del candidato antes de enviarlo. La baja y exportación se encuentran en
+Ajustes. Las denuncias y el bloqueo de usuarios están disponibles en el contenido.
+
+Los permisos se solicitan para la función correspondiente. Ubicación se utiliza
+para colaboración cercana; fotos/cámara para los medios elegidos. El acceso a
+contactos es opcional para invitaciones. No pedir al revisor simular GPS para
+el recorrido básico; documentar una ubicación de ensayo cuando una prueba de
+proximidad lo necesite.
+
+Enlaces: https://onlygoodthings.lat/h/{token} y ogt://h/{token}.
+Mercado Pago corresponde al portal empresarial y sigue en modo de prueba; la
+revisión de la app móvil no requiere pagar ni aportar datos de tarjetas reales.
+
+Estas notas son un borrador: no declaran terminadas las aceptaciones pendientes.

@@ -1,0 +1,12 @@
+// Tests install only com.onlygoodthings.app.qa and never read production credentials.
+gradle.taskGraph.whenReady { graph ->
+    // Init scripts also run in the external SDK composite build. Its tasks do
+    // not install our QA app, and it does not inherit OGT project properties.
+    if (rootProject.name != 'OnlyGoodThings') return
+    if(gradle.startParameter.projectProperties['ogt.instrumentedQa']!='true') {
+        throw new GradleException('Use -Pogt.instrumentedQa=true for the isolated device test package')
+    }
+    graph.allTasks.findAll { it.name == 'processDebugGoogleServices' }.each {
+        it.googleServicesJsonFiles.set([new File(rootProject.projectDir,'qa/firebase-android-instrumented.json')])
+    }
+}

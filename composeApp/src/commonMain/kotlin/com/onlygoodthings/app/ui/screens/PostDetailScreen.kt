@@ -660,6 +660,7 @@ fun PostDetailScreen(
         val mine = db.isOwnPost(post, me.aliases())
         PostOverflowSheet(
             isAuthor = mine,
+            blockUserId=post.authorUserId,
             canEdit = canEditSocialPost(mine, post.authorKind, post.tag, listing?.kind, post.sourceUrl),
             onDismiss = { overflowOpen = false },
             onHide = {

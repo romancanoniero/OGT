@@ -1,5 +1,5 @@
 /**
- * Sesión web: mismo Firebase que la app, sin Sign in with Apple.
+ * Sesión web: mismo Firebase que la app, con Google y Apple.
  * Una sesión Firebase fallida nunca se convierte en una sesión de laboratorio.
  */
 (function () {
@@ -287,6 +287,28 @@
         provider.addScope("email");
         const cred = await auth().signInWithPopup(provider);
         await openSession(cred.user);
+      });
+    },
+    async signInApple() {
+      return wrap(async () => {
+        const provider = new firebase.auth.OAuthProvider('apple.com');
+        provider.addScope('email');provider.addScope('name');
+        const cred = await auth().signInWithPopup(provider);
+        await openSession(cred.user);
+      });
+    },
+    async prepareAccountDeletion() {
+      return wrap(async () => {
+        const instance=auth(),user=instance.currentUser;
+        if(!user)throw new Error('Iniciá sesión para borrar la cuenta');
+        if(!(user.providerData||[]).some(provider=>provider.providerId==='apple.com'))return;
+        const uid=user.uid,provider=new firebase.auth.OAuthProvider('apple.com');
+        const result=await user.reauthenticateWithPopup(provider);
+        if(result.user?.uid!==uid || instance.currentUser?.uid!==uid)throw new Error('La sesión cambió. Volvé a solicitar la baja.');
+        const accessToken=result.credential?.accessToken;
+        if(!accessToken)throw new Error('Apple no devolvió la autorización necesaria para la baja. Tu cuenta se conserva.');
+        await instance.revokeAccessToken(accessToken);
+        persist(await user.getIdToken(true));
       });
     },
     async startPhone(e164) {
