@@ -1074,6 +1074,7 @@ body[data-crm-view="pending"] #crm-root { display: none !important; }
 .crm-business-form .crm-note { margin:0; overflow-wrap:anywhere; }
 .crm-business-form .crm-note a { display:inline-flex; margin:8px 12px 8px 0; }
 .crm-business .crm-table-wrap { max-width:100%; }
+.crm-business .crm-table { min-width:720px; }
 .crm-business .crm-table td { overflow-wrap:anywhere; }
 @media(max-width:600px) { .crm-business-form { padding:18px; } }
 

@@ -37,6 +37,8 @@ test('business workspace creates, edits and activates a campaign, issues coupons
  await expect(page.getByRole('link',{name:'Retomar pago',exact:true})).toHaveAttribute('href',a.checkoutUrl);
  await page.getByRole('button',{name:'Actualizar pagos',exact:true}).click();await expect(page.getByRole('status').first()).toHaveText('Saldo y movimientos actualizados.');
  await expect(reserve.getByLabel('Monto (ARS)',{exact:true})).toHaveValue('25,50');
+ const paymentRow=page.locator('[data-business-payments] tbody tr').first();
+ expect((await paymentRow.boundingBox()).height).toBeLessThan(160);
  const layout=await page.evaluate(()=>({width:window.innerWidth,client:document.documentElement.clientWidth,body:document.body.scrollWidth,visual:window.visualViewport?.width,scroll:document.documentElement.scrollWidth,outside:[...document.querySelectorAll('body *')].filter(el=>!el.closest('.crm-table-wrap')).map(el=>({tag:el.tagName,class:el.className,left:el.getBoundingClientRect().left,right:el.getBoundingClientRect().right,width:el.getBoundingClientRect().width,parent:el.parentElement?.className,overflow:el.parentElement?getComputedStyle(el.parentElement).overflowX:''})).filter(r=>r.right>window.innerWidth+1||r.left< -1).slice(0,15)}));
  expect(layout.scroll,JSON.stringify(layout)).toBeLessThanOrEqual(layout.width);
 
