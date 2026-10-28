@@ -28,6 +28,19 @@ export function createIdentity(sdk, auth, makeRecaptcha) {
       if (!auth.currentUser) throw new CrmError('Inici\u00e1 sesi\u00f3n.', 'UNAUTHENTICATED', 401);
       return sdk.getIdToken(auth.currentUser, true);
     },
+    tokenSource() {
+      const user = auth.currentUser, expected = generation;
+      if (!user) throw new CrmError('Iniciá sesión.', 'UNAUTHENTICATED', 401);
+      // A workspace keeps its original identity, but never freezes an expiring
+      // ID token. Firebase refreshes it without changing the MFA auth_time.
+      const current = () => auth.currentUser?.uid === user.uid && generation === expected;
+      return async (forceRefresh = false) => {
+        if (!current()) throw new CrmError('La sesión cambió.', 'ABORTED');
+        const token = await sdk.getIdToken(user, forceRefresh);
+        if (!current()) throw new CrmError('La sesión cambió.', 'ABORTED');
+        return token;
+      };
+    },
     signIn(email, password) {
       return authenticate(() => sdk.signInWithEmailAndPassword(auth, email, password));
     },

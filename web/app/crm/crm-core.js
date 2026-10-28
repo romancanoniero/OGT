@@ -38,20 +38,30 @@ export function sessionGate() {
 export function createApi(fetcher, timeoutMs = 15000) {
   return async (route, token, body = {}, signal) => {
     if (!routes.has(route) && !businessRoutes.has(route)) throw new CrmError('Ruta no permitida.', 'INVALID_ROUTE');
-    if (typeof token !== 'string' || !token || token.startsWith('dev.')) throw new CrmError('Inici\u00e1 sesi\u00f3n.', 'UNAUTHENTICATED', 401);
     const controller = new AbortController(); let timeout = false;
     const abort = () => controller.abort();
     if (signal?.aborted) abort(); else signal?.addEventListener('abort', abort, { once: true });
     const timer = setTimeout(() => { timeout = true; abort(); }, route === 'csr/payments/create' ? Math.max(timeoutMs, 35000) : timeoutMs);
     try {
       if (controller.signal.aborted) throw new CrmError('Solicitud cancelada.', 'ABORTED');
+      const bearer = typeof token === 'function' ? await new Promise((resolve, reject) => {
+        const cancelled = () => reject(new CrmError('Solicitud cancelada.', 'ABORTED'));
+        controller.signal.addEventListener('abort', cancelled, { once: true });
+        Promise.resolve().then(token).then(resolve, reject).finally(() => controller.signal.removeEventListener('abort', cancelled));
+      }) : token;
+      if (controller.signal.aborted) throw new CrmError('Solicitud cancelada.', 'ABORTED');
+      if (typeof bearer !== 'string' || !bearer || bearer.startsWith('dev.')) throw new CrmError('Iniciá sesión.', 'UNAUTHENTICATED', 401);
       const response = await fetcher((businessRoutes.has(route) ? '/api/v1/' : '/api/v1/crm/') + route, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + bearer },
         body: JSON.stringify(body), cache: 'no-store', credentials: 'omit', redirect: 'error', signal: controller.signal,
       });
       if (response.status === 404) throw new CrmError('El backend CRM no est\u00e1 instalado en este servidor.', 'BACKEND_MISSING', 404);
       let payload;
-      try { payload = await response.json(); } catch { throw new CrmError('El servidor no devolvi\u00f3 una respuesta CRM v\u00e1lida.', 'INVALID_RESPONSE', response.status); }
+      try { payload = await response.json(); } catch {
+        if (response.status === 401) throw new CrmError('Tu sesión venció. Verificá nuevamente o volvé a ingresar.', 'UNAUTHENTICATED', 401);
+        if (response.status === 403) throw new CrmError('Tu cuenta no tiene acceso a esta operación.', 'FORBIDDEN', 403);
+        throw new CrmError('El servidor no devolvi\u00f3 una respuesta CRM v\u00e1lida.', 'INVALID_RESPONSE', response.status);
+      }
       if (!response.ok || payload?.success !== true) throw new CrmError(typeof payload?.message === 'string' ? payload.message : 'Solicitud rechazada.', payload?.errorCode || payload?.code || (response.status === 401 ? 'UNAUTHENTICATED' : response.status === 403 ? 'FORBIDDEN' : 'REQUEST_FAILED'), response.status);
       if (!Object.hasOwn(payload, 'data') || payload.data === null) throw new CrmError('Respuesta incompleta.', 'INVALID_RESPONSE');
       return payload.data;

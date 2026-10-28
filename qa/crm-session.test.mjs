@@ -24,8 +24,53 @@ test('logout and tenant switch invalidate in-flight renders', () => { const gate
 test('API tokens never go to arbitrary URLs', async () => { let calls = 0; const api = createApi(async () => { calls++; }); await assert.rejects(api('https://other.test', 'jwt'), { code: 'INVALID_ROUTE' }); assert.equal(calls, 0); });
 test('CRM refuses laboratory tokens and missing tokens', async () => { const api = createApi(() => assert.fail('must not fetch')); for (const token of ['', null, 'dev.person.OWNER']) await assert.rejects(api('access', token), { code: 'UNAUTHENTICATED' }); });
 test('API uses bearer, no cookies, no cache and refuses redirects', async () => { const api = createApi(async (path, request) => { assert.equal(path, '/api/v1/crm/access'); assert.equal(request.headers.Authorization, 'Bearer jwt'); assert.equal(request.credentials, 'omit'); assert.equal(request.redirect, 'error'); assert.equal(request.cache, 'no-store'); return response({ success: true, data: { ok: true } }); }); assert.deepEqual(await api('access', 'jwt'), { ok: true }); });
+test('an open workspace gets the current Firebase token for every request', async () => {
+  let currentToken='first-token';const forced=[],headers=[];
+  const f=fixture('totp',{getIdToken:async(user,forceRefresh)=>{assert.equal(user.uid,'test');forced.push(forceRefresh);return currentToken;}});
+  const source=f.identity.tokenSource();
+  assert.equal(await source(true),'first-token');
+  const api=createApi(async(path,request)=>{headers.push(request.headers.Authorization);return response({success:true,data:{ok:true}});});
+  await api('platform/summary',source,{});
+  currentToken='refreshed-token';
+  await api('csr/registration/pending',source,{});
+  assert.deepEqual(headers,['Bearer first-token','Bearer refreshed-token']);
+  assert.deepEqual(forced,[true,false,false]);
+});
+test('an old workspace never borrows another signed-in identity', async()=>{
+  const f=fixture(),source=f.identity.tokenSource();f.auth.currentUser={uid:'other-account'};
+  await assert.rejects(createApi(()=>assert.fail('must not fetch'))('access',source),{code:'ABORTED'});
+});
+test('logout invalidates workspace token sources even if the same account returns',async()=>{
+  const f=fixture(),source=f.identity.tokenSource();await f.identity.signOut();f.auth.currentUser={uid:'test'};
+  await assert.rejects(source(),{code:'ABORTED'});
+});
+test('identity changes while Firebase refreshes cannot send the previous token',async()=>{
+  let resolve;const f=fixture('totp',{getIdToken:()=>new Promise(r=>resolve=r)}),source=f.identity.tokenSource();
+  const pending=createApi(()=>assert.fail('must not fetch'))('access',source);
+  await new Promise(r=>setImmediate(r));f.auth.currentUser={uid:'other-account'};resolve('previous-token');
+  await assert.rejects(pending,{code:'ABORTED'});
+});
+test('cancellation during token refresh never starts the API request',async()=>{
+  const abort=new AbortController();let resolve;
+  const source=()=>new Promise(r=>resolve=r),pending=createApi(()=>assert.fail('must not fetch'))('access',source,{},abort.signal);
+  await new Promise(r=>setImmediate(r));abort.abort();
+  await assert.rejects(pending,{code:'ABORTED'});resolve('late-token');
+});
+test('a stuck Firebase token refresh respects the request timeout',async()=>{
+  await assert.rejects(createApi(()=>assert.fail('must not fetch'),5)('access',()=>new Promise(()=>{})),{code:'TIMEOUT'});
+});
+test('token providers cannot bypass the laboratory-token denial or route allowlist',async()=>{
+  const api=createApi(()=>assert.fail('must not fetch'));
+  await assert.rejects(api('access',async()=>'dev.person.OWNER'),{code:'UNAUTHENTICATED'});
+  await assert.rejects(api('https://other.test',()=>assert.fail('must not resolve credentials')),{code:'INVALID_ROUTE'});
+});
 test('404 is an explicit backend deployment error', async () => { await assert.rejects(createApi(async () => response({}, 404))('access', 'jwt'), { code: 'BACKEND_MISSING' }); });
 test('HTML error pages are not treated as authenticated data', async () => { await assert.rejects(createApi(async () => ({ ok: true, status: 200, json: async () => { throw Error('html'); } }))('access', 'jwt'), { code: 'INVALID_RESPONSE' }); });
+test('plain HTTP authentication denials retain their actual meaning',async()=>{
+  for(const [status,code] of [[401,'UNAUTHENTICATED'],[403,'FORBIDDEN']]){
+    await assert.rejects(createApi(async()=>({ok:false,status,json:async()=>{throw Error('not JSON');}}))('access','jwt'),{code,status});
+  }
+});
 test('200 with failure envelope is denied', async () => { await assert.rejects(createApi(async () => response({ success: false, errorCode: 'FORBIDDEN' }))('access', 'jwt'), { code: 'FORBIDDEN' }); });
 test('backend MFA error stays machine-readable', async () => { await assert.rejects(createApi(async () => response({ success: false, errorCode: 'STEP_UP_REQUIRED' }, 403))('access', 'jwt'), { code: 'STEP_UP_REQUIRED' }); });
 test('response without data is rejected', async () => { await assert.rejects(createApi(async () => response({ success: true }))('access', 'jwt'), { code: 'INVALID_RESPONSE' }); });

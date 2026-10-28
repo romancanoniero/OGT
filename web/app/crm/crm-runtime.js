@@ -286,7 +286,8 @@ export async function start() {
     }
     logout.hidden = false;
     try {
-      const token = await identity.token(); if (!task.current()) return;
+      const token = identity.tokenSource();
+      await token(true); if (!task.current()) return;
       let permission;
       try {permission=validateAccess(await api('access', token, {}, task.signal), mode);}
       catch(error){
@@ -594,7 +595,8 @@ export async function start() {
         },
       });
       desk = mounted;
-      startPostLive(token);
+      const liveToken = await token(); if (!task.current()) return;
+      startPostLive(liveToken);
       message('Acceso autorizado. Datos obtenidos del servidor; sesión de administración limitada a 12 horas.', 'ok');
       showApp();
     } catch (error) { if (task.current()) fail(error); }

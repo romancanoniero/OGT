@@ -1,17 +1,17 @@
 # OGT: verificación del candidato integrado
 
-Actualización: 27/10/2026 (Argentina). Rama `codex/beta-candidate-20261027`;
+Actualización: 28/10/2026 (Argentina). Rama `codex/beta-candidate-20261027`;
 SDK `0a881b7a15c9a7d99b77da8547aabe2dd493a8b0`. Los apartados inferiores conservan
 el registro histórico: no reemplazan la evidencia de la revisión actual.
 
 ## Evidencia actual
 
 - Regresión completa: **50/50** Chromium y WebKit móvil, API/PostGIS/Redis reales
-  locales y Firebase emulado. Informe: `build/launch-candidate-e2e.json`.
+  locales y Firebase emulado. Informe: `build/live-company-full-regression-20261028.json`.
 - Backend: 60 pruebas; dominio compartido: 142; negocio con base aislada: 8.
 - Cliente Android: 47 pruebas JVM portables y las **56 pruebas comunes dentro
   de Android**, incluyendo las de imagen, sesión y archivos que requieren SO real.
-- Node: 99; Python: 114. Sin fallos en estas ejecuciones.
+- Node: 109; Python: 114. Sin fallos en estas ejecuciones.
 - API de historias: 13 grupos; bloqueo personal: 7; empresas: 5.
 - iOS: compilación firmada para dispositivo, `build/launch-final-ios-device.log`.
 - Android: AAB release firmado en `composeApp/build/outputs/bundle/release/`;
@@ -41,10 +41,15 @@ reutilizada falló por trabajos de pago sintéticos de ejecuciones antiguas; no 
 eliminaron esos datos ni se redujeron las aserciones. Para repetir estos tests,
 usar una base de integración nueva y separada de la API de QA.
 
-La aprobación con dos personas reales sigue pendiente: actualmente existe una
-sola cuenta de Control habilitada para revisar. No se creó un permiso empresarial
-para completar el ensayo. La baja con Apple sigue pendiente de una identidad de
-prueba que permita verificarla sin borrar la cuenta habitual.
+Se completó después la aprobación con dos identidades reales y MFA: una cuenta
+solicitante sin permisos de Control y la cuenta administradora existente.
+Con confirmación expresa del usuario se aprobó únicamente la empresa ficticia
+`QA20261028OTHER`: una titularidad, una auditoría de envío y una de aprobación;
+saldo e impacto cero. El solicitante accede a su organización y ve «Aprobada»;
+no recibió permisos de Control. Esa organización de prueba queda identificada
+y conservada: no se borraron datos ni se otorgó acceso a la empresa preexistente.
+La baja con Apple sigue pendiente de una identidad de prueba que permita
+verificarla sin borrar la cuenta habitual.
 
 ## Selección de cuenta Google (28/10/2026)
 
@@ -54,8 +59,31 @@ del UID. Se mantienen los scopes previos, MFA y el tratamiento de cancelación;
 no se cierran las sesiones de Google para cambiar de cuenta. Pasaron 101 pruebas
 Node y los cuatro recorridos de acceso en Chromium/WebKit. El primer arranque
 frío del navegador superó el tiempo global del ensayo; la repetición conservó
-las mismas aserciones y terminó en 9,6 segundos. La verificación del selector
-real se realiza después de publicar el candidato privado.
+las mismas aserciones y terminó en 9,6 segundos. Después de publicar el candidato
+privado, el usuario confirmó el selector y completó el ingreso con otra cuenta.
+
+## Renovación de credenciales del CRM (28/10/2026)
+
+La prueba real detectó dos respuestas 401 al abrir Empresas en una sesión de
+Control que seguía visible. «Verificar nuevamente» renovó la credencial y cargó
+la solicitud sin cambiar permisos. El workspace guardaba el ID token inicial;
+ahora obtiene el vigente desde Firebase para cada petición, sin forzar una
+consulta de red mientras el token sea válido. La renovación inicial conserva
+el refresco forzado. El segundo factor y su límite de 12 horas siguen sujetos
+a las comprobaciones originales del servidor y del cliente.
+
+Una fuente de credenciales queda ligada a la identidad y generación originales:
+cerrar sesión, cancelar el ingreso o cambiar de cuenta impide enviar consultas
+antiguas, incluso si Firebase termina de renovar después. Cancelación y timeout
+también cubren esa espera. Se mantienen tokens literales para clientes existentes,
+la lista de rutas, el rechazo de tokens de laboratorio y los errores de MFA en
+JSON. Las respuestas 401/403 sin JSON ahora explican el rechazo de acceso.
+
+Pasaron 109 pruebas Node y el ensayo de navegación con token rotado del runtime
+real del CRM en un navegador con identidad y API simuladas. La simulación mantiene
+la prohibición de usar servicios reales; incluye el módulo compartido de encuadre
+de historias y el parámetro del selector Google que el fixture anterior omitía.
+Los registros están en `build/company-session-refresh-{unit,browser}-20261028.log`.
 
 ## Cómo repetir las comprobaciones actuales
 

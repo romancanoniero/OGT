@@ -13,9 +13,9 @@ export const browserSessionPersistence='session';
 export const getAuth=()=>auth;
 export const setPersistence=async()=>{};
 export function onAuthStateChanged(a,cb){listeners.push(cb);queueMicrotask(cb);return()=>{};}
-export const getIdToken=async()=> 'fixture-token';
+export const getIdToken=async()=> 'fixture-token-'+(window.testTokenVersion||1);
 export const signInWithEmailAndPassword=async()=>{if(window.testEnroll){auth.currentUser={uid:'fixture',email:'fixture@example.test',emailVerified:true,providerData:[],enrolledFactors:[]};listeners.forEach(f=>f());return {user:auth.currentUser};}throw {code:'auth/multi-factor-auth-required'};};
-export class GoogleAuthProvider{addScope(){}}
+export class GoogleAuthProvider{addScope(){}setCustomParameters(parameters){if(parameters.prompt!=='select_account')throw Error('Google must offer account selection');}}
 export const signInWithPopup=async()=>{throw {code:'auth/multi-factor-auth-required'};};
 export const createUserWithEmailAndPassword=async(a,e,p)=>{if(window.testRegistrationError)throw {code:window.testRegistrationError};auth.currentUser={uid:'fixture',email:e,emailVerified:false,providerData:[],enrolledFactors:[]};listeners.forEach(f=>f());return {user:auth.currentUser};};
 export const multiFactor=user=>({enrolledFactors:user.enrolledFactors||[],getSession:async()=> 'new-mfa-session',enroll:async()=>{user.enrolledFactors=[{factorId:'totp'}];}});
@@ -54,9 +54,14 @@ with sync_playwright() as pw:
                 logo = (ROOT / 'web/app/google-logo.svg').read_text()
                 route.fulfill(status=200,content_type='image/svg+xml',body=logo)
                 return
+            if urlsplit(url).path == '/story-frame.js':
+                route.fulfill(status=200,content_type='text/javascript',body=(ROOT/'web/app/story-frame.js').read_text())
+                return
             if '/api/v1/crm/' in url:
                 body=route.request.post_data_json or {}
                 state['requests'].append((url,body))
+                if state.get('expected_token') and route.request.headers.get('authorization') != 'Bearer '+state['expected_token']:
+                    route.fulfill(status=401,content_type='text/plain',body='Unauthorized');return
                 if state['enroll'] or state.get('stale'):
                     route.fulfill(status=403,content_type='application/json',body=json.dumps({'success':False,'errorCode':'STEP_UP_REQUIRED','message':'Segundo factor obligatorio'}));return
                 if state['deny']:
@@ -135,6 +140,21 @@ with sync_playwright() as pw:
     def finish(page,code='123456'):
         page.locator('#crm-code').fill(code);page.get_by_role('button',name='Verificar e ingresar',exact=True).click()
     results=[]
+    context,page,state,errors=session('control')
+    state['post_fixture']=True
+    begin(page);finish(page)
+    expect(page.locator('#crm-root .crm-workspace')).to_be_visible()
+    # Model Firebase's automatic ID-token rotation while the MFA window stays
+    # valid. Navigation must ask Firebase for its current credential, not reuse
+    # the string captured when the workspace first opened.
+    page.evaluate('window.testTokenVersion=2')
+    state['expected_token']='fixture-token-2'
+    page.locator('.crm-nav-btn[data-section="publicaciones"]').click()
+    expect(page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]')).to_have_count(20)
+    expect(page.locator('#crm-root .crm-workspace')).to_be_visible()
+    assert not errors,errors
+    context.close()
+    results.append('Open Control workspace uses refreshed Firebase token without discarding navigation or extending MFA')
     # Navigate every currently implemented CRM workspace under an authorized
     # simulated session. The separate tenant and MFA checks below remain in force.
     for mode, sections in [
