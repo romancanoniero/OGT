@@ -88,15 +88,19 @@ jobs:
             sudo apt-get update -qq
             sudo apt-get install -y postgresql-client
           fi
-          for migration in database/migrations/*.sql; do
-            case "$migration" in */14_elpidio_homenaje.sql) continue;; esac
-            psql -h 127.0.0.1 -p 19432 -U ogt -d ogt_business_qa_ci -X -v ON_ERROR_STOP=1 --single-transaction -f "$migration"
+          createdb -h 127.0.0.1 -p 19432 -U ogt ogt_erasure_qa_ci
+          for qa_database in ogt_business_qa_ci ogt_erasure_qa_ci; do
+            for migration in database/migrations/*.sql; do
+              case "$migration" in */14_elpidio_homenaje.sql) continue;; esac
+              psql -h 127.0.0.1 -p 19432 -U ogt -d "$qa_database" -X -v ON_ERROR_STOP=1 --single-transaction -f "$migration"
+            done
           done
       - name: Compile and run backend tests before merging or publishing
         env:
           OGT_BUSINESS_TEST_JDBC: jdbc:postgresql://127.0.0.1:19432/ogt_business_qa_ci
+          OGT_ERASURE_TEST_JDBC: jdbc:postgresql://127.0.0.1:19432/ogt_erasure_qa_ci
         run: |
-          ./gradlew "-Pogt.dbKmpSdkPath=$GITHUB_WORKSPACE/_sdk" :backend:test :backend:businessIntegrationTest --no-daemon
+          ./gradlew "-Pogt.dbKmpSdkPath=$GITHUB_WORKSPACE/_sdk" :backend:test :backend:businessIntegrationTest :backend:accountErasureIntegrationTest --no-daemon
   database:
     needs: checks
     runs-on: ubuntu-24.04

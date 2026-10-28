@@ -21,7 +21,7 @@ class AccountErasureIntegrationTest {
     private fun add(db:Database):Pair<String,String> {
         val uid="qa-erasure-"+UUID.randomUUID();val hash=crmFirebaseTombstoneHash(uid)
         db.withConnection { c ->
-            c.prepareStatement("INSERT INTO crm_erased_accounts(uid_hash) VALUES(?)").use { q ->q.setString(1,hash);q.executeUpdate() }
+            c.prepareStatement("INSERT INTO crm_erased_accounts(uid_hash,reason) VALUES(?,'Solicitud de baja de la identidad sintética de QA')").use { q ->q.setString(1,hash);q.executeUpdate() }
             c.prepareStatement("INSERT INTO account_erasure_jobs(uid_hash,firebase_uid) VALUES(?,?)").use { q ->q.setString(1,hash);q.setString(2,uid);q.executeUpdate() }
         }
         return uid to hash

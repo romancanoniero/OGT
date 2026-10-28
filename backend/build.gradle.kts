@@ -52,6 +52,7 @@ tasks.test {
 
 val sourceSets=the<SourceSetContainer>()
 tasks.register<Test>("businessIntegrationTest") {
+    doNotTrackState("Exercises the current isolated database; a cached result cannot verify external state")
     group="verification"
     description="Verifies company isolation, transactional balances, coupons and payment retries in the isolated QA database."
     testClassesDirs=sourceSets["test"].output.classesDirs
@@ -60,6 +61,7 @@ tasks.register<Test>("businessIntegrationTest") {
 }
 
 tasks.register<Test>("accountErasureIntegrationTest") {
+    doNotTrackState("Verifies current database deletion retries and must execute for each invocation")
     group="verification"
     description="Checks durable deletion retries and concurrency against a dedicated local QA database."
     testClassesDirs=sourceSets["test"].output.classesDirs
