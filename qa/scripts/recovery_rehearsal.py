@@ -12,6 +12,7 @@ import time
 import urllib.request
 import uuid
 
+sys.dont_write_bytecode = True
 PRODUCTION=Path('/home/iankmp/ogt')
 
 

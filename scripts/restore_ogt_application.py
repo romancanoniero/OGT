@@ -12,6 +12,8 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+import sys
+sys.dont_write_bytecode = True
 from release_guard import validate_env,dotenv
 
 ID=re.compile(r'([a-f0-9]{40})-[0-9]{8}T[0-9]{6}Z')

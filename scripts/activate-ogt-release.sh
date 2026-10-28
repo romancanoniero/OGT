@@ -33,7 +33,7 @@ tar -czf "$BACKUP/application.tgz" web-app backend-dist docker-compose.yml Docke
 OLD_IMAGE="$(docker inspect -f '{{.Image}}' ogt-api)"
 docker tag "$OLD_IMAGE" "ogt-backend:before-$ID"
 printf '%s\n' "$OLD_IMAGE" > "$BACKUP/previous-image.txt"
-python3 "$RELEASE/scripts/install_ogt_operations.py" "$RELEASE"
+python3 -B "$RELEASE/scripts/install_ogt_operations.py" "$RELEASE"
 # From this point failures leave web/API stopped rather than expose mixed versions.
 trap 'code=$?; if [ "$code" -ne 0 ]; then docker stop ogt-web ogt-api >/dev/null 2>&1 || true; echo "Release failed. OGT web/API remain stopped. Recovery material: $BACKUP" >&2; fi' EXIT
 docker stop ogt-web ogt-api
@@ -86,7 +86,7 @@ for spec in 'ogt-api 8080/tcp' 'ogt-web 80/tcp'; do
 done
 test "$(docker inspect -f '{{index .Config.Labels "traefik.http.routers.ogt-web.middlewares"}}' ogt-web)" = ogt-prelaunch@docker
 cp "$RELEASE/release-manifest.json" "$ROOT/current-release.json"
-python3 "$ROOT/operations-runtime/ogt_backup.py" --if-due || echo "OGT database backup needs operational review"
-python3 "$ROOT/operations-runtime/ogt_operations.py" || test "$?" = 2
+python3 -B "$ROOT/operations-runtime/ogt_backup.py" --if-due || echo "OGT database backup needs operational review"
+python3 -B "$ROOT/operations-runtime/ogt_operations.py" || test "$?" = 2
 printf '%s\n' 'DEPLOYED_PRIVATE_CANDIDATE: local health, files and anonymous denials verified.'
 printf '%s\n' 'Still required: HTTPS from an allowed network, live MFA, roles and operational acceptance.'

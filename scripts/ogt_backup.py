@@ -9,6 +9,8 @@ from pathlib import Path
 import shutil
 import subprocess
 import time
+import sys
+sys.dont_write_bytecode = True
 from ogt_operations import atomic,command
 
 

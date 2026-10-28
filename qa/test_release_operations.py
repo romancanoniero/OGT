@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import subprocess
+import shutil
 import unittest
 from unittest.mock import patch
 
@@ -41,6 +43,14 @@ class OperationsTests(unittest.TestCase):
         self.assertEqual(before,after.replace(install.BLOCK,''))
         for invalid in (install.BEGIN+'\n',install.END+'\n',install.BLOCK+install.BLOCK,install.END+'\n'+install.BEGIN+'\n'):
             with self.assertRaises(ValueError):install.cron_with_block(invalid)
+    def test_executable_tools_do_not_add_bytecode_to_a_sealed_release(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            names=['install_ogt_operations.py','ogt_backup.py','ogt_operations.py','restore_ogt_application.py','release_guard.py']
+            for name in names:shutil.copy2(ROOT/'scripts'/name,root/name)
+            for name in names[:4]:
+                subprocess.run([sys.executable,str(root/name),'--help'],capture_output=True,check=True)
+            self.assertEqual(set(names),{p.name for p in root.iterdir()})
     def test_no_external_notification_destination_or_data_mutation_is_in_the_collector(self):
         sql=ops.SQL.upper();self.assertIn('BEGIN READ ONLY',sql);self.assertIn('STATEMENT_TIMEOUT',sql)
         for word in ('UPDATE ','DELETE ','INSERT ','TRUNCATE '):self.assertNotIn(word,sql)

@@ -23,7 +23,7 @@ export function mountOperations(root,{request}){
     if(key==='capacity')card.append(node('p',`Disco: ${check.diskUsedPercent??'—'} % · Libre: ${check.diskFreeGiB??'—'} GiB`),node('p',`Memoria disponible: ${check.memoryAvailablePercent??'—'} %`));
     if(key==='tls'&&check.daysRemaining!==undefined)card.append(node('p','Vence en '+check.daysRemaining+' días'));
     if(key==='backups')card.append(node('p',check.ageHours>=0?'Último respaldo: hace '+check.ageHours+' horas':'Sin respaldo verificado'));
-    if(key==='database')card.append(node('p',`Pagos atrasados: ${check.paymentsOverdue??0} · Incidencias: ${check.paymentIncidents??0}`),node('p',`Bajas atrasadas: ${check.erasureOverdue??0} · Archivos: ${check.mediaOverdue??0}`));
+    if(key==='database')card.append(node('p',`Pagos atrasados: ${check.paymentsOverdue??'—'} · Incidencias: ${check.paymentIncidents??'—'}`),node('p',`Bajas atrasadas: ${check.erasureOverdue??'—'} · Archivos: ${check.mediaOverdue??'—'}`));
     grid.append(card);
    }
    content.append(grid);status.textContent='Estado recibido del servidor. La supervisión comprueba el servicio cada minuto.';
