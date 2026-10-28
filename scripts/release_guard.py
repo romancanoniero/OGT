@@ -68,6 +68,9 @@ def validate_env(values):
     if payment_mode=="sandbox":
         if not re.fullmatch(r"[0-9]{1,30}",values.get("OGT_MP_COLLECTOR_ID","")):
             raise ValueError("Missing test Mercado Pago receiver")
+        buyers=values.get("OGT_MP_SANDBOX_BUYER_IDS","")
+        if buyers.strip() and not all(re.fullmatch(r"[0-9]{1,30}",item.strip()) for item in buyers.split(",")):
+            raise ValueError("Invalid sandbox test-buyer identifiers; no values were printed")
         for key in ("OGT_MP_ACCESS_TOKEN_FILE","OGT_MP_WEBHOOK_SECRET_FILE"):
             path=values.get(key,"")
             if not path.startswith("/run/secrets/mercadopago/") or ".." in path or path.endswith("/"):

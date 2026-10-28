@@ -8,7 +8,7 @@ el registro histórico: no reemplazan la evidencia de la revisión actual.
 
 - Regresión completa: **50/50** Chromium y WebKit móvil, API/PostGIS/Redis reales
   locales y Firebase emulado. Informe: `build/live-company-full-regression-20261028.json`.
-- Backend: 60 pruebas; dominio compartido: 142; negocio con base aislada: 8.
+- Backend: 62 pruebas; dominio compartido: 142; negocio con base aislada: 9.
 - Cliente Android: 47 pruebas JVM portables y las **56 pruebas comunes dentro
   de Android**, incluyendo las de imagen, sesión y archivos que requieren SO real.
 - Node: 109; Python: 114. Sin fallos en estas ejecuciones.
@@ -84,6 +84,26 @@ real del CRM en un navegador con identidad y API simuladas. La simulación manti
 la prohibición de usar servicios reales; incluye el módulo compartido de encuadre
 de historias y el parámetro del selector Google que el fixture anterior omitía.
 Los registros están en `build/company-session-refresh-{unit,browser}-20261028.log`.
+
+## Cuentas de prueba de Checkout Pro con señal de entorno legacy
+
+El ensayo con el comprador y vendedor de prueba de Mercado Pago produjo un pago
+aprobado cuyo GET autoritativo devolvió `live_mode=true`. El receptor conserva la
+etiqueta `test_user`; el comprador se contrastó con el inventario oficial de
+cuentas de prueba. El comportamiento previo lo rechazaba como discrepancia del
+proveedor, sin acreditar dinero. Se conserva el rechazo por defecto y en cobros
+reales: el caso legacy solo se habilita en sandbox para IDs de compradores de
+prueba configurados explícitamente en `OGT_MP_SANDBOX_BUYER_IDS`.
+
+La identificación de receptor, pedido, moneda, monto, devolución y firma mantiene
+sus controles. La lista no puede habilitarse en modo real; la API vuelve a validar
+que el receptor del token sea `test_user`. El dato `live_mode` original y el
+comprador configurado quedan en auditoría inmutable. Una discrepancia anterior
+solo se marca resuelta después de validar íntegramente el mismo pago. El ensayo
+SQL comprueba una sola acreditación ante reintentos, compradores no admitidos,
+receptores o importes diferentes y una devolución posterior. Pasaron 62 pruebas
+de backend y 9 de negocio con esquema completo en una base nueva; registros
+`build/mp-sandbox-compat-{unit,database}-20261028.log`.
 
 ## Cómo repetir las comprobaciones actuales
 

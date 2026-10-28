@@ -88,13 +88,13 @@ class CsrPayments internal constructor(private val repository:CsrRepository,priv
         c.prepareStatement("INSERT INTO csr_payment_incidents(payment_id,order_id,reason) VALUES(?,?::uuid,?) ON CONFLICT(payment_id,reason) DO NOTHING").use{q ->q.setString(1,id);q.setString(2,order);q.setString(3,reason);q.executeUpdate()}
     }
     private fun apply(c:Connection,id:String,p:ProviderPayment) {
-        if(p.id!=id || p.collector!=provider.collector || p.live!=provider.live || p.currency!="ARS" || runCatching{UUID.fromString(p.orderId)}.isFailure || p.refunded !in 0..p.amount){
+        if(p.id!=id || p.collector!=provider.collector || !provider.matchesEnvironment(p) || p.currency!="ARS" || runCatching{UUID.fromString(p.orderId)}.isFailure || p.refunded !in 0..p.amount){
             incident(c,id,null,"PROVIDER_MISMATCH");return
         }
         data class Order(val company:String,val amount:Long,val live:Boolean,val payment:String?,val credited:Long)
         val order=c.prepareStatement("SELECT company_id::text,amount_cents,live_mode,payment_id,credited_net_cents FROM csr_payment_orders WHERE id=?::uuid FOR UPDATE").use{q ->q.setString(1,p.orderId);q.executeQuery().use{r ->if(r.next())Order(r.getString(1),r.getLong(2),r.getBoolean(3),r.getString(4),r.getLong(5)) else null}}
         if(order==null){incident(c,id,null,"UNKNOWN_ORDER");return}
-        if(order.amount!=p.amount || order.live!=p.live){incident(c,id,p.orderId,"ORDER_MISMATCH");return}
+        if(order.amount!=p.amount || order.live!=provider.live){incident(c,id,p.orderId,"ORDER_MISMATCH");return}
         val net=if(p.status=="approved")p.amount-p.refunded else 0L
         if(order.payment!=null && order.payment!=id){
             if(net>0)incident(c,id,p.orderId,"EXTRA_PAYMENT");return
@@ -102,6 +102,18 @@ class CsrPayments internal constructor(private val repository:CsrRepository,priv
         // Rejected attempts do not consume an order; the buyer can retry from the same checkout.
         if(net==0L && order.payment==null){
             c.prepareStatement("UPDATE csr_payment_orders SET provider_status=?,updated_at=now() WHERE id=?::uuid").use{q ->q.setString(1,p.status);q.setString(2,p.orderId);q.executeUpdate()};return
+        }
+        if(!provider.live && p.live && order.payment==null){
+            // Legacy Checkout Pro can report live_mode=true for a transfer
+            // between generated test accounts. The provider has independently
+            // verified its collector's test_user tag; the payer must also be
+            // explicitly allowed from the operator's test-account inventory.
+            // Keep the raw provider flag in append-only audit, never normalize
+            // it silently or enable this exception for production collectors.
+            c.prepareStatement("""INSERT INTO crm_audit_events(company_id,action,target_type,target_id,reason,outcome,metadata)
+                VALUES(?::uuid,'PAYMENT_SANDBOX_CONFIRMED','payment',?,'Cuenta receptora test_user y comprador de prueba configurado; se conserva live_mode del proveedor','SUCCESS',?::jsonb)""").use{q ->
+                q.setString(1,order.company);q.setString(2,id);q.setString(3,buildJsonObject{put("providerLiveMode",p.live);put("collectorId",p.collector);put("configuredTestBuyerId",p.payer)}.toString());q.executeUpdate()
+            }
         }
         val balance=c.prepareStatement("SELECT campaign_balance_cents,payment_debt_cents FROM companies WHERE id=?::uuid FOR UPDATE").use{q ->q.setString(1,order.company);q.executeQuery().use{r ->check(r.next());r.getLong(1) to r.getLong(2)}}
         val delta=net-order.credited
@@ -114,6 +126,9 @@ class CsrPayments internal constructor(private val repository:CsrRepository,priv
                 source="payment:$id:${UUID.randomUUID()}",note=if(delta>0)"Pago confirmado por Mercado Pago" else "Devolución o contracargo confirmado por Mercado Pago")
         }
         c.prepareStatement("UPDATE csr_payment_orders SET payment_id=?,provider_status=?,credited_net_cents=?,updated_at=now() WHERE id=?::uuid").use{q ->q.setString(1,id);q.setString(2,p.status);q.setLong(3,net);q.setString(4,p.orderId);q.executeUpdate()}
+        // A previously rejected environment signal is resolved only after the
+        // same authoritative payment passed every identity/order/amount check.
+        c.prepareStatement("UPDATE csr_payment_incidents SET order_id=?::uuid,resolved_at=now() WHERE payment_id=? AND reason='PROVIDER_MISMATCH' AND resolved_at IS NULL").use{q ->q.setString(1,p.orderId);q.setString(2,id);q.executeUpdate()}
     }
 }
 

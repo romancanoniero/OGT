@@ -75,10 +75,35 @@ class CsrIntegrationTest {
     }
     private class FakeProvider:PaymentProvider {
         override val live=false;override val collector="12345"
+        override var sandboxBuyerIds:Set<String> = emptySet()
         var reads=0;var failure=false;lateinit var current:ProviderPayment
         override fun preference(order:String,amount:Long)=PaymentPreference("qa-$order","https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=qa-$order")
         override fun payment(id:String):ProviderPayment {reads++;if(failure)throw PaymentProviderFailure();return current}
         override fun paymentIds(order:String)=if(this::current.isInitialized && current.orderId==order)listOf(current.id) else emptyList()
+    }
+    @Test fun legacySandboxSignalRequiresConfiguredBuyerAndKeepsOneAuditedCredit():Unit=database().use{db ->
+        val f=fixture(db,0);val r=CsrRepository(db);val provider=FakeProvider();val p=CsrPayments(r,provider)
+        val order=p.checkout(f.actor,f.company,id(),10000);val payment=System.nanoTime().toString()
+        provider.current=ProviderPayment(payment,order.id,provider.collector,true,"ARS",10000,0,"approved",payer="67890")
+        p.enqueue(payment);p.processPending(100)
+        assertEquals(0,r.finance(f.actor,f.company).availableCents)
+        provider.sandboxBuyerIds=setOf("67890")
+        repeat(3){p.enqueue(payment);p.processPending(100)}
+        val finance=r.finance(f.actor,f.company);assertEquals(10000,finance.availableCents);assertTrue(finance.reconciled)
+        assertEquals(1,finance.entries.count{it.kind=="PAYMENT_CREDIT"})
+        assertFalse(r.paymentOrders(f.actor,f.company).single().liveMode)
+        db.withConnection{c ->
+            c.prepareStatement("SELECT count(*) FROM crm_audit_events WHERE target_id=? AND action='PAYMENT_SANDBOX_CONFIRMED' AND metadata->>'providerLiveMode'='true'").use{q ->q.setString(1,payment);q.executeQuery().use{it.next();assertEquals(1,it.getInt(1))}}
+            c.prepareStatement("SELECT count(*) FROM csr_payment_incidents WHERE payment_id=? AND resolved_at IS NULL").use{q ->q.setString(1,payment);q.executeQuery().use{it.next();assertEquals(0,it.getInt(1))}}
+        }
+        val next=p.checkout(f.actor,f.company,id(),10000)
+        for((index,bad) in listOf(provider.current.copy(payer="99999"),provider.current.copy(collector="OTHER"),provider.current.copy(currency="USD"),provider.current.copy(amount=10001)).withIndex()){
+            val badId=payment+(index+1);provider.current=bad.copy(id=badId,orderId=next.id);p.enqueue(badId);p.processPending(100)
+            assertEquals(10000,r.finance(f.actor,f.company).availableCents)
+        }
+        provider.current=provider.current.copy(id=payment,orderId=order.id,collector=provider.collector,currency="ARS",amount=10000,refunded=2500,payer="67890")
+        p.enqueue(payment);p.processPending(100)
+        assertEquals(7500,r.finance(f.actor,f.company).availableCents);assertTrue(r.finance(f.actor,f.company).reconciled)
     }
     @Test fun paymentsReconcileRetriesRefundsAndDebtWithoutDoubleCredit():Unit=database().use{db ->
         val f=fixture(db,0);val r=CsrRepository(db);val provider=FakeProvider();val p=CsrPayments(r,provider)

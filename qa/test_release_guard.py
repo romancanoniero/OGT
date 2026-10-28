@@ -57,6 +57,16 @@ class ReleaseGuardTests(unittest.TestCase):
         self.assertIn('ogt-mp-body.buffering.maxRequestBodyBytes=65536',source)
         self.assertIn('ogt-web.middlewares=ogt-prelaunch@docker',source)
 
+    def test_sandbox_buyer_allowlist_is_optional_and_numeric(self):
+        values=self.env();values.update(OGT_MP_MODE='sandbox',OGT_MP_COLLECTOR_ID='12345',
+            OGT_MP_ACCESS_TOKEN_FILE='/run/secrets/mercadopago/access-token-test',
+            OGT_MP_WEBHOOK_SECRET_FILE='/run/secrets/mercadopago/webhook-secret-test',
+            OGT_MP_SANDBOX_BUYER_IDS='67890, 123')
+        self.assertTrue(guard.validate_env(values))
+        for invalid in ['67890,','unknown','1.2','-1']:
+            with self.subTest(invalid=invalid),self.assertRaises(ValueError):
+                guard.validate_env(dict(values,OGT_MP_SANDBOX_BUYER_IDS=invalid))
+
     def fixture(self, folder):
         root = Path(folder)
         for name in guard.REQUIRED:
