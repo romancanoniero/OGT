@@ -77,29 +77,32 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.math.tan
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 private const val TILE_PX = 256
 private const val TILE_CACHE_MAX = 160
 /** Esri Light Gray: gris arena Quiet Studio, sin clave. */
-private const val TILE_STYLE = "qs-esri-light"
+private const val TILE_STYLE = "qs-esri-light-native16-v2"
+// Light Gray has street coverage through L16 in Argentina. Higher LODs can
+// return HTTP 200 with a "Map data not yet available" image, not an error.
+internal const val MAX_NATIVE_TILE_ZOOM = 16
+internal fun rasterTileZoom(zoom: Float): Int =
+    floor(zoom.toDouble()).toInt().coerceIn(3, MAX_NATIVE_TILE_ZOOM)
 private val MapWell = OgtColors.sand
 private val RadiusFill = OgtColors.secondary.copy(alpha = 0.10f)
 private val RadiusStroke = OgtColors.secondary
 private val tileClient by lazy { createTileHttpClient() }
-private val fetchMutex = Mutex()
 private val tileSlots = Semaphore(8)
-private val inflight = mutableSetOf<TileKey>()
 /** Caché de proceso: al volver a Estacionar no se vuelven a bajar las teselas. */
 private val tileCache = LinkedHashMap<TileKey, ImageBitmap>()
 
-private data class TileKey(val style: String, val z: Int, val x: Int, val y: Int)
+internal data class TileKey(val style: String, val z: Int, val x: Int, val y: Int)
 
 /** Cámara mutable: los gestos no pueden cerrar sobre un zoom viejo. */
 private class MapCamera(lat: Double, lng: Double, zoom: Float) {
@@ -139,7 +142,7 @@ fun OgtLibreMap(
     var viewport by remember { mutableStateOf(IntSize.Zero) }
     val tiles = remember { mutableStateMapOf<TileKey, ImageBitmap>() }
     var firstTile by remember { mutableStateOf(false) }
-    val tileZ = floor(zoom.toDouble()).toInt().coerceIn(3, 19)
+    val tileZ = rasterTileZoom(zoom)
     val consumeScroll = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset = available
@@ -180,8 +183,8 @@ fun OgtLibreMap(
         publishCamera()
     }
 
-    val visible = remember(viewLat, viewLng, tileZ, viewport) {
-        visibleTiles(viewLat, viewLng, tileZ, viewport)
+    val visible = remember(viewLat, viewLng, zoom, viewport) {
+        visibleTiles(viewLat, viewLng, zoom, viewport)
     }
     LaunchedEffect(visible) {
         visible.forEach { key ->
@@ -194,7 +197,6 @@ fun OgtLibreMap(
             missing.map { key ->
                 async(Dispatchers.Default) {
                     loadTile(key)?.let {
-                        rememberTile(key, it)
                         tiles[key] = it
                         firstTile = true
                     }
@@ -269,9 +271,13 @@ fun OgtLibreMap(
             visible.forEach { key ->
                 val left = ((key.x * TILE_PX - origin.x).toFloat() - cx) * scale + cx
                 val top = ((key.y * TILE_PX - origin.y).toFloat() - cy) * scale + cy
-                val side = (TILE_PX * scale).roundToInt().coerceAtLeast(1)
                 val dst = IntOffset(left.roundToInt(), top.roundToInt())
-                val dstSize = IntSize(side, side)
+                // Round the shared edges, rather than each tile's size, so
+                // fractional pinch zoom cannot leave one-pixel gaps.
+                val dstSize = IntSize(
+                    (left + TILE_PX * scale).roundToInt() - dst.x,
+                    (top + TILE_PX * scale).roundToInt() - dst.y,
+                )
                 val exact = tiles[key] ?: cachedTile(key)
                 if (exact != null) {
                     drawImage(exact, dstOffset = dst, dstSize = dstSize)
@@ -388,18 +394,21 @@ private fun MapPin(marker: BarrioMarker, selected: Boolean) {
     }
 }
 
-private fun visibleTiles(lat: Double, lng: Double, zoom: Int, viewport: IntSize): List<TileKey> {
+internal fun visibleTiles(lat: Double, lng: Double, zoom: Float, viewport: IntSize): List<TileKey> {
     if (viewport.width <= 0 || viewport.height <= 0) return emptyList()
-    val origin = worldOrigin(lng, lat, zoom, viewport.width.toFloat(), viewport.height.toFloat())
-    val n = 1 shl zoom
-    val x0 = floor(origin.x / TILE_PX).toInt()
-    val y0 = floor(origin.y / TILE_PX).toInt()
-    val x1 = floor((origin.x + viewport.width) / TILE_PX).toInt()
-    val y1 = floor((origin.y + viewport.height) / TILE_PX).toInt()
+    val tileZ = rasterTileZoom(zoom)
+    val scale = 2.0.pow((zoom - tileZ).toDouble())
+    val cx = lonToX(lng, tileZ)
+    val cy = latToY(lat, tileZ)
+    val n = 1 shl tileZ
+    val x0 = floor((cx - viewport.width / (2 * scale)) / TILE_PX).toInt()
+    val y0 = floor((cy - viewport.height / (2 * scale)) / TILE_PX).toInt()
+    val x1 = floor((cx + viewport.width / (2 * scale)) / TILE_PX).toInt()
+    val y1 = floor((cy + viewport.height / (2 * scale)) / TILE_PX).toInt()
     val keys = ArrayList<TileKey>((x1 - x0 + 1) * (y1 - y0 + 1))
     for (x in x0..x1) {
         for (y in y0..y1) {
-            if (y in 0 until n) keys += TileKey(TILE_STYLE, zoom, ((x % n) + n) % n, y)
+            if (y in 0 until n) keys += TileKey(TILE_STYLE, tileZ, ((x % n) + n) % n, y)
         }
     }
     return keys
@@ -413,7 +422,7 @@ private fun worldOrigin(lng: Double, lat: Double, zoom: Int, width: Float, heigh
     return WorldOrigin(cx - width / 2.0, cy - height / 2.0)
 }
 
-private fun screenOffset(
+internal fun screenOffset(
     lng: Double,
     lat: Double,
     viewLng: Double,
@@ -504,7 +513,7 @@ private fun DrawScope.drawArrowHead(from: Offset, to: Offset, color: Color) {
 }
 
 /** Invierte el offset de pantalla a lat/lng con zoom fraccionario. */
-private fun screenToGeo(
+internal fun screenToGeo(
     x: Float,
     y: Float,
     viewLng: Double,
@@ -512,7 +521,7 @@ private fun screenToGeo(
     zoom: Float,
     viewport: IntSize,
 ): GeoPoint {
-    val tileZ = floor(zoom.toDouble()).toInt().coerceIn(3, 19)
+    val tileZ = rasterTileZoom(zoom)
     val scale = 2.0.pow((zoom - tileZ).toDouble())
     val origin = worldOrigin(viewLng, viewLat, tileZ, viewport.width.toFloat(), viewport.height.toFloat())
     val cx = viewport.width / 2.0
@@ -634,12 +643,11 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawAncestorTile(
 
 private suspend fun loadTile(key: TileKey): ImageBitmap? = withContext(Dispatchers.Default) {
     cachedTile(key)?.let { return@withContext it }
-    fetchMutex.withLock {
-        if (!inflight.add(key)) return@withContext cachedTile(key)
-    }
-    tileSlots.acquire()
-    try {
-        cachedTile(key)?.let { return@withContext it }
+    // A camera change cancels its requests, including requests waiting for a
+    // slot. withPermit always releases the slot and leaves no stale in-flight
+    // entry that would prevent the same area from loading on the next gesture.
+    tileSlots.withPermit {
+        cachedTile(key)?.let { return@withPermit it }
         // Quiet Studio: Esri Light Gray primero; Carto Light si Esri no responde.
         val urls = listOf(
             "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/${key.z}/${key.y}/${key.x}",
@@ -647,18 +655,22 @@ private suspend fun loadTile(key: TileKey): ImageBitmap? = withContext(Dispatche
             "https://b.basemaps.cartocdn.com/light_all/${key.z}/${key.x}/${key.y}.png",
         )
         for (url in urls) {
-            val bytes = runCatching {
+            val bytes = try {
                 val response = tileClient.get(url) {
                     header("User-Agent", "OnlyGoodThings/0.1 (Compose Multiplatform; parking map)")
                     header("Referer", "https://onlygoodthings.app/")
                 }
                 if (response.status.isSuccess()) response.bodyAsBytes() else null
-            }.getOrNull() ?: continue
-            decodeTileBitmap(bytes)?.let { return@withContext it }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            } ?: continue
+            decodeTileBitmap(bytes)?.let {
+                rememberTile(key, it)
+                return@withPermit it
+            }
         }
         null
-    } finally {
-        tileSlots.release()
-        fetchMutex.withLock { inflight.remove(key) }
     }
 }

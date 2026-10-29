@@ -12,10 +12,12 @@
 
 ## Candidato actual (29/10/2026)
 
-La fuente mantiene `com.onlygoodthings.app`: Android 1.0/versionCode 8 e iOS
-1.0/build 7. Estos candidatos locales colocan la fuente debajo de la imagen, en
-el feed y en el detalle. Las consolas contienen la versión anterior: TestFlight
-build 6 en el grupo Internos y Play código 7 guardado como borrador interno.
+La fuente mantiene `com.onlygoodthings.app`: Android 1.0/versionCode 9 e iOS
+1.0/build 8. Estos candidatos locales conservan la fuente debajo de la imagen y
+corrigen el zoom del mapa: amplían las teselas disponibles hasta el zoom 19 sin
+pedir niveles sin cartografía, y cancelan las descargas al cambiar de cámara.
+Las consolas ya recibieron TestFlight build 7 y Play código 8; este último quedó
+guardado como borrador interno. Verificar el procesamiento actual en Apple.
 La compilación iOS de dispositivo y
 el AAB Android firmado se validan localmente. No equivalen a un nuevo build
 procesado en TestFlight o Play.
