@@ -12,10 +12,10 @@
 
 ## Candidato actual (29/10/2026)
 
-La fuente mantiene `com.onlygoodthings.app`: Android 1.0/versionCode 7 e iOS
-1.0/build 6. Son candidatos locales con el campo de fuente y las aclaraciones de
-publicación y ubicación. No reemplazan automáticamente los paquetes de las
-consolas: TestFlight contiene build 5 y Play tiene el código 6 en borrador interno.
+La fuente mantiene `com.onlygoodthings.app`: Android 1.0/versionCode 8 e iOS
+1.0/build 7. Estos candidatos locales colocan la fuente debajo de la imagen, en
+el feed y en el detalle. Las consolas contienen la versión anterior: TestFlight
+build 6 en el grupo Internos y Play código 7 guardado como borrador interno.
 La compilación iOS de dispositivo y
 el AAB Android firmado se validan localmente. No equivalen a un nuevo build
 procesado en TestFlight o Play.

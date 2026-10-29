@@ -607,7 +607,7 @@ private fun NeighborPostCard(
     isAdoptionAuthor: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier) {
+    Box(modifier) {
     when (kind) {
         FeedCardKind.LOST_PET -> LostPetFeedCard(
             post = post,
@@ -669,7 +669,6 @@ private fun NeighborPostCard(
             onClap = onClap,
         )
     }
-    com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
     }
 }
 
@@ -717,6 +716,7 @@ private fun LostPetFeedCard(
             OgtCaption("Última vista · $lastSeen · ${radius} m")
             listing?.marks?.takeIf { it.isNotBlank() }?.let { OgtCaption(it) }
             ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen)
+            com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
             PostActionRow(
                 clapped = clapped,
                 thanks = thanks,
@@ -792,6 +792,7 @@ private fun AdoptionFeedCard(
                 ImpactTruthPills(post)
             }
             ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen)
+            com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
             PostActionRow(
                 clapped = clapped,
                 thanks = thanks,
@@ -871,6 +872,7 @@ private fun TernuraFeedCard(
             }
             ImpactTruthPills(post)
             ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen)
+            com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
             PostActionRow(
                 clapped = clapped,
                 thanks = thanks,
@@ -952,6 +954,7 @@ private fun HomenajeFeedCard(
                 OgtCaption("La familia puede reivindicar este crédito.")
             }
             ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen)
+            com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
             PostActionRow(
                 clapped = clapped,
                 thanks = thanks,
@@ -1080,6 +1083,7 @@ private fun StoryFeedCard(
             petStory = petStory,
             onOpen = onOpen,
         )
+        com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
         PostActionRow(
             clapped = clapped,
             thanks = thanks,

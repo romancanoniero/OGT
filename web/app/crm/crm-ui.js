@@ -1706,8 +1706,8 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       changeAuthor.addEventListener('click', () => { void openReassign(listing, item); });
     }
     dialog.append(
-      head, meta, ...(photo ? [photo] : []), body,
-      ...[globalThis.OgtAttribution.link(card.attributionUrl)].filter(Boolean),
+      head, meta, ...(photo ? [photo] : []),
+      ...[globalThis.OgtAttribution.link(card.attributionUrl)].filter(Boolean), body,
       ...(changeAuthor ? [changeAuthor] : []),
       subheading('qs_clap.svg', 'Aplausos'), impact,
       subheading('qs_comment.svg', 'Comentarios'), commentsHost,

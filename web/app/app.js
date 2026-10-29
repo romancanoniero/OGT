@@ -1849,6 +1849,7 @@ function postCard(post, { openable = true, previewStories = true, compose = fals
     ${truequeExtrasHtml(post)}
     ${truequeBodyHtml(post)}
     ${shown}
+    <div class="post-attribution">${globalThis.OgtAttribution.link(post.attributionUrl)?.outerHTML || ""}</div>
     ${lostMapHtml(post)}
     ${truequeActionsHtml(post)}
     <div class="actions">
@@ -1858,7 +1859,6 @@ function postCard(post, { openable = true, previewStories = true, compose = fals
       <span class="count">${post.commentCount || 0}</span>
       <button class="act" data-share="${escapeHtml(post.id)}" aria-label="Compartir">${icon("qs-share")}</button>
     </div>
-    <div class="post-attribution">${globalThis.OgtAttribution.link(post.attributionUrl)?.outerHTML || ""}</div>
     ${storiesBlock(post, { preview: previewStories, compose })}
     ${lostActionsHtml(post, { onDetail: compose && !openable })}
   </article>`;

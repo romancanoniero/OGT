@@ -451,7 +451,6 @@ fun PostDetailScreen(
                             },
                         )
                     }
-                    com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
                     Column(Modifier.onGloballyPositioned { commentsAnchor = it.positionInParent().y.toInt() }) {
                         OgtSectionTitle("Comentarios")
                         OgtCaption("${comments.size} · Más recientes")
@@ -806,6 +805,7 @@ private fun LostPetDetail(
         }
     }
     DetailMedia(media, petName, height = 220.dp, onOpen = onOpenMedia)
+    com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
     Text(petName, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = OgtColors.ink)
     if (kindLine != null) OgtCaption(kindLine)
     if (!story.isNullOrBlank()) {
@@ -859,6 +859,7 @@ private fun AdoptionDetail(
     }
     AuthorLine(authorName, level, post)
     DetailMedia(media, post.tag, height = 240.dp, onOpen = onOpenMedia)
+    com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
     actions()
     if (isAuthor) {
         OgtPrimaryButton(copy.petsEdit, onClick = onEdit)
@@ -900,6 +901,7 @@ private fun PetStoryDetail(
     OgtPill(post.tag, OgtColors.sand, OgtColors.secondary)
     AuthorLine(authorName, level, post)
     DetailMedia(media, post.tag, height = 220.dp, onOpen = onOpenMedia)
+    com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
     actions()
     Text(post.body, fontSize = 16.sp, lineHeight = 22.sp, color = OgtColors.ink)
     if (!post.sourceUrl.isNullOrBlank()) {
@@ -925,6 +927,7 @@ private fun TernuraDetail(
     }
     AuthorLine(authorName, level, post, showCredit = false)
     DetailMedia(media, post.tag, height = 240.dp, onOpen = onOpenMedia)
+    com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
     Text(post.body, fontSize = 16.sp, lineHeight = 22.sp, color = OgtColors.ink)
     if (credit != authorName || db.creditPending(post)) {
         OgtCaption(
@@ -973,6 +976,7 @@ private fun HomenajeDetail(
         OgtCaption("La familia puede reivindicar este crédito.")
     }
     DetailMedia(media, post.tag, height = 220.dp, onOpen = onOpenMedia)
+    com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
     Text(post.body, fontSize = 16.sp, lineHeight = 22.sp, color = OgtColors.ink)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OgtStitchIcon(Res.drawable.qs_anecdote, "Anécdotas", tint = OgtColors.secondary)
@@ -1225,6 +1229,7 @@ private fun NewsDetail(
     OgtPill(post.tag)
     AuthorLine(authorName, level, post)
     DetailMedia(media, post.tag, height = 220.dp, onOpen = onOpenMedia)
+    com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
     actions()
     Text(post.body, fontSize = 16.sp, lineHeight = 22.sp, color = OgtColors.ink)
     if (!post.sourceUrl.isNullOrBlank()) {
@@ -1249,6 +1254,7 @@ private fun CommunityDetail(
     OgtPill(post.tag)
     AuthorLine(authorName, level, post, showPlace = !gathering)
     DetailMedia(media, post.tag, height = 220.dp, onOpen = onOpenMedia)
+    com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
     if (whenWhere != null) {
         OgtCaption("Cuándo y dónde")
         Text(whenWhere, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = OgtColors.ink)
