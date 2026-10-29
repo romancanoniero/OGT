@@ -68,7 +68,14 @@ services:
       # Same installation, temporarily restricted to the reviewer's networks.
       # No forwarded-header IP strategy: do not trust client-supplied X-Forwarded-For.
       - traefik.http.routers.ogt-web.middlewares=ogt-prelaunch@docker
-      # Only this signed notification endpoint is reachable outside review networks.
+      # Store reviewers must be able to read legal documents and app-link proofs.
+      # Exact paths and read methods only; app, CRM, API and assets keep the gate.
+      - traefik.http.routers.ogt-legal.entrypoints=websecure
+      - traefik.http.routers.ogt-legal.rule=(Host(`onlygoodthings.lat`) || Host(`www.onlygoodthings.lat`)) && (Path(`/privacy`) || Path(`/privacy.html`) || Path(`/terms`) || Path(`/terms.html`) || Path(`/terminos`) || Path(`/uso`) || Path(`/borrar-cuenta`) || Path(`/borrar-cuenta.html`) || Path(`/eliminar-cuenta`) || Path(`/.well-known/apple-app-site-association`) || Path(`/apple-app-site-association`) || Path(`/.well-known/assetlinks.json`)) && (Method(`GET`) || Method(`HEAD`))
+      - traefik.http.routers.ogt-legal.tls.certresolver=le
+      - traefik.http.routers.ogt-legal.priority=100
+      - traefik.http.routers.ogt-legal.service=ogt-web
+      # Signed payment notifications remain the only public write endpoint.
       - traefik.http.routers.ogt-mp.entrypoints=websecure
       - traefik.http.routers.ogt-mp.rule=Host(`onlygoodthings.lat`) && Path(`/api/v1/payments/mercadopago/webhook`) && Method(`POST`)
       - traefik.http.routers.ogt-mp.tls.certresolver=le

@@ -4,10 +4,15 @@ Only Good Things permite compartir publicaciones e historias, solicitar y ofrece
 ayuda comunitaria, colaborar con animales y compartir estacionamiento. Utiliza
 Firebase Authentication y el backend de onlygoodthings.lat. No es una demo local.
 
-PENDIENTE: preparar una cuenta de revisión sin privilegios administrativos,
-verificarla en el build exacto y cargar sus datos únicamente en App Review
-Information. Las antiguas credenciales de laboratorio no son válidas para esta
-revisión. El acceso de red prelaunch debe revisarse para que Apple pueda ingresar.
+La cuenta exclusiva de revisión se creó y se validó contra Firebase y la API real:
+rol USER, sin accesos a Control ni a empresas. Sus credenciales están fuera de Git
+y se cargaron en App Review Information. Ingresar con correo y contraseña; ese
+método no requiere un código de laboratorio. No incluir la contraseña en estas
+notas ni en las capturas.
+
+PENDIENTE: verificar esa cuenta en el build exacto de TestFlight y comprobar el
+acceso desde la red del revisor. La app conserva la restricción prelaunch. Las
+antiguas credenciales de laboratorio no son válidas para esta revisión.
 
 Ingreso: correo/contraseña, Google, teléfono y Apple. Completar las comprobaciones
 reales del candidato antes de enviarlo. La baja y exportación se encuentran en

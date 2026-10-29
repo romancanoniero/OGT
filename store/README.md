@@ -36,6 +36,29 @@ la recopilación efectiva. El manifiesto iOS incluido declara motivos de APIs,
 no reemplaza esos formularios. No publicar notas ni capturas que describan una
 versión demo como si fuera la actual.
 
+El 29/10 se cargó iOS 1.0/build 5 en App Store Connect. El procesamiento de Apple,
+la asignación a testers y la revisión pública son pasos distintos. Android
+1.0/versionCode 6 quedó firmado y con pruebas de unidad aprobadas para su carga.
+La cuenta de revisión ordinaria y sus credenciales se conservan fuera de Git;
+las notas de App Review ya reemplazan el acceso de laboratorio anterior.
+
+La validación de URLs de Google detectó HTTP 403 en `/privacy` por el filtro de
+red prelaunch. El router de documentos permite GET/HEAD de las rutas legales
+exactas y los tres archivos de asociación de enlaces. La aplicación, los CRM,
+API, archivos de usuarios y escrituras conservan sus restricciones. La excepción
+preexistente del webhook de Mercado Pago conserva sus controles de firma.
+Para comprobar el cambio y sus límites con la misma versión de Traefik del VPS:
+
+```sh
+python3 qa/check-public-documents.py --baseline-ref baba457
+```
+
+Antes del envío siguen pendientes las declaraciones de privacidad de Apple,
+revalidar Data Safety y las declaraciones de ID publicitario, seguridad infantil
+y ubicación de Play, renovar capturas, comprobar proveedores reales y habilitar
+el acceso de revisión de la app. No confundir el router de documentos públicos
+con una apertura de la aplicación.
+
 ## Historial de distribución anterior
 - Versión de prueba: **0.2.0** (iOS build 2 / Android versionCode 2).
 - iOS: TestFlight, bundle `com.onlygoodthings.app`, team `WER3D825VB`, Apple ID `6813852319`. Build `3104bf23-603e-45e9-9359-618d11740b18`.
