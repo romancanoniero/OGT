@@ -177,7 +177,7 @@ fun SettingsScreen(
                 PrefNav(copy.addAnotherCar) { onOpen("car") }
             }
 
-            PrefCategory("Permisos", "Para ceder un lugar, avisar de una mascota o invitar. Los podés apagar cuando quieras.")
+            PrefCategory("Permisos", "OGT usa tu ubicación para el estacionamiento comunitario y envía al servidor tu última posición y su precisión. Con «Siempre», también la recopila en segundo plano, aunque la app no esté en pantalla. Podés apagar GPS en Ajustes. No guardamos un historial de rutas. Los demás permisos se piden al usar cada función.")
             PrefGroup {
                 PrefSwitch(
                     title = "GPS",
@@ -197,7 +197,7 @@ fun SettingsScreen(
                         PrefDivider()
                         PrefRadio(
                             title = "Mientras uses la app",
-                            body = "Sincroniza cesiones y distancias con Parking o el mapa abiertos.",
+                            body = "Usa tu ubicación mientras tenés OGT en pantalla para calcular distancias y coordinar el estacionamiento.",
                             selected = session.locationScope == LocationScope.WHILE_USING,
                         ) {
                             session.applyLocationScope(LocationScope.WHILE_USING)
@@ -206,7 +206,7 @@ fun SettingsScreen(
                         PrefDivider()
                         PrefRadio(
                             title = "Siempre",
-                            body = "Sigue midiendo aunque cambies de app. No guardamos el historial.",
+                            body = "Recopila tu ubicación en segundo plano y actualiza tu última posición para el estacionamiento aunque cambies de app. No guarda un historial de rutas.",
                             selected = session.locationScope == LocationScope.ALWAYS,
                         ) {
                             session.applyLocationScope(LocationScope.ALWAYS)

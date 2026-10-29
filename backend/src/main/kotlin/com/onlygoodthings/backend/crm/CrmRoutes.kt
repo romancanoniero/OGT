@@ -69,6 +69,7 @@ data class CrmVisiblePost(
     val frameZoom: Double? = null,
     /** Archivo original. Solo lo abre el editor. La fila muestra `imageUrl`. */
     val editorUrl: String? = null,
+    val attributionUrl: String? = null,
 )
 
 @Serializable
@@ -1177,7 +1178,7 @@ private fun searchVisiblePostsAdvanced(
 }
 
 internal const val CRM_VISIBLE_POST_SEARCH = """
-SELECT p.id::text, p.body, COALESCE(p.topic, '') AS topic, p.moderation_status::text, p.created_at,
+SELECT p.id::text, p.body, p.attribution_url, COALESCE(p.topic, '') AS topic, p.moderation_status::text, p.created_at,
        COALESCE(NULLIF(btrim(u.display_name), ''), NULLIF(btrim(c.trade_name), ''), NULLIF(btrim(c.legal_name), ''), 'Alguien de la comunidad') AS author_name,
        p.author_user_id::text AS author_user_id,
        u.photo_url AS author_photo,
@@ -1222,6 +1223,7 @@ private fun ResultSet.toCrmVisiblePost(): CrmVisiblePost = CrmVisiblePost(
     frameY = frameUnit("frame_y"),
     frameZoom = frameUnit("frame_zoom"),
     editorUrl = crmPostImageUrl(getString("editor_url")),
+    attributionUrl = getString("attribution_url"),
 )
 
 private fun ResultSet.frameUnit(column: String): Double? {

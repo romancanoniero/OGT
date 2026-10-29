@@ -9,6 +9,7 @@ import com.onlygoodthings.backend.http.optInt
 import com.onlygoodthings.backend.http.optString
 import com.onlygoodthings.backend.http.reqString
 import com.onlygoodthings.backend.realtime.RealtimeHub
+import com.onlygoodthings.shared.domain.ContentAttribution
 import com.onlygoodthings.shared.domain.ApiResponse
 import com.onlygoodthings.shared.domain.FeedEventKind
 import com.onlygoodthings.shared.domain.FeedMode
@@ -82,6 +83,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             protagonistUserId = dataMap.optString("protagonistUserId"),
             participantUserIds = participants,
             honoreeName = dataMap.optString("honoreeName"),
+            attributionUrl = ContentAttribution.normalize(dataMap.optString("attributionUrl")),
         )
         hub.projectSocialPost(
             saved.id,
@@ -94,6 +96,8 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
                     authorUserId = saved.authorId,
                     body = saved.body,
                     tag = saved.topic,
+                    attributionUrl = saved.attributionUrl,
+                    attributionChanged = true,
                     createdAtEpochMs = saved.createdAtEpochMs,
                 ),
             ),
@@ -480,6 +484,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             userId = principal.userId,
             body = dataMap.reqString("body"),
             topic = dataMap.optString("topic"),
+            attributionUrl = dataMap.optString("attributionUrl"),
         )
         hub.projectSocialPost(
             updated.id,
@@ -494,6 +499,8 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
                     tag = updated.topic,
                     createdAtEpochMs = updated.createdAtEpochMs,
                     honoreeName = updated.honoreeName,
+                    attributionUrl = updated.attributionUrl,
+                    attributionChanged = true,
                 ),
             ),
         )

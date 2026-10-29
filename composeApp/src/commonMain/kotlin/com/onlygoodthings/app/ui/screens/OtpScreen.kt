@@ -67,7 +67,7 @@ fun OtpScreen(onConfirm: () -> Unit, onBack: () -> Unit) {
                 }
             }
         }
-        AuthField("Código", "Emulador: ${AuthLab.TEST_OTP}", code, otp = true) {
+        AuthField("Código", if (com.onlygoodthings.app.auth.authLabHintsEnabled()) "Emulador: ${AuthLab.TEST_OTP}" else "Código de seis dígitos", code, otp = true) {
             if (it.length <= 6) code = it.filter { c -> c.isDigit() }
         }
         GhostLink("Pegar código") {

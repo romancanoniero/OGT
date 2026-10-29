@@ -29,6 +29,7 @@ object StoryRules {
     val viewCount: Int = 0,
     val status: String = "VISIBLE",
     val frame: StoryFrame? = null,
+    val attributionUrl: String? = null,
 )
 
 @Serializable data class StoryPage(
@@ -54,4 +55,5 @@ fun activeStories(stories: List<Story>, serverNowEpochMs: Long): List<Story> =
     val audioMuted: Boolean = false,
     val unmutedPath: String? = null,
     val frame: StoryFrame? = null,
+    val attributionUrl: String? = null,
 )

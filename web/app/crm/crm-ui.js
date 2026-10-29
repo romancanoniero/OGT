@@ -1,3 +1,4 @@
+import '../content-attribution.js?v=1';
 // Capa visual del CRM. No autentica, no llama al backend y no decide permisos.
 
 function node(tag, text) {
@@ -1706,6 +1707,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     }
     dialog.append(
       head, meta, ...(photo ? [photo] : []), body,
+      ...[globalThis.OgtAttribution.link(card.attributionUrl)].filter(Boolean),
       ...(changeAuthor ? [changeAuthor] : []),
       subheading('qs_clap.svg', 'Aplausos'), impact,
       subheading('qs_comment.svg', 'Comentarios'), commentsHost,

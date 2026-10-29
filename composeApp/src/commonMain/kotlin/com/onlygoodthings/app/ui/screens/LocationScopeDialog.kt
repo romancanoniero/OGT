@@ -68,18 +68,18 @@ fun LocationScopeDialog(
                     .clip(RoundedCornerShape(28.dp)),
                 contentScale = ContentScale.Crop,
             )
-            OgtCaption("Pedimos el GPS real para parking y para que encuentres tu auto. No vendemos rutas.")
+            OgtCaption("OGT usa tu ubicación para el estacionamiento comunitario y envía al servidor tu última posición y su precisión. Con «Siempre», también la recopila en segundo plano, aunque la app no esté en pantalla. Podés apagar GPS en Ajustes. No guardamos un historial de rutas.")
             PrefCategory("Alcance")
             PrefGroup {
                 PrefRadio(
                     title = "Mientras uses la app",
-                    body = "Sincroniza cesiones y distancias con Parking o el mapa abiertos.",
+                    body = "Usa tu ubicación mientras tenés OGT en pantalla para calcular distancias y coordinar el estacionamiento.",
                     selected = scope == LocationScope.WHILE_USING,
                 ) { scope = LocationScope.WHILE_USING }
                 PrefDivider()
                 PrefRadio(
                     title = "Siempre",
-                    body = "Sigue midiendo aunque cambies de app. No guardamos el historial.",
+                    body = "Recopila tu ubicación en segundo plano y actualiza tu última posición para el estacionamiento aunque cambies de app. No guarda un historial de rutas.",
                     selected = scope == LocationScope.ALWAYS,
                 ) { scope = LocationScope.ALWAYS }
             }

@@ -62,7 +62,7 @@ fun PermissionsScreen(
                     trailing = "Para aportar",
                 )
             }
-            OgtCaption("Cero venta de datos. Cifrado de extremo a extremo.")
+            OgtCaption("No vendemos tus datos. La conexión al servicio está protegida con HTTPS.")
             OgtPrimaryButton("Aceptar y continuar") { onContinue() }
             GhostLink("Personalizar más tarde") { onContinue() }
             Spacer(Modifier.height(24.dp))

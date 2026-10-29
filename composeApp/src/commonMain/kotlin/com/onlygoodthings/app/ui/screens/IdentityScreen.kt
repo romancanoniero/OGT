@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -35,8 +37,9 @@ fun IdentityScreen(onContinue: () -> Unit) {
         document = picked.path.substringAfterLast('/')
     }
     val pickDocument = rememberOgtDocumentPicker { name -> document = name }
-    Column(Modifier.fillMaxSize().background(OgtColors.canvas).verticalScroll(rememberScrollState())) {
+    Column(Modifier.fillMaxSize().background(OgtColors.canvas).navigationBarsPadding()) {
         OgtTopBar(title = "Verificación")
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
         ScreenColumn {
             OgtCaption("Only Good Things (OGT) es una red de personas reales. Verificar el perfil abre alertas, trueques y voto comunitario.")
             PrefCategory("Beneficios")
@@ -90,8 +93,11 @@ fun IdentityScreen(onContinue: () -> Unit) {
             }
             OgtPrimaryButton("Escanear documento") { camera.takeCamera() }
             OgtSecondaryButton("Subir PDF o foto") { pickDocument() }
-            GhostLink("Continuar sin verificar") { onContinue() }
             Spacer(Modifier.height(24.dp))
+        }
+        }
+        Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+            GhostLink("Continuar sin verificar") { onContinue() }
         }
     }
 }

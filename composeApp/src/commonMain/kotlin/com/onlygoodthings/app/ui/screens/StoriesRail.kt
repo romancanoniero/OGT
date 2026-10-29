@@ -169,6 +169,8 @@ private fun StoryEditor(controller: StoriesController,preparing:Boolean=false,on
     var framing by remember(draft.id) { mutableStateOf(false) }
     var gestureActive by remember(draft.id) { mutableStateOf(false) }
     var previewHeight by remember { mutableIntStateOf(0) }
+    var actionsHeight by remember { mutableIntStateOf(0) }
+    val density=androidx.compose.ui.platform.LocalDensity.current
     val scroll=rememberScrollState()
     val scope=rememberCoroutineScope()
     var caption by remember(draft.id) { mutableStateOf(TextFieldValue(draft.caption,TextRange(draft.caption.length))) }
@@ -196,6 +198,9 @@ private fun StoryEditor(controller: StoriesController,preparing:Boolean=false,on
                         }
                     },Modifier.fillMaxWidth(),enabled=!controller.publishing,label={Text("Texto opcional")},maxLines=5,
                         keyboardOptions=KeyboardOptions(capitalization=KeyboardCapitalization.Sentences))
+                    com.onlygoodthings.app.ui.components.AttributionField(draft.attributionUrl.orEmpty(), { value ->
+                        controller.draft?.takeIf { it.id==draft.id }?.let { controller.updateDraft(it.copy(attributionUrl=value)) }
+                    }, enabled=!controller.publishing)
                     if(draft.kind==MediaKind.VIDEO) com.onlygoodthings.app.ui.components.OgtVideoEditAction(
                         OgtPickedMedia(draft.id,draft.kind,draft.path,true,draft.posterPath,draft.prepared,draft.sourcePath,draft.audioMuted,draft.unmutedPath),
                         StoryRules.MAX_VIDEO_MS,enabled=!controller.publishing && !preparing,frame=draft.frame, onBusyChange={editingVideo=it},
@@ -217,13 +222,14 @@ private fun StoryEditor(controller: StoriesController,preparing:Boolean=false,on
                         TextButton(onClick={discard=true}) { Text("Descartar borrador",color=OgtColors.error) }
                     }
                 }
-                Spacer(Modifier.height(100.dp))
+                Spacer(Modifier.height(with(density) { actionsHeight.toDp() }))
             }
         }
-            Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+            Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().onSizeChanged { actionsHeight=it.height }
                 .background(Brush.verticalGradient(listOf(Color.Transparent,OgtColors.canvas.copy(alpha=.96f))))
                 .padding(horizontal=20.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
                 controller.publishError?.let { Text(it,color=OgtColors.error) }
+                com.onlygoodthings.app.ui.components.PublicationRightsNotice()
                 Button(onClick={controller.publish()},enabled=!controller.publishing && !preparing && !editingVideo && !gestureActive,modifier=Modifier.fillMaxWidth()) { Text(if(controller.publishing) "Publicando…" else if(controller.publishError!=null) "Reintentar publicación" else "Publicar historia") }
                 if(controller.publishing) Text("Podés cerrar esta pantalla; la publicación continúa mientras la app esté abierta.",fontSize=12.sp)
             }
@@ -347,6 +353,7 @@ private fun StoryPlayer(controller: StoriesController,story: Story,foreground:Bo
             }
             Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha=.45f)).padding(16.dp)) {
                 Text(story.caption,color=Color.White)
+                com.onlygoodthings.app.ui.components.AttributionLink(story.attributionUrl, Color.White)
                 if(story.authorId!=owner) TextButton(onClick={reporting=true},enabled=!reportSending) { Text(if(reportSending) "Enviando denuncia…" else "Denunciar historia",color=Color.White) }
                 if(story.authorId!=owner) com.onlygoodthings.app.ui.components.BlockUserButton(story.authorId,contentColor=Color.White,onBlocked=onClose)
                 reportMessage?.let { Text(it,color=Color.White,fontSize=13.sp) }

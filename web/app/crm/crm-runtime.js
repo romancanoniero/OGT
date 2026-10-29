@@ -2,7 +2,7 @@ import { mountOperations } from './crm-operations.js?v=ops-1';
 import { mountTeam, mountTeamInbox } from './crm-team.js?v=team-1';
 import { mountBusiness } from './crm-business.js?v=csr-1';
 import { mountCompanyApplication, mountCompanyReview } from './crm-registration.js?v=registration-1';
-import { createStoryListing } from './crm-stories.js?v=story-frame-1';
+import { createStoryListing } from './crm-stories.js?v=attribution-20261029';
 import { createApi, sessionGate, validateAccess, requireCompany, friendlyError, CrmError, stepUpReturnsToSignIn, isExpiredMfaChallenge } from './crm-core.js?v=teams-20261028';
 import { createIdentity } from './crm-auth.js?v=tacho-1';
 
@@ -139,7 +139,7 @@ export async function start() {
   fields.append(factorLabel, begin, recaptcha, codeLabel, verify, cancel);
   challenge.append(fields); login.insertAdjacentElement('afterend', challenge);
   // El shell viaja en paralelo con Firebase. El ingreso no lo espera para pintar.
-  const workspaceReady = import('./crm-ui.js?v=beta-candidate-20261027');
+  const workspaceReady = import('./crm-ui.js?v=attribution-20261029');
   const [appSdk, sdk] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),
@@ -425,6 +425,7 @@ export async function start() {
                   title: post.animalTitle || post.authorName || 'Alguien de la comunidad',
                   meta: `${post.authorName || 'Alguien de la comunidad'} · ${when} · Visible`,
                   body: post.body || '',
+                  attributionUrl: post.attributionUrl,
                   image: editor,
                   frame,
                   reasonLabel: 'Motivo',

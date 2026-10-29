@@ -41,6 +41,7 @@ data class SocialPost(
     val viewerSupported: Boolean = false,
     val viewerInvited: Boolean = false,
     val matchesMyOffer: Boolean = false,
+    val attributionUrl: String? = null,
 )
 
 @Serializable
@@ -119,6 +120,8 @@ data class SocialLiveCounters(
     val mediaUrls: List<String> = emptyList(),
     /** Alias del mismo JPEG. Lo lee el cliente que ya conocía este nombre. */
     val imageUrl: String? = null,
+    val attributionUrl: String? = null,
+    val attributionChanged: Boolean = false,
 ) {
     val canIngest: Boolean
         get() = !authorUserId.isNullOrBlank() && !body.isNullOrBlank()

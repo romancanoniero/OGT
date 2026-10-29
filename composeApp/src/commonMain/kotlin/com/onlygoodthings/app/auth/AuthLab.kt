@@ -10,3 +10,6 @@ object AuthLab {
     const val TEST_EMAIL = "vecino.emulador@goodthings.test"
     const val TEST_PASSWORD = "GoodThings123"
 }
+
+/** Diagnostic hints belong to development builds, never store-facing screens. */
+expect fun authLabHintsEnabled(): Boolean

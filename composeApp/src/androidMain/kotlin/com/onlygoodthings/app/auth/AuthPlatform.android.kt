@@ -35,6 +35,8 @@ import kotlin.coroutines.resumeWithException
 private const val GOOGLE_WEB_CLIENT_ID =
     "521063054927-2i8k3qkmh48p5h3qp3nqaunt5t7j4sj0.apps.googleusercontent.com"
 
+actual fun authLabHintsEnabled(): Boolean = com.onlygoodthings.app.BuildConfig.DEBUG
+
 actual class AuthPlatform actual constructor() {
     private val auth: FirebaseAuth get() = FirebaseAuth.getInstance()
 

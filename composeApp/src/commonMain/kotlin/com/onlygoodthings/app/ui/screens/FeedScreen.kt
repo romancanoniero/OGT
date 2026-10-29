@@ -607,7 +607,7 @@ private fun NeighborPostCard(
     isAdoptionAuthor: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier) {
+    Column(modifier) {
     when (kind) {
         FeedCardKind.LOST_PET -> LostPetFeedCard(
             post = post,
@@ -669,6 +669,7 @@ private fun NeighborPostCard(
             onClap = onClap,
         )
     }
+    com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
     }
 }
 

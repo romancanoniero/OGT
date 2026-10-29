@@ -59,6 +59,8 @@ class EntryPoints(unittest.TestCase):
                 route.fulfill(status=200, content_type='application/javascript', body='window.qaSdkLoaded = true;')
             elif u.path == '/app.js':
                 route.fulfill(status=200, content_type='application/javascript', body='window.qaAppLoaded = window.qaSdkLoaded === true;')
+            elif u.path == '/content-attribution.js':
+                route.fulfill(status=200, content_type='application/javascript', body=(ROOT/'web/app/content-attribution.js').read_text())
             elif u.path == '/auth.js':
                 route.fulfill(status=200, content_type='application/javascript', body='')
             elif u.path == '/styles.css':

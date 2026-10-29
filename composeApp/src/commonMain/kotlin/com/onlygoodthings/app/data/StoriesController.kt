@@ -138,6 +138,8 @@ class StoriesController(private val session: SessionStore, private val prefs: Au
     fun publish() {
         val original=draft ?: return
         if(publishing || original.ownerId!=owner) return
+        try { ContentAttribution.normalize(original.attributionUrl) }
+        catch (error: IllegalArgumentException) { publishError=error.message;return }
         val user=owner
         val version=generation
         publishing=true;publishError=null

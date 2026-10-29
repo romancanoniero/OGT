@@ -178,6 +178,7 @@ class OgtLocalDatabase {
                 createdAtEpochMs = live.createdAtEpochMs.takeIf { it > 0L } ?: currentEpochMs(),
                 listingId = live.listingId,
                 honoreeName = live.honoreeName,
+                attributionUrl = live.attributionUrl,
                 heartCount = live.heartCount,
             )
             bumpFeed()
@@ -196,6 +197,7 @@ class OgtLocalDatabase {
             authorUserId = authorId ?: current.authorUserId,
             authorKind = if (authorId != null) AuthorKind.USER else current.authorKind,
             authorCompanyId = if (authorId != null) null else current.authorCompanyId,
+            attributionUrl = if (live.attributionChanged) live.attributionUrl else current.attributionUrl,
         )
         if (authorId != null && authorId != current.authorUserId) {
             postPeople.removeAll { it.postId == live.id && it.role == PostPersonRole.AUTHOR && it.userId != authorId }
@@ -919,14 +921,15 @@ class OgtLocalDatabase {
             .toSet()
 
     /** Corrige texto y tema de un post propio. */
-    fun editOwnPost(viewerId: String, postId: String, body: String, tag: String? = null): LocalSocialPost? {
+    fun editOwnPost(viewerId: String, postId: String, body: String, tag: String? = null, attributionUrl: String? = null): LocalSocialPost? {
         val trimmed = body.trim()
         if (trimmed.isEmpty()) return null
         val idx = posts.indexOfFirst { it.id == postId }
         if (idx < 0) return null
         val current = posts[idx]
         if (!isOwnPost(current, viewerAliases(viewerId))) return null
-        val updated = current.copy(body = trimmed, tag = tag?.trim()?.takeIf { it.isNotEmpty() } ?: current.tag)
+        val updated = current.copy(body = trimmed, tag = tag?.trim()?.takeIf { it.isNotEmpty() } ?: current.tag,
+            attributionUrl = if (attributionUrl == null) current.attributionUrl else com.onlygoodthings.shared.domain.ContentAttribution.normalize(attributionUrl))
         posts[idx] = updated
         bumpFeed()
         bumpSocial()
@@ -2035,6 +2038,7 @@ class OgtLocalDatabase {
                 )
             },
             sourceUrl = post.sourceUrl,
+            attributionUrl = post.attributionUrl,
             placement = post.placement,
             achievedCount = post.achievedCount,
             empresaQueSuma = post.empresaQueSuma,
@@ -2170,6 +2174,7 @@ internal fun SocialPost.asLocalPost(): LocalSocialPost = LocalSocialPost(
     storyLabel = null,
     createdAtEpochMs = createdAtEpochMs,
     sourceUrl = sourceUrl,
+    attributionUrl = attributionUrl,
     honoreeName = honoreeName,
     placement = placement,
     achievedCount = achievedCount,

@@ -451,6 +451,7 @@ fun PostDetailScreen(
                             },
                         )
                     }
+                    com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
                     Column(Modifier.onGloballyPositioned { commentsAnchor = it.positionInParent().y.toInt() }) {
                         OgtSectionTitle("Comentarios")
                         OgtCaption("${comments.size} · Más recientes")

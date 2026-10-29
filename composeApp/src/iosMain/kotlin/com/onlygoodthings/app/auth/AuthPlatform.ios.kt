@@ -6,6 +6,9 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
 
+@OptIn(kotlin.experimental.ExperimentalNativeApi::class)
+actual fun authLabHintsEnabled(): Boolean = kotlin.native.Platform.isDebugBinary
+
 actual class AuthPlatform actual constructor() {
     private fun host(): IosAuthHost =
         IosAuthRuntime.host ?: throw AuthException("Firebase iOS todavía no se inicializó")

@@ -67,8 +67,8 @@ fun LoginScreen(onEnter: () -> Unit, onSignUp: () -> Unit, onRecover: () -> Unit
             contentAlignment = Alignment.Center,
         ) { Text("Ingresar con Huella o Rostro · Rápido", fontWeight = FontWeight.SemiBold, fontSize = 13.sp) }
         Text("O CON TU CORREO / TELÉFONO", color = OgtColors.muted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-        OgtCaption("Lab emulador: ${AuthLab.TEST_EMAIL} / ${AuthLab.TEST_PHONE_E164}")
-        AuthField("Correo o teléfono", "correo@comunidad.org o ${AuthLab.TEST_PHONE_E164}", id) { id = it }
+        if (com.onlygoodthings.app.auth.authLabHintsEnabled()) OgtCaption("Lab emulador: ${AuthLab.TEST_EMAIL} / ${AuthLab.TEST_PHONE_E164}")
+        AuthField("Correo o teléfono", if (com.onlygoodthings.app.auth.authLabHintsEnabled()) "correo@comunidad.org o ${AuthLab.TEST_PHONE_E164}" else "correo@comunidad.org o tu teléfono", id) { id = it }
         GhostLink("¿Olvidaste tu contraseña?") { onRecover() }
         AuthField("Contraseña", "Tu clave secreta", password, secret = true) { password = it }
         Row(verticalAlignment = Alignment.CenterVertically) {

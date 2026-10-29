@@ -159,6 +159,7 @@ fun PublishActionScreen(
     var story by remember(kind) {
         mutableStateOf(existing?.body?.takeIf { it.isNotBlank() }.orEmpty())
     }
+    var attribution by remember(kind, editPostId) { mutableStateOf(existing?.attributionUrl.orEmpty()) }
     val draftMedia = remember(kind) { mutableStateListOf<OgtPickedMedia>() }
     var includePlace by remember { mutableStateOf(false) }
     var spotIndex by remember { mutableStateOf(0) }
@@ -215,8 +216,10 @@ fun PublishActionScreen(
             ternuraForm -> "Ternura"
             else -> categories.firstOrNull { it.id == category }?.label ?: "Ayuda vecinal"
         }
+        val credit = try { com.onlygoodthings.shared.domain.ContentAttribution.normalize(attribution) }
+            catch (error: IllegalArgumentException) { publishError = error.message; return }
         if (editing && existing != null) {
-            optimisticEditPost(db, auth.feed, scope, me.id, existing.id, story, tag) {
+            optimisticEditPost(db, auth.feed, scope, me.id, existing.id, story, tag, credit.orEmpty()) {
                 session.persistSocialFeed()
             }
             toast = true
@@ -249,6 +252,7 @@ fun PublishActionScreen(
                     protagonistUserId = heroId,
                     participantUserIds = selectedNeighbors.mapNotNull { it.userId }.distinct(),
                     honoreeName = selectedHero?.takeIf { it.namedOnly }?.displayName,
+                    attributionUrl = credit,
                 )
                 check(session.currentUserId == me.id) { "La sesión cambió. Volvé a intentarlo." }
                 db.upsertRemoteSocial(remote)
@@ -591,6 +595,8 @@ fun PublishActionScreen(
                             )
                         }
 
+                        com.onlygoodthings.app.ui.components.AttributionField(attribution, { attribution = it }, enabled = !publishing)
+                        com.onlygoodthings.app.ui.components.PublicationRightsNotice()
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             OgtPrimaryButton(
                                 when {

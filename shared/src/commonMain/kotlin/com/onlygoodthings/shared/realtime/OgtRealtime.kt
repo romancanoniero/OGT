@@ -195,6 +195,8 @@ fun socialLiveCountersFrom(raw: Map<String, Any?>, key: String?): SocialLiveCoun
         frameX = (raw["frameX"] as? Number)?.toDouble(),
         frameY = (raw["frameY"] as? Number)?.toDouble(),
         frameZoom = (raw["frameZoom"] as? Number)?.toDouble(),
+        attributionUrl = raw["attributionUrl"] as? String,
+        attributionChanged = raw["attributionChanged"] as? Boolean ?: false,
         url = (raw["url"] as? String)?.takeIf { it.isNotBlank() },
         mediaUrls = when (val listed = raw["mediaUrls"]) {
             is List<*> -> listed.mapNotNull { (it as? String)?.takeIf { value -> value.isNotBlank() } }
@@ -258,6 +260,7 @@ private fun SocialLiveCounters.toTreeMap(): Map<String, Any?> = buildMap {
     url?.let { put("url", it) }
     if (mediaUrls.isNotEmpty()) put("mediaUrls", mediaUrls)
     imageUrl?.let { put("imageUrl", it) }
+    if (attributionChanged) { put("attributionChanged", true);put("attributionUrl", attributionUrl) }
 }
 
 private fun SocialComment.toTreeMap(): Map<String, Any?> = mapOf(

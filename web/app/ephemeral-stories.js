@@ -1,3 +1,4 @@
+import './content-attribution.js?v=1';
 import {confirmUserBlock} from "./user-safety.js?v=1";
 import {createStoryMediaCache,storyBookProgress,storyDuration} from './story-playback.js?v=1';
 import { createStoryViewport } from './story-frame.js?v=2';
@@ -88,7 +89,7 @@ export function mountStories(root, api, {ownerId=null}={}) {
       const pause=button('Pausar',()=>{paused=!paused;pause.textContent=paused?'Reproducir':'Pausar';visibility();if(paused && media.pause)media.pause();});
       controls.append(button('Anterior',()=>show(index-1)),...(row.kind==='VIDEO'?[]:[pause]),button('Siguiente',next));
       if(row.authorId!==ownerId){controls.append(button('Denunciar historia',reportStory),button('Bloquear usuario',()=>{paused=true;media?.pause?.();confirmUserBlock(api,row.authorId,close);}));}
-      const footer=document.createElement('footer');footer.append(caption,time,...(built.controls?[built.controls]:[]),controls);
+      const footer=document.createElement('footer');footer.append(caption,...[globalThis.OgtAttribution.link(row.attributionUrl)].filter(Boolean),time,...(built.controls?[built.controls]:[]),controls);
       dialog.replaceChildren(built.viewport,head,progress,footer);
       turning=!!oldViewport;
       let turnFinished=false;

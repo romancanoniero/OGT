@@ -54,6 +54,9 @@ with sync_playwright() as pw:
                 logo = (ROOT / 'web/app/google-logo.svg').read_text()
                 route.fulfill(status=200,content_type='image/svg+xml',body=logo)
                 return
+            if urlsplit(url).path == '/content-attribution.js':
+                route.fulfill(status=200,content_type='text/javascript',body=(ROOT/'web/app/content-attribution.js').read_text())
+                return
             if urlsplit(url).path == '/story-frame.js':
                 route.fulfill(status=200,content_type='text/javascript',body=(ROOT/'web/app/story-frame.js').read_text())
                 return
@@ -77,6 +80,7 @@ with sync_playwright() as pw:
                         'authorName':'Ana Torres',
                         'body':f'Publicaci\u00f3n de prueba {n}',
                         'animalTitle':'Luna' if n==1 else None,
+                        'attributionUrl':'https://example.org/original?autor=Ana' if n==1 else None,
                         'createdAt':'2026-10-24T10:00:00Z',
                         'topic':'adopci\u00f3n',
                         'imageUrl':None,
@@ -153,6 +157,12 @@ with sync_playwright() as pw:
     state['expected_token']='fixture-token-2'
     page.locator('.crm-nav-btn[data-section="publicaciones"]').click()
     expect(page.locator('.crm-table-wrap:not([hidden]) tbody tr[data-post]')).to_have_count(20)
+    page.get_by_role('button',name='Ver publicación',exact=True).first.click()
+    credit=page.get_by_role('link',name='Fuente y créditos',exact=True)
+    expect(credit).to_be_visible()
+    expect(credit).to_have_attribute('href','https://example.org/original?autor=Ana')
+    expect(credit).to_have_attribute('rel','noopener noreferrer')
+    page.keyboard.press('Escape')
     expect(page.locator('#crm-root .crm-workspace')).to_be_visible()
     assert not errors,errors
     context.close()

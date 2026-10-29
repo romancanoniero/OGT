@@ -16,7 +16,7 @@ class StorySqlRepository(private val db: Database, val media: StoryMediaStore) {
         u.status='ACTIVE' AND ogt_users_can_interact(?::uuid,p.author_user_id) AND (COALESCE((u.metadata->'settings'->>'publicProfileVisible')::boolean,true)
           OR EXISTS(SELECT 1 FROM follows f WHERE f.follower_id=?::uuid AND f.followed_id=p.author_user_id))
         AND (d.audience='COMMUNITY' OR EXISTS(SELECT 1 FROM follows f WHERE f.follower_id=?::uuid AND f.followed_id=p.author_user_id))))"""
-    private val fields = """p.id::text,p.author_user_id::text,u.display_name,u.photo_url,p.body,
+    private val fields = """p.id::text,p.author_user_id::text,u.display_name,u.photo_url,p.body,p.attribution_url,
         d.frame_mode,d.frame_zoom,d.frame_x,d.frame_y,d.audience,d.kind,d.content_type,d.duration_ms,d.has_poster,p.moderation_status::text,
         (extract(epoch from p.created_at)*1000)::bigint AS created_ms,
         (extract(epoch from p.story_expires_at)*1000)::bigint AS expires_ms"""
@@ -51,20 +51,21 @@ class StorySqlRepository(private val db: Database, val media: StoryMediaStore) {
                         rs.getLong("duration_ms"),rs.getLong("created_ms"),expires,rs.getBoolean("seen"),
                         if(admin || owner==viewer) rs.getInt("views") else 0,
                         if(rs.getString("moderation_status")!="VISIBLE") rs.getString("moderation_status") else if(expires<=now) "EXPIRED" else "VISIBLE",
-                        rs.getString("frame_mode")?.let { StoryFrame(StoryFrameMode.valueOf(it),rs.getDouble("frame_zoom"),rs.getDouble("frame_x"),rs.getDouble("frame_y")) }))
+                        rs.getString("frame_mode")?.let { StoryFrame(StoryFrameMode.valueOf(it),rs.getDouble("frame_zoom"),rs.getDouble("frame_x"),rs.getDouble("frame_y")) },rs.getString("attribution_url")))
                 }
             } }
         }
         StoryPage(found.take(100),now,if(found.size>100) (offset+100).toString() else null)
     }
 
-    fun publish(owner: String, id: String, caption: String, audience: StoryAudience, bytes: ByteArray, video: Boolean, posterBytes: ByteArray?, frame: StoryFrame? = null): Story {
+    fun publish(owner: String, id: String, caption: String, audience: StoryAudience, bytes: ByteArray, video: Boolean, posterBytes: ByteArray?, frame: StoryFrame? = null, attributionUrl: String? = null): Story {
         UUID.fromString(id)
+        val credit = ContentAttribution.normalize(attributionUrl)
         require(caption.length<=StoryRules.MAX_CAPTION) { "El texto admite hasta 1200 caracteres" }
         val valid = media.validate(bytes,video)
         val poster = posterBytes?.let { media.validate(it,false) }
         require(!video || poster!=null) { "El video necesita una imagen de vista previa" }
-        val digest=media.hash(bytes + caption.toByteArray() + audience.name.toByteArray() + (posterBytes ?: byteArrayOf()) + (frame?.let { "frame:${it.mode}:${it.zoom}:${it.x}:${it.y}".toByteArray() } ?: byteArrayOf()))
+        val digest=media.hash((credit?.let { "attribution:$it".toByteArray() } ?: byteArrayOf()) + bytes + caption.toByteArray() + audience.name.toByteArray() + (posterBytes ?: byteArrayOf()) + (frame?.let { "frame:${it.mode}:${it.zoom}:${it.x}:${it.y}".toByteArray() } ?: byteArrayOf()))
         db.withConnection { c ->
             c.autoCommit=false
             var wrote=false
@@ -79,8 +80,8 @@ class StorySqlRepository(private val db: Database, val media: StoryMediaStore) {
                     require(c.prepareStatement("SELECT status='ACTIVE' AND NOT COALESCE((to_jsonb(users)->>'publishing_blocked')::boolean,false) FROM users WHERE id=?::uuid").use { s->s.setString(1,owner);s.executeQuery().use { it.next() && it.getBoolean(1) } }) { "Esta cuenta no puede publicar" }
                     media.write(id,valid.bytes); wrote=true
                     if(poster!=null) media.write(id,poster.bytes,true)
-                    c.prepareStatement("""INSERT INTO social_posts(id,author_kind,author_user_id,body,topic,is_story,story_expires_at)
-                        VALUES(?::uuid,'USER',?::uuid,?,'Historia',true,now()+interval '24 hours')""").use { s->s.setString(1,id);s.setString(2,owner);s.setString(3,caption);s.executeUpdate() }
+                    c.prepareStatement("""INSERT INTO social_posts(id,author_kind,author_user_id,body,topic,is_story,story_expires_at,attribution_url)
+                        VALUES(?::uuid,'USER',?::uuid,?,'Historia',true,now()+interval '24 hours',?)""").use { s->s.setString(1,id);s.setString(2,owner);s.setString(3,caption);s.setString(4,credit);s.executeUpdate() }
                     c.prepareStatement("""INSERT INTO story_details(post_id,audience,kind,content_type,duration_ms,content_hash,has_poster,frame_mode,frame_zoom,frame_x,frame_y)
                         VALUES(?::uuid,?,?,?,?,?,?,?,?,?,?)""").use { s->
                         s.setString(1,id);s.setString(2,audience.name);s.setString(3,valid.kind.name);s.setString(4,valid.type)

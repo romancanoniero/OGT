@@ -30,6 +30,7 @@ class RestStoriesRepository(private val client: HttpClient, private val session:
     suspend fun publish(draft: StoryDraft, bytes: ByteArray, poster: ByteArray?): Story = post("publish",buildJsonObject {
         put("requestId",draft.id);put("caption",draft.caption);put("audience",draft.audience.name);put("kind",draft.kind.name)
         draft.frame?.let { put("frame",Json.encodeToJsonElement(it)) }
+        ContentAttribution.normalize(draft.attributionUrl)?.let { put("attributionUrl",it) }
         put("bytesBase64",kotlin.io.encoding.Base64.encode(bytes))
         poster?.let { put("posterBase64",kotlin.io.encoding.Base64.encode(it)) }
     })

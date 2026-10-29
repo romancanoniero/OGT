@@ -118,13 +118,14 @@ fun optimisticEditPost(
     postId: String,
     body: String,
     topic: String? = null,
+    attributionUrl: String? = null,
     persistFeed: () -> Unit = {},
 ) {
     val before = db.snapshotPost(postId) ?: return
-    val edited = db.editOwnPost(viewerId, postId, body, topic) ?: return
+    val edited = db.editOwnPost(viewerId, postId, body, topic, attributionUrl) ?: return
     persistFeed()
     scope.launch {
-        val remote = runCatching { feed.editPost(postId, edited.body, edited.tag) }
+        val remote = runCatching { feed.editPost(postId, edited.body, edited.tag, attributionUrl) }
         remote.onSuccess { db.upsertRemoteSocial(it) }
             .onFailure { db.restorePost(before) }
         persistFeed()

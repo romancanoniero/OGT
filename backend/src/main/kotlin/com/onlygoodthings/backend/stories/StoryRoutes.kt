@@ -40,7 +40,7 @@ fun Route.storyRoutes(repository: StorySqlRepository, hub: RealtimeHub) {
         val saved=withContext(Dispatchers.IO) { repository.publish(viewer.userId,body.reqString("requestId"),
             body.optString("caption").orEmpty().trim(),StoryAudience.valueOf(body.reqString("audience")),
             decode("bytesBase64"),kind=="VIDEO",
-            body.optString("posterBase64")?.let { require(it.length<=2_000_000) { "La vista previa es demasiado grande" }; Base64.getDecoder().decode(it) },framing) }
+            body.optString("posterBase64")?.let { require(it.length<=2_000_000) { "La vista previa es demasiado grande" }; Base64.getDecoder().decode(it) },framing,ContentAttribution.normalize(body.optString("attributionUrl"))) }
         hub.projectStoryChange()
         call.respond(ApiResponse.ok(saved,"Historia publicada durante 24 horas"))
     }

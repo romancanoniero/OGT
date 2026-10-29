@@ -128,10 +128,11 @@ class RestFeedRepository(
             put("anecdoteId", JsonPrimitive(anecdoteId))
         })
 
-    override suspend fun editPost(postId: String, body: String, topic: String?): SocialPost =
+    override suspend fun editPost(postId: String, body: String, topic: String?, attributionUrl: String?): SocialPost =
         post("/api/v1/social/post/edit", buildJsonObject {
             put("postId", JsonPrimitive(postId))
             put("body", JsonPrimitive(body))
+            attributionUrl?.let { put("attributionUrl", JsonPrimitive(com.onlygoodthings.shared.domain.ContentAttribution.normalize(it).orEmpty())) }
             topic?.let { put("topic", JsonPrimitive(it)) }
         })
 
@@ -163,8 +164,10 @@ class RestFeedRepository(
         protagonistUserId: String?,
         participantUserIds: List<String>,
         honoreeName: String?,
+        attributionUrl: String?,
     ): SocialPost = post("/api/v1/social/publish", buildJsonObject {
         put("body", JsonPrimitive(body))
+        com.onlygoodthings.shared.domain.ContentAttribution.normalize(attributionUrl)?.let { put("attributionUrl", JsonPrimitive(it)) }
         put("topic", JsonPrimitive(topic))
         latitude?.let { put("latitude", JsonPrimitive(it)) }
         longitude?.let { put("longitude", JsonPrimitive(it)) }

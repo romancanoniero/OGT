@@ -1,3 +1,4 @@
+import '../content-attribution.js?v=1';
 import { createStoryViewport } from '../story-frame.js?v=1';
 /** Stories keep their own inspection and moderation UI. */
 export function createStoryListing(api, token, signal, canManage, message) {
@@ -31,6 +32,7 @@ export function createStoryListing(api, token, signal, canManage, message) {
       const failure = node('p'); failure.setAttribute('role', 'status');
       media.addEventListener('error', () => { failure.textContent = 'El archivo ya no está disponible. Cerrá y volvé a abrir la historia para renovar el acceso.'; });
       dialog.append(heading, close, metadata, viewport, ...(controls?[controls]:[]), node('p', row.caption), failure);
+      const credit=globalThis.OgtAttribution.link(row.attributionUrl);if(credit)dialog.append(credit);
       const reportSection=node('section');reportSection.setAttribute('aria-label','Denuncias de la historia');
       reportSection.append(node('h3','Denuncias'));
       let reports=[], reportsLoaded=false;

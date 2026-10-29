@@ -74,8 +74,8 @@
 
   // Icons are optional decoration: a failed icon request cannot block startup.
   loadIcons().catch(error => console.warn("OGT: icons unavailable", error.message));
-  loadScript("/ogt-sdk.js?v=frame-size")
-    .then(() => loadScript("/app.js?v=story-frame-1"))
+  loadScript("/ogt-sdk.js?v=attribution-20261029")
+    .then(() => loadScript("/app.js?v=attribution-20261029"))
     .catch(error => {
       console.error("OGT: application startup failed", error.message);
       showFailure("No se pudieron cargar los archivos de OGT. La instalacion puede estar incompleta o la conexion se interrumpio. No se puede iniciar la aplicacion.");

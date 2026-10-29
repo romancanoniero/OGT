@@ -1,4 +1,6 @@
 Only Good Things es una red social creada para promover las buenas acciones, la camaradería y la difusión de buenas noticias y actividades comunitarias.
 
+Con tu permiso, OGT usa tu ubicación para el estacionamiento comunitario. Si elegís «Siempre», también recopila ubicación en segundo plano y envía tu última posición al servidor aunque la app no esté en pantalla. Podés elegir «Mientras uses la app» o apagar GPS en Ajustes. No se guarda un historial de rutas.
+
 Sitio: https://onlygoodthings.lat
 Privacidad: https://onlygoodthings.lat/privacy

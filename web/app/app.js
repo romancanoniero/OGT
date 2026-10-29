@@ -345,6 +345,7 @@ function applyLive(live) {
     honoreeName: live.honoreeName,
     topic: live.tag || lastFeed[idx].topic,
   };
+  if (live.attributionChanged) patch.attributionUrl = live.attributionUrl || null;
   if (live.authorUserId) {
     patch.authorId = live.authorUserId;
     if (live.authorName) patch.authorName = live.authorName;
@@ -422,6 +423,8 @@ function paintPost(post) {
     const body = card.querySelector(":scope > .body");
     if (body) body.textContent = post.body;
   }
+  const credit = card.querySelector(":scope > .post-attribution");
+  if (credit) credit.replaceChildren(...[globalThis.OgtAttribution.link(post.attributionUrl)].filter(Boolean));
   const frame = mediaFrameOf(post);
   const photo = post.media?.[0]?.url || post.mediaUrls?.[0];
   const next = photo ? mediaUrl(photo) : "";
@@ -1248,6 +1251,8 @@ function renderEdit(post) {
     <h2>Editar publicación</h2>
     <p>El texto queda en esta ficha. La foto no se cambia desde acá.</p>
     <textarea id="edit-body">${escapeHtml(post.body || "")}</textarea>
+    <label class="field">Fuente o enlace original (opcional)<input id="edit-attribution" type="url" maxlength="2048" autocapitalize="off" value="${escapeHtml(post.attributionUrl || "")}"></label>
+    <p class="hint">Citar la fuente no reemplaza el permiso de uso.</p>
     <div class="row">
       <button class="ghost" data-close-dialog>Cancelar</button>
       <button class="primary" data-edit-save="${escapeHtml(post.id)}">Guardar</button>
@@ -1477,7 +1482,8 @@ function bindDialog(post) {
       const body = document.getElementById("edit-body")?.value.trim();
       if (!body) return;
       try {
-        const updated = await api("/api/v1/social/post/edit", { postId: post.id, body });
+        const attributionUrl = globalThis.OgtAttribution.normalize(document.getElementById("edit-attribution")?.value);
+        const updated = await api("/api/v1/social/post/edit", { postId: post.id, body, attributionUrl: attributionUrl || "" });
         closeDialog();
         toast("Publicación editada");
         paintPost(mergePost(updated));
@@ -1852,6 +1858,7 @@ function postCard(post, { openable = true, previewStories = true, compose = fals
       <span class="count">${post.commentCount || 0}</span>
       <button class="act" data-share="${escapeHtml(post.id)}" aria-label="Compartir">${icon("qs-share")}</button>
     </div>
+    <div class="post-attribution">${globalThis.OgtAttribution.link(post.attributionUrl)?.outerHTML || ""}</div>
     ${storiesBlock(post, { preview: previewStories, compose })}
     ${lostActionsHtml(post, { onDetail: compose && !openable })}
   </article>`;
@@ -2336,7 +2343,7 @@ async function renderInicio() {
     await loadFeed(feedType);
     paintFeedList();
     const rail=document.getElementById("ephemeral-stories");
-    if(rail) import('./ephemeral-stories.js?v=2').then(({mountStories})=>{if(rail.isConnected)disposeStories=mountStories(rail,api,{ownerId:me.userId});}).catch(()=>{if(rail.isConnected)rail.textContent='No pudimos cargar las historias.';});
+    if(rail) import('./ephemeral-stories.js?v=attribution-20261029').then(({mountStories})=>{if(rail.isConnected)disposeStories=mountStories(rail,api,{ownerId:me.userId});}).catch(()=>{if(rail.isConnected)rail.textContent='No pudimos cargar las historias.';});
   } catch (e) {
     const box = document.getElementById("feed-list");
     if (box) box.innerHTML = `<p class="err">${escapeHtml(e.message)}. ¿El API está en ${API}?</p>`;
@@ -2968,6 +2975,9 @@ function bindPublishForm(kind) {
       toast("Hace falta al menos una foto o un video");
       return;
     }
+    let attributionUrl;
+    try { attributionUrl = globalThis.OgtAttribution.normalize(form.elements.attributionUrl.value); }
+    catch (error) { toast(error.message); return; }
     submit.disabled = true;
     try {
       const media = await uploadPublishMedia(topic);
@@ -2975,6 +2985,7 @@ function bindPublishForm(kind) {
         body,
         topic,
         honoreeName: (honor || !self) && honoree ? honoree : undefined,
+        attributionUrl,
         media,
       });
       clearPublishFiles();
@@ -3127,6 +3138,8 @@ async function renderPublicar(kind) {
         <textarea name="body" maxlength="500" placeholder="${honor ? "Contá la enseñanza, la anécdota o las gracias." : kind === "ternura" ? "Unos gatitos, un gesto, algo que enterneció el día." : "Inspirador y constructivo."}"></textarea>
       </label>
       <p class="count" data-count>0 / 500</p>
+      <label class="field">Fuente o enlace original (opcional)<input name="attributionUrl" type="url" maxlength="2048" autocapitalize="off" placeholder="https://"></label>
+      <p class="hint publication-rights-notice">Al publicar declarás que el contenido es tuyo o que tenés los permisos necesarios. Citar la fuente no reemplaza la autorización. <a href="/terms#propiedad-intelectual" target="_blank" rel="noopener">Leer el acuerdo de publicación</a>.</p>
       <button type="submit" class="publish-cta" data-submit>${icon(spec.icon)} Publicar</button>
     </form>`;
   bindPublishForm(kind);

@@ -90,8 +90,8 @@ class LocalFeedRepository(
     override suspend fun repostAnecdote(anecdoteId: String): SocialPost =
         db.toDomain(db.repostAnecdote(db.user(currentUserId), anecdoteId) ?: error("No se pudo repostear"))
 
-    override suspend fun editPost(postId: String, body: String, topic: String?): SocialPost =
-        db.toDomain(db.editOwnPost(currentUserId, postId, body, topic) ?: error("No se pudo editar"))
+    override suspend fun editPost(postId: String, body: String, topic: String?, attributionUrl: String?): SocialPost =
+        db.toDomain(db.editOwnPost(currentUserId, postId, body, topic, attributionUrl) ?: error("No se pudo editar"))
 
     override suspend fun deletePost(postId: String) {
         db.removeOwnPost(currentUserId, postId) ?: error("No se pudo eliminar")
@@ -114,6 +114,7 @@ class LocalFeedRepository(
         protagonistUserId: String?,
         participantUserIds: List<String>,
         honoreeName: String?,
+        attributionUrl: String?,
     ): SocialPost {
         val now = currentEpochMs()
         val id = "post-pub-$now"
@@ -132,6 +133,7 @@ class LocalFeedRepository(
             storyLabel = null,
             createdAtEpochMs = now,
             honoreeName = honoreeName,
+            attributionUrl = com.onlygoodthings.shared.domain.ContentAttribution.normalize(attributionUrl),
         )
         db.bumpFeed()
         return db.toDomain(db.post(id))

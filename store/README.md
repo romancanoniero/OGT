@@ -12,10 +12,10 @@
 
 ## Candidato actual (29/10/2026)
 
-La fuente mantiene `com.onlygoodthings.app`: Android 1.0/versionCode 6 e iOS
-1.0/build 5. TestFlight ya contiene 1.0/build 4, cargado el 22/10; ese número no
-puede reutilizarse para el candidato actual. Google Play ya contiene los códigos
-3, 4 y 5 de la versión 1.0, cargados el 22/10; el código nuevo es 6.
+La fuente mantiene `com.onlygoodthings.app`: Android 1.0/versionCode 7 e iOS
+1.0/build 6. Son candidatos locales con el campo de fuente y las aclaraciones de
+publicación y ubicación. No reemplazan automáticamente los paquetes de las
+consolas: TestFlight contiene build 5 y Play tiene el código 6 en borrador interno.
 La compilación iOS de dispositivo y
 el AAB Android firmado se validan localmente. No equivalen a un nuevo build
 procesado en TestFlight o Play.
@@ -53,13 +53,44 @@ Para comprobar el cambio y sus límites con la misma versión de Traefik del VPS
 python3 qa/check-public-documents.py --baseline-ref baba457
 ```
 
-App Privacy tiene 16 categorías configuradas en borrador, documentadas con sus
-fuentes en `store/privacy-data-inventory.json`; no está publicada. La declaración
-de ID publicitario de Play ya indica No. Antes del envío siguen pendientes la
-revisión/publicación de privacidad, revalidar Data Safety, las declaraciones de
-seguridad infantil y ubicación de Play, renovar capturas, comprobar proveedores
-reales y habilitar el acceso de revisión. No confundir los documentos públicos
-con una apertura de la aplicación.
+App Privacy tiene 16 categorías publicadas, documentadas con sus fuentes en
+`store/privacy-data-inventory.json`. Data Safety tiene 17 tipos guardados y la
+declaración de seguridad infantil fue guardada con confirmación del operador.
+La declaración de ID publicitario de Play indica No. Antes del envío siguen
+pendientes la declaración y demostración de ubicación de Play, renovar capturas,
+comprobar los proveedores reales y habilitar el acceso de revisión. No confundir
+los documentos públicos con una apertura de la aplicación.
+
+## Derechos de contenido: declaración pendiente
+
+`attributionUrl` es el enlace opcional de créditos de publicaciones e historias;
+se conserva al guardar, leer, editar, cachear y moderar. Es independiente de
+`sourceUrl`, que mantiene la clasificación de noticias y los enlaces de homenajes.
+La migración 36 agrega una columna nullable compatible con clientes anteriores.
+Omitir el campo al editar conserva el crédito; enviarlo vacío lo borra.
+
+El acuerdo y el formulario aclaran la declaración de derechos del usuario,
+las obligaciones propias de OGT y la denuncia y retirada. Dar crédito no crea
+una autorización. El inventario `editorial-media-rights.json` relaciona las 19
+fotografías precargadas con las fichas consultadas en Wikimedia Commons: cinco
+licencias CC y catorce fichas que indican dominio público. Se compararon los
+originales del servidor: 17 coinciden byte a byte y dos tienen los mismos píxeles
+con metadatos distintos. El anexo de créditos identifica autores, licencias,
+procedencias y adaptaciones; no certifica derechos que no estén acreditados.
+
+No aceptar todavía la declaración afirmativa de Apple. Sigue pendiente evaluar
+la aplicación o exención del dominio público pagante en Argentina, el alcance
+territorial de Favaloro, Mercedes Sosa y Carlos Mugica, y los derechos de imagen
+que no resuelve una licencia de copyright. La distribución inicial en Argentina
+no demuestra por sí sola que la web sea inaccesible desde otros países.
+
+La aceptación Android se realiza únicamente en el emulador autorizado
+`OgtReleaseAcceptance20261029`, con la cuenta ordinaria de revisión y una
+ubicación ficticia. El ingreso y la concesión de «Siempre» funcionaron; el
+botón para omitir verificación se movió fuera del contenido desplazable para
+evitar que quedara detrás de la navegación del sistema. La pantalla preexistente
+de identidad todavía requiere una auditoría funcional de su recepción de
+documentos y de sus estados: elegir un archivo no acredita una verificación.
 
 ## Respaldo externo provisional
 

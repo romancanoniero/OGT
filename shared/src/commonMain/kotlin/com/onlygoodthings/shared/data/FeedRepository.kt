@@ -30,7 +30,7 @@ interface FeedRepository {
     suspend fun clapAnecdote(anecdoteId: String): SocialAnecdote
     suspend fun heartAnecdote(anecdoteId: String): SocialAnecdote
     suspend fun repostAnecdote(anecdoteId: String): SocialPost
-    suspend fun editPost(postId: String, body: String, topic: String? = null): SocialPost
+    suspend fun editPost(postId: String, body: String, topic: String? = null, attributionUrl: String? = null): SocialPost
     suspend fun deletePost(postId: String)
     suspend fun reportPost(postId: String, reason: String, details: String?)
     suspend fun recordFeedEvent(postId: String, kind: FeedEventKind, dwellMs: Int? = null)
@@ -43,6 +43,7 @@ interface FeedRepository {
         protagonistUserId: String? = null,
         participantUserIds: List<String> = emptyList(),
         honoreeName: String? = null,
+        attributionUrl: String? = null,
     ): SocialPost
     suspend fun follow(userId: String)
     suspend fun unfollow(userId: String)

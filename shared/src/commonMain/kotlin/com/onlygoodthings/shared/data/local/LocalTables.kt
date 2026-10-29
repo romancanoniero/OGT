@@ -129,6 +129,7 @@ data class LocalSocialPost(
     val parentPostId: String? = null,
     val viewerHasImpacted: Boolean = false,
     val viewerHasHearted: Boolean = false,
+    val attributionUrl: String? = null,
 )
 
 @Serializable

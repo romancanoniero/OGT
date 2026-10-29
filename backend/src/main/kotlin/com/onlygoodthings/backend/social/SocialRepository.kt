@@ -4,6 +4,7 @@ import com.onlygoodthings.backend.http.optBoolean
 import com.onlygoodthings.backend.http.optString
 import com.onlygoodthings.backend.infra.Database
 import com.onlygoodthings.backend.infra.stringOrNull
+import com.onlygoodthings.shared.domain.ContentAttribution
 import com.onlygoodthings.shared.domain.AuthorKind
 import com.onlygoodthings.shared.domain.FeedEventKind
 import com.onlygoodthings.shared.domain.FeedMode
@@ -110,9 +111,11 @@ class SocialSqlRepository(private val db: Database) {
         participantUserIds: List<String>,
         honoreeName: String? = null,
         sourceUrl: String? = null,
+        attributionUrl: String? = null,
     ): SocialPost {
         require(body.isNotBlank()) { "El texto no puede estar vacío" }
         require(media.isNotEmpty()) { "Hace falta al menos una foto o un video" }
+        val credit = ContentAttribution.normalize(attributionUrl)
         val postId = UUID.randomUUID().toString()
         db.withConnection { connection ->
             connection.autoCommit = false
@@ -120,12 +123,12 @@ class SocialSqlRepository(private val db: Database) {
                 connection.prepareStatement(
                     """
                     INSERT INTO social_posts (
-                        id, author_kind, author_user_id, body, media_urls, location, topic, placement, honoree_name, source_url
+                        id, author_kind, author_user_id, body, media_urls, location, topic, placement, honoree_name, source_url, attribution_url
                     ) VALUES (
                         ?::uuid, 'USER', ?::uuid, ?, ?,
                         CASE WHEN ?::float8 IS NULL THEN NULL
                              ELSE ST_SetSRID(ST_MakePoint(?::float8, ?::float8), 4326) END,
-                        ?, 'ORGANIC', ?, ?
+                        ?, 'ORGANIC', ?, ?, ?
                     )
                     """.trimIndent(),
                 ).use { stmt ->
@@ -153,6 +156,7 @@ class SocialSqlRepository(private val db: Database) {
                     } else {
                         stmt.setString(10, sourceUrl.trim())
                     }
+                    stmt.setString(11, credit)
                     stmt.executeUpdate()
                 }
                 connection.prepareStatement(
@@ -760,7 +764,8 @@ class SocialSqlRepository(private val db: Database) {
         }
     }
 
-    fun editPost(postId: String, userId: String, body: String, topic: String?): SocialPost {
+    fun editPost(postId: String, userId: String, body: String, topic: String?, attributionUrl: String? = null): SocialPost {
+        val credit = ContentAttribution.normalize(attributionUrl)
         val trimmed = body.trim()
         require(trimmed.isNotBlank()) { "El texto no puede estar vacío" }
         db.withConnection { connection ->
@@ -776,13 +781,16 @@ class SocialSqlRepository(private val db: Database) {
                 UPDATE social_posts
                 SET body = ?,
                     topic = COALESCE(?, topic),
+                    attribution_url = CASE WHEN ? THEN ? ELSE attribution_url END,
                     updated_at = now()
                 WHERE id = ?::uuid
                 """.trimIndent(),
             ).use { stmt ->
                 stmt.setString(1, trimmed)
                 if (topic.isNullOrBlank()) stmt.setNull(2, java.sql.Types.VARCHAR) else stmt.setString(2, topic.trim())
-                stmt.setString(3, postId)
+                stmt.setBoolean(3, attributionUrl != null)
+                stmt.setString(4, credit)
+                stmt.setString(5, postId)
                 stmt.executeUpdate()
             }
         }
@@ -1020,7 +1028,7 @@ class SocialSqlRepository(private val db: Database) {
                 """
                 SELECT p.id, p.author_kind, p.author_user_id, p.author_company_id, p.body, p.media_urls,
                        p.impact_count, p.comment_count, p.is_story, COALESCE(p.topic, '') AS topic,
-                       p.source_url, p.honoree_name,
+                       p.source_url, p.attribution_url, p.honoree_name,
                        COALESCE(p.achieved_count, 0) AS achieved_count,
                        COALESCE(p.placement::text, 'ORGANIC') AS placement,
                        EXTRACT(EPOCH FROM p.created_at) * 1000 AS created_ms,
@@ -1417,6 +1425,7 @@ class SocialSqlRepository(private val db: Database) {
             topic = runCatching { getString("topic") }.getOrNull().orEmpty(),
             protagonistUserId = runCatching { getString("protagonist_id") }.getOrNull(),
             sourceUrl = runCatching { stringOrNull("source_url") }.getOrNull(),
+            attributionUrl = stringOrNull("attribution_url"),
             placement = runCatching { PostPlacement.valueOf(getString("placement")) }
                 .getOrDefault(PostPlacement.ORGANIC),
             achievedCount = runCatching { getInt("achieved_count") }.getOrDefault(0),

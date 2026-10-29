@@ -21,7 +21,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
-	<string>5</string>
+	<string>6</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
@@ -46,11 +46,11 @@
 	<key>NSFaceIDUsageDescription</key>
 	<string>Usamos Face ID para entrar a tu barrio sin escribir la contraseña.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Usamos tu GPS para el barrio: plazas, mascotas cerca y para que encuentres tu auto. No vendemos rutas.</string>
+	<string>Usamos tu ubicación para calcular distancias y coordinar el estacionamiento comunitario. Enviamos al servidor tu última posición y su precisión; no guardamos un historial de rutas.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Con GPS activado podemos avisar de plazas y mascotas cerca, y actualizar tu barrio aunque cambies de app. No guardamos el historial de rutas.</string>
+	<string>Si elegís Siempre, recopilamos tu ubicación en segundo plano para el estacionamiento comunitario, aunque la app no esté en pantalla. Enviamos tu última posición al servidor; no guardamos un historial de rutas.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>Con GPS activado podemos avisar de plazas y mascotas cerca, y actualizar tu barrio aunque cambies de app. No guardamos el historial de rutas.</string>
+	<string>Si elegís Siempre, recopilamos tu ubicación en segundo plano para el estacionamiento comunitario, aunque la app no esté en pantalla. Enviamos tu última posición al servidor; no guardamos un historial de rutas.</string>
 	<key>GIDClientID</key>
 	<string>521063054927-34gajgesa1pk2rh51vep08rrs617tsuf.apps.googleusercontent.com</string>
 	<key>GIDServerClientID</key>
