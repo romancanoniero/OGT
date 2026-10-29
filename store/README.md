@@ -10,11 +10,13 @@
 - Android: `store/android/es-419/`
 - Capturas: `store/screenshots/ios/` y `store/screenshots/android/`
 
-## Candidato actual (27/10/2026)
+## Candidato actual (29/10/2026)
 
 La fuente mantiene `com.onlygoodthings.app`: Android 1.0/versionCode 5 e iOS
-1.0/build 4. La compilación iOS de dispositivo y el AAB Android firmado se validaron
-localmente. No equivalen a un nuevo build procesado en TestFlight o Play.
+1.0/build 5. TestFlight ya contiene 1.0/build 4, cargado el 22/10; ese número no
+puede reutilizarse para el candidato actual. La compilación iOS de dispositivo y
+el AAB Android firmado se validan localmente. No equivalen a un nuevo build
+procesado en TestFlight o Play.
 Antes de subir, consultar los números existentes en ambas consolas y elegir un
 número nuevo si alguno ya fue utilizado. Conservar la firma actual y la de Play.
 
