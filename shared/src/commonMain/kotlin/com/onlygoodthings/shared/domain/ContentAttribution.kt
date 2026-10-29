@@ -7,6 +7,15 @@ object ContentAttribution {
     const val MAX_URL_LENGTH = 2048
     const val NOTICE = "Al publicar declarás que el contenido es tuyo o que tenés los permisos necesarios. Citar la fuente no reemplaza la autorización."
 
+    /** Editorial illustration anchors disclose synthetic images beside the media. */
+    fun label(value: String?): String {
+        val url=runCatching { normalize(value)?.let {Url(it)} }.getOrNull()
+        val generated=url!=null && url.protocol.name=="https" && url.host=="onlygoodthings.lat" &&
+            url.port==443 && url.encodedPath=="/terms" &&
+            url.fragment.matches(Regex("ilustracion-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}"))
+        return if(generated) "Ilustración generada con IA · OGT" else "Fuente y créditos"
+    }
+
     fun normalize(value: String?): String? {
         val text = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
         require(text.length <= MAX_URL_LENGTH && text.none { it.isWhitespace() || it.isISOControl() || it == '\\' }) {

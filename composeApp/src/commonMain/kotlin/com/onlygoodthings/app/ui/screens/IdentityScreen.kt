@@ -1,103 +1,37 @@
 package com.onlygoodthings.app.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.onlygoodthings.app.platform.rememberOgtDocumentPicker
-import com.onlygoodthings.app.platform.rememberOgtMediaPicker
 import com.onlygoodthings.app.theme.OgtColors
-import com.onlygoodthings.app.ui.components.GhostLink
-import com.onlygoodthings.app.ui.components.OgtCaption
-import com.onlygoodthings.app.ui.components.OgtPrimaryButton
-import com.onlygoodthings.app.ui.components.OgtSecondaryButton
-import com.onlygoodthings.app.ui.components.OgtTopBar
-import com.onlygoodthings.app.ui.components.PrefCategory
-import com.onlygoodthings.app.ui.components.PrefDivider
-import com.onlygoodthings.app.ui.components.PrefGroup
-import com.onlygoodthings.app.ui.components.PrefLine
-import com.onlygoodthings.app.ui.components.ScreenColumn
+import com.onlygoodthings.app.ui.components.*
 
+/** Account access is not a documentary identity or address verification. */
 @Composable
 fun IdentityScreen(onContinue: () -> Unit) {
-    var document by remember { mutableStateOf<String?>(null) }
-    val camera = rememberOgtMediaPicker { picked ->
-        document = picked.path.substringAfterLast('/')
-    }
-    val pickDocument = rememberOgtDocumentPicker { name -> document = name }
     Column(Modifier.fillMaxSize().background(OgtColors.canvas).navigationBarsPadding()) {
-        OgtTopBar(title = "Verificación")
+        OgtTopBar(title = "Tu identidad")
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-        ScreenColumn {
-            OgtCaption("Only Good Things (OGT) es una red de personas reales. Verificar el perfil abre alertas, trueques y voto comunitario.")
-            PrefCategory("Beneficios")
-            PrefGroup {
-                PrefLine(
-                    title = "Insignia de verificado",
-                    body = "Se ve en el avatar, el perfil, las publicaciones y las respuestas.",
-                )
-                PrefDivider()
-                PrefLine(
-                    title = "Alertas de mascotas",
-                    body = "Aviso geolocalizado cuando hay un extravío cerca.",
-                )
-                PrefDivider()
-                PrefLine(
-                    title = "Trueques y reservas",
-                    body = "Sin comisión y con prioridad en las dársenas de la comunidad.",
-                )
-                PrefDivider()
-                PrefLine(
-                    title = "Presupuesto participativo",
-                    body = "Voz y voto en el fondo ecológico y los proyectos compartidos.",
-                )
+            ScreenColumn {
+                OgtCaption("En OGT podés participar sin presentar documentos personales.")
+                PrefCategory("Tu cuenta")
+                PrefGroup {
+                    PrefLine(title = "Acceso a OGT", body = "El ingreso mediante correo, teléfono, Google o Apple permite acceder a tu cuenta. No certifica tu identidad civil ni tus antecedentes.")
+                    PrefDivider()
+                    PrefLine(title = "Ubicación opcional", body = "La ubicación del teléfono se usa en las funciones que la necesitan y se configura desde Ajustes. No verifica tu domicilio.")
+                    PrefDivider()
+                    PrefLine(title = "Sin documentos", body = "OGT no solicita ni recibe DNI o facturas para verificar personas. No compartas documentos en publicaciones, historias ni chats.")
+                }
+                OgtCaption("Esta versión no otorga una insignia de identidad verificada a partir del ingreso o de la ubicación. Las funciones comunitarias disponibles no requieren una verificación documental.")
+                Spacer(Modifier.height(24.dp))
             }
-            PrefCategory("Proceso", "Paso 2 de 3")
-            PrefGroup {
-                PrefLine(
-                    title = "Confirmación de zona",
-                    body = "Palermo Soho, CABA · Zona validada",
-                    trailing = "Listo",
-                )
-                PrefDivider()
-                PrefLine(
-                    title = "Documento o servicio",
-                    body = "DNI o factura con domicilio. JPG, PNG o PDF. Máx. 10 MB.",
-                    trailing = "En curso",
-                )
-                PrefDivider()
-                PrefLine(
-                    title = "Aval de la comunidad",
-                    body = "Dos perfiles verificados pueden confirmar que formás parte.",
-                    trailing = "Opcional",
-                )
-            }
-            OgtCaption("Los documentos se procesan cifrados y se borran al validar. No se venden ni se comparten.")
-            if (document == null) {
-                OgtCaption("Todavía no hay documento. Escanear abre la cámara; subir abre un archivo.")
-            } else {
-                OgtCaption("Documento listo.")
-                OgtPrimaryButton("Continuar") { onContinue() }
-            }
-            OgtPrimaryButton("Escanear documento") { camera.takeCamera() }
-            OgtSecondaryButton("Subir PDF o foto") { pickDocument() }
-            Spacer(Modifier.height(24.dp))
-        }
         }
         Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
-            GhostLink("Continuar sin verificar") { onContinue() }
+            OgtPrimaryButton("Continuar") { onContinue() }
         }
     }
 }

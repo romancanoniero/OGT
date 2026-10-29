@@ -38,5 +38,5 @@ fun PublicationRightsNotice() {
 fun AttributionLink(value: String?, color: Color = OgtColors.primary) {
     val safe = runCatching { ContentAttribution.normalize(value) }.getOrNull() ?: return
     val uri = LocalUriHandler.current
-    TextButton(onClick = { uri.openUri(safe) }) { Text("Fuente y créditos", color = color) }
+    TextButton(onClick = { uri.openUri(safe) }) { Text(ContentAttribution.label(safe), color = color) }
 }

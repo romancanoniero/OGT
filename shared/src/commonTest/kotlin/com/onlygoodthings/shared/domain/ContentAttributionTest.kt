@@ -7,6 +7,14 @@ import kotlinx.serialization.json.Json
 import kotlin.test.*
 
 class ContentAttributionTest {
+    @Test fun onlyOgtEditorialIllustrationLinksUseTheGeneratedImageDisclosure() {
+        val path="/terms#ilustracion-a2000000-0000-4000-8000-000000000012"
+        assertEquals("Ilustración generada con IA · OGT",ContentAttribution.label("https://onlygoodthings.lat"+path))
+        for(url in listOf("https://example.org"+path,"http://onlygoodthings.lat"+path,
+            "https://onlygoodthings.lat:8443"+path,"https://onlygoodthings.lat/terms#credito-a2000000-0000-4000-8000-000000000012",null)) {
+            assertEquals("Fuente y créditos",ContentAttribution.label(url))
+        }
+    }
     @Test fun externalCreditsAcceptOnlyWebLinksWithoutCredentials() {
         assertNull(ContentAttribution.normalize(null))
         assertNull(ContentAttribution.normalize("  "))

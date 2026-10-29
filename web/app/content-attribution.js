@@ -11,13 +11,20 @@ globalThis.OgtAttribution = Object.freeze({
     }
     return text;
   },
+  label(value) {
+    let safe;try {safe=this.normalize(value);} catch (_) {return 'Fuente y créditos';}
+    const url=safe?new URL(safe):null;
+    return url?.origin==='https://onlygoodthings.lat' && url.pathname==='/terms' &&
+      /^#ilustracion-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(url.hash)
+      ? 'Ilustración generada con IA · OGT' : 'Fuente y créditos';
+  },
   link(value) {
     let safe;
     try { safe = this.normalize(value); } catch (_) { return null; }
     if (!safe) return null;
     const link = document.createElement('a');
     link.href = safe; link.target = '_blank'; link.rel = 'noopener noreferrer';
-    link.className = 'content-attribution'; link.textContent = 'Fuente y créditos';
+    link.className = 'content-attribution'; link.textContent = this.label(safe);
     return link;
   },
 });

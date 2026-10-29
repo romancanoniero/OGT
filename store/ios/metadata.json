@@ -10,5 +10,6 @@
   "support_url": "https://onlygoodthings.lat",
   "marketing_url": "https://onlygoodthings.lat",
   "privacy_url": "https://onlygoodthings.lat/privacy",
-  "content_rights_status": "pending_evidence_review"
+  "content_rights_status": "editorial_replacements_documented_store_confirmation_pending",
+  "editorial_rights_manifest": "store/editorial-media-rights.json"
 }

@@ -12,12 +12,14 @@
 
 ## Candidato actual (29/10/2026)
 
-La fuente mantiene `com.onlygoodthings.app`: Android 1.0/versionCode 9 e iOS
-1.0/build 8. Estos candidatos locales conservan la fuente debajo de la imagen y
+La fuente mantiene `com.onlygoodthings.app`: Android 1.0/versionCode 10 e iOS
+1.0/build 9. Estos candidatos locales conservan la fuente debajo de la imagen y
 corrigen el zoom del mapa: amplían las teselas disponibles hasta el zoom 19 sin
 pedir niveles sin cartografía, y cancelan las descargas al cambiar de cámara.
-Las consolas ya recibieron TestFlight build 7 y Play código 8; este último quedó
-guardado como borrador interno. Verificar el procesamiento actual en Apple.
+Las consolas recibieron TestFlight build 8 y Play código 9; este último quedó
+guardado como borrador interno. Los nuevos candidatos 9/10 se preparan localmente
+con identificación de ilustraciones generadas con IA y la política sin documentos.
+No se declara una carga a las tiendas hasta comprobar su recepción.
 La compilación iOS de dispositivo y
 el AAB Android firmado se validan localmente. No equivalen a un nuevo build
 procesado en TestFlight o Play.
@@ -150,3 +152,17 @@ las bajas de cuentas posteriores a la instantánea antes de reabrir el servicio.
 - `store/screenshots/android/04-skills.png`
 - `store/screenshots/android/05-dock.png`
 - `store/screenshots/android/06-publish.png`
+
+## Ajuste de identidad y recursos editoriales
+
+El titular confirmó conservar OGT sin solicitar documentos personales. La pantalla
+de identidad explica el alcance del ingreso y de la ubicación; no recibe archivos,
+no valida un domicilio fijo ni promete una insignia inexistente. Se conserva el
+ingreso al feed y se puede consultar la explicación desde Ajustes. La prueba real
+de ingreso y baja con Apple queda pendiente por decisión del titular.
+
+El inventario editorial contiene 13 ilustraciones generadas para OGT y seis
+fotografías con licencia Creative Commons. Se conservan los créditos y las
+condiciones de las fotografías. Las ilustraciones se identifican junto al medio,
+y sus instrucciones, originales y huellas están en `editorial-media/provenance.json`.
+Esto no es una garantía de ausencia universal de reclamos ni acredita otros activos.

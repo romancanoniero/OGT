@@ -152,6 +152,11 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
             )
 
+            PrefCategory("Tu identidad")
+            PrefGroup {
+                PrefNav("Sobre tu identidad") {onOpen("identity")}
+            }
+
             PrefCategory(copy.languageTitle)
             PrefGroup {
                 PrefNav(

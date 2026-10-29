@@ -436,7 +436,7 @@ fun App() {
             OgtRoute.Language, OgtRoute.Wallet, OgtRoute.Ranking, OgtRoute.Sponsors,
             OgtRoute.SplashSponsors, OgtRoute.CommunityRules, OgtRoute.Gps,
             OgtRoute.AnimatedSvg, OgtRoute.Invite, OgtRoute.Messages, OgtRoute.Milestone,
-            OgtRoute.Vehicle,
+            OgtRoute.Vehicle, OgtRoute.Identity,
             OgtRoute.Chat,
         )
         val keepSettings = route == OgtRoute.Settings || (settingsResume && route in settingsLeaves)
@@ -456,6 +456,7 @@ fun App() {
             settingsResume = true
             route = when (key) {
                 "language" -> OgtRoute.Language
+                "identity" -> OgtRoute.Identity
                 "rules" -> {
                     rulesBack = OgtRoute.Settings
                     OgtRoute.CommunityRules
@@ -614,7 +615,7 @@ fun App() {
                     )
                     OgtRoute.Identity -> IdentityScreen {
                         auth.markOnboardingDone()
-                        route = OgtRoute.Feed
+                        if(settingsResume)closeSettingsLeaf() else route = OgtRoute.Feed
                     }
                     OgtRoute.Feed, OgtRoute.PostDetail, OgtRoute.NeighborProfile -> {
                         // El feed sigue compuesto bajo la ficha: atrás vuelve a la misma tarjeta.
