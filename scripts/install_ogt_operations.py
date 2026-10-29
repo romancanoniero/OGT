@@ -16,7 +16,7 @@ BEGIN='# BEGIN OGT OPERATIONS v1'
 END='# END OGT OPERATIONS v1'
 BLOCK='''# BEGIN OGT OPERATIONS v1
 * * * * * /usr/bin/python3 -B /home/iankmp/ogt/operations-runtime/ogt_operations.py >> /home/iankmp/ogt/operations/events.log 2>&1
-17 * * * * /usr/bin/python3 -B /home/iankmp/ogt/operations-runtime/ogt_backup.py --if-due >> /home/iankmp/ogt/operations/events.log 2>&1
+17 * * * * /usr/bin/python3 -B /home/iankmp/ogt/operations-runtime/ogt_backup.py --if-due --retention-days 30 >> /home/iankmp/ogt/operations/events.log 2>&1
 # END OGT OPERATIONS v1
 '''
 

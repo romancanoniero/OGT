@@ -209,7 +209,7 @@
     "diagnostics": "Operational diagnostics and Firebase SDK user-agent/version metadata; no Analytics, Crashlytics or Performance product linked. Firebase uses user-agent data to maintain and improve SDKs.",
     "otherData": "IP addresses and service/security request metadata.",
     "businessOnly": "Fiscal identifiers, balances and Mercado Pago transaction metadata are in the separate website, not requested in native community flows.",
-    "retention": "Backup retention decision pending; no exact period declared.",
+    "retention": "Owner selected 30 days for automatic backups. Complete recent verified copy required before expiry; legacy/manual/unknown copies are preserved. External destination DEV_MAC is provisional and depends on the Mac being available.",
     "publication": "Prepared inventory; final owner review and store publication separate."
   },
   "primaryReferences": [
@@ -217,5 +217,21 @@
     "https://firebase.google.com/docs/ios/app-store-data-collection",
     "https://firebase.google.com/docs/android/play-data-disclosure",
     "https://support.google.com/googleplay/android-developer/answer/10787469"
-  ]
+  ],
+  "googlePlay": {
+    "status": "draft",
+    "allExistingResponsesAudited": true,
+    "additionalTypes": [
+      "Approximate location",
+      "Contacts",
+      "Voice or sound recordings within videos",
+      "App interactions",
+      "Other actions (reactions/follows)"
+    ],
+    "locationSharing": "Map providers receive IP addresses and viewport tile requests. Location sharing disclosed for app functionality; collection also used for proximity/ranking. No advertising purpose.",
+    "otherSharing": "Firebase operates as service provider; public content and chosen invitations are user-initiated transfers. No ads or data brokers.",
+    "accountCollection": "Name and user ID required; email and phone optional across available sign-in methods.",
+    "preservedBaseline": "Existing selected data types and purposes retained. Added functionality to diagnostics and personalization to user ID and location/interaction categories.",
+    "finalOwnerReviewPending": true
+  }
 }
