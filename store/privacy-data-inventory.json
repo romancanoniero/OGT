@@ -1,0 +1,221 @@
+{
+  "schemaVersion": 1,
+  "auditedAt": "2026-10-29",
+  "sourceBaseline": "0bdad48f22fb7b82936f02ef8379f6d16866461b",
+  "appScope": "Native community clients; company-only website fields documented separately",
+  "tracking": false,
+  "advertisingIdentifiersRequested": false,
+  "categories": [
+    {
+      "appleName": "Nombre",
+      "purposes": [
+        "APP_FUNCTIONALITY"
+      ],
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "evidence": [
+        "backend/src/main/kotlin/com/onlygoodthings/backend/infra/IdentityStore.kt",
+        "backend/src/main/kotlin/com/onlygoodthings/backend/social/HonorRepository.kt"
+      ]
+    },
+    {
+      "appleName": "Dirección de correo electrónico",
+      "purposes": [
+        "APP_FUNCTIONALITY"
+      ],
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "evidence": [
+        "backend/src/main/kotlin/com/onlygoodthings/backend/infra/IdentityStore.kt",
+        "backend/src/main/kotlin/com/onlygoodthings/backend/social/HonorRepository.kt"
+      ]
+    },
+    {
+      "appleName": "Número de teléfono",
+      "purposes": [
+        "APP_FUNCTIONALITY"
+      ],
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "evidence": [
+        "backend/src/main/kotlin/com/onlygoodthings/backend/infra/IdentityStore.kt",
+        "backend/src/main/kotlin/com/onlygoodthings/backend/social/HonorRepository.kt"
+      ]
+    },
+    {
+      "appleName": "Ubicación exacta",
+      "purposes": [
+        "APP_FUNCTIONALITY",
+        "PRODUCT_PERSONALIZATION"
+      ],
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "evidence": [
+        "backend/src/main/kotlin/com/onlygoodthings/backend/infra/IdentityStore.kt",
+        "backend/src/main/kotlin/com/onlygoodthings/backend/parking/ParkingRepository.kt",
+        "backend/src/main/kotlin/com/onlygoodthings/backend/social/SocialRepository.kt"
+      ]
+    },
+    {
+      "appleName": "Ubicación aproximada",
+      "purposes": [
+        "APP_FUNCTIONALITY",
+        "PRODUCT_PERSONALIZATION"
+      ],
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "evidence": [
+        "composeApp/src/androidMain/kotlin/com/onlygoodthings/app/map/OgtLocation.android.kt",
+        "composeApp/src/commonMain/kotlin/com/onlygoodthings/app/map/OgtLibreMap.kt"
+      ]
+    },
+    {
+      "appleName": "Contactos",
+      "purposes": [
+        "APP_FUNCTIONALITY",
+        "PRODUCT_PERSONALIZATION"
+      ],
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "evidence": [
+        "backend/src/main/kotlin/com/onlygoodthings/backend/social/HonorRepository.kt",
+        "backend/src/main/kotlin/com/onlygoodthings/backend/social/SocialRepository.kt"
+      ]
+    },
+    {
+      "appleName": "Correos electrónicos o mensajes de texto",
+      "purposes": [
+        "APP_FUNCTIONALITY"
+      ],
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "evidence": [
+        "backend/src/main/kotlin/com/onlygoodthings/backend/infra/IdentityStore.kt"
+      ]
+    },
+    {
+      "appleName": "Fotos o vídeos",
+      "purposes": [
+        "APP_FUNCTIONALITY"
+      ],
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "evidence": [
+        "backend/src/main/kotlin/com/onlygoodthings/backend/stories/StoryMediaStore.kt",
+        "backend/src/main/kotlin/com/onlygoodthings/backend/stories/StoryRepository.kt"
+      ]
+    },
+    {
+      "appleName": "Datos de audio",
+      "purposes": [
+        "APP_FUNCTIONALITY"
+      ],
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "evidence": [
+        "iosApp/iosApp/OgtVideoEditor.swift",
+        "composeApp/src/androidMain/kotlin/com/onlygoodthings/app/platform/OgtVideoEditor.android.kt"
+      ]
+    },
+    {
+      "appleName": "Atención al cliente",
+      "purposes": [
+        "APP_FUNCTIONALITY"
+      ],
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "evidence": [
+        "backend/src/main/kotlin/com/onlygoodthings/backend/stories/StoryRepository.kt"
+      ]
+    },
+    {
+      "appleName": "Otro contenido del usuario",
+      "purposes": [
+        "APP_FUNCTIONALITY"
+      ],
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "evidence": [
+        "backend/src/main/kotlin/com/onlygoodthings/backend/social/SocialRepository.kt",
+        "backend/src/main/kotlin/com/onlygoodthings/backend/stories/StoryRepository.kt"
+      ]
+    },
+    {
+      "appleName": "ID de usuario",
+      "purposes": [
+        "APP_FUNCTIONALITY",
+        "PRODUCT_PERSONALIZATION"
+      ],
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "evidence": [
+        "backend/src/main/kotlin/com/onlygoodthings/backend/infra/IdentityStore.kt",
+        "backend/src/main/kotlin/com/onlygoodthings/backend/social/SocialRepository.kt"
+      ]
+    },
+    {
+      "appleName": "ID del dispositivo",
+      "purposes": [
+        "APP_FUNCTIONALITY"
+      ],
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "evidence": [
+        "backend/src/main/kotlin/com/onlygoodthings/backend/notify/NoticeRepository.kt",
+        "database/migrations/08_device_tokens.sql"
+      ]
+    },
+    {
+      "appleName": "Interacción con el producto",
+      "purposes": [
+        "APP_FUNCTIONALITY",
+        "PRODUCT_PERSONALIZATION"
+      ],
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "evidence": [
+        "backend/src/main/kotlin/com/onlygoodthings/backend/stories/StoryRepository.kt",
+        "backend/src/main/kotlin/com/onlygoodthings/backend/social/SocialRepository.kt"
+      ]
+    },
+    {
+      "appleName": "Otros datos de diagnóstico",
+      "purposes": [
+        "APP_FUNCTIONALITY",
+        "ANALYTICS"
+      ],
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "evidence": [
+        "composeApp/build.gradle.kts",
+        "iosApp/iosApp.xcodeproj/project.pbxproj"
+      ]
+    },
+    {
+      "appleName": "Otros tipos de datos",
+      "purposes": [
+        "APP_FUNCTIONALITY"
+      ],
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "evidence": [
+        "deploy/vps/docker-compose.yml"
+      ]
+    }
+  ],
+  "limits": {
+    "contacts": "Bulk address book and contact photos stay on device. Selected name/phone/email invitations and social graph are stored.",
+    "audio": "Sound embedded in uploaded videos; no standalone voice/music feature.",
+    "diagnostics": "Operational diagnostics and Firebase SDK user-agent/version metadata; no Analytics, Crashlytics or Performance product linked. Firebase uses user-agent data to maintain and improve SDKs.",
+    "otherData": "IP addresses and service/security request metadata.",
+    "businessOnly": "Fiscal identifiers, balances and Mercado Pago transaction metadata are in the separate website, not requested in native community flows.",
+    "retention": "Backup retention decision pending; no exact period declared.",
+    "publication": "Prepared inventory; final owner review and store publication separate."
+  },
+  "primaryReferences": [
+    "https://developer.apple.com/app-store/app-privacy-details/",
+    "https://firebase.google.com/docs/ios/app-store-data-collection",
+    "https://firebase.google.com/docs/android/play-data-disclosure",
+    "https://support.google.com/googleplay/android-developer/answer/10787469"
+  ]
+}
