@@ -219,6 +219,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install pinned dependencies for release verification
+        run: python3 -m pip install -r scripts/requirements-identity.txt
       - name: Android build prerequisites
         run: |
           test -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
