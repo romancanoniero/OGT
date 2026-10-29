@@ -12,9 +12,11 @@
 
 ## Candidato actual (29/10/2026)
 
-La fuente mantiene `com.onlygoodthings.app`: Android 1.0/versionCode 5 e iOS
+La fuente mantiene `com.onlygoodthings.app`: Android 1.0/versionCode 6 e iOS
 1.0/build 5. TestFlight ya contiene 1.0/build 4, cargado el 22/10; ese número no
-puede reutilizarse para el candidato actual. La compilación iOS de dispositivo y
+puede reutilizarse para el candidato actual. Google Play ya contiene los códigos
+3, 4 y 5 de la versión 1.0, cargados el 22/10; el código nuevo es 6.
+La compilación iOS de dispositivo y
 el AAB Android firmado se validan localmente. No equivalen a un nuevo build
 procesado en TestFlight o Play.
 Antes de subir, consultar los números existentes en ambas consolas y elegir un

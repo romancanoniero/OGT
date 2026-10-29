@@ -102,7 +102,7 @@ android {
         applicationId = "com.onlygoodthings.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
+        versionCode = 6
         versionName = "1.0"
         testInstrumentationRunner = "com.onlygoodthings.app.qa.QaTestRunner"
         manifestPlaceholders["ogtAppLabel"] = "Only Good Things"
