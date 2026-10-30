@@ -940,14 +940,9 @@ private fun HomenajeFeedCard(
                 OgtPill(if (moment) "Anécdota" else post.tag, OgtColors.sand, OgtColors.ink)
             }
             if (!moment) ImpactTruthPills(post)
-            if (moment || honoree != profile.fullName) {
-                Text(
+            if (moment || !post.honoreeName.isNullOrBlank() || honoree != profile.fullName) {
+                com.onlygoodthings.app.ui.components.HonoreeTitle(
                     if (moment) "Anécdota del homenaje a $honoree" else honoree,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = OgtColors.ink,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
             if (db.creditPending(post)) {
@@ -1074,6 +1069,10 @@ private fun StoryFeedCard(
             verified = profile.verified,
             onOpenAuthor = onOpenAuthor,
             onOverflow = onOverflow,
+        )
+        com.onlygoodthings.app.ui.components.HonoreeTitle(
+            post.honoreeName,
+            modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 10.dp),
         )
         PostMediaPager(
             media = media,

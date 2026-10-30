@@ -963,7 +963,7 @@ private fun HomenajeDetail(
         OgtStitchIcon(Res.drawable.qs_invite, copy.feedTitleHomenaje, tint = OgtColors.secondary)
         OgtPill(post.tag, OgtColors.sand, OgtColors.ink)
     }
-    Text(honoree, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = OgtColors.ink)
+    com.onlygoodthings.app.ui.components.HonoreeTitle(honoree, detail = true)
     OgtCaption(
         listOfNotNull(
             "Lo cuenta $authorName",
@@ -1228,6 +1228,7 @@ private fun NewsDetail(
 ) {
     OgtPill(post.tag)
     AuthorLine(authorName, level, post)
+    com.onlygoodthings.app.ui.components.HonoreeTitle(post.honoreeName, detail = true)
     DetailMedia(media, post.tag, height = 220.dp, onOpen = onOpenMedia)
     com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
     actions()
@@ -1253,6 +1254,7 @@ private fun CommunityDetail(
     val whenWhere = gatheringWhenWhere(post.place, post.eventStartsAtEpochMs, currentEpochMs())
     OgtPill(post.tag)
     AuthorLine(authorName, level, post, showPlace = !gathering)
+    com.onlygoodthings.app.ui.components.HonoreeTitle(post.honoreeName, detail = true)
     DetailMedia(media, post.tag, height = 220.dp, onOpen = onOpenMedia)
     com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
     if (whenWhere != null) {

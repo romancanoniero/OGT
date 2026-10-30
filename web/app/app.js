@@ -1816,7 +1816,7 @@ function postCard(post, { openable = true, previewStories = true, compose = fals
   const shown = photo ? `<div class="media-slot">${img}</div>` : "";
   const share = isAnecdoteShare(post);
   const homage = isHomenaje(post);
-  const honoree = post.honoreeName;
+  const honoree = String(post.honoreeName || "").trim();
   const listing = cardKind(post);
   const pill = share
     ? `<span class="stories-head">${icon("qs-anecdote")}<span class="pill">Anécdota</span></span>`
@@ -1828,9 +1828,9 @@ function postCard(post, { openable = true, previewStories = true, compose = fals
           ? `<span class="stories-head">${icon("qs-pets")}<span class="pill">Adopción</span></span>`
           : "";
   const honoreeLine = share && honoree
-    ? `<p class="honoree">Anécdota del homenaje a ${escapeHtml(honoree)}</p>`
-    : honoree && honoree !== post.authorName
-      ? `<p class="honoree">${escapeHtml(honoree)}</p>`
+    ? `<h2 class="honoree">Anécdota del homenaje a ${escapeHtml(honoree)}</h2>`
+    : honoree
+      ? `<h2 class="honoree">${escapeHtml(honoree)}</h2>`
       : "";
   const openClass = openable ? " open" : "";
   const openAttr = openable ? ` data-open="${escapeHtml(post.id)}"` : "";

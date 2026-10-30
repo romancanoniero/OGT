@@ -175,3 +175,12 @@ El retrato de Favaloro fue rehecho el 30/10/2026 con una fotografía de Clevelan
 Clinic como referencia de identidad. Tanto la referencia como su adaptación
 con IA se documentan y ofrecen bajo CC BY 4.0, con atribución en los créditos.
 Esto no es una garantía de ausencia universal de reclamos ni acredita otros activos.
+
+Las 19 tarjetas editoriales identifican al personaje mediante `honoreeName`,
+independientemente del autor y del tema. El nombre se muestra sobre la imagen,
+también en las tarjetas de noticias o comunidad y en su detalle, sin truncarlo.
+`scripts/complete_editorial_honorees.py` revisa ese inventario y, con `--apply`,
+completa únicamente los nombres vacíos. Conserva los nombres existentes, los
+relatos, categorías, autores, imágenes, fuentes, créditos y conversaciones;
+verifica esos datos dentro de la misma transacción. Sin `--apply` solo informa
+el estado y no modifica publicaciones.

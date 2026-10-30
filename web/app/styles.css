@@ -235,7 +235,7 @@ button { font: inherit; background: none; border: 0; cursor: pointer; color: inh
   font-weight: 600;
 }
 .pill.lost { background: var(--sunset); color: var(--sunset-text); }
-.honoree { font-weight: 700; font-size: 16px; margin: 0 0 8px; }
+.honoree { font-weight: 700; font-size: 18px; line-height: 1.35; margin: 0 0 10px; overflow-wrap: anywhere; }
 .caption { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
 .stories-head {
   display: flex;

@@ -17,7 +17,8 @@ node --check web/app/app.js
 node --check web/app/auth.js
 node --check web/app/content-attribution.js
 find web/app/crm -type f -name '*.js' -print0 | xargs -0 -n 1 node --check
-node --test qa/auth-unit.test.mjs qa/crm-*.test.mjs qa/content-attribution.test.mjs
+node --test qa/auth-unit.test.mjs qa/crm-*.test.mjs qa/content-attribution.test.mjs qa/honoree-card.test.mjs
+python3 -m unittest qa.test_editorial_honorees
 python3 -m unittest discover -s qa -p 'test_release*.py' -v
 if [ "$MODE" = --check ]; then
   echo 'Source checks passed. No build, SSH connection or deployment was performed.'
