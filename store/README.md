@@ -184,3 +184,11 @@ completa únicamente los nombres vacíos. Conserva los nombres existentes, los
 relatos, categorías, autores, imágenes, fuentes, créditos y conversaciones;
 verifica esos datos dentro de la misma transacción. Sin `--apply` solo informa
 el estado y no modifica publicaciones.
+
+Los retratos de Carlos Saavedra Lamas y Elpidio González fueron rehechos el
+30/10/2026 con referencias históricas individuales para corregir el parecido.
+La clasificación de dominio público argentino de esas fotografías se registra
+como declaración territorial de la fuente, separada de la ilustración nueva.
+Las referencias, huellas e instrucciones quedan documentadas; las fotografías
+fuente no se muestran como contenido de la app. Elpidio se representa afeitado,
+según su referencia, y Saavedra Lamas conserva su bigote característico.

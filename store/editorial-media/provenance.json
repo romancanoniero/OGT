@@ -78,18 +78,39 @@
     },
     {
       "key": "saavedra-lamas",
-      "prompt": "Use case: historical-scene. Asset type: retrato editorial para un homenaje cultural en Only Good Things. Crea una ilustración ORIGINAL de Carlos Saavedra Lamas, diplomático argentino y premio Nobel de la Paz, alrededor de 60 años en los años treinta, cabello oscuro peinado hacia atrás con entradas, frente amplia, nariz larga, rostro fino y serio, bigote fino discreto, traje oscuro de época, camisa clara y corbata. Estilo: pintura editorial digital realista, pincelada fina visible, elegante y sobria, paleta natural y fondo neutro cálido de papel con sutil profundidad. Composición horizontal 16:9, busto y cabeza centrados, cabeza completa con aire por encima, rostro en el tercio superior central, hombros visibles, apariencia digna y humana. Composición nueva, sin copiar una pintura o fotografía de archivo ni una pose icónica. No debe parecer fotografía histórica auténtica. Sin texto, firmas, marcas de agua, logos ni propaganda. Se identificará como ilustración generada con IA.",
-      "asset": "store/editorial-media/52d7c7b8-7a01-3770-aca4-ea36f617fbbe.jpg",
-      "master": "store/editorial-media/masters/52d7c7b8-7a01-3770-aca4-ea36f617fbbe.png",
-      "sha256": "586beb56a9450abaad719d85f34114aa6163a9c483cf1dc3dfd90275953b943e",
-      "originalSha256": "b165881f8fca5fccdf3f149717394a57c7929246caf3d0e2cba09dfb5fc15d2c",
-      "masterBytes": 2534793,
-      "deliveryBytes": 142139,
+      "prompt": "Use case: historical-scene. Asset type: retrato editorial ilustrado horizontal 16:9 para el homenaje cultural a Carlos Saavedra Lamas en Only Good Things.\nInput image 1: referencia histórica de identidad de Carlos Saavedra Lamas; es el único sujeto que debes retratar. La fidelidad a esta persona concreta es el objetivo principal. Rehace el retrato en una composición nueva y claramente pictórica, sin calcar el encuadre ni el fondo de la fotografía.\nPrimary request: ilustración editorial pintada de Carlos Saavedra Lamas con sus facciones muy fieles al hombre de la referencia. Conserva el óvalo relativamente ancho, la frente despejada, pelo oscuro espeso hacia atrás con raya lateral, cejas oscuras marcadas y arqueadas, ojos hundidos con su forma y separación reales, nariz y punta de nariz específicas, boca y mentón particulares y el bigote oscuro denso y ancho de la referencia. Conserva la edad y el parecido, sin convertirlo en un hombre genérico de traje, sin afinarle artificialmente la cara ni alargarla. No usar el rostro de Elpidio González ni de otros políticos. Su bigote no es un fino bigote tipo lápiz.\nStyle/medium: pintura editorial digital sobria y realista, con pincelada fina visible, tonos de piel naturales, acabado de ilustración y fondo cálido neutro de papel. Apariencia digna y humana, sin simulación de foto de archivo.\nComposition/framing: un solo hombre, busto con cabeza completa centrada y aire por encima, hombros y parte del torso visibles; rostro en el tercio superior central, nueva postura ligeramente de tres cuartos. Traje oscuro de época, camisa clara y corbata sencilla. Lienzo horizontal 16:9, suficiente espacio lateral para la tarjeta.\nConstraints: mantener la identidad del rostro de la foto como prioridad. No texto, letras, nombres, firmas, marcas de agua, logos, carteles, medallas ni propaganda. No agregar otras personas. El rótulo con su nombre y la indicación de ilustración se añaden en la app, no dentro de la imagen.",
+      "asset": "store/editorial-media/933af195-cd51-3fa1-bd0e-b214d94be7ac.jpg",
+      "master": "store/editorial-media/masters/933af195-cd51-3fa1-bd0e-b214d94be7ac.png",
+      "sha256": "fe485706a0cef3e9a6c006d53f45fc78b3d3e5a5b8caee53eb0879e5d4386f9d",
+      "originalSha256": "19e1cda95cc22839b9bc0a26bd3b5617c1df6561b03d3f7a42f0d9dc84d014aa",
+      "masterBytes": 3090634,
+      "deliveryBytes": 204211,
       "tool": "built-in image_gen",
-      "inputImages": 0,
-      "generatedOn": "2026-10-29",
+      "inputImages": 1,
+      "generatedOn": "2026-10-30",
       "subject": "Carlos Saavedra Lamas",
-      "postId": "a2000000-0000-4000-8000-000000000023"
+      "postId": "a2000000-0000-4000-8000-000000000023",
+      "outputLicence": "Recurso generado para OGT por encargo del titular",
+      "referenceImages": [
+        {
+          "role": "Identidad facial individual de Carlos Saavedra Lamas; no usar el retrato anterior generado",
+          "asset": "store/editorial-media/references/saavedra-lamas-historical-reference.jpg",
+          "sha256": "647505023e9708c9b5d1c0a798b6a8123b93b64ab47a2d00bc665d49c5ac0238",
+          "sourcePage": "https://commons.wikimedia.org/wiki/File:Carlos_Saavedra_Lamas.jpg",
+          "commonsTitle": "File:Carlos Saavedra Lamas.jpg",
+          "creator": "Autor no identificado · fotografía histórica catalogada por Wikimedia Commons; procedencia indicada: sitio del Premio Nobel",
+          "licence": "Public domain in Argentina (source declaration)",
+          "licenceUrl": "https://commons.wikimedia.org/wiki/Template:PD-AR-Photo",
+          "use": "identity-reference-new-illustration",
+          "sourcePhotographIncludedInApp": false,
+          "rightsNote": "Clasificación territorial declarada por el archivo de origen; se conserva la fuente y su alcance. La nueva ilustración es una interpretación artística, no una fotografía documental. No es una garantía de ausencia de otros derechos aplicables."
+        }
+      ],
+      "likenessReview": {
+        "referenceViewed": true,
+        "deliveryViewed": true,
+        "defectCorrected": "Rostro individual y bigote ancho, según la referencia"
+      }
     },
     {
       "key": "cecilia-grierson",
@@ -168,18 +189,39 @@
     },
     {
       "key": "elpidio-gonzalez",
-      "prompt": "Use case: historical-scene. Asset type: retrato editorial para un homenaje cultural en Only Good Things. Crea una ilustración ORIGINAL de Elpidio González, vicepresidente argentino de los años veinte, alrededor de 55 años, rostro alargado y delgado, frente amplia, cabello oscuro corto y lacio peinado de costado con entradas, bigote muy fino discreto, traje oscuro de época, camisa clara y corbata, expresión sobria y honesta. Estilo: pintura editorial digital realista, pincelada fina visible, elegante y sobria, paleta natural y fondo neutro cálido de papel con sutil profundidad. Composición horizontal 16:9, busto y cabeza centrados, cabeza completa con aire por encima, rostro en el tercio superior central, hombros visibles, apariencia digna y humana. Composición nueva, sin copiar una pintura o fotografía de archivo ni una pose icónica. No debe parecer fotografía histórica auténtica. Sin texto, firmas, marcas de agua, logos ni propaganda. Se identificará como ilustración generada con IA.",
-      "asset": "store/editorial-media/4c68129f-3b05-311b-a2a9-ac89ab538300.jpg",
-      "master": "store/editorial-media/masters/4c68129f-3b05-311b-a2a9-ac89ab538300.png",
-      "sha256": "bad8509222554d3b5a10adf321fc47e0c82390650fec8e36feef88f3b52ffbe9",
-      "originalSha256": "0e83b9f150cb424bd389f3e3e262cae9ad1cda5e125b1efbd8ce3b075854dac1",
-      "masterBytes": 2726174,
-      "deliveryBytes": 159315,
+      "prompt": "Use case: historical-scene. Asset type: retrato editorial ilustrado horizontal 16:9 para el homenaje cultural a Elpidio González en Only Good Things.\nInput image 1: referencia histórica individual de identidad de Elpidio González, el único sujeto. Rehacer en una composición nueva y pictórica con fidelidad facial muy alta. No reconstruir ni calcar la fotografía completa.\nPrimary request: ilustración editorial pintada de Elpidio González, reconocible como el hombre de la referencia, conservando fielmente la forma de su cabeza alargada, frente alta y amplia, cabello lacio peinado hacia atrás con canas suaves y entradas, arcos de cejas oscuros y rectos, ojos con su forma y separación concretas, nariz larga recta y prominente, contorno de los pómulos, boca fina y mentón estrecho específicos. MUY IMPORTANTE: Elpidio González en esta referencia está AFEITADO, sin bigote y sin barba; conservar el labio superior y la expresión de la foto, no inventar pelo facial. No confundirlo con Carlos Saavedra Lamas. No generar otro político genérico con bigote, ni una cara rejuvenecida o embellecida.\nStyle/medium: pintura editorial digital sobria y realista, pincelada fina visible, piel natural, fondo neutro cálido de papel con profundidad suave; conservar la edad aparente de esta referencia. Ilustración reconocible, no fotografía histórica auténtica.\nComposition/framing: lienzo horizontal 16:9, busto de una sola persona, cabeza completa centrada con aire por encima, rostro en tercio superior central, hombros y parte del torso visibles, postura nueva ligeramente de tres cuartos. Traje gris oscuro de época, camisa de cuello alto clara y corbata oscura sobria. Composición individual nueva; no copiar el fondo ni los deterioros de la foto.\nConstraints: prioridad absoluta a la identidad de la referencia y al rostro limpio SIN BIGOTE. Sin otras personas, textos, letras, nombres, firmas, marcas de agua, logos, carteles ni propaganda. La app mostrará su nombre y el aviso de ilustración fuera de la imagen.",
+      "asset": "store/editorial-media/72a6e3af-c1d0-383a-a9db-e52d47a379af.jpg",
+      "master": "store/editorial-media/masters/72a6e3af-c1d0-383a-a9db-e52d47a379af.png",
+      "sha256": "00671eccdff7d88dca44e7174621f788193b26325401c87d8776f61f7f79abe6",
+      "originalSha256": "bef05be43b1c232926d66c9b5784d39c87dc44b7319c44379cc73abb248aa4c6",
+      "masterBytes": 3133997,
+      "deliveryBytes": 193725,
       "tool": "built-in image_gen",
-      "inputImages": 0,
-      "generatedOn": "2026-10-29",
+      "inputImages": 1,
+      "generatedOn": "2026-10-30",
       "subject": "Elpidio González",
-      "postId": "a2000000-0000-4000-8000-000000000040"
+      "postId": "a2000000-0000-4000-8000-000000000040",
+      "outputLicence": "Recurso generado para OGT por encargo del titular",
+      "referenceImages": [
+        {
+          "role": "Identidad facial individual de Elpidio González; no usar el retrato anterior generado",
+          "asset": "store/editorial-media/references/elpidio-gonzalez-historical-reference.jpg",
+          "sha256": "a7de3836935076a6e73736a397612d95f556306ee072785f8fe03d0a74c03df7",
+          "sourcePage": "https://commons.wikimedia.org/wiki/File:Elpidio_Gonz%C3%A1lez.JPG",
+          "commonsTitle": "File:Elpidio González.JPG",
+          "creator": "Autor no identificado · fotografía histórica publicada en Historia Argentina Contemporánea 1862–1930, Academia Nacional de la Historia / Editorial Ateneo, 1964",
+          "licence": "Public domain in Argentina (source declaration)",
+          "licenceUrl": "https://commons.wikimedia.org/wiki/Template:PD-AR-Photo",
+          "use": "identity-reference-new-illustration",
+          "sourcePhotographIncludedInApp": false,
+          "rightsNote": "Clasificación territorial declarada por el archivo de origen; se conserva la fuente y su alcance. La nueva ilustración es una interpretación artística, no una fotografía documental. No es una garantía de ausencia de otros derechos aplicables."
+        }
+      ],
+      "likenessReview": {
+        "referenceViewed": true,
+        "deliveryViewed": true,
+        "defectCorrected": "Rostro individual afeitado; se eliminó el bigote inventado"
+      }
     },
     {
       "key": "favaloro",

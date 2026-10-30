@@ -21,6 +21,37 @@ REFERENCE_LICENCES = {
     'CC BY-SA 2.0': 'https://creativecommons.org/licenses/by-sa/2.0',
     'CC BY-SA 3.0': 'https://creativecommons.org/licenses/by-sa/3.0',
 }
+HISTORICAL_IDENTITY_REFERENCES = {
+    'a2000000-0000-4000-8000-000000000023': (
+        'https://commons.wikimedia.org/wiki/File:Carlos_Saavedra_Lamas.jpg',
+        '647505023e9708c9b5d1c0a798b6a8123b93b64ab47a2d00bc665d49c5ac0238',
+    ),
+    'a2000000-0000-4000-8000-000000000040': (
+        'https://commons.wikimedia.org/wiki/File:Elpidio_Gonz%C3%A1lez.JPG',
+        'a7de3836935076a6e73736a397612d95f556306ee072785f8fe03d0a74c03df7',
+    ),
+}
+
+
+def validate_reference_rights(e, record, reference):
+    assert reference['sourcePage'].startswith('https://commons.wikimedia.org/wiki/File:')
+    assert reference['creator'] and e['attributionRequired'] is True
+    if reference['licence'] == 'Public domain in Argentina (source declaration)':
+        # Only these two reviewed historic identity references are admitted.
+        # Their source declaration is territorial, not a worldwide licence.
+        assert HISTORICAL_IDENTITY_REFERENCES.get(e['postId']) == (reference['sourcePage'], reference['sha256'])
+        assert reference['licenceUrl'] == 'https://commons.wikimedia.org/wiki/Template:PD-AR-Photo'
+        assert reference['use'] == 'identity-reference-new-illustration'
+        assert reference['sourcePhotographIncludedInApp'] is False
+        assert reference['rightsNote']
+        assert e['licence'] == record['outputLicence'] == 'Recurso generado para OGT por encargo del titular'
+        assert e['licenceUrl'] is None
+    else:
+        assert reference['licence'] in REFERENCE_LICENCES
+        assert reference['licenceUrl'] == REFERENCE_LICENCES[reference['licence']]
+        # Keep the reference's licence on the adaptation, including ShareAlike.
+        assert e['licence'] == reference['licence'] and e['licenceUrl'] == reference['licenceUrl']
+        assert record['outputLicence'] == reference['licence']
 
 
 def validate_illustration(e, record):
@@ -34,13 +65,7 @@ def validate_illustration(e, record):
         data = path.read_bytes()
         assert 0 < len(data) <= 10 * 1024 * 1024 and data[:3] == b'\xff\xd8\xff'
         assert hashlib.sha256(data).hexdigest() == reference['sha256']
-        assert reference['licence'] in REFERENCE_LICENCES
-        assert reference['licenceUrl'] == REFERENCE_LICENCES[reference['licence']]
-        assert reference['sourcePage'].startswith('https://commons.wikimedia.org/wiki/File:')
-        assert reference['creator'] and e['attributionRequired'] is True
-        # Keep the reference's licence on the adaptation, including ShareAlike.
-        assert e['licence'] == reference['licence'] and e['licenceUrl'] == reference['licenceUrl']
-        assert record['outputLicence'] == reference['licence']
+        validate_reference_rights(e, record, reference)
     assert e['creditUrl'] == 'https://onlygoodthings.lat/terms#ilustracion-' + e['postId']
 
 REMOTE = r'''
