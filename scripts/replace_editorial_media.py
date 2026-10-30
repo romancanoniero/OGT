@@ -40,14 +40,18 @@ for e in entries:
   finally:os.unlink(tmp)
  old=quote(e['expectedUrl']);new=quote(e['url']);pid=quote(e['postId'])+'::uuid';mid=quote(e['mediaId'])+'::uuid'
  checks.append("IF (SELECT count(*) FROM social_posts p JOIN post_media m ON m.post_id=p.id WHERE p.id="+pid+" AND m.id="+mid+" AND NOT p.is_story AND p.moderation_status='VISIBLE' AND m.kind='IMAGE' AND p.source_url="+quote(e['sourceUrl'])+" AND p.attribution_url IN ("+quote(e['previousCreditUrl'])+','+quote(e['creditUrl'])+") AND m.url IN ("+old+','+new+"))<>1 THEN RAISE EXCEPTION 'EDITORIAL_BASELINE_CHANGED'; END IF;")
- updates.append('UPDATE post_media SET url='+new+', original_url='+new+', alt_text='+quote(e['alt'])+", frame_x=NULL,frame_y=NULL,frame_zoom=NULL WHERE id="+mid+' AND post_id='+pid+' AND url='+old+';')
+ if e.get('mode')=='transport-only':
+  updates.append('UPDATE post_media SET url='+new+',original_url=CASE WHEN original_url='+old+' THEN '+new+' ELSE original_url END WHERE id='+mid+' AND post_id='+pid+' AND url='+old+';')
+ else:
+  updates.append('UPDATE post_media SET url='+new+', original_url='+new+', alt_text='+quote(e['alt'])+", frame_x=NULL,frame_y=NULL,frame_zoom=NULL WHERE id="+mid+' AND post_id='+pid+' AND url='+old+';')
  updates.append('UPDATE social_posts SET media_urls=array_replace(media_urls,'+old+','+new+'),updated_at=now() WHERE id='+pid+' AND '+old+'=ANY(media_urls);')
  updates.append('UPDATE social_posts SET attribution_url='+quote(e['creditUrl'])+' WHERE id='+pid+' AND attribution_url IS DISTINCT FROM '+quote(e['creditUrl'])+';')
 # Exclude precisely the two expected changes; validate all other post/media
 # values under the same repeatable-read snapshot, including discussion counts.
 ids=','.join(quote(e['postId'])+'::uuid' for e in entries)
 mids=','.join(quote(e['mediaId'])+'::uuid' for e in entries)
-protected="SELECT jsonb_build_object('posts',(SELECT jsonb_agg(to_jsonb(p)-'updated_at'-'media_urls'-'attribution_url' ORDER BY p.id) FROM social_posts p WHERE p.id IN ("+ids+")),'media',(SELECT jsonb_agg(to_jsonb(m)-'url'-'original_url'-'alt_text'-'frame_x'-'frame_y'-'frame_zoom' ORDER BY m.id) FROM post_media m WHERE m.id IN ("+mids+")),'comments',(SELECT count(*) FROM post_comments),'allPosts',(SELECT count(*) FROM social_posts))"
+transport_ids=','.join(quote(e['mediaId'])+'::uuid' for e in entries if e.get('mode')=='transport-only') or 'NULL::uuid'
+protected="SELECT jsonb_build_object('posts',(SELECT jsonb_agg(to_jsonb(p)-'updated_at'-'media_urls'-'attribution_url' ORDER BY p.id) FROM social_posts p WHERE p.id IN ("+ids+")),'media',(SELECT jsonb_agg(CASE WHEN m.id IN ("+transport_ids+") THEN to_jsonb(m)-'url'-'original_url' ELSE to_jsonb(m)-'url'-'original_url'-'alt_text'-'frame_x'-'frame_y'-'frame_zoom' END ORDER BY m.id) FROM post_media m WHERE m.id IN ("+mids+")),'comments',(SELECT count(*) FROM post_comments),'allPosts',(SELECT count(*) FROM social_posts))"
 sql="SET TRANSACTION ISOLATION LEVEL REPEATABLE READ; DO $ogt_replace$ DECLARE before_data jsonb;after_data jsonb; BEGIN\n"+'\n'.join(checks)+"\n"+protected.replace('SELECT jsonb_build_object','SELECT jsonb_build_object',1)+" INTO before_data;\n"
 if j['apply']:
  sql+='\n'.join(updates)+'\n'
@@ -100,7 +104,7 @@ def main():
                         'expectedUrl': e['previousImage']['expectedMediaUrl'],
                         'url': e['expectedMediaUrl'], 'sourceUrl': e['expectedNewsSource'],
                         'creditUrl': e['creditUrl'], 'previousCreditUrl':e['previousImage'].get('creditUrl') or e['creditUrl'], 'storedName': path.name,
-                        'sha256': e['originalSha256'], 'alt': e['replacementAlt'],
+                        'sha256': e['originalSha256'], 'alt': e['replacementAlt'],'mode':e.get('replacementMode','replace'),
                         'bytes': base64.b64encode(data).decode()})
     assert entries
     cleanup.difference_update(e['storedName'] for e in entries)

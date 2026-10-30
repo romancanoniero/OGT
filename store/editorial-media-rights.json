@@ -332,7 +332,7 @@
       "mediaId": "c2000000-0000-4000-8000-000000000022",
       "subject": "Manu Ginóbili",
       "expectedNewsSource": "https://dib.com.ar/2023/12/bahia-blanca-la-campana-solidaria-impulsad-por-ginobili-ya-recaudo-5-millones-de-dolares",
-      "expectedMediaUrl": "http://217.216.82.209:19080/media/u/c2000000-0000-4000-8000-000000000022.jpg",
+      "expectedMediaUrl": "https://onlygoodthings.lat/media/u/c2000000-0000-4000-8000-000000000022.jpg",
       "originalFile": "c2000000-0000-4000-8000-000000000022.jpg",
       "originalSha256": "ea161f8194b857775f505e6ca4b041b84227734a86a0a7c1d4b3450fd659a59e",
       "match": "exact bytes",
@@ -346,7 +346,22 @@
       "territorialReviewRequired": false,
       "territorialNote": null,
       "changes": "Miniatura o redimensionado técnico. OGT puede aplicar el encuadre visible de la publicación. Se conserva el original.",
-      "creditUrl": "https://onlygoodthings.lat/terms#credito-a2000000-0000-4000-8000-000000000022"
+      "creditUrl": "https://onlygoodthings.lat/terms#credito-a2000000-0000-4000-8000-000000000022",
+      "previousImage": {
+        "expectedMediaUrl": "http://217.216.82.209:19080/media/u/c2000000-0000-4000-8000-000000000022.jpg",
+        "originalFile": "c2000000-0000-4000-8000-000000000022.jpg",
+        "originalSha256": "ea161f8194b857775f505e6ca4b041b84227734a86a0a7c1d4b3450fd659a59e",
+        "commonsTitle": "File:Manu Ginóbili.jpg",
+        "commonsPage": "https://commons.wikimedia.org/wiki/File:Manu_Gin%C3%B3bili.jpg",
+        "creator": "Mike from Orlando, FL",
+        "licence": "CC BY-SA 2.0",
+        "creditUrl": "https://onlygoodthings.lat/terms#credito-a2000000-0000-4000-8000-000000000022",
+        "territorialReviewRequired": false
+      },
+      "asset": "store/editorial-media/c2000000-0000-4000-8000-000000000022.jpg",
+      "replacementMode": "transport-only",
+      "replacementAlt": "Manu Ginóbili",
+      "replacementOn": "2026-10-29"
     },
     {
       "postId": "a2000000-0000-4000-8000-000000000023",
@@ -431,7 +446,7 @@
       "mediaId": "c2000000-0000-4000-8000-000000000025",
       "subject": "Quino",
       "expectedNewsSource": "https://www.unicef.org/lac/historias/10-derechos-fundamentales-de-la-infancia-por-quino",
-      "expectedMediaUrl": "http://217.216.82.209:19080/media/u/c2000000-0000-4000-8000-000000000025.jpg",
+      "expectedMediaUrl": "https://onlygoodthings.lat/media/u/c2000000-0000-4000-8000-000000000025.jpg",
       "originalFile": "c2000000-0000-4000-8000-000000000025.jpg",
       "originalSha256": "ead52138d2b7461bbfb0779227acac8809fbd1ec5d495942a144d7ab0af3fc26",
       "match": "exact bytes",
@@ -445,7 +460,22 @@
       "territorialReviewRequired": false,
       "territorialNote": null,
       "changes": "Miniatura o redimensionado técnico. OGT puede aplicar el encuadre visible de la publicación. Se conserva el original.",
-      "creditUrl": "https://onlygoodthings.lat/terms#credito-a2000000-0000-4000-8000-000000000025"
+      "creditUrl": "https://onlygoodthings.lat/terms#credito-a2000000-0000-4000-8000-000000000025",
+      "previousImage": {
+        "expectedMediaUrl": "http://217.216.82.209:19080/media/u/c2000000-0000-4000-8000-000000000025.jpg",
+        "originalFile": "c2000000-0000-4000-8000-000000000025.jpg",
+        "originalSha256": "ead52138d2b7461bbfb0779227acac8809fbd1ec5d495942a144d7ab0af3fc26",
+        "commonsTitle": "File:Quino (13331254273) (cropped).jpg",
+        "commonsPage": "https://commons.wikimedia.org/wiki/File:Quino_(13331254273)_(cropped).jpg",
+        "creator": "ActuaLitté",
+        "licence": "CC BY-SA 2.0",
+        "creditUrl": "https://onlygoodthings.lat/terms#credito-a2000000-0000-4000-8000-000000000025",
+        "territorialReviewRequired": false
+      },
+      "asset": "store/editorial-media/c2000000-0000-4000-8000-000000000025.jpg",
+      "replacementMode": "transport-only",
+      "replacementAlt": "Quino",
+      "replacementOn": "2026-10-29"
     },
     {
       "postId": "a2000000-0000-4000-8000-000000000026",
@@ -530,7 +560,7 @@
       "mediaId": "c2000000-0000-4000-8000-000000000028",
       "subject": "Juan Martín del Potro",
       "expectedNewsSource": "https://www.infobae.com/deportes-2/2018/09/10/infobae-en-tandil-las-acciones-solidarias-y-silenciosas-de-juan-martin-del-potro-en-su-ciudad/",
-      "expectedMediaUrl": "http://217.216.82.209:19080/media/u/c2000000-0000-4000-8000-000000000028.jpg",
+      "expectedMediaUrl": "https://onlygoodthings.lat/media/u/c2000000-0000-4000-8000-000000000028.jpg",
       "originalFile": "c2000000-0000-4000-8000-000000000028.jpg",
       "originalSha256": "9ee04e358ad769c1a0148d9d7285a91adba50918c7ade31952d50c6c3fd54c49",
       "match": "identical decoded RGB pixels; file metadata differs",
@@ -544,7 +574,22 @@
       "territorialReviewRequired": false,
       "territorialNote": null,
       "changes": "Miniatura o redimensionado técnico. OGT puede aplicar el encuadre visible de la publicación. Se conserva el original.",
-      "creditUrl": "https://onlygoodthings.lat/terms#credito-a2000000-0000-4000-8000-000000000028"
+      "creditUrl": "https://onlygoodthings.lat/terms#credito-a2000000-0000-4000-8000-000000000028",
+      "previousImage": {
+        "expectedMediaUrl": "http://217.216.82.209:19080/media/u/c2000000-0000-4000-8000-000000000028.jpg",
+        "originalFile": "c2000000-0000-4000-8000-000000000028.jpg",
+        "originalSha256": "9ee04e358ad769c1a0148d9d7285a91adba50918c7ade31952d50c6c3fd54c49",
+        "commonsTitle": "File:Juan Martín del Potro.jpg",
+        "commonsPage": "https://commons.wikimedia.org/wiki/File:Juan_Mart%C3%ADn_del_Potro.jpg",
+        "creator": "Yann Caradec",
+        "licence": "CC BY-SA 2.0",
+        "creditUrl": "https://onlygoodthings.lat/terms#credito-a2000000-0000-4000-8000-000000000028",
+        "territorialReviewRequired": false
+      },
+      "asset": "store/editorial-media/c2000000-0000-4000-8000-000000000028.jpg",
+      "replacementMode": "transport-only",
+      "replacementAlt": "Juan Martín del Potro",
+      "replacementOn": "2026-10-29"
     },
     {
       "postId": "a2000000-0000-4000-8000-000000000029",
