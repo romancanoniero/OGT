@@ -154,7 +154,25 @@
       "territorialReviewRequired": false,
       "territorialNote": null,
       "changes": "Miniatura o redimensionado técnico. OGT puede aplicar el encuadre visible de la publicación. Se conserva el original.",
-      "creditUrl": "https://onlygoodthings.lat/terms#credito-a2000000-0000-4000-8000-000000000015"
+      "creditUrl": "https://onlygoodthings.lat/terms#credito-a2000000-0000-4000-8000-000000000015",
+      "deliverySha256": "3d53ac5118d15bd341bd76373c6522357ade431224d8485a3816d83e3f8f7fb8",
+      "deliveryFrame": {
+        "frameX": 0.5,
+        "frameY": 0.300248351029601,
+        "frameZoom": 1
+      },
+      "asset": "store/editorial-media/c2000000-0000-4000-8000-000000000015.jpg",
+      "replacementMode": "original-transport-only",
+      "replacementOn": "2026-10-29",
+      "replacementAlt": "Lionel Messi",
+      "originalTransport": {
+        "expectedUrl": "http://217.216.82.209:19080/media/u/c2000000-0000-4000-8000-000000000015.jpg",
+        "url": "https://onlygoodthings.lat/media/u/c2000000-0000-4000-8000-000000000015.jpg"
+      },
+      "previousImage": {
+        "expectedMediaUrl": "https://onlygoodthings.lat/media/u/78d25603-e8ac-482a-ab28-e5061ab04b16.jpg",
+        "creditUrl": "https://onlygoodthings.lat/terms#credito-a2000000-0000-4000-8000-000000000015"
+      }
     },
     {
       "postId": "a2000000-0000-4000-8000-000000000017",
@@ -175,7 +193,25 @@
       "territorialReviewRequired": false,
       "territorialNote": null,
       "changes": "Miniatura o redimensionado técnico. OGT puede aplicar el encuadre visible de la publicación. Se conserva el original.",
-      "creditUrl": "https://onlygoodthings.lat/terms#credito-a2000000-0000-4000-8000-000000000017"
+      "creditUrl": "https://onlygoodthings.lat/terms#credito-a2000000-0000-4000-8000-000000000017",
+      "deliverySha256": "55308582db37f05945881de6c7e5fab255f8573a057370bd2ec19b6d72fdbd80",
+      "deliveryFrame": {
+        "frameX": 0.5,
+        "frameY": 0.33341081824062097,
+        "frameZoom": 1
+      },
+      "asset": "store/editorial-media/c2000000-0000-4000-8000-000000000017.jpg",
+      "replacementMode": "original-transport-only",
+      "replacementOn": "2026-10-29",
+      "replacementAlt": "Jorge Mario Bergoglio",
+      "originalTransport": {
+        "expectedUrl": "http://217.216.82.209:19080/media/u/c2000000-0000-4000-8000-000000000017.jpg",
+        "url": "https://onlygoodthings.lat/media/u/c2000000-0000-4000-8000-000000000017.jpg"
+      },
+      "previousImage": {
+        "expectedMediaUrl": "https://onlygoodthings.lat/media/u/3d0fd58f-d12b-4b26-8b52-23435c93a0ef.jpg",
+        "creditUrl": "https://onlygoodthings.lat/terms#credito-a2000000-0000-4000-8000-000000000017"
+      }
     },
     {
       "postId": "a2000000-0000-4000-8000-000000000018",
