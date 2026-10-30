@@ -16,6 +16,24 @@ import uuid
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / 'store/editorial-media-rights.json'
 
+
+def validate_illustration(e, record):
+    assert record['sha256'] == e['originalSha256']
+    assert hashlib.sha256((ROOT / record['master']).read_bytes()).hexdigest() == record['originalSha256']
+    references = record.get('referenceImages', [])
+    assert record['inputImages'] in (0, 1) and len(references) == record['inputImages']
+    for reference in references:
+        path = ROOT / reference['asset']
+        assert path.parent == ROOT / 'store/editorial-media/references' and not path.is_symlink()
+        data = path.read_bytes()
+        assert 0 < len(data) <= 10 * 1024 * 1024 and data[:3] == b'\xff\xd8\xff'
+        assert hashlib.sha256(data).hexdigest() == reference['sha256']
+        assert reference['licence'] == 'CC BY 4.0' and reference['licenceUrl'] == 'https://creativecommons.org/licenses/by/4.0'
+        assert reference['sourcePage'].startswith('https://commons.wikimedia.org/wiki/File:')
+        assert reference['creator'] and e['attributionRequired'] is True
+        assert e['licence'] == 'CC BY 4.0' and e['licenceUrl'] == reference['licenceUrl']
+    assert e['creditUrl'] == 'https://onlygoodthings.lat/terms#ilustracion-' + e['postId']
+
 REMOTE = r'''
 import base64,hashlib,json,os,subprocess,sys,tempfile
 from pathlib import Path
@@ -77,11 +95,18 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--apply', action='store_true')
     parser.add_argument('--receipt', type=Path, required=True)
+    parser.add_argument('--post-id', action='append', help='Limit the reviewed operation to these exact publication UUIDs')
     args = parser.parse_args()
     entries = []
     cleanup=set()
     evidence=json.loads((ROOT/'store/editorial-media/provenance.json').read_text())
-    for e in json.loads(MANIFEST.read_text())['entries']:
+    manifest_entries=json.loads(MANIFEST.read_text())['entries']
+    selected=set(args.post_id or [])
+    if selected-set(e['postId'] for e in manifest_entries):
+        parser.error('Selected publication is not in the reviewed editorial inventory')
+    for e in manifest_entries:
+        if selected and e['postId'] not in selected:
+            continue
         if not e.get('asset') or not e.get('previousImage'):
             continue
         for previous in [e['previousImage'],*e.get('replacementHistory',[])]:
@@ -92,9 +117,7 @@ def main():
                 cleanup.add(name)
         if e.get('kind')=='generated-illustration':
             record=next(r for r in evidence['entries'] if r['postId']==e['postId'])
-            assert record['sha256']==e['originalSha256'] and record['inputImages']==0
-            assert hashlib.sha256((ROOT/record['master']).read_bytes()).hexdigest()==record['originalSha256']
-            assert e['creditUrl']=='https://onlygoodthings.lat/terms#ilustracion-'+e['postId']
+            validate_illustration(e,record)
         else:
             assert e['licence'].startswith('CC BY') and all(x not in e['licence'] for x in ('NC', 'ND'))
         for key in ('postId', 'mediaId'):

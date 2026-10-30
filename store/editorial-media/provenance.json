@@ -183,18 +183,32 @@
     },
     {
       "key": "favaloro",
-      "prompt": "Use case: historical-scene. Asset type: retrato editorial para un homenaje cultural en Only Good Things. Crea una ilustración ORIGINAL de René Favaloro, cirujano y educador argentino, alrededor de 65 años, rostro ovalado alargado y mirada cálida, cejas pobladas, cabello canoso ondulado peinado hacia atrás, afeitado, traje sobrio y camisa clara, expresión humana y reflexiva, sin instrumental ni aparatos médicos inventados. Estilo: pintura editorial digital realista, pincelada fina visible, elegante y sobria, paleta natural y fondo neutro cálido de papel con sutil profundidad. Composición horizontal 16:9, busto y cabeza centrados, cabeza completa con aire por encima, rostro en el tercio superior central, hombros visibles, apariencia digna y humana. Composición nueva, sin copiar una pintura o fotografía de archivo ni una pose icónica. No debe parecer fotografía histórica auténtica. Sin texto, firmas, marcas de agua, logos ni propaganda. Se identificará como ilustración generada con IA.",
-      "asset": "store/editorial-media/7c0dca93-4e3f-3b6b-8e28-f8c9a5d4ff57.jpg",
-      "master": "store/editorial-media/masters/7c0dca93-4e3f-3b6b-8e28-f8c9a5d4ff57.png",
-      "sha256": "ba81f8e835a527ff3adf897eca8cc8f35957608d84d14082a508edc7f3a474e8",
-      "originalSha256": "c362cc70da4ab5129db970bd8da46fd610c6760c710e711807d4a894f9a81e9b",
-      "masterBytes": 2608970,
-      "deliveryBytes": 152671,
+      "prompt": "Use case: historical-scene. Asset type: retrato editorial horizontal para el homenaje cultural a René Favaloro en Only Good Things.\nInput image 1: referencia fotográfica de identidad, Cleveland Clinic, CC BY 4.0. René Favaloro es ÚNICAMENTE el hombre más alto que está A LA IZQUIERDA, con traje a cuadros y corbata. Ignora por completo al hombre de la derecha (Mason Sones); no mezcles sus rostros.\nPrimary request: crear una nueva ilustración pictórica de René Favaloro con un parecido facial muy fiel a esta fotografía. Lo prioritario es reconocer a Favaloro, no obtener un rostro genérico de médico. Conserva la forma de la cabeza y frente amplia, la línea de implantación del pelo peinado hacia atrás con entradas, ojos y párpados, cejas, nariz, boca, mejillas, mentón y orejas específicos del hombre de la izquierda. Conserva su edad aparente de la referencia y su expresión afable y serena. No embellezcas, no idealices, no rejuvenezcas y no lo confundas con otros personajes.\nStyle/medium: ilustración editorial realista de gran calidad, pintura digital con pincelada fina perceptible y rostro cuidadosamente dibujado; no fotografía ni simulación de documento de archivo. Luz suave lateral, tonos naturales de piel, gris y azul sobrio. Fondo neutro cálido de papel, sencillo y sin objetos.\nComposition/framing: horizontal 16:9, busto del solo Favaloro, cabeza completa centrada con aire suficiente por arriba para encuadre 16:9 sin cortar el pelo, rostro en el tercio superior central, hombros y parte del torso visibles. Nueva composición individual, no reproducir la escena de los dos médicos. Traje gris sobrio y corbata lisa, camisa clara; sin logos ni inscripciones.\nConstraints: un solo hombre: Favaloro de la izquierda. No copiar al médico de la derecha. Sin instrumental inventado, manos, texto, firmas, marcas de agua, bordes, carteles ni propaganda. La aplicación lo identificará como ilustración generada con IA basada en una fotografía de referencia con licencia CC BY 4.0.",
+      "asset": "store/editorial-media/500034c7-803b-30ef-ae6d-26a07a84a491.jpg",
+      "master": "store/editorial-media/masters/500034c7-803b-30ef-ae6d-26a07a84a491.png",
+      "sha256": "10b71b3d71a66664ebe57d56d632186df9967f476882a7f3d7f0d15e850b7f46",
+      "originalSha256": "dd65a0a7854aa34a9197a8c75a5f19fb265fb70b3dfc62aac28cec1272c69661",
+      "masterBytes": 2872555,
+      "deliveryBytes": 165555,
       "tool": "built-in image_gen",
-      "inputImages": 0,
-      "generatedOn": "2026-10-29",
+      "inputImages": 1,
+      "generatedOn": "2026-10-30",
       "subject": "René Favaloro",
-      "postId": "a2000000-0000-4000-8000-000000000011"
+      "postId": "a2000000-0000-4000-8000-000000000011",
+      "referenceImages": [
+        {
+          "asset": "store/editorial-media/references/favaloro-cleveland-clinic-c1970.jpg",
+          "sha256": "b23517b4afe67847f3d5f728c3d942485ab36786eece317f64c1b7486e07ddb3",
+          "sourceSha1": "42ece54e413b7474b50339a94a465b102a94f926",
+          "sourcePage": "https://commons.wikimedia.org/wiki/File:Drs_Rene_Favaloro_and_Mason_Sones_c1970_A0353.jpg",
+          "creator": "Cleveland Clinic",
+          "licence": "CC BY 4.0",
+          "licenceUrl": "https://creativecommons.org/licenses/by/4.0",
+          "role": "Identidad de René Favaloro, hombre a la izquierda; no Mason Sones",
+          "reviewedOn": "2026-10-30"
+        }
+      ],
+      "outputLicence": "CC BY 4.0"
     }
   ]
 }

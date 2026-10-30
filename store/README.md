@@ -169,4 +169,7 @@ El inventario editorial contiene 13 ilustraciones generadas para OGT y seis
 fotografías con licencia Creative Commons. Se conservan los créditos y las
 condiciones de las fotografías. Las ilustraciones se identifican junto al medio,
 y sus instrucciones, originales y huellas están en `editorial-media/provenance.json`.
+El retrato de Favaloro fue rehecho el 30/10/2026 con una fotografía de Cleveland
+Clinic como referencia de identidad. Tanto la referencia como su adaptación
+con IA se documentan y ofrecen bajo CC BY 4.0, con atribución en los créditos.
 Esto no es una garantía de ausencia universal de reclamos ni acredita otros activos.
