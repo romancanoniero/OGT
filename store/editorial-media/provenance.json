@@ -209,6 +209,151 @@
         }
       ],
       "outputLicence": "CC BY 4.0"
+    },
+    {
+      "key": "bergoglio",
+      "prompt": "Use case: historical-scene. Retrato para una colección editorial cultural. Crear una ILUSTRACIÓN claramente pintada, de estilo óleo editorial sobre papel cálido, no una fotografía ni una imagen fotorealista. La foto adjunta es una referencia de la persona y está licenciada para adaptación. Mostrar un único personaje reconocible por sus rasgos característicos, conservando su edad aparente. Composición horizontal 16:9, cabeza completa con espacio por arriba, busto centrado y hombros visibles. Fondo beige cálido con pinceladas visibles, luz suave y colores sobrios, rostro cuidadosamente dibujado. Sin texto, firmas, marcas de agua, logos ni patrocinadores. No implica respaldo del retratado a OGT. La app identificará la imagen como ilustración con IA y mostrará la atribución y licencia correspondientes.\nPersona y detalles: Jorge Mario Bergoglio, Papa Francisco, con la edad y las gafas de la referencia de su etapa de cardenal. Mantener sus rasgos característicos, cabello blanco corto, frente, gafas de marco fino y sonrisa cálida. Pose de tres cuartos hacia la derecha parecida a la referencia; vestimenta clerical clara y sencilla, sin escudos, medallas, mitra ni ornamentos añadidos.",
+      "asset": "store/editorial-media/399ff958-7bf2-3a95-8a78-cbcf2469e0a7.jpg",
+      "master": "store/editorial-media/masters/399ff958-7bf2-3a95-8a78-cbcf2469e0a7.png",
+      "sha256": "bf192ed374d7529a75dd6e34e9406d3a7ac76a7c2eff69420099b7a8f044bb70",
+      "originalSha256": "a4ff7c2a212490299fe0db31355fe2b134eea6f259aae0287f71a45d0d8662a9",
+      "masterBytes": 3145228,
+      "deliveryBytes": 200566,
+      "subject": "Jorge Mario Bergoglio",
+      "postId": "a2000000-0000-4000-8000-000000000017",
+      "tool": "built-in image_gen",
+      "inputImages": 1,
+      "generatedOn": "2026-10-30",
+      "outputLicence": "CC BY 2.0",
+      "referenceImages": [
+        {
+          "asset": "store/editorial-media/references/bergoglio-reference.jpg",
+          "sha256": "e7d3dd14a9327dd01a497be6644e6353a367e1238fe8dc8869d14210ebbb58ed",
+          "sourcePage": "https://commons.wikimedia.org/wiki/File:Jorge_Mario_Bergoglio.jpg",
+          "creator": "Gobierno de la Ciudad de Buenos Aires, photo of Sandra Hernandez",
+          "licence": "CC BY 2.0",
+          "licenceUrl": "https://creativecommons.org/licenses/by/2.0",
+          "role": "Referencia de identidad de Jorge Mario Bergoglio",
+          "sourceMatchEvidence": "exact bytes",
+          "reviewedOn": "2026-10-30"
+        }
+      ]
+    },
+    {
+      "key": "manu-ginobili",
+      "prompt": "Use case: historical-scene. Retrato para una colección editorial cultural. Crear una ILUSTRACIÓN claramente pintada, de estilo óleo editorial sobre papel cálido, no una fotografía ni una imagen fotorealista. La foto adjunta es una referencia de la persona y está licenciada para adaptación. Mostrar un único personaje reconocible por sus rasgos característicos, conservando su edad aparente. Composición horizontal 16:9, cabeza completa con espacio por arriba, busto centrado y hombros visibles. Fondo beige cálido con pinceladas visibles, luz suave y colores sobrios, rostro cuidadosamente dibujado. Sin texto, firmas, marcas de agua, logos ni patrocinadores. No implica respaldo del retratado a OGT. La app identificará la imagen como ilustración con IA y mostrará la atribución y licencia correspondientes.\nPersona y detalles: Manu Ginóbili es únicamente el jugador del CENTRO con la camiseta blanca número 20 en la foto. Retratarlo individualmente; no al árbitro de la derecha ni a la persona de la izquierda. Conservar su pelo corto oscuro con entradas, cejas, ojos, nariz, mandíbula y barba corta de la referencia. Nueva pose de retrato con una expresión natural tranquila. Remera deportiva blanca lisa con ribete gris oscuro, sin escudos, números, letras ni logos; sin otras personas ni cancha.",
+      "asset": "store/editorial-media/74409ef2-2aad-336d-a008-1c1a315e3184.jpg",
+      "master": "store/editorial-media/masters/74409ef2-2aad-336d-a008-1c1a315e3184.png",
+      "sha256": "66024b8114eab1528608462e83b62030bd949d46bd11c597394815f7f0e43521",
+      "originalSha256": "1213d663ff0c0566fb0deec0238a4b5a4533ebcf4619c1f59a2b7c404f83a332",
+      "masterBytes": 3026528,
+      "deliveryBytes": 187266,
+      "subject": "Manu Ginóbili",
+      "postId": "a2000000-0000-4000-8000-000000000022",
+      "tool": "built-in image_gen",
+      "inputImages": 1,
+      "generatedOn": "2026-10-30",
+      "outputLicence": "CC BY-SA 2.0",
+      "referenceImages": [
+        {
+          "asset": "store/editorial-media/references/manu-ginobili-reference.jpg",
+          "sha256": "ea161f8194b857775f505e6ca4b041b84227734a86a0a7c1d4b3450fd659a59e",
+          "sourcePage": "https://commons.wikimedia.org/wiki/File:Manu_Gin%C3%B3bili.jpg",
+          "creator": "Mike from Orlando, FL",
+          "licence": "CC BY-SA 2.0",
+          "licenceUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+          "role": "Referencia de identidad de Manu Ginóbili",
+          "sourceMatchEvidence": "exact bytes",
+          "reviewedOn": "2026-10-30"
+        }
+      ]
+    },
+    {
+      "key": "del-potro",
+      "prompt": "Use case: historical-scene. Retrato para una colección editorial cultural. Crear una ILUSTRACIÓN claramente pintada, de estilo óleo editorial sobre papel cálido, no una fotografía ni una imagen fotorealista. La foto adjunta es una referencia de la persona y está licenciada para adaptación. Mostrar un único personaje reconocible por sus rasgos característicos, conservando su edad aparente. Composición horizontal 16:9, cabeza completa con espacio por arriba, busto centrado y hombros visibles. Fondo beige cálido con pinceladas visibles, luz suave y colores sobrios, rostro cuidadosamente dibujado. Sin texto, firmas, marcas de agua, logos ni patrocinadores. No implica respaldo del retratado a OGT. La app identificará la imagen como ilustración con IA y mostrará la atribución y licencia correspondientes.\nPersona y detalles: Juan Martín del Potro, con la edad y rasgos de la foto: cabello oscuro desordenado corto, cinta azul oscura lisa sin logo, rostro alargado característico, cejas y barba ligera. Retrato de busto en tres cuartos, mirada tranquila un poco levantada respecto de la referencia. Remera deportiva lisa de tono azul sobrio, sin marcas ni emblemas; sin raqueta, otras personas ni cancha.",
+      "asset": "store/editorial-media/2fe67eda-bfe9-3ea8-9d30-200271079b20.jpg",
+      "master": "store/editorial-media/masters/2fe67eda-bfe9-3ea8-9d30-200271079b20.png",
+      "sha256": "1d7972a81b2a147585c3f464e060c21f6ef38810fe7632dbd5e77265318af787",
+      "originalSha256": "79e20a91914a8f6cbe8d86755eaa19d3c7635d018fe86d613d3c44910315e30f",
+      "masterBytes": 2780095,
+      "deliveryBytes": 173787,
+      "subject": "Juan Martín del Potro",
+      "postId": "a2000000-0000-4000-8000-000000000028",
+      "tool": "built-in image_gen",
+      "inputImages": 1,
+      "generatedOn": "2026-10-30",
+      "outputLicence": "CC BY-SA 2.0",
+      "referenceImages": [
+        {
+          "asset": "store/editorial-media/references/del-potro-reference.jpg",
+          "sha256": "9ee04e358ad769c1a0148d9d7285a91adba50918c7ade31952d50c6c3fd54c49",
+          "sourcePage": "https://commons.wikimedia.org/wiki/File:Juan_Mart%C3%ADn_del_Potro.jpg",
+          "creator": "Yann Caradec",
+          "licence": "CC BY-SA 2.0",
+          "licenceUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+          "role": "Referencia de identidad de Juan Martín del Potro",
+          "sourceMatchEvidence": "identical decoded RGB pixels; file metadata differs",
+          "reviewedOn": "2026-10-30"
+        }
+      ]
+    },
+    {
+      "key": "mercedes-sosa",
+      "prompt": "Use case: historical-scene. Retrato para una colección editorial cultural. Crear una ILUSTRACIÓN claramente pintada, de estilo óleo editorial sobre papel cálido, no una fotografía ni una imagen fotorealista. La foto adjunta es una referencia de la persona y está licenciada para adaptación. Mostrar un único personaje reconocible por sus rasgos característicos, conservando su edad aparente. Composición horizontal 16:9, cabeza completa con espacio por arriba, busto centrado y hombros visibles. Fondo beige cálido con pinceladas visibles, luz suave y colores sobrios, rostro cuidadosamente dibujado. Sin texto, firmas, marcas de agua, logos ni patrocinadores. No implica respaldo del retratado a OGT. La app identificará la imagen como ilustración con IA y mostrará la atribución y licencia correspondientes.\nPersona y detalles: Mercedes Sosa, la mujer sentada y cantando en la referencia de Nicaragua 2008. Retrato de busto con sus pómulos, rasgos, cara ancha, cabello negro largo peinado hacia atrás y gafas de marco ámbar. Expresión cálida y serena con boca cerrada; vestimenta oscura y bufanda roja. No representar el micrófono, las manos, el instrumento, el escenario ni la silla de la foto.",
+      "asset": "store/editorial-media/4f589bea-fe90-3271-ac90-6ea4a162b917.jpg",
+      "master": "store/editorial-media/masters/4f589bea-fe90-3271-ac90-6ea4a162b917.png",
+      "sha256": "adab9d97536ed35e8fb5e4f6191f73f211400a63e8149eef929f6b2014015937",
+      "originalSha256": "1a16c585e3fd3a83a501f01c8b171a6ca0255a0f0113194ee4a0ebf7b24ecc6a",
+      "masterBytes": 2755427,
+      "deliveryBytes": 177678,
+      "subject": "Mercedes Sosa",
+      "postId": "a2000000-0000-4000-8000-000000000021",
+      "tool": "built-in image_gen",
+      "inputImages": 1,
+      "generatedOn": "2026-10-30",
+      "outputLicence": "CC BY 2.0",
+      "referenceImages": [
+        {
+          "asset": "store/editorial-media/references/mercedes-sosa-reference.jpg",
+          "sha256": "e99c4a8c74569152709e0cfb9625dedac66da109c3ee255397038266da39ffc1",
+          "sourcePage": "https://commons.wikimedia.org/wiki/File:Mercedes_Sosa_-_Nicaragua_2008-_2300976656-Mej%C3%ADa_Peralta_(1).jpg",
+          "creator": "Jorge Mejía peralta from Managua, Nicaragua",
+          "licence": "CC BY 2.0",
+          "licenceUrl": "https://creativecommons.org/licenses/by/2.0",
+          "role": "Referencia de identidad de Mercedes Sosa",
+          "sourceMatchEvidence": "Original de reemplazo descargado sin modificar; SHA-256 verificado",
+          "reviewedOn": "2026-10-30"
+        }
+      ]
+    },
+    {
+      "key": "quino",
+      "prompt": "Use case: historical-scene. Retrato para una colección editorial cultural. Crear una ILUSTRACIÓN claramente pintada, de estilo óleo editorial sobre papel cálido, no una fotografía ni una imagen fotorealista. La foto adjunta es una referencia de la persona y está licenciada para adaptación. Mostrar un único personaje reconocible por sus rasgos característicos, conservando su edad aparente. Composición horizontal 16:9, cabeza completa con espacio por arriba, busto centrado y hombros visibles. Fondo beige cálido con pinceladas visibles, luz suave y colores sobrios, rostro cuidadosamente dibujado. Sin texto, firmas, marcas de agua, logos ni patrocinadores. No implica respaldo del retratado a OGT. La app identificará la imagen como ilustración con IA y mostrará la atribución y licencia correspondientes.\nPersona y detalles: Quino, Joaquín Salvador Lavado, el dibujante argentino de la referencia: hombre mayor calvo con cabello gris a los lados y gafas negras rectangulares. Mantener sus facciones características y sonrisa discreta; suéter azul grisáceo oscuro y bufanda sobria. No representar el micrófono, manos, medallas, viñetas ni personajes de historieta. Solamente su retrato pintado individual.",
+      "asset": "store/editorial-media/cf482ee5-0fa0-39e8-ac8b-b84981a5217c.jpg",
+      "master": "store/editorial-media/masters/cf482ee5-0fa0-39e8-ac8b-b84981a5217c.png",
+      "sha256": "0203f018d92052e7036d556d87a34614d8d9205a61eedef5ffcd3daf1a634bf3",
+      "originalSha256": "8248528e1a22d9f6e290aa02550a9ee7d3129c1008f6c8e3995a55c0cf838761",
+      "masterBytes": 2980571,
+      "deliveryBytes": 192615,
+      "subject": "Quino",
+      "postId": "a2000000-0000-4000-8000-000000000025",
+      "tool": "built-in image_gen",
+      "inputImages": 1,
+      "generatedOn": "2026-10-30",
+      "outputLicence": "CC BY-SA 2.0",
+      "referenceImages": [
+        {
+          "asset": "store/editorial-media/references/quino-reference.jpg",
+          "sha256": "ead52138d2b7461bbfb0779227acac8809fbd1ec5d495942a144d7ab0af3fc26",
+          "sourcePage": "https://commons.wikimedia.org/wiki/File:Quino_(13331254273)_(cropped).jpg",
+          "creator": "ActuaLitté",
+          "licence": "CC BY-SA 2.0",
+          "licenceUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+          "role": "Referencia de identidad de Quino",
+          "sourceMatchEvidence": "exact bytes",
+          "reviewedOn": "2026-10-30"
+        }
+      ]
     }
   ]
 }

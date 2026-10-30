@@ -165,9 +165,11 @@ no valida un domicilio fijo ni promete una insignia inexistente. Se conserva el
 ingreso al feed y se puede consultar la explicación desde Ajustes. La prueba real
 de ingreso y baja con Apple queda pendiente por decisión del titular.
 
-El inventario editorial contiene 13 ilustraciones generadas para OGT y seis
-fotografías con licencia Creative Commons. Se conservan los créditos y las
-condiciones de las fotografías. Las ilustraciones se identifican junto al medio,
+El inventario editorial contiene 18 ilustraciones generadas para OGT y una
+fotografía con licencia Creative Commons (Messi). Su ilustración sigue pendiente:
+el generador integrado rechazó esa solicitud por su filtro de figuras públicas. Se conservan los créditos y las
+condiciones de las fotografías de referencia, incluido CompartirIgual cuando
+corresponde. Las ilustraciones se identifican junto al medio,
 y sus instrucciones, originales y huellas están en `editorial-media/provenance.json`.
 El retrato de Favaloro fue rehecho el 30/10/2026 con una fotografía de Cleveland
 Clinic como referencia de identidad. Tanto la referencia como su adaptación

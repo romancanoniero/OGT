@@ -15,6 +15,12 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / 'store/editorial-media-rights.json'
+REFERENCE_LICENCES = {
+    'CC BY 2.0': 'https://creativecommons.org/licenses/by/2.0',
+    'CC BY 4.0': 'https://creativecommons.org/licenses/by/4.0',
+    'CC BY-SA 2.0': 'https://creativecommons.org/licenses/by-sa/2.0',
+    'CC BY-SA 3.0': 'https://creativecommons.org/licenses/by-sa/3.0',
+}
 
 
 def validate_illustration(e, record):
@@ -28,10 +34,13 @@ def validate_illustration(e, record):
         data = path.read_bytes()
         assert 0 < len(data) <= 10 * 1024 * 1024 and data[:3] == b'\xff\xd8\xff'
         assert hashlib.sha256(data).hexdigest() == reference['sha256']
-        assert reference['licence'] == 'CC BY 4.0' and reference['licenceUrl'] == 'https://creativecommons.org/licenses/by/4.0'
+        assert reference['licence'] in REFERENCE_LICENCES
+        assert reference['licenceUrl'] == REFERENCE_LICENCES[reference['licence']]
         assert reference['sourcePage'].startswith('https://commons.wikimedia.org/wiki/File:')
         assert reference['creator'] and e['attributionRequired'] is True
-        assert e['licence'] == 'CC BY 4.0' and e['licenceUrl'] == reference['licenceUrl']
+        # Keep the reference's licence on the adaptation, including ShareAlike.
+        assert e['licence'] == reference['licence'] and e['licenceUrl'] == reference['licenceUrl']
+        assert record['outputLicence'] == reference['licence']
     assert e['creditUrl'] == 'https://onlygoodthings.lat/terms#ilustracion-' + e['postId']
 
 REMOTE = r'''
