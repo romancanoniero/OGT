@@ -93,8 +93,9 @@ La aceptación Android se realiza únicamente en el emulador autorizado
 ubicación ficticia. El ingreso y la concesión de «Siempre» funcionaron; el
 botón para omitir verificación se movió fuera del contenido desplazable para
 evitar que quedara detrás de la navegación del sistema. La pantalla preexistente
-de identidad todavía requiere una auditoría funcional de su recepción de
-documentos y de sus estados: elegir un archivo no acredita una verificación.
+de identidad fue reemplazada en la candidata iOS 9 / Android 10 por una explicación
+veraz de las comprobaciones disponibles. Por decisión del titular, OGT no solicita
+DNI ni comprobantes y no promete una verificación civil o de antecedentes.
 
 ## Respaldo externo provisional
 
@@ -121,8 +122,11 @@ copias automáticas completas identificadas por estas herramientas; conserva
 copias manuales, secretos, archivos desconocidos y enlaces. El cron del servidor
 aplica también 30 días a sus instantáneas de base generadas por OGT, sin afectar
 los trabajos de otros proyectos. DEV_MAC es una solución provisional: falta un
-destino externo independiente y el procedimiento de recuperación debe contemplar
-las bajas de cuentas posteriores a la instantánea antes de reabrir el servicio.
+destino externo independiente para una etapa posterior. El registro cifrado de
+bajas se actualiza cada hora y conserva las huellas conocidas aunque se restaure
+el origen. El procedimiento de `docs/OPERATIONS.md` exige reconciliar una candidata
+sin tráfico con evidencia que cubra la última escritura posible del origen antes
+de considerar su reapertura. No restaura ni abre automáticamente la base real.
 
 ## Historial de distribución anterior
 - Versión de prueba: **0.2.0** (iOS build 2 / Android versionCode 2).

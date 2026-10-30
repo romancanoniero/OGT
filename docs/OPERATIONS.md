@@ -114,3 +114,53 @@ dos membresías, tres asientos contables y 64 tablas. La base atendida por la ap
 conservó su estado y la copia temporal fue eliminada. Son dos comprobaciones
 diferentes: recuperación de aplicación con datos recientes y restauración del
 archivo de respaldo. Los recibos privados están en `build/operations-*.json`.
+
+## Bajas de cuentas después de una copia de datos
+
+El agente de respaldo de la Mac conserva además `erasure-journal.aesgcm` en el
+destino aprobado de DEV_MAC. Cada ejecución horaria copia únicamente las huellas
+SHA-256 de identidades dadas de baja, sin correos, UID ni claves de sesión. Cifra
+este registro con la clave local existente y autenticación AES-256-GCM. Su unión
+es acumulativa: restaurar una base antigua en el origen no puede retirar bajas
+que ya se habían registrado fuera del servidor. La retención de 30 días de las
+copias completas se mantiene. Un fallo del registro genera una advertencia y no
+impide realizar la copia diaria de datos y archivos.
+
+Este registro horario no garantiza cubrir las bajas ocurridas después de su
+última captura. Antes de recuperar datos hay que impedir nuevas escrituras en
+el origen y obtener un registro que cubra su última escritura posible. Si el
+origen se perdió y no existe esa evidencia, la candidata no puede reabrirse
+automáticamente: debe resolverse ese intervalo antes de servirla.
+
+La restauración se prepara en una base **sin tráfico**, con nombre
+`ogt_recovery_<32 caracteres hexadecimales>` y comentario
+`ogt-recovery-privacy:<los mismos 32 caracteres>`. Nunca se restaura directamente
+sobre `onlygoodthings`. Tras restaurar y revisar la copia se ejecuta primero un
+plan desde la Mac, con tiempos UTC en segundos Unix:
+
+```sh
+python3 scripts/ogt_recovery_privacy.py \
+  --encrypted-journal /Volumes/DEV_MAC/OGT-Backups/data/erasure-journal.aesgcm \
+  --key-file /Users/romancanoniero/.config/ogt/secure/backups/data-aes256.key \
+  --database ogt_recovery_<identificador> \
+  --snapshot-epoch <instante de la copia> \
+  --required-through-epoch <última escritura posible del origen> \
+  --receipt <ruta privada del recibo>
+```
+
+Después de revisar ese plan, `--apply` ejecuta exclusivamente en esa base temporal
+el mismo recorrido de baja de OGT: elimina contenido propio, conserva y vuelve
+a contar las conversaciones ajenas y deja la limpieza de archivos en la cola
+existente. Bloquea conflictos con titulares de empresas o cuentas de Control;
+primero hay que resolver su titularidad. Rechaza otras conexiones activas y
+registros sin cobertura temporal o con huellas alteradas. Puede reintentarse.
+No contacta Firebase, no cambia archivos, rutas públicas ni la base principal.
+Un fallo puede dejar bajas ya reconciliadas en la candidata, que debe permanecer
+sin tráfico hasta completar el recorrido. El recibo nunca autoriza por sí solo
+la apertura: quedan las comprobaciones de medios, permisos, salud y aprobación
+de la recuperación. El CLI no tiene un endpoint HTTP.
+
+El ensayo local `qa/scripts/verify_recovery_privacy.py` usa datos sintéticos en un
+contenedor etiquetado, con PostgreSQL publicado solo en loopback. Comprueba plan,
+rechazos, baja, contadores, limpieza en cola e idempotencia; compara la base de
+origen antes y después y retira únicamente el contenedor creado para el ensayo.

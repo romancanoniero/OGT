@@ -33,6 +33,14 @@ SSH = ['/usr/bin/ssh', '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes',
        '-o', 'ServerAliveCountMax=2', 'iankmp-vps']
 REMOTE_ROOT = '/home/iankmp/ogt'
 SIGNING_KEY = 'media/stories-private/.signing-key'
+ERASURE_MAGIC = b'OGTERASE1\n'
+ERASURE_AAD = b'OGT offsite erasure journal v1'
+ERASURE_KIND = 'ogt-erasure-journal-v1'
+ERASURE_SQL = """BEGIN READ ONLY; SET LOCAL statement_timeout='5000ms';
+SELECT json_build_object('kind','ogt-erasure-journal-v1',
+ 'capturedAtEpochSeconds',floor(extract(epoch FROM clock_timestamp()))::bigint,
+ 'hashes',coalesce((SELECT json_agg(uid_hash ORDER BY uid_hash) FROM crm_erased_accounts),'[]'::json));
+COMMIT;"""
 
 # pg_dump supplies its own consistent transaction while users keep writing.
 # Only schema names and media fingerprints are compared around capture: normal
@@ -213,6 +221,71 @@ def unseal(encrypted, key):
     return AESGCM(key).decrypt(encrypted[n:n+12], encrypted[n+12:], AAD)
 
 
+def validate_erasure_journal(value):
+    if (not isinstance(value, dict) or value.get('kind') != ERASURE_KIND
+            or type(value.get('capturedAtEpochSeconds')) is not int
+            or not isinstance(value.get('hashes'), list) or len(value['hashes']) > 25000
+            or any(not isinstance(h, str) or not re.fullmatch('[a-f0-9]{64}', h) for h in value['hashes'])
+            or value['hashes'] != sorted(set(value['hashes']))):
+        raise BackupError('ERASURE_JOURNAL_FORMAT')
+    return value
+
+
+def open_erasure_journal(encrypted, key):
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    if not encrypted.startswith(ERASURE_MAGIC) or not 38 <= len(encrypted) <= 2 * 1024 * 1024:
+        raise BackupError('ERASURE_JOURNAL_HEADER')
+    n = len(ERASURE_MAGIC)
+    try:
+        return validate_erasure_journal(json.loads(AESGCM(key).decrypt(encrypted[n:n+12], encrypted[n+12:], ERASURE_AAD)))
+    except BackupError:
+        raise
+    except Exception:
+        raise BackupError('ERASURE_JOURNAL_AUTHENTICATION') from None
+
+
+def refresh_erasure_journal(config):
+    """Preserve only hashes of erased identities, including between daily dumps.
+
+    A restored source cannot remove previously recorded tombstones. This is not
+    a final recovery approval: an offline restore requires a journal captured
+    after the last possible write of the source installation.
+    """
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    target = destination(config); key = read_key(config['keyFile'])
+    path = target / 'erasure-journal.aesgcm'
+    if path.is_symlink():
+        raise BackupError('ERASURE_JOURNAL_SYMLINK')
+    if path.exists() and (not path.is_file() or path.stat().st_size>2*1024*1024 or path.stat().st_uid!=os.getuid() or path.stat().st_mode&0o077):
+        raise BackupError('ERASURE_JOURNAL_FILE')
+    old = open_erasure_journal(path.read_bytes(), key) if path.exists() else None
+    response = remote(['docker', 'exec', 'ogt-postgres', 'psql', '-X', '-qAt', '-v', 'ON_ERROR_STOP=1',
+                       '-U', 'ogt', '-d', 'onlygoodthings', '-c', ERASURE_SQL])
+    current = validate_erasure_journal(json.loads(response))
+    if not 0 <= time.time() - current['capturedAtEpochSeconds'] <= 120:
+        raise BackupError('ERASURE_JOURNAL_SOURCE_CLOCK')
+    if old:
+        if current['capturedAtEpochSeconds'] < old['capturedAtEpochSeconds']:
+            raise BackupError('ERASURE_JOURNAL_CLOCK_REVERSED')
+        current['hashes'] = sorted(set(current['hashes']) | set(old['hashes']))
+    validate_erasure_journal(current)
+    payload = json.dumps(current, sort_keys=True, separators=(',', ':')).encode()
+    nonce = secrets.token_bytes(12)
+    encrypted = ERASURE_MAGIC + nonce + AESGCM(key).encrypt(nonce, payload, ERASURE_AAD)
+    if open_erasure_journal(encrypted, key) != current:
+        raise BackupError('ERASURE_JOURNAL_ROUNDTRIP')
+    temp = path.with_name(path.name + '.next-' + secrets.token_hex(8))
+    try:
+        fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, 'wb') as handle:
+            handle.write(encrypted); handle.flush(); os.fsync(handle.fileno())
+        os.replace(temp, path)
+    finally:
+        temp.unlink(missing_ok=True)
+    return {'capturedAtEpochSeconds': current['capturedAtEpochSeconds'], 'hashCount': len(current['hashes']),
+            'encryptedSha256': hashlib.sha256(encrypted).hexdigest()}
+
+
 def latest_verified(target):
     receipts = []
     for path in target.glob('automatic-*/receipt.json'):
@@ -348,11 +421,20 @@ def main():
             # The first background invocation performs a real transfer even if a
             # manual rehearsal just ran, so launchd's SSH/volume access is tested.
             scheduled_verified = previous.get('scheduledTransferVerified') is True
-            result = backup(json.loads(args.config.read_text()), args.if_due and scheduled_verified)
-            status = {'status': 'verified' if result else 'not_due',
+            config=json.loads(args.config.read_text())
+            journal=None; journal_error=None
+            try:
+                journal=refresh_erasure_journal(config)
+            except Exception as error:
+                # A secondary journal failure cannot suppress the existing daily
+                # database/media backup. It remains a separate warning.
+                journal_error=str(error) if isinstance(error,BackupError) else type(error).__name__.upper()
+            result = backup(config, args.if_due and scheduled_verified)
+            status = {'status': 'warning' if journal_error else 'verified' if result else 'not_due',
                       'lastAttemptEpochSeconds': int(time.time()),
                       'scheduledTransferVerified': scheduled_verified or (args.if_due and result is not None),
-                      'lastSuccessEpochSeconds': result['completedAtEpochSeconds'] if result else previous.get('lastSuccessEpochSeconds')}
+                      'lastSuccessEpochSeconds': result['completedAtEpochSeconds'] if result else previous.get('lastSuccessEpochSeconds'),
+                      'erasureJournal': journal or previous.get('erasureJournal'), 'erasureJournalErrorCode':journal_error}
             atomic_json(state / 'status.json', status)
             if result:
                 print(json.dumps({'event': 'ogt_offsite_backup', **status}), flush=True)
