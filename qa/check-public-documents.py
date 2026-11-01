@@ -11,7 +11,7 @@ import urllib.request
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
-PUBLIC = ('/privacy', '/privacy.html', '/terms', '/terms.html', '/terminos',
+PUBLIC = ('/presentacion', '/presentacion.html', '/privacy', '/privacy.html', '/terms', '/terms.html', '/terminos',
           '/uso', '/borrar-cuenta', '/borrar-cuenta.html', '/eliminar-cuenta',
           '/.well-known/apple-app-site-association', '/apple-app-site-association',
           '/.well-known/assetlinks.json')
@@ -19,6 +19,7 @@ PRIVATE = ('/', '/index.html', '/auth.js', '/crm/control/', '/crm/empresas/',
            '/api/v1/auth/session', '/api/v1/account/erase', '/api/v1/social/feed',
            '/api/v1/stories/list', '/media/example.jpg', '/db', '/ws', '/health',
            '/release.json', '/join/example', '/h/example', '/privacy/',
+           '/presentacion/', '/presentacion/api/v1/auth/session',
            '/privacy/api/v1/auth/session', '/privacy%2Fcrm%2Fcontrol%2F',
            '/.well-known/unknown.json')
 LABEL = 'org.onlygoodthings.qa.public-documents'
@@ -61,15 +62,16 @@ def request(port, path, method='GET', host='onlygoodthings.lat', headers=None):
         return error.code, error.read(), error.headers.get('Content-Type', '')
 
 
-def check(port, public):
+def check(port, public, presentation=False):
     count = 0
     protected = {}
     for host in ('onlygoodthings.lat', 'www.onlygoodthings.lat'):
         for path in PUBLIC:
+            path_public = presentation if path in ('/presentacion', '/presentacion.html') else public
             for method in ('GET', 'HEAD'):
                 status, body, mime = request(port, path, method, host)
-                assert status == (200 if public else 403), (host, method, path, status)
-                if public:
+                assert status == (200 if path_public else 403), (host, method, path, status)
+                if path_public:
                     assert ('json' if 'association' in path or 'assetlinks' in path else 'text/html') in mime
                     assert bool(body) == (method == 'GET')
                 count += 1
@@ -153,7 +155,7 @@ def main():
                     time.sleep(.25)
                 else:
                     raise RuntimeError('Isolated routing was not ready')
-                count, protected = check(port, phase == 'candidate')
+                count, protected = check(port, 'routers.ogt-legal.rule=' in source, phase == 'candidate')
                 if phase == 'baseline':
                     baseline_protected = protected
                 else:
