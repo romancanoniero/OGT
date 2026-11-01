@@ -41,6 +41,8 @@ expect class AuthPrefs() {
     /** True solo si confirmó “ESTACIONE” / ParkHere. */
     var parkedSetByUser: Boolean
     var vehiclesJson: String
+    /** Garage and parked location keyed by immutable Firebase account identity. */
+    var parkingAccountsJson: String
     var selectedVehicleId: String
     /** Token de mención de honor pendiente de reivindicar. */
     var pendingHonorToken: String

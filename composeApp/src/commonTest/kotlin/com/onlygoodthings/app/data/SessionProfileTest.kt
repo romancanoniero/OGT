@@ -15,6 +15,63 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SessionProfileTest {
+    @Test
+    fun switchingAccountsRestoresOnlyTheirOwnParkingAndClearsTransientPrompts() {
+        val prefs = com.onlygoodthings.app.auth.AuthPrefs()
+        val saved = prefs.parkingAccountsJson
+        val oldGarage = prefs.vehiclesJson
+        try {
+            prefs.parkingAccountsJson = ""
+            // Old device-wide records have no reliable ownership metadata.
+            prefs.vehiclesJson = "[{\"id\":\"legacy\",\"make\":\"Legacy\",\"color\":\"Gris\",\"plate\":\"OLD123\"}]"
+            val session = OgtPreviewSession(OgtLocalDatabase(), prefs = prefs)
+            assertTrue(session.vehicles.isEmpty())
+            session.switchParkingAccount("firebase-A")
+            assertTrue(session.vehicles.isEmpty())
+            val a = com.onlygoodthings.shared.domain.VehicleProfile("a", "Auto A", "Gris", plate = "AA123BB")
+            val a2 = a.copy(id = "a2", plate = "AA456CC")
+            session.saveVehicle(a)
+            session.saveVehicle(a2)
+            session.selectVehicle(a.id)
+            val parked = com.onlygoodthings.shared.domain.ParkedCar(-34.6, -58.4, 100L, vehicle = a)
+            session.rememberParked(parked)
+            session.focusParkedCar = true
+            session.askYieldApproach = true
+            session.showYieldNotifying = true
+            session.switchParkingAccount("")
+            assertTrue(session.vehicles.isEmpty())
+            assertNull(session.parkedCar)
+            assertFalse(session.focusParkedCar)
+            assertFalse(session.askYieldApproach)
+            assertFalse(session.showYieldNotifying)
+            session.switchParkingAccount("firebase-B")
+            assertTrue(session.vehicles.isEmpty())
+            assertFalse(session.vehicle.isReady())
+            assertFalse(session.isParked())
+            val b = a.copy(id = "b", make = "Auto B")
+            session.saveVehicle(b)
+            session.switchParkingAccount("firebase-A")
+            assertEquals(setOf(a, a2), session.vehicles.toSet())
+            assertEquals(a, session.vehicle)
+            assertEquals(parked, session.parkedCar)
+            assertTrue(session.isParked())
+            session.forgetParked()
+            val restarted = OgtPreviewSession(OgtLocalDatabase(), prefs = prefs)
+            restarted.switchParkingAccount("firebase-B")
+            assertEquals(listOf(b), restarted.vehicles)
+            restarted.deleteCurrentParkingAccount()
+            restarted.switchParkingAccount("firebase-B")
+            assertTrue(restarted.vehicles.isEmpty())
+            restarted.switchParkingAccount("firebase-A")
+            assertEquals(setOf(a, a2), restarted.vehicles.toSet())
+            assertNull(restarted.parkedCar)
+            assertTrue(prefs.vehiclesJson.contains("legacy"))
+        } finally {
+            prefs.parkingAccountsJson = saved
+            prefs.vehiclesJson = oldGarage
+        }
+    }
+
     private fun user(id: String, photo: String? = null) = LocalUser(
         id, "firebase-$id", null, null, id, photo, UserRole.USER,
         0, "invite", "community", "level", "honor", 0.0, 0.0,

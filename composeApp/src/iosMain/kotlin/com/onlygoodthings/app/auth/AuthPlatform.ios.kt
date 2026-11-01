@@ -149,6 +149,9 @@ actual class AuthPrefs actual constructor() {
     actual var vehiclesJson: String
         get() = defaults.stringForKey("ogt.cars.json").orEmpty()
         set(value) { defaults.setObject(value, forKey = "ogt.cars.json") }
+    actual var parkingAccountsJson: String
+        get() = defaults.stringForKey("ogt.parking.accounts").orEmpty()
+        set(value) { defaults.setObject(value, forKey = "ogt.parking.accounts"); defaults.synchronize() }
     actual var selectedVehicleId: String
         get() = defaults.stringForKey("ogt.car.sel").orEmpty()
         set(value) { defaults.setObject(value, forKey = "ogt.car.sel") }

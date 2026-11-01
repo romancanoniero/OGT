@@ -205,6 +205,7 @@ class AuthController(
         platform.prepareAccountDeletion()
         platform.idToken(true)?.let { session.firebaseJwt = it }
         api.deleteAccount()
+        preview.deleteCurrentParkingAccount()
         signOut()
     }
 
@@ -261,6 +262,7 @@ class AuthController(
         pendingPhone = null
         secondFactorSignIn.clear()
         _signedIn.value = false
+        preview.switchParkingAccount("")
         preview.currentUserId = ""
         preview.overlayUser = null
         ensureDevBearer()
@@ -358,6 +360,7 @@ class AuthController(
             val idx = db.users.indexOfFirst { it.id == existing.id }
             if (idx >= 0) db.users[idx] = local
         }
+        preview.switchParkingAccount(user.firebaseUid)
         preview.currentUserId = local.id
         preview.overlayUser = local
         db.claimPublishedAnimals(

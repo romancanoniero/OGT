@@ -411,6 +411,9 @@ actual class AuthPrefs actual constructor() {
     actual var vehiclesJson: String
         get() = prefs.getString("cars_json", "").orEmpty()
         set(value) { prefs.edit().putString("cars_json", value).apply() }
+    actual var parkingAccountsJson: String
+        get() = prefs.getString("parking_accounts_json", "").orEmpty()
+        set(value) { prefs.edit().putString("parking_accounts_json", value).apply() }
     actual var selectedVehicleId: String
         get() = prefs.getString("car_sel", "").orEmpty()
         set(value) { prefs.edit().putString("car_sel", value).apply() }

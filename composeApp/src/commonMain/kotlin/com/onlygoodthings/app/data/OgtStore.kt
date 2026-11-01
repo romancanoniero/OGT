@@ -27,8 +27,6 @@ import com.onlygoodthings.shared.domain.prefCode
 import com.onlygoodthings.shared.realtime.OgtSdk
 import com.onlygoodthings.shared.realtime.currentEpochMs
 import com.onlygoodthings.shared.realtime.gatewayEndpointFromApiBase
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
 val LocalOgtDb = staticCompositionLocalOf<OgtLocalDatabase> {
     error("OgtLocalDatabase no fue provisto. Envolvé la UI con OgtPreviewStore.")
@@ -66,10 +64,13 @@ class OgtPreviewSession(
     var locationAccuracy by mutableStateOf<Float?>(null)
     /** Solo un fix real del dispositivo. Nunca el lat/lng del seed. */
     var deviceLocation by mutableStateOf<GeoPoint?>(null)
-    var vehicles by mutableStateOf(loadGarage(prefs))
-    var selectedVehicleId by mutableStateOf(prefs.selectedVehicleId)
-    var vehicle by mutableStateOf(pickVehicle(loadGarage(prefs), prefs.selectedVehicleId))
-    var parkedCar by mutableStateOf(loadParked(prefs))
+    private val parkingStore = AccountParkingStore({ prefs.parkingAccountsJson }, { prefs.parkingAccountsJson = it })
+    private var parkingOwner = initialUserId
+    private val initialParking = parkingStore.load(parkingOwner)
+    var vehicles by mutableStateOf(initialParking.vehicles)
+    var selectedVehicleId by mutableStateOf(initialParking.selectedVehicleId)
+    var vehicle by mutableStateOf(pickVehicle(initialParking.vehicles, initialParking.selectedVehicleId))
+    var parkedCar by mutableStateOf(initialParking.parkedCar)
     var focusParkedCar by mutableStateOf(false)
     var askLocationScope by mutableStateOf(false)
     var language by mutableStateOf(OgtLang.fromCode(prefs.appLanguage))
@@ -86,7 +87,7 @@ class OgtPreviewSession(
     var askLeaveWithoutYield by mutableStateOf(false)
     var staleAsked by mutableStateOf(false)
     var askStaleParked by mutableStateOf(false)
-    var lastParkedConfirmEpochMs by mutableStateOf(loadParked(prefs)?.parkedAtEpochMs ?: 0L)
+    var lastParkedConfirmEpochMs by mutableStateOf(initialParking.parkedCar?.parkedAtEpochMs ?: 0L)
     /** Token de `onlygoodthings.app/h/{token}` pendiente de reivindicar. */
     var pendingHonorToken by mutableStateOf(prefs.pendingHonorToken.takeIf { it.isNotBlank() })
 
@@ -172,7 +173,7 @@ class OgtPreviewSession(
     /** Lugar fijado al estacionar (ESTACIONE), no un pin residual ni el GPS del perfil. */
     fun hasParkedPlace(): Boolean {
         val car = parkedCar ?: return false
-        if (!prefs.parkedSetByUser || car.parkedAtEpochMs <= 0L) return false
+        if (parkingOwner.isBlank() || car.parkedAtEpochMs <= 0L) return false
         if (!car.latitude.isFinite() || !car.longitude.isFinite()) return false
         if (car.latitude == 0.0 && car.longitude == 0.0) return false
         if (kotlin.math.abs(car.latitude) > 90.0 || kotlin.math.abs(car.longitude) > 180.0) return false
@@ -180,6 +181,31 @@ class OgtPreviewSession(
     }
 
     fun isParked(): Boolean = hasParkedPlace()
+    /** Switch synchronously before exposing the next signed-in profile to the UI. */
+    fun switchParkingAccount(firebaseUid: String) {
+        if (parkingOwner == firebaseUid) return
+        parkingOwner = firebaseUid
+        val saved = parkingStore.load(firebaseUid)
+        vehicles = saved.vehicles
+        selectedVehicleId = saved.selectedVehicleId
+        vehicle = pickVehicle(vehicles, selectedVehicleId)
+        parkedCar = saved.parkedCar
+        focusParkedCar = false
+        willLeaveParked = false
+        farthestFromParkedMeters = 0.0
+        yieldAsked = false
+        askYieldApproach = false
+        showYieldNotifying = false
+        resetLeaveState()
+        lastParkedConfirmEpochMs = parkedCar?.parkedAtEpochMs ?: 0L
+        if (!hasParkedPlace()) forgetParked()
+    }
+
+    fun deleteCurrentParkingAccount() {
+        parkingStore.remove(parkingOwner)
+        switchParkingAccount("")
+    }
+
     fun saveVehicle(next: VehicleProfile) {
         upsertVehicle(next)
     }
@@ -213,24 +239,13 @@ class OgtPreviewSession(
     }
 
     private fun persistGarage() {
-        prefs.vehiclesJson = garageJson.encodeToString(vehicles)
-        prefs.selectedVehicleId = selectedVehicleId
-        prefs.vehicleMake = vehicle.make
-        prefs.vehicleColor = vehicle.color
-        prefs.vehicleColorHex = vehicle.colorHex
-        prefs.vehiclePlate = vehicle.plate
+        parkingStore.save(parkingOwner, AccountParking(vehicles, selectedVehicleId, parkedCar))
     }
     fun rememberParked(car: ParkedCar) {
         val withCar = if (car.vehicle != null) car else car.copy(vehicle = vehicle.takeIf { it.isReady() })
         parkedCar = withCar
-        prefs.parkedLatitude = withCar.latitude
-        prefs.parkedLongitude = withCar.longitude
-        prefs.parkedAtEpochMs = withCar.parkedAtEpochMs
-        prefs.parkedHeading = withCar.headingDegrees ?: 0f
-        prefs.parkedManeuver = withCar.maneuver.orEmpty()
-        prefs.parkedAddress = withCar.address.orEmpty()
-        prefs.parkedSetByUser = true
         withCar.vehicle?.let { upsertVehicle(it) }
+        persistGarage()
         willLeaveParked = false
         farthestFromParkedMeters = 0.0
         yieldAsked = false
@@ -259,10 +274,7 @@ class OgtPreviewSession(
 
     fun forgetParked() {
         parkedCar = null
-        prefs.parkedAtEpochMs = 0L
-        prefs.parkedManeuver = ""
-        prefs.parkedAddress = ""
-        prefs.parkedSetByUser = false
+        persistGarage()
         willLeaveParked = false
         farthestFromParkedMeters = 0.0
         yieldAsked = false
@@ -304,42 +316,8 @@ fun OgtPreviewStore(content: @Composable () -> Unit) {
     )
 }
 
-private val garageJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
-
-private fun loadVehicle(prefs: AuthPrefs) = VehicleProfile(
-    make = prefs.vehicleMake,
-    color = prefs.vehicleColor,
-    colorHex = prefs.vehicleColorHex,
-    plate = prefs.vehiclePlate,
-).ensureId()
-
-private fun loadGarage(prefs: AuthPrefs): List<VehicleProfile> {
-    val parsed = runCatching {
-        if (prefs.vehiclesJson.isBlank()) emptyList()
-        else garageJson.decodeFromString<List<VehicleProfile>>(prefs.vehiclesJson)
-    }.getOrDefault(emptyList()).map { it.ensureId() }.filter { it.isReady() }
-    if (parsed.isNotEmpty()) return parsed
-    val legacy = loadVehicle(prefs)
-    return if (legacy.isReady()) listOf(legacy) else emptyList()
-}
-
 private fun pickVehicle(garage: List<VehicleProfile>, selectedId: String): VehicleProfile =
     garage.firstOrNull { it.id == selectedId } ?: garage.firstOrNull() ?: VehicleProfile()
-
-private fun loadParked(prefs: AuthPrefs): ParkedCar? {
-    if (!prefs.parkedSetByUser || prefs.parkedAtEpochMs <= 0L) return null
-    if (prefs.parkedLatitude == 0.0 && prefs.parkedLongitude == 0.0) return null
-    val vehicle = loadVehicle(prefs).takeIf { it.isReady() }
-    return ParkedCar(
-        latitude = prefs.parkedLatitude,
-        longitude = prefs.parkedLongitude,
-        parkedAtEpochMs = prefs.parkedAtEpochMs,
-        headingDegrees = prefs.parkedHeading.takeIf { it != 0f },
-        maneuver = prefs.parkedManeuver.takeIf { it.isNotBlank() },
-        address = prefs.parkedAddress.takeIf { it.isNotBlank() },
-        vehicle = vehicle,
-    )
-}
 
 private fun guestSessionUser() = LocalUser(
     id = "",
