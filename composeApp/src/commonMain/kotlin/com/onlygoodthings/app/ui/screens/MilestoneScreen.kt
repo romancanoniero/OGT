@@ -35,36 +35,10 @@ fun MilestoneScreen(onBack: () -> Unit, onGoFeed: () -> Unit = onBack) {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        OgtCaption("Nuevo hito")
-        Text("Nivel 4 · Guardián", color = OgtColors.secondary, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-        Text(
-            "Felicitaciones, ${me.displayName.substringBefore(" ")}",
-            fontWeight = FontWeight.Bold,
-            fontSize = 22.sp,
-            color = OgtColors.ink,
-        )
-        OgtCaption("Tu dedicación ayuda a que la comunidad sea más solidaria.")
+        OgtCaption("Tu participación en la comunidad")
+        Text(com.onlygoodthings.shared.domain.communityLevelLabel(me.communityPoints),
+            color = OgtColors.secondary, fontWeight = FontWeight.Bold)
         Text("${me.communityPoints} pts", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = OgtColors.primary)
-        OgtCaption("Top 3% · ${me.honorTag}")
-        PrefCategory("Privilegios")
-        PrefGroup {
-            PrefLine(
-                title = "15% en ferias asociadas",
-                body = "Válido en ferias agroecológicas y huertas comunitarias.",
-            )
-            PrefDivider()
-            PrefLine(
-                title = "Voto doble comunitario",
-                body = "Tu voz cuenta el doble al asignar fondos de mejoras.",
-            )
-            PrefDivider()
-            PrefLine(
-                title = "Insignia de Guardián",
-                body = "Distintivo público en las publicaciones.",
-            )
-        }
-        OgtPrimaryButton("Compartir hito") { onBack() }
-        OgtSecondaryButton("Ver billetera") { onBack() }
         OgtSecondaryButton("Continuar al feed") { onGoFeed() }
         Spacer(Modifier.height(16.dp))
     }

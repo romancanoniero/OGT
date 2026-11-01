@@ -54,24 +54,6 @@ fun WalletScreen(onBack: () -> Unit = {}) {
             }
             OgtCaption("Meta ${formatPts(nextGoal)} pts")
             com.onlygoodthings.app.ui.components.CouponWallet()
-            PrefCategory("Comercios que agradecen", "Un canje es un gracias, no reputación comprada.")
-            PrefGroup {
-                db.rewards.forEachIndexed { index, reward ->
-                    if (index > 0) PrefDivider()
-                    PrefLine(
-                        title = reward.place,
-                        body = "${reward.badge} · ${reward.detail}",
-                        trailing = "${reward.costPoints} pts",
-                        leading = {
-                            OgtMark(
-                                walletMarkArt(reward.mark),
-                                reward.place,
-                                brand = walletMarkIsBrand(reward.mark),
-                            )
-                        },
-                    )
-                }
-            }
             PrefCategory("Actividad")
             PrefGroup {
                 db.karma.filter { it.userId == me.id }.forEachIndexed { index, entry ->

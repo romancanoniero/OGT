@@ -34,16 +34,12 @@ fun InviteScreen(onBack: () -> Unit = {}) {
     Column(Modifier.fillMaxSize().background(OgtColors.canvas).verticalScroll(rememberScrollState())) {
         OgtTopBar(title = "Invitar", onBack = onBack)
         ScreenColumn {
-            OgtCaption("Por cada persona que se sume, ambos reciben +100 puntos y se dona un árbol.")
-            Text("7 árboles donados", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = OgtColors.primary)
-            OgtCaption("+700 pts · Código ${me.inviteCode}")
+            OgtCaption("Invitá a tus amigos a compartir buenas acciones y ayudar a la comunidad.")
             OgtCaption(link.removePrefix("https://"))
-            OgtPrimaryButton("Copiar enlace") {
-                sharePlainText("Sumate a Only Good Things (OGT) con ${me.displayName}: $link")
-            }
-            OgtPrimaryButton("Compartir por WhatsApp") {
-                sharePlainText("Sumate a Only Good Things (OGT) con ${me.displayName}: $link")
-            }
+            com.onlygoodthings.app.ui.components.InvitationShareButtons(
+                link, "Sumate a Only Good Things",
+                "Sumate a Only Good Things con ${me.displayName}: $link",
+            )
             PrefCategory("Contactos de confianza")
             PrefGroup {
                 db.inviteContacts.forEachIndexed { index, contact ->

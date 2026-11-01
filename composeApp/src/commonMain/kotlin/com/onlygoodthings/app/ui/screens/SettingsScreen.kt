@@ -304,10 +304,7 @@ fun SettingsScreen(
                     "Billetera de puntos" to "wallet",
                     "Ranking de la comunidad" to "ranking",
                     "Mensajes" to "messages",
-                    "Sponsors RSE" to "sponsors",
-                    "Celebrar hito" to "milestone",
-                    "Splash sponsors" to "splashSponsors",
-                    "Logo animado" to "animatedSvg",
+                    "Invitar empresas como sponsors" to "sponsors",
                 ).forEachIndexed { index, (label, key) ->
                     if (index > 0) PrefDivider()
                     PrefNav(label) { onOpen(key) }

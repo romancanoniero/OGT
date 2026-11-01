@@ -1,10 +1,7 @@
 package com.onlygoodthings.app.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -13,42 +10,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.onlygoodthings.app.data.LocalOgtDb
-import com.onlygoodthings.app.data.LocalOgtSession
 import com.onlygoodthings.app.theme.OgtColors
-import com.onlygoodthings.app.ui.components.OgtCaption
-import com.onlygoodthings.app.ui.components.OgtTopBar
-import com.onlygoodthings.app.ui.components.PrefCategory
-import com.onlygoodthings.app.ui.components.PrefDivider
-import com.onlygoodthings.app.ui.components.PrefGroup
-import com.onlygoodthings.app.ui.components.PrefLine
-import com.onlygoodthings.app.ui.components.ScreenColumn
+import com.onlygoodthings.app.ui.components.*
 
 @Composable
-fun SponsorsScreen(onBack: () -> Unit = {}) {
-    val db = LocalOgtDb.current
-    val me = LocalOgtSession.current.me()
+fun SponsorsScreen(onBack: () -> Unit = {}, onContinue: (() -> Unit)? = null) {
     Column(Modifier.fillMaxSize().background(OgtColors.canvas)) {
-        OgtTopBar(title = "Sponsors", onBack = onBack)
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        ScreenColumn {
-            OgtCaption("Empresas que financian proyectos comunitarios y premian tu huella.")
-            Text("${me.communityPoints} pts", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = OgtColors.primary)
-            OgtCaption("${me.levelLabel} · Score verde")
-            PrefCategory("Alianzas")
-            PrefGroup {
-                db.sponsors.forEachIndexed { index, offer ->
-                    if (index > 0) PrefDivider()
-                    PrefLine(
-                        title = offer.company,
-                        body = listOfNotNull(offer.title, offer.body).joinToString(" · "),
-                        trailing = offer.badge,
-                    )
-                }
+        OgtTopBar(title = "Sumar sponsors", onBack = onBack)
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            ScreenColumn {
+                Text("Invitá a una empresa a sumarse", fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold, color = OgtColors.ink)
+                OgtCaption("¿Conocés una empresa que quiera acompañar a la comunidad? Compartile el proyecto para que se contacte con Only Good Things y podamos conversar sobre su participación como sponsor.")
+                OgtCaption("Cada propuesta se evalúa con el equipo de OGT.")
+                InvitationShareButtons(sponsorInvitationUrl, "Sumarse como sponsor de Only Good Things", sponsorInvitationText)
+                onContinue?.let { OgtSecondaryButton("Continuar", onClick = it) }
+                Spacer(Modifier.height(80.dp))
             }
-            OgtCaption("El 100% de la publicidad financia causas. No se venden datos.")
-            Spacer(Modifier.height(80.dp))
-        }
         }
     }
 }
