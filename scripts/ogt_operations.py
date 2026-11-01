@@ -9,6 +9,9 @@ import os
 from pathlib import Path
 import shutil
 import socket
+import stat
+import uuid
+import urllib.parse
 import ssl
 import subprocess
 import time
@@ -185,6 +188,54 @@ def collect(root):
         return {name:future.result() for name,future in work.items()}
 
 
+HEARTBEAT_CODES = frozenset(
+    [name.upper() + '_FAILED' for name in ('containers','application','authorization','database','redis','release','tls','capacity','backups')] +
+    ['PAYMENTSOVERDUE','PAYMENTINCIDENTS','ERASUREOVERDUE','MEDIAOVERDUE','DISK_CAPACITY','MEMORY_CAPACITY']
+)
+
+
+def heartbeat_url(raw):
+    # This private URL grants only permission to report this check's state.
+    # Never follow redirects or accept arbitrary hosts, query strings or paths.
+    if not isinstance(raw, str): raise ValueError('Invalid heartbeat destination')
+    parsed = urllib.parse.urlsplit(raw)
+    if parsed.scheme != 'https' or parsed.netloc != 'hc-ping.com' or parsed.query or parsed.fragment:
+        raise ValueError('Invalid heartbeat destination')
+    identifier = parsed.path.removeprefix('/')
+    if str(uuid.UUID(identifier)) != identifier: raise ValueError('Invalid heartbeat destination')
+    return 'https://hc-ping.com/' + identifier
+
+
+def external_heartbeat(snapshot, config_path, send=None):
+    config_path = Path(config_path)
+    if not config_path.exists() and not config_path.is_symlink(): return None
+    try:
+        fd = os.open(config_path, os.O_RDONLY | os.O_NOFOLLOW)
+        with os.fdopen(fd) as handle:
+            info = os.fstat(handle.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077 or info.st_size > 4096:
+                raise ValueError('Unsafe heartbeat configuration')
+            url = heartbeat_url(json.load(handle)['url'])
+        failed = bool(snapshot.get('alerts'))
+        if snapshot.get('status') != 'healthy' and not failed:
+            # Preserve the collector's existing three-sample debounce. A host
+            # outage still times out at the external provider without a ping.
+            return {'state':'debouncing','delivered':False}
+        body = json.dumps({'service':'OGT','status':'failed' if failed else 'healthy',
+                           'alerts':sorted({a['code'] for a in snapshot.get('alerts', []) if a.get('code') in HEARTBEAT_CODES})}).encode()
+        request = urllib.request.Request(url + ('/fail' if failed else ''), data=body,
+                                         headers={'Content-Type':'application/json'}, method='POST')
+        if send is None:
+            with urllib.request.build_opener(NoRedirect).open(request, timeout=5) as response:
+                if response.status != 200: raise ValueError('Heartbeat rejected')
+        else:
+            if send(request) != 200: raise ValueError('Heartbeat rejected')
+        return {'state':'failed' if failed else 'healthy','delivered':True}
+    except Exception:
+        # Neither the capability URL nor response bodies/exceptions may be logged.
+        return {'state':'delivery_failed','delivered':False}
+
+
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--root',type=Path,default=Path.home()/'ogt');args=parser.parse_args()
     root=args.root.resolve(strict=True)
@@ -200,6 +251,13 @@ def main():
         snapshot=assess(collect(root),previous,time.time())
         atomic(state/'status.json',json.dumps(snapshot,indent=2)+'\n')
         atomic(state/'metrics.prom',metrics(snapshot))
+        heartbeat = external_heartbeat(snapshot, Path.home()/'ogt-secrets/operations-heartbeat.json')
+        if heartbeat is not None:
+            try: prior_heartbeat = json.loads((state/'heartbeat.json').read_text())
+            except (OSError, ValueError): prior_heartbeat = {}
+            atomic(state/'heartbeat.json',json.dumps({**heartbeat,'checkedAtEpochSeconds':int(time.time())})+'\n')
+            if heartbeat.get('state') != prior_heartbeat.get('state'):
+                print(json.dumps({'event':'ogt_external_heartbeat',**heartbeat}),flush=True)
         if snapshot['alerts']!=previous.get('alerts') or snapshot['status']!=previous.get('status'):
             print(json.dumps({'event':'ogt_operational_state','status':snapshot['status'],'alerts':snapshot['alerts']}),flush=True)
         if snapshot['status']=='critical':raise SystemExit(2)

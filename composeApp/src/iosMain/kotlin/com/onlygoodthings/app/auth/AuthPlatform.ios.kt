@@ -55,6 +55,15 @@ actual class AuthPlatform actual constructor() {
 
     actual suspend fun signInGoogle(): AuthUser = awaitUser { host().signInGoogle(it) }
     actual suspend fun signInApple(): AuthUser = awaitUser { host().signInApple(it) }
+    actual suspend fun beginSecondFactor(index: Int): Boolean = suspendCancellableCoroutine { cont ->
+        host().beginSecondFactor(index) { step, error ->
+            if (!cont.isActive) return@beginSecondFactor
+            if (error != null) cont.resumeWithException(AuthException(error))
+            else cont.resume(step != "automatic")
+        }
+    }
+    actual suspend fun confirmSecondFactor(code: String): AuthUser = awaitUser(challengeAllowed = false) { host().confirmSecondFactor(code, it) }
+    actual fun cancelSecondFactor() { host().cancelSecondFactor() }
     actual suspend fun prepareAccountDeletion(): Unit = suspendCancellableCoroutine { cont ->
         host().prepareAccountDeletion { error ->
             if (cont.isActive) {
@@ -74,12 +83,15 @@ actual class AuthPlatform actual constructor() {
         host().signOut()
     }
 
-    private suspend fun awaitUser(block: ((AuthUser?, String?) -> Unit) -> Unit): AuthUser =
+    private suspend fun awaitUser(challengeAllowed: Boolean = true, block: ((AuthUser?, String?) -> Unit) -> Unit): AuthUser =
         suspendCancellableCoroutine { cont ->
             block { user, err ->
                 if (!cont.isActive) return@block
                 when {
-                    err != null -> cont.resumeWithException(AuthException(err))
+                    err != null -> {
+                        val factors = if (challengeAllowed) host().pendingSecondFactors() else emptyList()
+                        cont.resumeWithException(if (factors.isNotEmpty()) AuthSecondFactorRequired(factors) else AuthException(err))
+                    }
                     user != null -> cont.resume(user)
                     else -> cont.resumeWithException(AuthException("No se pudo autenticar"))
                 }

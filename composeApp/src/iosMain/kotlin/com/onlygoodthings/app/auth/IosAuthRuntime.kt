@@ -14,6 +14,10 @@ interface IosAuthHost {
     fun confirmPhone(verificationId: String, code: String, onResult: (AuthUser?, String?) -> Unit)
     fun signInGoogle(onResult: (AuthUser?, String?) -> Unit)
     fun signInApple(onResult: (AuthUser?, String?) -> Unit)
+    fun pendingSecondFactors(): List<AuthSecondFactor>
+    fun beginSecondFactor(index: Int, onResult: (String?, String?) -> Unit)
+    fun confirmSecondFactor(code: String, onResult: (AuthUser?, String?) -> Unit)
+    fun cancelSecondFactor()
     fun prepareAccountDeletion(onResult: (String?) -> Unit)
     fun appleSignInButton(onClick: () -> Unit): platform.UIKit.UIView
     fun unlockBiometric(onResult: (Boolean) -> Unit)

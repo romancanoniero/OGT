@@ -16,6 +16,11 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.FirebaseException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.FirebaseAuthMultiFactorException
+import com.google.firebase.auth.MultiFactorResolver
+import com.google.firebase.auth.PhoneMultiFactorInfo
+import com.google.firebase.auth.PhoneMultiFactorGenerator
+import com.google.firebase.auth.TotpMultiFactorGenerator
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.OAuthProvider
 import com.google.firebase.auth.OAuthCredential
@@ -39,6 +44,80 @@ actual fun authLabHintsEnabled(): Boolean = com.onlygoodthings.app.BuildConfig.D
 
 actual class AuthPlatform actual constructor() {
     private val auth: FirebaseAuth get() = FirebaseAuth.getInstance()
+    private var factorResolver: MultiFactorResolver? = null
+    private var factorIndex: Int? = null
+    private var factorVerificationId: String? = null
+    private var automaticFactorCredential: PhoneAuthCredential? = null
+    private var factorGeneration = 0
+
+    actual fun cancelSecondFactor() {
+        factorGeneration++
+        factorResolver = null
+        factorIndex = null
+        factorVerificationId = null
+        automaticFactorCredential = null
+    }
+
+    actual suspend fun beginSecondFactor(index: Int): Boolean {
+        val resolver = factorResolver ?: throw AuthException("La verificación venció. Volvé a ingresar.")
+        val hint = resolver.hints.getOrNull(index) ?: throw AuthException("Elegí una verificación disponible")
+        factorGeneration++
+        val generation = factorGeneration
+        factorIndex = index
+        factorVerificationId = null
+        automaticFactorCredential = null
+        if (hint.factorId == TotpMultiFactorGenerator.FACTOR_ID) return true
+        if (hint !is PhoneMultiFactorInfo) throw AuthException("Ese segundo factor no está disponible en esta app")
+        return suspendCancellableCoroutine { cont ->
+            val callbacks = object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
+                override fun onCodeSent(id: String, token: PhoneAuthProvider.ForceResendingToken) {
+                    if (cont.isActive && generation == factorGeneration) {
+                        factorVerificationId = id
+                        cont.resume(true)
+                    }
+                }
+                override fun onVerificationCompleted(credential: PhoneAuthCredential) {
+                    if (cont.isActive && generation == factorGeneration) {
+                        automaticFactorCredential = credential
+                        cont.resume(false)
+                    }
+                }
+                override fun onVerificationFailed(error: FirebaseException) {
+                    if (cont.isActive && generation == factorGeneration) cont.resumeWithException(mapFirebase(error))
+                }
+            }
+            val options = PhoneAuthOptions.newBuilder(auth)
+                .setActivity(AndroidAuthHost.requireActivity())
+                .setMultiFactorHint(hint)
+                .setMultiFactorSession(resolver.session)
+                .setTimeout(60L, TimeUnit.SECONDS)
+                .setCallbacks(callbacks)
+                .build()
+            PhoneAuthProvider.verifyPhoneNumber(options)
+        }
+    }
+
+    actual suspend fun confirmSecondFactor(code: String): AuthUser {
+        val resolver = factorResolver ?: throw AuthException("La verificación venció. Volvé a ingresar.")
+        val hint = factorIndex?.let { resolver.hints.getOrNull(it) }
+            ?: throw AuthException("Elegí una verificación disponible")
+        val assertion = when (hint.factorId) {
+            TotpMultiFactorGenerator.FACTOR_ID -> {
+                require(validSecondFactorCode(code)) { "Ingresá los seis dígitos del código" }
+                TotpMultiFactorGenerator.getAssertionForSignIn(hint.uid, code)
+            }
+            PhoneMultiFactorGenerator.FACTOR_ID -> {
+                val credential = automaticFactorCredential ?: run {
+                    require(validSecondFactorCode(code)) { "Ingresá los seis dígitos del código" }
+                    val id = factorVerificationId ?: throw AuthException("Solicitá el código SMS nuevamente")
+                    PhoneAuthProvider.getCredential(id, code)
+                }
+                PhoneMultiFactorGenerator.getAssertion(credential)
+            }
+            else -> throw AuthException("Ese segundo factor no está disponible en esta app")
+        }
+        return runAuth { resolver.resolveSignIn(assertion).await().user ?: error("No se pudo confirmar el ingreso") }
+    }
 
     actual suspend fun currentUser(): AuthUser? = auth.currentUser?.toAuthUser()
 
@@ -215,8 +294,25 @@ actual class AuthPlatform actual constructor() {
         }
     }
 
-    private suspend fun runAuth(block: suspend () -> FirebaseUser): AuthUser =
-        runCatching { block().toAuthUser() }.getOrElse { throw mapFirebase(it) }
+    private suspend fun runAuth(block: suspend () -> FirebaseUser): AuthUser = try {
+        block().toAuthUser()
+    } catch (cancel: kotlinx.coroutines.CancellationException) {
+        throw cancel
+    } catch (challenge: FirebaseAuthMultiFactorException) {
+        cancelSecondFactor()
+        factorResolver = challenge.resolver
+        val factors = challenge.resolver.hints.mapIndexedNotNull { index, hint ->
+            when (hint.factorId) {
+                TotpMultiFactorGenerator.FACTOR_ID -> AuthSecondFactor(index, "totp", hint.displayName ?: "Aplicación autenticadora")
+                PhoneMultiFactorGenerator.FACTOR_ID -> AuthSecondFactor(index, "phone", "SMS · ••••${(hint as? PhoneMultiFactorInfo)?.phoneNumber.orEmpty().takeLast(4)}")
+                else -> null
+            }
+        }
+        if (factors.isEmpty()) throw AuthException("No hay un segundo factor compatible para completar el ingreso")
+        throw AuthSecondFactorRequired(factors)
+    } catch (failure: Exception) {
+        throw mapFirebase(failure)
+    }
 }
 
 private fun FirebaseUser.toAuthUser() = AuthUser(
@@ -256,7 +352,7 @@ private fun mapFirebase(error: Throwable?): AuthException {
         "ERROR_EMAIL_ALREADY_IN_USE" -> "Ese correo ya está registrado"
         "ERROR_WEAK_PASSWORD" -> "La contraseña es demasiado débil"
         "ERROR_TOO_MANY_REQUESTS" -> "Demasiados intentos. Probá más tarde"
-        "ERROR_INVALID_VERIFICATION_CODE" -> "El código SMS no es válido"
+        "ERROR_INVALID_VERIFICATION_CODE" -> "El código de verificación no es válido"
         "ERROR_SESSION_EXPIRED" -> "El código SMS venció. Pedí uno nuevo"
         "ERROR_QUOTA_EXCEEDED" -> "Se agotó la cuota de SMS de Firebase"
         "ERROR_OPERATION_NOT_ALLOWED" -> "Este método de ingreso no está habilitado en Firebase"

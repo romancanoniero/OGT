@@ -11,6 +11,10 @@ expect class AuthPlatform() {
     suspend fun confirmPhone(pending: PendingPhoneAuth, code: String): AuthUser
     suspend fun signInGoogle(): AuthUser
     suspend fun signInApple(): AuthUser
+    /** True when a code is required; false when SMS verification completed automatically. */
+    suspend fun beginSecondFactor(index: Int): Boolean
+    suspend fun confirmSecondFactor(code: String): AuthUser
+    fun cancelSecondFactor()
     /** Revokes the Apple grant, when linked, before requesting durable server deletion. */
     suspend fun prepareAccountDeletion()
     suspend fun unlockBiometric(): Boolean

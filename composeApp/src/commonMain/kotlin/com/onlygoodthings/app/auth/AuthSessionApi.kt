@@ -17,15 +17,20 @@ import kotlinx.serialization.json.buildJsonObject
 class AuthSessionApi(private val session: SessionStore) {
     private val client = createPlatformHttpClient()
 
-    suspend fun openSession(token: String): UserProfile? = runCatching {
+    suspend fun openSession(token: String, firebaseUid: String): UserProfile = try {
         val response: ApiResponse<UserProfile> = client.post("${session.apiBaseUrl}/api/v1/auth/session") {
             contentType(ContentType.Application.Json)
             header("Authorization", "Bearer $token")
             setBody(buildJsonObject { put("token", JsonPrimitive(token)) })
         }.body()
-        if (!response.success) return@runCatching null
-        response.data
-    }.getOrNull()
+        confirmedSessionProfile(response, firebaseUid)
+    } catch (cancel: kotlinx.coroutines.CancellationException) {
+        throw cancel
+    } catch (failure: AuthException) {
+        throw failure
+    } catch (failure: Exception) {
+        throw AuthException("No pudimos conectar con OGT para abrir tu sesión. Revisá la conexión y volvé a intentarlo.", failure)
+    }
 
     suspend fun uploadProfilePhoto(token: String, filename: String, bytes: ByteArray): com.onlygoodthings.shared.domain.UploadedMedia = uploadMedia(token, filename, bytes)
 

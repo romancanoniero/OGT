@@ -83,6 +83,7 @@ import com.onlygoodthings.app.ui.screens.IdentityScreen
 import com.onlygoodthings.app.ui.screens.ClaimHonorScreen
 import com.onlygoodthings.app.ui.screens.InviteScreen
 import com.onlygoodthings.app.ui.screens.LoginScreen
+import com.onlygoodthings.app.ui.screens.SecondFactorDialog
 import com.onlygoodthings.app.ui.screens.OtpScreen
 import com.onlygoodthings.app.ui.screens.RecoverScreen
 import com.onlygoodthings.app.ui.screens.SignUpScreen
@@ -481,6 +482,7 @@ fun App() {
                 }
             }
         }
+        SecondFactorDialog(auth, onAuthenticated = { goHomeOrOnboard() })
         CompositionLocalProvider(
             LocalOgtLocation provides location,
             LocalOgtChrome provides chrome,

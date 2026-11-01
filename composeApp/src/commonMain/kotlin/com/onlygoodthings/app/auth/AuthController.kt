@@ -44,6 +44,32 @@ class AuthController(
     }
 
     var pendingPhone by mutableStateOf<PendingPhoneAuth?>(null)
+    private var secondFactorKeepSession = true
+    private val secondFactorSignIn = SecondFactorSignIn(
+        begin = platform::beginSecondFactor,
+        verify = platform::confirmSecondFactor,
+        openSession = { user, keep -> finishSession(user, keep) },
+        cancelNative = platform::cancelSecondFactor,
+    )
+    val secondFactors: List<AuthSecondFactor> get() = secondFactorSignIn.factors
+    val selectedSecondFactor: AuthSecondFactor? get() = secondFactorSignIn.selected
+
+    private fun beginPrimarySignIn(keep: Boolean) {
+        secondFactorSignIn.clear()
+        secondFactorKeepSession = keep
+    }
+
+    suspend fun chooseSecondFactor(index: Int): Boolean {
+        var authenticated = false
+        return wrap { authenticated = secondFactorSignIn.choose(index) } && authenticated
+    }
+
+    suspend fun confirmSecondFactor(code: String): Boolean = wrap { secondFactorSignIn.confirm(code) }
+
+    fun cancelSecondFactor() {
+        secondFactorSignIn.clear()
+        error = null
+    }
     var busy by mutableStateOf(false)
     var error by mutableStateOf<String?>(null)
 
@@ -69,6 +95,7 @@ class AuthController(
     }
 
     suspend fun signInIdentifier(identifier: String, password: String, keep: Boolean): Boolean = wrap {
+        beginPrimarySignIn(keep)
         when (val contact = parseContact(identifier)) {
             is AuthContact.Email -> {
                 if (password.isBlank()) error("Ingresá tu contraseña")
@@ -86,6 +113,7 @@ class AuthController(
         password: String,
         barrio: String,
     ): Boolean = wrap {
+        beginPrimarySignIn(true)
         require(name.isNotBlank()) { "Ingresá tu nombre" }
         val titled = titleCasePersonName(name.trim())
         when (val contact = parseContact(identifier)) {
@@ -127,6 +155,7 @@ class AuthController(
     }
 
     suspend fun signInProvider(provider: String): Boolean = wrap {
+        beginPrimarySignIn(true)
         val user = when (provider) {
             "google" -> platform.signInGoogle()
             "apple" -> platform.signInApple()
@@ -145,24 +174,15 @@ class AuthController(
         }
     }
 
-    suspend fun unlockWithBiometric(): Boolean {
+    suspend fun unlockWithBiometric(): Boolean = wrap {
         if (!platform.canUseBiometric()) {
-            error = "Este dispositivo no tiene huella o rostro configurados"
-            return false
+            throw AuthException("Este dispositivo no tiene huella o rostro configurados")
         }
         val user = platform.currentUser()
-        if (user == null) {
-            error = "Primero iniciá sesión para activar el ingreso biométrico"
-            return false
-        }
-        return if (platform.unlockBiometric()) {
-            prefs.biometricEnabled = true
-            finishSession(user, keep = true)
-            true
-        } else {
-            error = "No se pudo validar la biometría"
-            false
-        }
+            ?: throw AuthException("Primero iniciá sesión para activar el ingreso biométrico")
+        if (!platform.unlockBiometric()) throw AuthException("No se pudo validar la biometría")
+        prefs.biometricEnabled = true
+        finishSession(user, keep = true)
     }
 
     /** Borra la fila de OGT y el contenido de esta cuenta, y después cierra la sesión local. */
@@ -239,6 +259,7 @@ class AuthController(
         runCatching { platform.signOut() }
         session.firebaseJwt = null
         pendingPhone = null
+        secondFactorSignIn.clear()
         _signedIn.value = false
         preview.currentUserId = ""
         preview.overlayUser = null
@@ -295,12 +316,9 @@ class AuthController(
     private suspend fun finishSession(user: AuthUser, keep: Boolean = true) {
         prefs.keepSession = keep
         val token = platform.idToken(true) ?: error("No se pudo obtener el token Firebase")
-        session.firebaseJwt = if (allowDevTokens) {
-            "dev.${user.firebaseUid}.USER"
-        } else {
-            token
-        }
-        val profile = api.openSession(session.firebaseJwt ?: token)
+        val bearer = if (allowDevTokens) "dev.${user.firebaseUid}.USER" else token
+        val profile = api.openSession(bearer, user.firebaseUid)
+        session.firebaseJwt = bearer
         attachLocal(user, profile)
         stories.start(preview.currentUserId)
         ensureDevBearer()
@@ -373,6 +391,10 @@ class AuthController(
             true
         } catch (cancel: kotlinx.coroutines.CancellationException) {
             throw cancel
+        } catch (challenge: AuthSecondFactorRequired) {
+            secondFactorSignIn.require(challenge.factors, secondFactorKeepSession)
+            error = null
+            false
         } catch (e: AuthException) {
             error = e.message
             false

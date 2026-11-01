@@ -51,7 +51,7 @@ class OperationsTests(unittest.TestCase):
             for name in names[:4]:
                 subprocess.run([sys.executable,str(root/name),'--help'],capture_output=True,check=True)
             self.assertEqual(set(names),{p.name for p in root.iterdir()})
-    def test_no_external_notification_destination_or_data_mutation_is_in_the_collector(self):
+    def test_collector_preserves_read_only_probes_and_never_uses_unapproved_messaging_channels(self):
         sql=ops.SQL.upper();self.assertIn('BEGIN READ ONLY',sql);self.assertIn('STATEMENT_TIMEOUT',sql)
         for word in ('UPDATE ','DELETE ','INSERT ','TRUNCATE '):self.assertNotIn(word,sql)
         source=(ROOT/'scripts/ogt_operations.py').read_text();self.assertNotIn('hooks.slack',source);self.assertNotIn('sendmail',source)

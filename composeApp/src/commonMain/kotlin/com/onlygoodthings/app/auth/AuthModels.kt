@@ -4,6 +4,14 @@ import com.onlygoodthings.shared.domain.UserProfile
 
 class AuthException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
+/** Only the public choices are shared; the Firebase resolver remains native and in memory. */
+data class AuthSecondFactor(val index: Int, val kind: String, val label: String)
+
+class AuthSecondFactorRequired(val factors: List<AuthSecondFactor>) :
+    Exception("Confirmá el segundo factor para completar el ingreso")
+
+fun validSecondFactorCode(code: String): Boolean = code.length == 6 && code.all { it in '0'..'9' }
+
 data class AuthUser(
     val firebaseUid: String,
     val email: String?,

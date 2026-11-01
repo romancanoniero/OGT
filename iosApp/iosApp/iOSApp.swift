@@ -286,6 +286,82 @@ final class OgtFirebaseHost: NSObject, IosAuthHost, ASAuthorizationControllerDel
     private var appleState: String?
     private var appleDeletionUid: String?
     private var appleWindow: UIWindow?
+    private var factorResolver: MultiFactorResolver?
+    private var selectedFactorIndex: Int?
+    private var factorVerificationId: String?
+    private var factorGeneration = 0
+
+    func cancelSecondFactor() {
+        factorGeneration += 1
+        factorResolver = nil
+        selectedFactorIndex = nil
+        factorVerificationId = nil
+    }
+
+    func pendingSecondFactors() -> [AuthSecondFactor] {
+        guard let resolver = factorResolver else { return [] }
+        return resolver.hints.enumerated().compactMap { index, hint in
+            if hint.factorID == TOTPMultiFactorID {
+                return AuthSecondFactor(index: Int32(index), kind: "totp", label: hint.displayName ?? "Aplicación autenticadora")
+            }
+            if let phone = hint as? PhoneMultiFactorInfo {
+                return AuthSecondFactor(index: Int32(index), kind: "phone", label: "SMS · ••••" + phone.phoneNumber.suffix(4))
+            }
+            return nil
+        }
+    }
+
+    private func captureSecondFactor(_ error: Error) -> Bool {
+        let ns = error as NSError
+        guard ns.code == AuthErrorCode.secondFactorRequired.rawValue,
+              let resolver = ns.userInfo[AuthErrorUserInfoMultiFactorResolverKey] as? MultiFactorResolver else { return false }
+        cancelSecondFactor()
+        factorResolver = resolver
+        return !pendingSecondFactors().isEmpty
+    }
+
+    func beginSecondFactor(index: Int32, onResult: @escaping (String?, String?) -> Void) {
+        guard let resolver = factorResolver, resolver.hints.indices.contains(Int(index)) else {
+            onResult(nil, "La verificación venció. Volvé a ingresar."); return
+        }
+        factorGeneration += 1
+        let generation = factorGeneration
+        selectedFactorIndex = Int(index)
+        factorVerificationId = nil
+        let hint = resolver.hints[Int(index)]
+        if hint.factorID == TOTPMultiFactorID { onResult("totp", nil); return }
+        guard let phone = hint as? PhoneMultiFactorInfo else {
+            onResult(nil, "Ese segundo factor no está disponible en esta app"); return
+        }
+        PhoneAuthProvider.provider().verifyPhoneNumber(with: phone, uiDelegate: nil, multiFactorSession: resolver.session) { [weak self] id, error in
+            guard let self, self.factorGeneration == generation else { return }
+            if let error { onResult(nil, Self.mensaje(error)); return }
+            guard let id else { onResult(nil, "No se pudo enviar el código SMS"); return }
+            self.factorVerificationId = id
+            onResult("phone", nil)
+        }
+    }
+
+    func confirmSecondFactor(code: String, onResult: @escaping (AuthUser?, String?) -> Void) {
+        guard let resolver = factorResolver, let index = selectedFactorIndex,
+              resolver.hints.indices.contains(index) else {
+            onResult(nil, "La verificación venció. Volvé a ingresar."); return
+        }
+        guard code.count == 6, code.allSatisfy({ $0 >= "0" && $0 <= "9" }) else {
+            onResult(nil, "Ingresá los seis dígitos del código"); return
+        }
+        let hint = resolver.hints[index]
+        let assertion: MultiFactorAssertion
+        if hint.factorID == TOTPMultiFactorID {
+            assertion = TOTPMultiFactorGenerator.assertionForSignIn(withEnrollmentID: hint.uid, oneTimePassword: code)
+        } else if hint.factorID == PhoneMultiFactorID, let id = factorVerificationId {
+            let credential = PhoneAuthProvider.provider().credential(withVerificationID: id, verificationCode: code)
+            assertion = PhoneMultiFactorGenerator.assertion(with: credential)
+        } else { onResult(nil, "Solicitá el código SMS nuevamente"); return }
+        resolver.resolveSignIn(with: assertion) { [weak self] result, error in
+            self?.finish(result?.user, error, onResult)
+        }
+    }
 
     func appleSignInButton(onClick: @escaping () -> Void) -> UIView {
         let button = ASAuthorizationAppleIDButton(type: .continue, style: .black)
@@ -380,7 +456,10 @@ final class OgtFirebaseHost: NSObject, IosAuthHost, ASAuthorizationControllerDel
         } else {
             Auth.auth().signIn(with: credential) { [weak self] result, error in
                 guard let self else { return }
-                if let error { self.finishApple(nil, Self.mensaje(error)) }
+                if let error {
+                    let message = self.captureSecondFactor(error) ? "Confirmá el segundo factor para completar el ingreso" : Self.mensaje(error)
+                    self.finishApple(nil, message)
+                }
                 else if let user = result?.user { self.finishApple(user) }
                 else { self.finishApple(nil, "No se pudo autenticar con Apple") }
             }
@@ -404,7 +483,7 @@ final class OgtFirebaseHost: NSObject, IosAuthHost, ASAuthorizationControllerDel
 
     func signInEmail(email: String, password: String, onResult: @escaping (AuthUser?, String?) -> Void) {
         Auth.auth().signIn(withEmail: email, password: password) { result, error in
-            Self.finish(result?.user, error, onResult)
+            self.finish(result?.user, error, onResult)
         }
     }
 
@@ -418,7 +497,7 @@ final class OgtFirebaseHost: NSObject, IosAuthHost, ASAuthorizationControllerDel
             change.displayName = displayName
             change.commitChanges { _ in
                 user.reload { _ in
-                    Self.finish(Auth.auth().currentUser, nil, onResult)
+                    self.finish(Auth.auth().currentUser, nil, onResult)
                 }
             }
         }
@@ -439,7 +518,7 @@ final class OgtFirebaseHost: NSObject, IosAuthHost, ASAuthorizationControllerDel
     func confirmPhone(verificationId: String, code: String, onResult: @escaping (AuthUser?, String?) -> Void) {
         let credential = PhoneAuthProvider.provider().credential(withVerificationID: verificationId, verificationCode: code)
         Auth.auth().signIn(with: credential) { result, error in
-            Self.finish(result?.user, error, onResult)
+            self.finish(result?.user, error, onResult)
         }
     }
 
@@ -468,7 +547,7 @@ final class OgtFirebaseHost: NSObject, IosAuthHost, ASAuthorizationControllerDel
             let accessToken = result?.user.accessToken.tokenString ?? ""
             let credential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: accessToken)
             Auth.auth().signIn(with: credential) { authResult, authError in
-                Self.finish(authResult?.user, authError, onResult)
+                self.finish(authResult?.user, authError, onResult)
             }
         }
     }
@@ -495,11 +574,12 @@ final class OgtFirebaseHost: NSObject, IosAuthHost, ASAuthorizationControllerDel
         GIDSignIn.sharedInstance.signOut()
     }
 
-    private static func finish(_ user: User?, _ error: Error?, _ onResult: (AuthUser?, String?) -> Void) {
+    private func finish(_ user: User?, _ error: Error?, _ onResult: (AuthUser?, String?) -> Void) {
         if let error {
-            onResult(nil, mensaje(error))
+            if captureSecondFactor(error) { onResult(nil, "Confirmá el segundo factor para completar el ingreso") }
+            else { onResult(nil, Self.mensaje(error)) }
         } else if let user {
-            onResult(map(user), nil)
+            onResult(Self.map(user), nil)
         } else {
             onResult(nil, "No se pudo autenticar")
         }
@@ -532,7 +612,7 @@ final class OgtFirebaseHost: NSObject, IosAuthHost, ASAuthorizationControllerDel
         case .emailAlreadyInUse: return "Ese correo ya está registrado"
         case .weakPassword: return "La contraseña es demasiado débil"
         case .tooManyRequests: return "Demasiados intentos. Probá más tarde"
-        case .invalidVerificationCode: return "El código SMS no es válido"
+        case .invalidVerificationCode: return "El código de verificación no es válido"
         case .sessionExpired: return "El código SMS venció. Pedí uno nuevo"
         case .quotaExceeded: return "Se agotó la cuota de SMS de Firebase"
         case .operationNotAllowed: return "Este método de ingreso no está habilitado en Firebase"
