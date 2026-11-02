@@ -24,7 +24,12 @@ class MediaStore(
     fun publicUrl(storedName: String): String =
         publicBase.trimEnd('/') + "/media/u/" + storedName
 
-    fun save(bytes: ByteArray, filename: String, contentType: String?, id: String = UUID.randomUUID().toString()): UploadedMedia {
+    data class MeasuredUpload(val media: UploadedMedia, val receivedBytes: Long, val storedBytes: Long)
+
+    fun save(bytes: ByteArray, filename: String, contentType: String?, id: String = UUID.randomUUID().toString()): UploadedMedia =
+        saveMeasured(bytes,filename,contentType,id).media
+
+    fun saveMeasured(bytes: ByteArray, filename: String, contentType: String?, id: String = UUID.randomUUID().toString()): MeasuredUpload {
         require(bytes.isNotEmpty()) { "El archivo está vacío" }
         require(bytes.size <= MAX_BYTES) { "El archivo supera ${MAX_BYTES / (1024 * 1024)} MB" }
         val declaredExt = extensionOf(filename, contentType)
@@ -40,12 +45,12 @@ class MediaStore(
             Files.write(temporary, optimized.bytes)
             Files.move(temporary, dest)
         } finally { Files.deleteIfExists(temporary) }
-        return UploadedMedia(
+        return MeasuredUpload(UploadedMedia(
             id = id,
             kind = kind,
             url = publicUrl(stored),
             filename = stored,
-        )
+        ),bytes.size.toLong(),Files.size(dest))
     }
 
     fun resolvePublic(name: String): Path? {

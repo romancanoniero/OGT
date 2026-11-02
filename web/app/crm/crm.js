@@ -1,4 +1,4 @@
-import { start } from './crm-runtime.js?v=image-credit-20261029';
+import { start } from './crm-runtime.js?v=media-audit-1';
 
 start().catch(() => {
   document.body.dataset.crmView = 'auth';

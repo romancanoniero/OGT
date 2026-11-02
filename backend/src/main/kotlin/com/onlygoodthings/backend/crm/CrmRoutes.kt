@@ -367,6 +367,15 @@ fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: Realtime
         )))
     }
     val operations=CrmOperations()
+    val auditDashboard=CrmAuditDashboardReader(db,operations)
+    post("/api/v1/crm/platform/audit-summary") {
+        val auth=crmContext(call,db,verifier) ?: return@post
+        if(auth.platformRole !in setOf("OWNER","OPERATIONS")) {
+            return@post call.respond(HttpStatusCode.Forbidden,ApiResponse.fail<Unit>("Solo personal de operaciones autorizado","FORBIDDEN"))
+        }
+        val snapshot=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO){auditDashboard.read()}
+        call.respond(ApiResponse.ok(snapshot))
+    }
     post("/api/v1/crm/platform/operations") {
         val auth=crmContext(call,db,verifier) ?: return@post
         if(auth.platformRole !in setOf("OWNER","OPERATIONS")) {

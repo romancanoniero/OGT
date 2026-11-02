@@ -164,3 +164,30 @@ El ensayo local `qa/scripts/verify_recovery_privacy.py` usa datos sintéticos en
 contenedor etiquetado, con PostgreSQL publicado solo en loopback. Comprueba plan,
 rechazos, baja, contadores, limpieza en cola e idempotencia; compara la base de
 origen antes y después y retira únicamente el contenedor creado para el ensayo.
+
+## Dashboard de auditoría y multimedia (02/11/2026)
+
+El Resumen de Control conserva sus indicadores y agrega un suplemento exclusivo
+para OWNER/OPERATIONS con MFA vigente (`platform/audit-summary`). Consulta altas,
+actividad registrada, publicaciones e historias, resultados de auditoría y últimas
+12 acciones. No devuelve motivos, contactos, direcciones IP, claves ni contenido.
+Los conteos de auditoría corresponden a acciones registradas de Control/Empresas,
+no a todos los intentos HTTP o accesos al servidor.
+
+La migración aditiva 37 registra bytes recibidos y guardados de nuevas subidas
+en la misma transacción que su titularidad/publicación. Un reintento idempotente
+de historia no duplica el registro. Son mediciones anónimas de procesamiento:
+no guardan usuarios, URLs, nombres de archivo ni copias originales. El ratio
+ponderado suma bytes recibidos y los divide por bytes guardados; excluye videos,
+miniaturas y recortes de Control, y no pretende medir la compresión anterior
+realizada por el teléfono. Los archivos históricos quedan sin estimación de
+entrada. Las mediciones se conservan aunque el archivo haya sido eliminado.
+
+El colector recorre únicamente `media/` de OGT, sin seguir enlaces simbólicos
+ni leer imágenes o claves. Reporta tamaño lógico, bloques ocupados (sin duplicar
+enlaces duros), desglose de archivos y capacidad libre del volumen de medios.
+El espacio libre del volumen es compartido con los otros usos que pueda tener.
+La exploración tiene límite de tiempo y cantidad de archivos: una lectura
+incompleta no publica totales parciales como si fueran completos. La supervisión
+previa del disco del servidor permanece sin cambios. Se mantiene la cadencia
+de un minuto, el estado vencido a tres minutos y la protección del cron ajeno.

@@ -1,0 +1,43 @@
+{
+  "date": "2026-11-02",
+  "baseline": "a8a7ad1341171bb8669ca1070e44e761bb215245",
+  "scope": "OGT Control Resumen: aggregate audit, measured image compression and actual multimedia host storage",
+  "preserved": [
+    "Existing platform statistics and their labels",
+    "Other Control lists, forms, moderation actions and bounded scrolling",
+    "Company CRM authorization and finance flows",
+    "Public upload response, image optimizer behavior, story retry semantics and media access rules",
+    "Existing capacity probes, heartbeat recipient, database/media retention and other projects"
+  ],
+  "intentionalDifferences": [
+    "OWNER/OPERATIONS with fresh MFA see the new read-only audit supplement in Resumen; other roles retain existing summary",
+    "Processing measurements are recorded transactionally for new uploads/stories; anonymous, without names, users, URLs or copies of original images",
+    "Ratio is weighted received/stored bytes at the server, excludes videos/posters/Control recrops; no invented retrospective compression or phone-stage claims",
+    "Storage uses a bounded host media inventory, logical bytes, allocated blocks and capacity of that actual volume; symlinks and hidden keys excluded",
+    "Old and incomplete snapshots display their limitations; network errors preserve last reading, authorization failures clear audit data",
+    "CRM search now has the combobox role required by its existing autocomplete ARIA attributes",
+    "Cache versions updated for shared CRM assets"
+  ],
+  "schema": "37_media_processing_metrics.sql (additive; no edits to existing rows)",
+  "verification": {
+    "backendUnit": 75,
+    "isolatedDatabaseIntegration": 3,
+    "apiEndToEndGroups": 6,
+    "dashboardAndOperationsBrowserCases": 16,
+    "browserEngines": [
+      "Chromium",
+      "WebKit"
+    ],
+    "node": 113,
+    "python": 163,
+    "legacyBrowserSuites": "All four existing suites passed; Control UX audit 0 errors, 1 existing SMALL_ACTION_TARGET warning"
+  },
+  "limits": [
+    "Input sizes of older files are unknown; compression starts with newly measured uploads",
+    "Compression totals describe processing, not necessarily files still present",
+    "Free capacity is shared with the other uses of the media volume",
+    "Audit event totals are recorded Control/Empresas actions, not every HTTP access or security event"
+  ],
+  "liveVerification": "Pending private deployment and owner sign-in for visual review",
+  "privateEvidence": "build/crm-dashboard-20261102/ (credentials excluded from Git)"
+}

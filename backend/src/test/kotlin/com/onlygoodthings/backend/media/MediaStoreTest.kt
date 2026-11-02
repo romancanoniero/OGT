@@ -23,6 +23,15 @@ class MediaStoreTest {
         }
         return ByteArrayOutputStream().also { ImageIO.write(image, "png", it) }.toByteArray()
     }
+    @Test fun measuredUploadReportsTheActualReceivedAndStoredBytesWithoutChangingThePublicPayload() {
+        val store=MediaStore(root,"http://localhost")
+        val input=javaClass.getResourceAsStream("/images/rotated.jpg")!!.readBytes()
+        val measured=store.saveMeasured(input,"photo.jpg","image/jpeg")
+        assertEquals(input.size.toLong(),measured.receivedBytes)
+        assertEquals(java.nio.file.Files.size(store.resolvePublic(measured.media.filename)),measured.storedBytes)
+        assertTrue(measured.storedBytes<measured.receivedBytes)
+    }
+
     @Test fun `large image is reduced and remains readable`() {
         val input = picture(3000, 2400)
         val store = store()

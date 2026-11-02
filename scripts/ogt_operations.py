@@ -70,8 +70,8 @@ def probe_application():
 
 
 def probe_authorization():
-    statuses = [http('/api/v1/crm/'+path, b'{}')[0] for path in ('access','platform/summary','company/summary')]
-    return {'ok': statuses==[401,401,401], 'securityViolation':any(200<=s<300 for s in statuses)}
+    statuses = [http('/api/v1/crm/'+path, b'{}')[0] for path in ('access','platform/summary','company/summary','platform/audit-summary')]
+    return {'ok': statuses==[401,401,401,401], 'securityViolation':any(200<=s<300 for s in statuses)}
 
 
 def probe_database():
@@ -116,6 +116,45 @@ def probe_capacity(root):
     available = round(100*mem['MemAvailable']/mem['MemTotal'],1)
     return {'ok': percent<90 and usage.free>=2*1024**3 and available>=5,
             'diskUsedPercent': percent,'diskFreeGiB': round(usage.free/1024**3,2),'memoryAvailablePercent': available}
+
+
+
+def probe_media(root, max_files=250000, seconds=5):
+    # Scan only OGT's actual host media mount; never Docker overlay or other apps.
+    media=root/'media'
+    if media.is_symlink() or not media.is_dir():raise ValueError('Media directory unavailable')
+    deadline=time.monotonic()+seconds
+    counts={key:0 for key in ('files','mediaBytes','allocatedBytes','uploadImageFiles','uploadImageBytes','uploadVideoFiles','uploadVideoBytes','storyFiles','storyBytes','posterFiles','posterBytes','otherFiles','otherBytes')}
+    allocated=set()
+    stack=[media]
+    while stack:
+        if time.monotonic()>deadline: return {'ok':False,'complete':False}
+        with os.scandir(stack.pop()) as entries:
+            for entry in entries:
+                if time.monotonic()>deadline or counts['files']>=max_files:return {'ok':False,'complete':False}
+                if entry.name.startswith('.') or entry.is_symlink():continue
+                if entry.is_dir(follow_symlinks=False):stack.append(Path(entry.path));continue
+                if not entry.is_file(follow_symlinks=False):continue
+                try: info=entry.stat(follow_symlinks=False)
+                except FileNotFoundError: continue  # Concurrent expiry/deletion; retry on next sample.
+                size=info.st_size
+                inode=(info.st_dev,info.st_ino)
+                if inode not in allocated:
+                    counts['allocatedBytes']+=info.st_blocks*512
+                    allocated.add(inode)
+                counts['files']+=1;counts['mediaBytes']+=size
+                relative=Path(entry.path).relative_to(media)
+                ext=Path(entry.name).suffix.lower()
+                if relative.parts[0]=='u' and ext in ('.jpg','.jpeg','.png','.webp'):category='uploadImage'
+                elif relative.parts[0]=='u' and ext in ('.mp4','.webm'):category='uploadVideo'
+                elif relative.parts[0]=='stories-private' and entry.name.endswith('-poster.bin'):category='poster'
+                elif relative.parts[0]=='stories-private' and ext=='.bin':category='story'
+                else:category='other'
+                counts[category+'Files']+=1;counts[category+'Bytes']+=size
+    usage=shutil.disk_usage(media)
+    return {'ok':usage.free>=2*1024**3 and usage.free/usage.total>.1,'complete':True,**counts,
+            'diskTotalBytes':usage.total,'diskFreeBytes':usage.free,
+            'diskUsedPercent':round(100*(usage.total-usage.free)/usage.total,1)}
 
 
 def probe_backups(root):
@@ -182,14 +221,14 @@ def metrics(snapshot):
 def collect(root):
     probes={'containers':probe_containers,'application':probe_application,'authorization':probe_authorization,
             'database':probe_database,'redis':probe_redis,'release':lambda:probe_release(root),
-            'tls':probe_tls,'capacity':lambda:probe_capacity(root),'backups':lambda:probe_backups(root)}
+            'tls':probe_tls,'capacity':lambda:probe_capacity(root),'backups':lambda:probe_backups(root),'media':lambda:probe_media(root)}
     with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
         work={name:pool.submit(safe_probe,probe) for name,probe in probes.items()}
         return {name:future.result() for name,future in work.items()}
 
 
 HEARTBEAT_CODES = frozenset(
-    [name.upper() + '_FAILED' for name in ('containers','application','authorization','database','redis','release','tls','capacity','backups')] +
+    [name.upper() + '_FAILED' for name in ('containers','application','authorization','database','redis','release','tls','capacity','backups','media')] +
     ['PAYMENTSOVERDUE','PAYMENTINCIDENTS','ERASUREOVERDUE','MEDIAOVERDUE','DISK_CAPACITY','MEMORY_CAPACITY']
 )
 

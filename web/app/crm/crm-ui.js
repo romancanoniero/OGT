@@ -170,6 +170,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   suggestBox.hidden = true;
   suggestBox.setAttribute('role', 'listbox');
   suggestBox.setAttribute('aria-label', 'Sugerencias');
+  search.setAttribute('role', 'combobox');
   search.setAttribute('aria-autocomplete', 'list');
   search.setAttribute('aria-expanded', 'false');
   search.setAttribute('aria-controls', 'crm-suggest');
@@ -229,7 +230,8 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   thead.append(headRow);
   const tbody = node('tbody');
   table.append(thead, tbody);
-  tableWrap.append(table);
+  const supplementHost = node('section'); supplementHost.hidden = true;
+  tableWrap.append(supplementHost, table);
   const empty = emptyState();
   empty.box.hidden = true;
   const detail = node('section');
@@ -242,6 +244,7 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
   panel.append(panelTitle, bulkBar, tableWrap, entityWrap, listCount, more, listError, empty.box, detail);
   const custom = node('section'); custom.hidden = true;
   let disposeCustom = null;
+  let supplementedSection = null;
   main.append(header, tools, queryChips, kpis, panel, custom);
   workspace.append(nav, main);
   const dialog = node('dialog');
@@ -1933,9 +1936,13 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
     markCurrent();
   }
   function paint() {
-    disposeCustom?.(); disposeCustom = null;
     const section = sectionOf(current);
-    custom.hidden = true; custom.replaceChildren();
+    const keepSupplement = supplementedSection === current && typeof section?.supplement === 'function';
+    if (!keepSupplement) {
+      disposeCustom?.(); disposeCustom = null; supplementedSection = null;
+      custom.hidden = true; custom.replaceChildren();
+      supplementHost.hidden = true; supplementHost.replaceChildren();
+    }
     panel.hidden = false; tools.hidden = false;
     if (typeof section?.mount === 'function') {
       heading.textContent = section.label; tools.hidden = true; panel.hidden = true;
@@ -2007,6 +2014,11 @@ export function mountWorkspace(root, { title, brand, lede, rows, sections, extra
       empty.detail.textContent = 'No hay registros en esta vista. El total informado es cero.';
       empty.box.hidden = false;
     } else empty.box.hidden = true;
+    if (typeof section?.supplement === 'function' && !keepSupplement) {
+      supplementHost.hidden = false;
+      disposeCustom = section.supplement(supplementHost);
+      supplementedSection = current;
+    }
   }
 
   nav.append(brandBox);

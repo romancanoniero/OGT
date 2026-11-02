@@ -5,6 +5,18 @@ import org.junit.jupiter.api.Assertions.*
 import java.nio.file.Files
 
 class CrmOperationsTest {
+    @Test fun completeMediaInventoryRequiresConsistentTotalsAndRealVolumeCapacity() {
+        val folder=Files.createTempDirectory("ogt-media-snapshot");val path=folder.resolve("status.json")
+        val media="""{"ok":true,"complete":true,"files":0,"mediaBytes":0,"allocatedBytes":0,"uploadImageFiles":0,"uploadImageBytes":0,"uploadVideoFiles":0,"uploadVideoBytes":0,"storyFiles":0,"storyBytes":0,"posterFiles":0,"posterBytes":0,"otherFiles":0,"otherBytes":0,"diskTotalBytes":100,"diskFreeBytes":60,"diskUsedPercent":40}"""
+        fun write(value:String){Files.writeString(path,"""{"schemaVersion":1,"checkedAtEpochSeconds":1000,"status":"healthy","checks":{"media":$value}}""")}
+        try {
+            write(media);assertEquals(0L,CrmOperations(path).read(1000).checks["media"]!!.mediaBytes)
+            write(media.replace("\"mediaBytes\":0","\"mediaBytes\":999"));assertEquals("unavailable",CrmOperations(path).read(1000).status)
+            write(media.replace("\"diskFreeBytes\":60","\"diskFreeBytes\":101"));assertEquals("unavailable",CrmOperations(path).read(1000).status)
+            write("""{"ok":false,"complete":false}""");val partial=CrmOperations(path).read(1000).checks["media"]!!
+            assertFalse(partial.complete!!);assertNull(partial.mediaBytes);assertNull(partial.diskFreeBytes)
+        } finally {Files.deleteIfExists(path);Files.deleteIfExists(folder)}
+    }
     @Test fun validRecentSnapshotStaleSnapshotAndCorruptionHaveDistinctSafeStates() {
         val folder=Files.createTempDirectory("ogt-operations-test");val path=folder.resolve("status.json")
         try {

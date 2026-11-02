@@ -241,11 +241,19 @@ fun Application.module() {
             parkingRoutes(ParkingSqlRepository(db), redis, hub, FootRoutingService.fromEnv(), parkingProximity)
             socialRoutes(SocialSqlRepository(db), hub)
             userBlockRoutes(com.onlygoodthings.backend.community.UserBlocks(db),hub)
-            mediaRoutes(mediaStore) { owner,name ->
-                db.withConnection { c -> c.prepareStatement("INSERT INTO uploaded_media_owners(stored_name,uploader_user_id) VALUES(?,?::uuid)").use { q ->
-                    q.setString(1,name);q.setString(2,owner);q.executeUpdate()
-                } }
-            }
+            mediaRoutes(mediaStore,onMeasuredUpload = { owner,upload ->
+                db.withConnection { c ->
+                    c.autoCommit=false
+                    try {
+                        c.prepareStatement("INSERT INTO uploaded_media_owners(stored_name,uploader_user_id) VALUES(?,?::uuid)").use { q ->
+                            q.setString(1,upload.media.filename);q.setString(2,owner);q.executeUpdate()
+                        }
+                        com.onlygoodthings.backend.media.recordMediaProcessing(c,"UPLOAD",upload.media.kind,upload.receivedBytes,upload.storedBytes)
+                        c.commit()
+                    } catch(error:Exception) { c.rollback();throw error }
+                    finally { c.autoCommit=true }
+                }
+            })
             honorRoutes(honors)
             noticeRoutes(NoticeSqlRepository(db))
             referralRoutes(db)

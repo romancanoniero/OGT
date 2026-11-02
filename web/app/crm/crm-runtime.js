@@ -1,3 +1,4 @@
+import { mountAuditDashboard } from './crm-dashboard.js?v=media-audit-1';
 import { mountOperations } from './crm-operations.js?v=ops-1';
 import { mountTeam, mountTeamInbox } from './crm-team.js?v=team-1';
 import { mountBusiness } from './crm-business.js?v=csr-1';
@@ -139,7 +140,7 @@ export async function start() {
   fields.append(factorLabel, begin, recaptcha, codeLabel, verify, cancel);
   challenge.append(fields); login.insertAdjacentElement('afterend', challenge);
   // El shell viaja en paralelo con Firebase. El ingreso no lo espera para pintar.
-  const workspaceReady = import('./crm-ui.js?v=image-credit-20261029');
+  const workspaceReady = import('./crm-ui.js?v=media-audit-1');
   const [appSdk, sdk] = await Promise.all([
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
     import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),
@@ -579,6 +580,7 @@ export async function start() {
         },
       };
       const sections = (mode === 'control' ? controlSections : empresaSections).filter(section=>!section.operations||['OWNER','OPERATIONS'].includes(permission.platformRole)).map(section =>
+        mode==='control'&&section.id==='resumen'&&['OWNER','OPERATIONS'].includes(permission.platformRole) ? {...section,supplement:container=>mountAuditDashboard(container,{request:(path,data,signal)=>api(path,token,data,signal)})} :
         section.operations ? {...section,mount:container=>mountOperations(container,{request:(path,data,signal)=>api(path,token,data,signal)})} :
         section.team ? {...section,mount:container=>mountTeam(container,{companyId:chosen,actorId:identity.currentUser().uid,request:(path,data,signal)=>api(path,token,data,signal),onAccess:()=>void checkAccess()})} :
         section.registration ? {...section,mount:container=>mountCompanyApplication(container,{actorId:identity.currentUser().uid,request:(path,data,signal)=>api(path,token,data,signal),onAccess:()=>void checkAccess()})} :

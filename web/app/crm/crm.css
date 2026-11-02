@@ -1082,3 +1082,17 @@ body[data-crm-view="pending"] #crm-root { display: none !important; }
 .crm-business-metrics article { background:var(--ogt-canvas,#fff); border:1px solid var(--ogt-hairline,#dce2e5); border-radius:16px; padding:18px; min-width:0; }
 .crm-business-metrics p { font-size:13px; color:var(--ogt-muted,#66717b); margin:0 0 10px; }
 .crm-business-metrics strong { font-size:22px; overflow-wrap:anywhere; }
+
+.crm-audit-dashboard progress { display:block; width:100%; accent-color:var(--ogt-secondary); }
+.crm-audit-dashboard .crm-table { min-width:480px; }
+.crm-audit-dashboard caption { text-align:left; padding:12px 0; color:var(--ogt-muted); }
+.crm-audit-warning { color:var(--ogt-error); font-weight:600; }
+
+.crm-audit-dashboard { margin-top:8px; gap:12px; padding:8px; }
+.crm-audit-dashboard :is(h2,h3,p) { margin:0; }
+.crm-audit-dashboard h3 { margin-top:12px; }
+.crm-audit-dashboard .crm-audit-head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+.crm-audit-head .crm-btn { width:auto; padding:0 16px; }
+.crm-audit-dashboard .crm-audit-priority { grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); }
+.crm-audit-dashboard details p { margin-top:10px; }
+.crm-audit-dashboard summary { cursor:pointer; font-weight:600; }

@@ -90,6 +90,8 @@ class StorySqlRepository(private val db: Database, val media: StoryMediaStore) {
                         listOf(frame?.zoom,frame?.x,frame?.y).forEachIndexed { index,value -> if(value==null) s.setNull(9+index,java.sql.Types.DOUBLE) else s.setDouble(9+index,value) }
                         s.executeUpdate()
                     }
+                    com.onlygoodthings.backend.media.recordMediaProcessing(c,"STORY",valid.kind,bytes.size.toLong(),valid.bytes.size.toLong())
+                    if(poster!=null)com.onlygoodthings.backend.media.recordMediaProcessing(c,"STORY_POSTER",poster.kind,posterBytes!!.size.toLong(),poster.bytes.size.toLong())
                 }
                 c.commit()
             } catch(e:Exception) { c.rollback();if(wrote) media.delete(id);throw e }

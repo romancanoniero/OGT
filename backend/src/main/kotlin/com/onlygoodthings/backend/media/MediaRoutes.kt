@@ -36,7 +36,7 @@ fun Route.publicMediaRoutes(store: MediaStore,available:(String)->Boolean={true}
     }
 }
 
-fun Route.mediaRoutes(store: MediaStore,onUploaded:(String,String)->Unit={_,_->}) {
+fun Route.mediaRoutes(store: MediaStore,onMeasuredUpload:((String,MediaStore.MeasuredUpload)->Unit)?=null,onUploaded:(String,String)->Unit={_,_->}) {
     post("/api/v1/media/upload") {
         val principal=call.principal<AuthPrincipal>() ?: return@post call.respond(
             HttpStatusCode.Unauthorized,
@@ -54,9 +54,13 @@ fun Route.mediaRoutes(store: MediaStore,onUploaded:(String,String)->Unit={_,_->}
             return@post call.respond(HttpStatusCode.BadRequest, ApiResponse.fail<Unit>("bytesBase64 inválido", "BAD_REQUEST"))
         }
         val saved = withContext(Dispatchers.IO) {
-            val uploaded=store.save(bytes, filename, contentType)
-            try { onUploaded(principal.userId,uploaded.filename);uploaded }
-            catch(error:Exception) { store.deleteLocal(uploaded.url);throw error }
+            val uploaded=store.saveMeasured(bytes, filename, contentType)
+            try {
+                if(onMeasuredUpload!=null)onMeasuredUpload(principal.userId,uploaded)
+                else onUploaded(principal.userId,uploaded.media.filename)
+                uploaded.media
+            }
+            catch(error:Exception) { store.deleteLocal(uploaded.media.url);throw error }
         }
         call.respond(ApiResponse.ok(saved, "Archivo listo, como una foto subida"))
     }
