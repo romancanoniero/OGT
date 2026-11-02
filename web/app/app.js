@@ -4153,9 +4153,8 @@ async function renderAjustes() {
       </div>
       <div class="pref-block">
         <h2>Avisos y radar</h2>
-        ${prefSwitch("animalAlertPush", settings.animalAlertPush !== false, "Animales en riesgo", "Alertas push inmediatas")}
-        ${prefSwitch("skillAlertPush", settings.skillAlertPush !== false, "Intercambio de ayuda", "Avisos de una mano por otra")}
-        ${prefSwitch("parkingRadarSounds", settings.parkingRadarSounds !== false, "Sonidos de radar", "Aviso al ceder o pedir un lugar")}
+        <p class="hint">Los avisos push disponibles son las menciones. Las alertas de animales y los pedidos de ayuda se consultan en la app.</p>
+        ${prefSwitch("parkingRadarSounds", settings.parkingRadarSounds !== false, "Sonidos de radar", "Sonido al detectar nuevas plazas en el radar")}
         ${prefSwitch("radarEnabled", settings.radarEnabled !== false, "Radar de estacionamiento", "Detecta plazas solidarias cerca")}
         ${prefSwitch("quietHoursEnabled", settings.quietHoursEnabled !== false, "Silencio nocturno", "Avisos sin sonido entre las 22:00 y las 07:00 en tu zona horaria")}
       </div>
@@ -4211,8 +4210,6 @@ async function renderAjustes() {
         barrio: String(data.get("barrio") || "").trim(),
         language: String(data.get("language") || "es"),
         publicProfileVisible: form.publicProfileVisible.checked,
-        animalAlertPush: form.animalAlertPush.checked,
-        skillAlertPush: form.skillAlertPush.checked,
         parkingRadarSounds: form.parkingRadarSounds.checked,
         radarEnabled: form.radarEnabled.checked,
         quietHoursEnabled: form.quietHoursEnabled.checked,

@@ -304,31 +304,18 @@ fun SettingsScreen(
             }
 
             PrefCategory("Notificaciones")
+            OgtCaption("Los avisos push disponibles son las menciones. Las alertas de animales y los pedidos de ayuda se consultan en la app.")
             PrefGroup {
                 PrefSwitch(
-                    title = "Animales en riesgo",
-                    body = "Alertas push inmediatas",
-                    checked = session.animalAlertPush,
-                    enabled = !settingsBusy,
-                ) { on -> saveSettings { it.copy(animalAlertPush = on) } }
-                PrefDivider()
-                PrefSwitch(
-                    title = "Intercambio de ayuda",
-                    body = "Avisos de una mano por otra",
-                    checked = session.skillAlertPush,
-                    enabled = !settingsBusy,
-                ) { on -> saveSettings { it.copy(skillAlertPush = on) } }
-                PrefDivider()
-                PrefSwitch(
                     title = "Sonidos de radar",
-                    body = "Aviso al ceder o pedir un lugar",
+                    body = "Sonido al detectar nuevas plazas en el radar",
                     checked = session.parkingRadarSounds,
                     enabled = !settingsBusy,
                 ) { on -> saveSettings { it.copy(parkingRadarSounds = on) } }
             }
 
             PrefGroup {
-                PrefSwitch("Silencio nocturno", "De 22:00 a 07:00 en tu zona horaria. Los avisos llegan sin sonido.", session.accountSettings.quietHoursEnabled, enabled = !settingsBusy) { on -> saveSettings { it.copy(quietHoursEnabled=on) } }
+                PrefSwitch("Silencio nocturno", "De 22:00 a 07:00 en tu zona horaria. Los avisos y el radar quedan sin sonido.", session.accountSettings.quietHoursEnabled, enabled = !settingsBusy) { on -> saveSettings { it.copy(quietHoursEnabled=on) } }
             }
             if (settingsBusy) OgtCaption("Guardando…")
             settingsError?.let { Text(it, color=OgtColors.error) }

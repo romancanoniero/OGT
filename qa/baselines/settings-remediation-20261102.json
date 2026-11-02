@@ -19,7 +19,7 @@
     {
       "id": "S02",
       "section": "Preferencias de notificaciones",
-      "resolution": "Category preferences enforced at server delivery and local notification presentation, persisted per account. Recipient-bound Android delivery and logout token removal.",
+      "resolution": "Existing mention push and native radar tone respect saved sound/quiet-hour choices and recipient identity. Animal/help category delivery policy and stored legacy choices are preserved, but unsupported push controls and immediate-delivery promises retired until actual event emitters exist.",
       "state": "implemented_and_local_regression_passed"
     },
     {
@@ -92,9 +92,9 @@
   "verification": {
     "backendUnit": 72,
     "sharedUnit": 150,
-    "androidJvm": 51,
+    "androidJvm": 72,
     "isolatedPostgresIntegration": 2,
-    "androidDevice": 13,
+    "androidDevice": 14,
     "node": 113,
     "python": 161,
     "apiEndToEnd": 7,
@@ -104,7 +104,8 @@
       "WebKit"
     ],
     "accessibilityScreenChecks": 24,
-    "nativeEvidence": "QA-only package on authorized OgtReleaseAcceptance20261029 emulator; server persistence, restart, JSON export, wallet/ranking, exact character-order chat checked"
+    "nativeEvidence": "QA-only package on authorized OgtReleaseAcceptance20261029 emulator; server persistence, restart, JSON export, wallet/ranking, exact character-order chat checked; radar tone policy additionally tested on device, final control UI acceptance tracked in private receipt",
+    "accountCredentialRefresh": "Provider token acquired per account request; switch/logout during renewal rejected in unit regression"
   },
   "intentionalDifferences": [
     "Unsupported carbon and exact-match-location switches replaced/retired; no precise location sharing added",
@@ -112,11 +113,12 @@
     "Messages have server threads plus explicitly identified existing local adoption/sighting conversations",
     "Real server wallet/ranking, export as private JSON file, accurate app version",
     "Camera permission separated from system picker; unused broad Android photo permissions removed",
-    "Fixed fictional tree/garden counter on the adjacent login screen replaced by a plain community invitation."
+    "Fixed fictional tree/garden counter on the adjacent login screen replaced by a plain community invitation.",
+    "Animal/help push switches retired because no event emitter exists; no new mass-push source added. Existing animal/help content and stored preferences preserved. Native radar tone now obeys sound and quiet-hour choices."
   ],
   "distributionCandidates": {
-    "ios": "1.0 (14), distribution IPA signature verified",
-    "android": "1.0 (15), APK/AAB signatures verified"
+    "ios": "1.0 (14), exact signed distribution receipt recorded privately after final build",
+    "android": "1.0 (15), exact signed distribution receipt recorded privately after final build"
   },
   "acceptanceLimits": [
     "Physical APNs/FCM delivery and OS permission-return behavior need final distributed-package acceptance on iPhone/Android. Policy, owner checks and payload paths tested locally.",

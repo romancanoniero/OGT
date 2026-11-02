@@ -1107,3 +1107,16 @@ y referencias URL a los medios, no las contraseñas ni archivos de otras cuentas
 Las pruebas de política de notificaciones no sustituyen una entrega física
 APNs/FCM en los paquetes distribuidos por las tiendas. La aceptación final
 en dispositivos y el ingreso/baja con un Apple ID de pruebas siguen separados.
+
+Revisión final de emisores: el backend actual envía push de menciones, no de
+animales ni de ayuda. Se conservan los campos privados y su política de entrega
+para compatibilidad, pero se retiran esos dos interruptores y la promesa de
+«push inmediato». No se agregan emisores masivos como efecto secundario. El tono
+independiente del radar sí existe y ahora pasa por la misma política de sonido,
+cuenta y silencio nocturno antes de reproducirse.
+
+Los nuevos accesos de cuenta (ajustes, billetera, exportación y mensajes) piden
+el token vigente a Firebase antes de cada solicitud. Se conserva su caché
+normal y se rechaza una renovación que termina después de cambiar de cuenta
+o cerrar sesión. La baja de un token de notificaciones usa expresamente la
+credencial capturada del titular anterior y no la de la cuenta nueva.

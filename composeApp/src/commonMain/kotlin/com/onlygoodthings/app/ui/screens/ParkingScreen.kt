@@ -139,7 +139,11 @@ fun ParkingScreen(
         history = repo.history()
         val next = if (seeking && session.radarEnabled && here != null) repo.nearby(here, radius) else emptyList()
         val fresh = next.map { it.id }.toSet() - knownNearbyIds
-        if (knownNearbyIds.isNotEmpty() && fresh.isNotEmpty()) {
+        if (knownNearbyIds.isNotEmpty() && fresh.isNotEmpty() &&
+            com.onlygoodthings.app.notify.currentNoticePresentation(
+                com.onlygoodthings.shared.data.local.LocalNotification("radar-tone", "PARKING", "", "", "", false, recipientUserId=me.id)
+            )?.sound == true
+        ) {
             playParkingFoundSound()
         }
         knownNearbyIds = next.map { it.id }.toSet()

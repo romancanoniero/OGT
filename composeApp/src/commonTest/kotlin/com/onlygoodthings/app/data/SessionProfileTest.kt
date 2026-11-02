@@ -15,6 +15,21 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SessionProfileTest {
+    @Test fun radarToneUsesSavedSoundChoiceAndVerifiedAccount() {
+        val prefs=com.onlygoodthings.app.auth.AuthPrefs()
+        val owner=prefs.noticeOwnerId;val saved=prefs.noticeSettingsJson
+        try {
+            val tone=com.onlygoodthings.shared.data.local.LocalNotification("tone","PARKING","","","",false,recipientUserId="A")
+            prefs.noticeOwnerId="A"
+            prefs.noticeSettingsJson="{\"parkingRadarSounds\":false,\"quietHoursEnabled\":false}"
+            assertFalse(com.onlygoodthings.app.notify.currentNoticePresentation(tone)!!.sound)
+            prefs.noticeSettingsJson="{\"parkingRadarSounds\":true,\"quietHoursEnabled\":false}"
+            assertTrue(com.onlygoodthings.app.notify.currentNoticePresentation(tone)!!.sound)
+            prefs.noticeOwnerId="B"
+            assertNull(com.onlygoodthings.app.notify.currentNoticePresentation(tone))
+        } finally { prefs.noticeOwnerId=owner;prefs.noticeSettingsJson=saved }
+    }
+
     @Test fun noticesCannotCrossAccountsOrAppearAfterLogout() {
         val prefs=com.onlygoodthings.app.auth.AuthPrefs()
         val owner=prefs.noticeOwnerId;val saved=prefs.noticeSettingsJson

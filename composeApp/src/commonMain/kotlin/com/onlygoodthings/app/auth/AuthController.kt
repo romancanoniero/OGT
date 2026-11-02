@@ -28,7 +28,14 @@ class AuthController(
     private val platform = AuthPlatform()
     private val prefs = AuthPrefs()
     init { prefs.noticeOwnerId = "" }
-    val account = AuthSessionApi(session)
+    val account = AuthSessionApi(session) {
+        ownerScopedAccountToken({ preview.overlayUser?.firebaseUid.orEmpty() }) { uid ->
+            if (allowDevTokens) session.firebaseJwt else {
+                check(platform.currentUser()?.firebaseUid == uid) { "La sesión cambió" }
+                platform.idToken(false)
+            }
+        }.also { session.firebaseJwt = it }
+    }
     private val api = account
     private val settingsMutex = kotlinx.coroutines.sync.Mutex()
     private val accountWorkScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob()+kotlinx.coroutines.Dispatchers.Default)

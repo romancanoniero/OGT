@@ -14,11 +14,11 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 
 /** Abre sesión de plataforma con el JWT de Firebase. */
-class AuthSessionApi(private val session: SessionStore) {
+class AuthSessionApi(private val session: SessionStore, private val tokenProvider: suspend () -> String? = { session.firebaseJwt }) {
     private val client = createPlatformHttpClient()
 
-    private suspend inline fun <reified T> accountPost(path: String, body: kotlinx.serialization.json.JsonObject = buildJsonObject {}, bearer: String? = session.firebaseJwt): T {
-        val token = bearer ?: error("Iniciá sesión para continuar")
+    private suspend inline fun <reified T> accountPost(path: String, body: kotlinx.serialization.json.JsonObject = buildJsonObject {}, bearer: String? = null): T {
+        val token = bearer ?: tokenProvider() ?: error("Iniciá sesión para continuar")
         val response: ApiResponse<T> = client.post("${session.apiBaseUrl}$path") {
             contentType(ContentType.Application.Json)
             header("Authorization", "Bearer $token")

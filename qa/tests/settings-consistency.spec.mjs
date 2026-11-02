@@ -12,20 +12,21 @@ test('settings preserve actual account choices across reload and a failed save n
  await page.goto('/#/ajustes');await expect(page.locator('#profile-form')).toBeVisible();
  await expect(page.getByText('Ahorro de huella',{exact:true})).toHaveCount(0);
  await expect(page.getByText('Ubicación exacta en matches',{exact:true})).toHaveCount(0);
+ await expect(page.locator('input[name=animalAlertPush],input[name=skillAlertPush]')).toHaveCount(0);
  await page.locator('input[name=publicProfileVisible]').uncheck();
- await page.locator('input[name=animalAlertPush]').uncheck();
+ await page.locator('input[name=parkingRadarSounds]').uncheck();
  await page.locator('input[name=quietHoursEnabled]').uncheck();
  await page.locator('#save-profile').click();await expect(page.locator('#profile-ok')).toBeVisible();
  await page.reload();await expect(page.locator('#profile-form')).toBeVisible();
- for(const key of ['publicProfileVisible','animalAlertPush','quietHoursEnabled'])await expect(page.locator(`input[name=${key}]`)).not.toBeChecked();
+ for(const key of ['publicProfileVisible','parkingRadarSounds','quietHoursEnabled'])await expect(page.locator(`input[name=${key}]`)).not.toBeChecked();
  await page.screenshot({path:info.outputPath('settings-persisted.png'),fullPage:true});
  await context.route('**/api/v1/users/profile/update',r=>r.abort());
- await page.locator('input[name=animalAlertPush]').check();
+ await page.locator('input[name=parkingRadarSounds]').check();
  await page.locator('#save-profile').click();
  await expect(page.locator('#save-profile')).toBeEnabled();
  await expect(page.locator('#profile-ok')).toBeHidden();await expect(page.locator('#toast')).toBeVisible();
  await context.unroute('**/api/v1/users/profile/update');
- await page.reload();await expect(page.locator('input[name=animalAlertPush]')).not.toBeChecked();
+ await page.reload();await expect(page.locator('input[name=parkingRadarSounds]')).not.toBeChecked();
  // A late private-settings read must not replace the screen reached meanwhile.
  let releaseRead;
  const waiting = new Promise(resolve => { releaseRead = resolve; });
