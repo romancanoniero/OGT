@@ -4105,7 +4105,7 @@ async function renderAjustes() {
   const settingsOwner = me.userId;
   const isCurrentSettings = () => me.userId === settingsOwner && location.hash.split("?")[0] === "#/ajustes";
   if (!isCurrentSettings()) return;
-  main.innerHTML = `<p class="empty">Cargando tus ajustes…</p>`;
+  main.innerHTML = `<div class="chrome"><a href="#/perfil">Perfil</a><h1>Configuración</h1></div><p class="empty" role="status">Cargando tus ajustes…</p>`;
   let settings;
   try {
     settings = { ...defaultSettings(), ...await api("/api/v1/me/settings", {}) };
