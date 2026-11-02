@@ -13,6 +13,11 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
 
 fun Route.noticeRoutes(repository: NoticeSqlRepository) {
+    post("/api/v1/notifications/unregister") {
+        val principal=call.principal<AuthPrincipal>() ?: return@post call.respond(HttpStatusCode.Unauthorized,ApiResponse.fail<Unit>("Token requerido","UNAUTHENTICATED"))
+        repository.unregister(principal.userId,JsonBody.receiveMap(call).reqString("token"))
+        call.respond(ApiResponse.ok("ok"))
+    }
     post("/api/v1/notifications/register") {
         val principal = call.principal<AuthPrincipal>() ?: return@post call.respond(
             HttpStatusCode.Unauthorized,

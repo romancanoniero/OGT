@@ -45,7 +45,7 @@ fun PermissionsScreen(
                 PrefDivider()
                 PrefLine(
                     title = "Notificaciones",
-                    body = "Plazas, matches y menciones. De 22 a 7 se silencia solo. Si las negaste, tocá de nuevo.",
+                    body = "Avisos de la comunidad. Podés configurar el silencio de 22 a 7 en Ajustes. Si las negaste, tocá de nuevo.",
                     trailing = if (notificationsGranted) "Activo" else "Pedir",
                     onClick = onRetryNotify,
                 )
@@ -57,8 +57,8 @@ fun PermissionsScreen(
                 )
                 PrefDivider()
                 PrefLine(
-                    title = "Cámara y fotos",
-                    body = "Para publicar un recuerdo o un reporte. Se limpian los EXIF sensibles.",
+                    title = "Cámara y selector de fotos",
+                    body = "La cámara se autoriza al usarla. Las fotos y videos existentes se eligen con el selector del sistema, sin dar acceso a toda la biblioteca.",
                     trailing = "Para aportar",
                 )
             }

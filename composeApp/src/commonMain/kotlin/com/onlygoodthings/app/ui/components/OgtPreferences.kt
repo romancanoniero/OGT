@@ -70,12 +70,13 @@ fun PrefSwitch(
     title: String,
     body: String? = null,
     checked: Boolean,
+    enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) }
+            .clickable(enabled = enabled) { onCheckedChange(!checked) }
             .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -84,7 +85,7 @@ fun PrefSwitch(
             Text(title, color = OgtColors.ink, fontSize = 16.sp, fontWeight = FontWeight.Medium)
             if (!body.isNullOrBlank()) OgtCaption(body)
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange, colors = ogtSwitchColors())
+        Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled, colors = ogtSwitchColors())
     }
 }
 

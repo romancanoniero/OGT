@@ -17,6 +17,7 @@ import com.onlygoodthings.shared.domain.UserRole
 import com.onlygoodthings.shared.domain.titleCasePersonName
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 
 class AuthController(
     private val db: OgtLocalDatabase,
@@ -26,7 +27,32 @@ class AuthController(
 ) {
     private val platform = AuthPlatform()
     private val prefs = AuthPrefs()
-    private val api = AuthSessionApi(session)
+    init { prefs.noticeOwnerId = "" }
+    val account = AuthSessionApi(session)
+    private val api = account
+    private val settingsMutex = kotlinx.coroutines.sync.Mutex()
+    private val accountWorkScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob()+kotlinx.coroutines.Dispatchers.Default)
+
+    suspend fun refreshSettings() {
+        val owner=preview.currentUserId
+        val settings=api.settings()
+        check(owner.isNotBlank() && preview.currentUserId==owner) { "La sesión cambió" }
+        preview.applyAccountSettings(settings)
+    }
+
+    suspend fun updateSettings(owner: String, change: (com.onlygoodthings.shared.domain.AccountSettings) -> com.onlygoodthings.shared.domain.AccountSettings) {
+        settingsMutex.lock()
+        try {
+            check(owner.isNotBlank() && preview.currentUserId == owner) { "La sesión cambió" }
+            val json = kotlinx.serialization.json.Json { encodeDefaults = true }
+            val before = json.encodeToJsonElement(com.onlygoodthings.shared.domain.AccountSettings.serializer(), preview.accountSettings) as kotlinx.serialization.json.JsonObject
+            val next = change(preview.accountSettings).copy(timeZone = kotlinx.datetime.TimeZone.currentSystemDefault().id)
+            val after = json.encodeToJsonElement(com.onlygoodthings.shared.domain.AccountSettings.serializer(), next) as kotlinx.serialization.json.JsonObject
+            val saved = api.saveSettings(kotlinx.serialization.json.JsonObject(after.filter { (key, value) -> before[key] != value }))
+            check(preview.currentUserId == owner) { "La sesión cambió" }
+            preview.applyAccountSettings(saved)
+        } finally { settingsMutex.unlock() }
+    }
     val stories = com.onlygoodthings.app.data.StoriesController(session,prefs) { platform.idToken(false) }
     val honor = RestHonorRepository(createPlatformHttpClient(), session)
     val notices = RestNoticeRepository(createPlatformHttpClient(), session)
@@ -205,6 +231,7 @@ class AuthController(
         platform.prepareAccountDeletion()
         platform.idToken(true)?.let { session.firebaseJwt = it }
         api.deleteAccount()
+        preview.deleteCurrentSettingsAccount()
         preview.deleteCurrentParkingAccount()
         signOut()
     }
@@ -256,6 +283,10 @@ class AuthController(
     }
 
     suspend fun signOut() {
+        prefs.noticeOwnerId = ""
+        com.onlygoodthings.app.notify.clearSystemNotices()
+        val previousToken=com.onlygoodthings.app.notify.currentPushToken()
+        val previousBearer=session.firebaseJwt
         stories.clear()
         runCatching { platform.signOut() }
         session.firebaseJwt = null
@@ -263,9 +294,17 @@ class AuthController(
         secondFactorSignIn.clear()
         _signedIn.value = false
         preview.switchParkingAccount("")
+        preview.switchSettingsAccount("")
         preview.currentUserId = ""
         preview.overlayUser = null
         ensureDevBearer()
+        if(previousToken!=null && previousBearer!=null)accountWorkScope.launch {
+            kotlinx.coroutines.withTimeoutOrNull(3000) {
+                try { api.unregisterNoticeToken(previousToken,previousBearer) }
+                catch(cancel:kotlinx.coroutines.CancellationException) { throw cancel }
+                catch(_:Exception) { /* Best effort offline; a new registration also reassigns this token. */ }
+            }
+        }
     }
 
     /** Token de lab cuando todavía no hay JWT Firebase, para grabar fichas en el backend local. */
@@ -322,6 +361,9 @@ class AuthController(
         val profile = api.openSession(bearer, user.firebaseUid)
         session.firebaseJwt = bearer
         attachLocal(user, profile)
+        refreshSettings()
+        val zone=kotlinx.datetime.TimeZone.currentSystemDefault().id
+        if(preview.accountSettings.timeZone!=zone)preview.applyAccountSettings(api.saveSettings(kotlinx.serialization.json.buildJsonObject { put("timeZone",kotlinx.serialization.json.JsonPrimitive(zone)) }))
         stories.start(preview.currentUserId)
         ensureDevBearer()
         _signedIn.value = true
@@ -340,6 +382,9 @@ class AuthController(
             email = user.email ?: existing.email,
             phoneE164 = user.phone ?: existing.phoneE164,
             photoUrl = profile?.photoUrl ?: user.photoUrl ?: existing.photoUrl,
+            communityPoints = profile?.communityPoints ?: existing.communityPoints,
+            role = profile?.role ?: existing.role,
+            levelLabel = com.onlygoodthings.shared.domain.communityLevelLabel(profile?.communityPoints ?: existing.communityPoints),
         ) ?: LocalUser(
             id = profile?.id ?: user.firebaseUid,
             firebaseUid = user.firebaseUid,
@@ -351,7 +396,7 @@ class AuthController(
             communityPoints = profile?.communityPoints ?: 0,
             inviteCode = profile?.inviteCode ?: (user.firebaseUid.take(8).uppercase() + "-GOOD"),
             barrio = "Tu comunidad",
-            levelLabel = "Comunidad nueva",
+            levelLabel = com.onlygoodthings.shared.domain.communityLevelLabel(profile?.communityPoints ?: 0),
             honorTag = "Red GoodThings",
             latitude = -34.588,
             longitude = -58.430,
@@ -361,6 +406,7 @@ class AuthController(
             if (idx >= 0) db.users[idx] = local
         }
         preview.switchParkingAccount(user.firebaseUid)
+        preview.switchSettingsAccount(user.firebaseUid)
         preview.currentUserId = local.id
         preview.overlayUser = local
         db.claimPublishedAnimals(

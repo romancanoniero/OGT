@@ -15,6 +15,48 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SessionProfileTest {
+    @Test fun noticesCannotCrossAccountsOrAppearAfterLogout() {
+        val prefs=com.onlygoodthings.app.auth.AuthPrefs()
+        val owner=prefs.noticeOwnerId;val saved=prefs.noticeSettingsJson
+        try {
+            prefs.noticeOwnerId="A"
+            prefs.noticeSettingsJson="{}"
+            val notice=com.onlygoodthings.shared.data.local.LocalNotification("qa","ALERT","Aviso","Mensaje de prueba","Ahora",false,recipientUserId="B",serverDelivered=true,serverSound=false)
+            assertNull(com.onlygoodthings.app.notify.currentNoticePresentation(notice))
+            val own=notice.copy(recipientUserId="A")
+            assertFalse(com.onlygoodthings.app.notify.currentNoticePresentation(own)!!.sound)
+            prefs.noticeOwnerId=""
+            assertNull(com.onlygoodthings.app.notify.currentNoticePresentation(own))
+        } finally { prefs.noticeOwnerId=owner;prefs.noticeSettingsJson=saved }
+    }
+
+    @Test fun settingsRestorePerOwnerAndSwitchingDisablesThePreviousNotificationIdentity() {
+        val prefs=com.onlygoodthings.app.auth.AuthPrefs()
+        val saved=prefs.settingsAccountsJson
+        val owner=prefs.noticeOwnerId
+        val noticeSettings=prefs.noticeSettingsJson
+        try {
+            prefs.settingsAccountsJson=""
+            val session=OgtPreviewSession(OgtLocalDatabase(),prefs=prefs)
+            session.switchSettingsAccount("firebase-A");session.currentUserId="server-A"
+            session.applyAccountSettings(com.onlygoodthings.shared.domain.AccountSettings(publicProfileVisible=false,radarEnabled=false))
+            assertEquals("server-A",prefs.noticeOwnerId)
+            session.switchSettingsAccount("firebase-B");session.currentUserId="server-B"
+            assertEquals("",prefs.noticeOwnerId)
+            assertTrue(session.publicProfileVisible);assertTrue(session.radarEnabled)
+            session.applyAccountSettings(com.onlygoodthings.shared.domain.AccountSettings(skillAlertPush=false))
+            val restarted=OgtPreviewSession(OgtLocalDatabase(),prefs=prefs)
+            restarted.switchSettingsAccount("firebase-A")
+            assertFalse(restarted.publicProfileVisible);assertFalse(restarted.radarEnabled)
+            restarted.deleteCurrentSettingsAccount()
+            assertEquals("",prefs.noticeOwnerId)
+            restarted.switchSettingsAccount("firebase-B")
+            assertFalse(restarted.skillAlertPush)
+        } finally {
+            prefs.settingsAccountsJson=saved;prefs.noticeOwnerId=owner;prefs.noticeSettingsJson=noticeSettings
+        }
+    }
+
     @Test
     fun switchingAccountsRestoresOnlyTheirOwnParkingAndClearsTransientPrompts() {
         val prefs = com.onlygoodthings.app.auth.AuthPrefs()

@@ -152,6 +152,15 @@ actual class AuthPrefs actual constructor() {
     actual var parkingAccountsJson: String
         get() = defaults.stringForKey("ogt.parking.accounts").orEmpty()
         set(value) { defaults.setObject(value, forKey = "ogt.parking.accounts"); defaults.synchronize() }
+    actual var settingsAccountsJson: String
+        get() = defaults.stringForKey("ogt.settings.accounts").orEmpty()
+        set(value) { defaults.setObject(value, forKey = "ogt.settings.accounts") }
+    actual var noticeOwnerId: String
+        get() = defaults.stringForKey("ogt.notice.owner").orEmpty()
+        set(value) { defaults.setObject(value, forKey = "ogt.notice.owner") }
+    actual var noticeSettingsJson: String
+        get() = defaults.stringForKey("ogt.notice.settings").orEmpty()
+        set(value) { defaults.setObject(value, forKey = "ogt.notice.settings") }
     actual var selectedVehicleId: String
         get() = defaults.stringForKey("ogt.car.sel").orEmpty()
         set(value) { defaults.setObject(value, forKey = "ogt.car.sel") }
@@ -191,3 +200,8 @@ actual fun defaultApiBaseUrl(): String =
     if (platform.Foundation.NSBundle.mainBundle.bundleIdentifier == "com.onlygoodthings.app.qa" &&
         platform.Foundation.NSProcessInfo.processInfo.environment["OGT_QA_MODE"] == "1") "http://127.0.0.1:19083"
     else OGT_DEFAULT_API_BASE
+
+actual fun appVersionLabel(): String {
+    val bundle = platform.Foundation.NSBundle.mainBundle
+    return "${bundle.objectForInfoDictionaryKey("CFBundleShortVersionString") ?: ""} (${bundle.objectForInfoDictionaryKey("CFBundleVersion") ?: ""})"
+}

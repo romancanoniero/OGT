@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "auditedAt": "2026-10-29",
+  "auditedAt": "2026-11-02",
   "sourceBaseline": "0bdad48f22fb7b82936f02ef8379f6d16866461b",
   "appScope": "Native community clients; company-only website fields documented separately",
   "tracking": false,
@@ -210,7 +210,9 @@
     "otherData": "IP addresses and service/security request metadata.",
     "businessOnly": "Fiscal identifiers, balances and Mercado Pago transaction metadata are in the separate website, not requested in native community flows.",
     "retention": "Owner selected 30 days for automatic backups. Complete recent verified copy required before expiry; legacy/manual/unknown copies are preserved. External destination DEV_MAC is provisional and depends on the Mac being available.",
-    "publication": "Prepared inventory; final owner review and store publication separate."
+    "publication": "Prepared inventory; final owner review and store publication separate.",
+    "accountPreferences": "Privacy/notification/radar choices and device time zone are stored per account. Time zone is used for quiet hours, not to infer a precise location.",
+    "photoAccess": "Native clients use the system photo/video picker. Broad Android READ_MEDIA_IMAGES and READ_EXTERNAL_STORAGE declarations have been removed; camera permission is requested separately."
   },
   "primaryReferences": [
     "https://developer.apple.com/app-store/app-privacy-details/",

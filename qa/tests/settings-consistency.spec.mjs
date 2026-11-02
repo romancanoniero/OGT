@@ -1,0 +1,43 @@
+import {test,expect} from '@playwright/test';
+test.skip(process.env.OGT_FULL_E2E!=='1','Requires isolated local QA services and synthetic identities.');
+test('settings preserve actual account choices across reload and a failed save never reports success',async({page,context},info)=>{
+ await context.route('**/*',r=>['localhost','127.0.0.1'].includes(new URL(r.request().url()).hostname)?r.continue():r.abort());
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('/#/registro');
+ await page.getByLabel('Nombre y apellido').fill('Persona Ajustes Web');
+ await page.getByLabel('Correo electrónico').fill(`qa-settings-ui-${Date.now()}@example.test`);
+ await page.getByLabel('Contraseña',{exact:true}).fill('OnlyGoodThings-QA-2468');
+ await page.getByRole('button',{name:'Crear cuenta',exact:true}).click();
+ await expect(page).toHaveURL(/#\/inicio/);
+ await page.goto('/#/ajustes');await expect(page.locator('#profile-form')).toBeVisible();
+ await expect(page.getByText('Ahorro de huella',{exact:true})).toHaveCount(0);
+ await expect(page.getByText('Ubicación exacta en matches',{exact:true})).toHaveCount(0);
+ await page.locator('input[name=publicProfileVisible]').uncheck();
+ await page.locator('input[name=animalAlertPush]').uncheck();
+ await page.locator('input[name=quietHoursEnabled]').uncheck();
+ await page.locator('#save-profile').click();await expect(page.locator('#profile-ok')).toBeVisible();
+ await page.reload();await expect(page.locator('#profile-form')).toBeVisible();
+ for(const key of ['publicProfileVisible','animalAlertPush','quietHoursEnabled'])await expect(page.locator(`input[name=${key}]`)).not.toBeChecked();
+ await page.screenshot({path:info.outputPath('settings-persisted.png'),fullPage:true});
+ await context.route('**/api/v1/users/profile/update',r=>r.abort());
+ await page.locator('input[name=animalAlertPush]').check();
+ await page.locator('#save-profile').click();
+ await expect(page.locator('#save-profile')).toBeEnabled();
+ await expect(page.locator('#profile-ok')).toBeHidden();await expect(page.locator('#toast')).toBeVisible();
+ await context.unroute('**/api/v1/users/profile/update');
+ await page.reload();await expect(page.locator('input[name=animalAlertPush]')).not.toBeChecked();
+ // A late private-settings read must not replace the screen reached meanwhile.
+ let releaseRead;
+ const waiting = new Promise(resolve => { releaseRead = resolve; });
+ let readStarted;
+ const started = new Promise(resolve => { readStarted = resolve; });
+ await context.route('**/api/v1/me/settings',async route=>{
+   const response=await route.fetch();readStarted();await waiting;await route.fulfill({response});
+ });
+ await page.goto('/#/inicio');
+ await page.goto('/#/ajustes');await started;
+ await page.goto('/#/inicio');releaseRead();
+ await expect(page.locator('#profile-form')).toHaveCount(0);
+ await context.unroute('**/api/v1/me/settings');
+ expect(errors).toEqual([]);
+});

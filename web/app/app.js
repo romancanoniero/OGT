@@ -4085,6 +4085,7 @@ function defaultSettings() {
     parkingRadarSounds: true,
     radarEnabled: true,
     carbonSaveMode: false,
+    quietHoursEnabled: true,
   };
 }
 
@@ -4100,8 +4101,22 @@ async function renderAjustes() {
   if (!me.settings) {
     await reloadSession();
   }
-  const settings = { ...defaultSettings(), ...(me.settings || {}) };
   const main = document.getElementById("main");
+  const settingsOwner = me.userId;
+  const isCurrentSettings = () => me.userId === settingsOwner && location.hash.split("?")[0] === "#/ajustes";
+  if (!isCurrentSettings()) return;
+  main.innerHTML = `<p class="empty">Cargando tus ajustes…</p>`;
+  let settings;
+  try {
+    settings = { ...defaultSettings(), ...await api("/api/v1/me/settings", {}) };
+    if (!isCurrentSettings()) return;
+    me.settings = settings;
+  } catch (_) {
+    if (!isCurrentSettings()) return;
+    main.innerHTML = `<div class="chrome"><a href="#/perfil">Perfil</a><h1>Configuración</h1></div><p class="err" role="alert">No se pudieron cargar tus ajustes. Revisá la conexión y volvé a intentarlo.</p><button type="button" id="retry-settings">Reintentar</button>`;
+    document.getElementById("retry-settings")?.addEventListener("click", () => renderAjustes());
+    return;
+  }
   main.innerHTML = `<div class="chrome"><a href="#/perfil">Perfil</a><h1>Configuración</h1></div>
     <p class="hint"><a href="#/acceso">Acceso privado</a></p>
     <form class="profile-edit" id="profile-form">
@@ -4133,8 +4148,8 @@ async function renderAjustes() {
       <div class="pref-block">
         <h2>Privacidad</h2>
         <p class="hint">Las mismas opciones que en la app.</p>
-        ${prefSwitch("publicProfileVisible", settings.publicProfileVisible !== false, "Perfil visible", "Permite validar donaciones comunitarias")}
-        ${prefSwitch("showExactMatchLocation", settings.showExactMatchLocation === true, "Ubicación exacta en matches", "Si está apagado, solo se ve la distancia")}
+        ${prefSwitch("publicProfileVisible", settings.publicProfileVisible !== false, "Perfil e historias visibles", "Si lo apagás, solo tus seguidores pueden abrir tu perfil e historias. Tus publicaciones siguen visibles en el feed.")}
+        <p class="hint">Los hilos de ayuda no muestran tu ubicación exacta. El GPS de estacionamiento se controla por separado.</p>
       </div>
       <div class="pref-block">
         <h2>Avisos y radar</h2>
@@ -4142,7 +4157,7 @@ async function renderAjustes() {
         ${prefSwitch("skillAlertPush", settings.skillAlertPush !== false, "Intercambio de ayuda", "Avisos de una mano por otra")}
         ${prefSwitch("parkingRadarSounds", settings.parkingRadarSounds !== false, "Sonidos de radar", "Aviso al ceder o pedir un lugar")}
         ${prefSwitch("radarEnabled", settings.radarEnabled !== false, "Radar de estacionamiento", "Detecta plazas solidarias cerca")}
-        ${prefSwitch("carbonSaveMode", settings.carbonSaveMode === true, "Ahorro de huella", "Agrupa trayectos y avisos eco")}
+        ${prefSwitch("quietHoursEnabled", settings.quietHoursEnabled !== false, "Silencio nocturno", "Avisos sin sonido entre las 22:00 y las 07:00 en tu zona horaria")}
       </div>
       <button type="submit" class="publish-cta" id="save-profile">Guardar</button>
       <p class="save-ok" id="profile-ok" hidden>Perfil actualizado</p>
@@ -4196,15 +4211,17 @@ async function renderAjustes() {
         barrio: String(data.get("barrio") || "").trim(),
         language: String(data.get("language") || "es"),
         publicProfileVisible: form.publicProfileVisible.checked,
-        showExactMatchLocation: form.showExactMatchLocation.checked,
         animalAlertPush: form.animalAlertPush.checked,
         skillAlertPush: form.skillAlertPush.checked,
         parkingRadarSounds: form.parkingRadarSounds.checked,
         radarEnabled: form.radarEnabled.checked,
-        carbonSaveMode: form.carbonSaveMode.checked,
+        quietHoursEnabled: form.quietHoursEnabled.checked,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       };
       if (photoUrl) payload.photoUrl = photoUrl;
+      if (me.userId !== settingsOwner) throw new Error("La sesión cambió. Volvé a abrir tus ajustes.");
       const card = await api("/api/v1/users/profile/update", payload);
+      if (!isCurrentSettings()) return;
       applyProfileLive({
         id: (card && card.userId) || me.userId,
         displayName: (card && card.displayName) || payload.displayName,

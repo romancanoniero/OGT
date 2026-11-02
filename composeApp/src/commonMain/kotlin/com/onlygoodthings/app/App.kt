@@ -145,7 +145,7 @@ fun App() {
         }
         var gpsAwaiting by remember { mutableStateOf(false) }
         var selectedPostId by remember { mutableStateOf("") }
-        var selectedMatchId by remember { mutableStateOf(OgtIds.MatchCamila) }
+        var selectedMatchId by remember { mutableStateOf("") }
         var selectedNeighborId by remember { mutableStateOf(OgtIds.ValeriaP) }
         var selectedSpotId by remember { mutableStateOf(OgtIds.SpotCorrientes) }
         var publishKind by remember {

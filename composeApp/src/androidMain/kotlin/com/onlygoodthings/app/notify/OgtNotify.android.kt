@@ -42,9 +42,18 @@ actual fun rememberOgtNotify(): OgtNotifyState {
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         granted = notifyGranted(context)
     }
+    val lifecycleOwner=androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer=androidx.lifecycle.LifecycleEventObserver { _,event ->
+            if(event==androidx.lifecycle.Lifecycle.Event.ON_RESUME)granted=notifyGranted(context)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     LaunchedEffect(Unit) {
         ensureChannels(context)
         OgtPushToken.latest?.let { token = it }
+        if(com.onlygoodthings.app.BuildConfig.DEBUG && context.packageName=="com.onlygoodthings.app.qa")return@LaunchedEffect
         FirebaseMessaging.getInstance().token.addOnSuccessListener {
             OgtPushToken.latest = it
             token = it
@@ -52,11 +61,17 @@ actual fun rememberOgtNotify(): OgtNotifyState {
     }
     fun ask(insist: Boolean) {
         if (Build.VERSION.SDK_INT < 33) {
-            granted = true
+            granted = notifyGranted(context)
+            if(!granted && insist)openNotificationSettings(context)
             return
         }
         if (notifyGranted(context)) {
             granted = true
+            return
+        }
+        if(ContextCompat.checkSelfPermission(context,Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED) {
+            granted=false
+            if(insist)openNotificationSettings(context)
             return
         }
         val activity = context.findActivity()
@@ -105,6 +120,11 @@ private fun openNotificationSettings(context: Context) {
 }
 
 actual fun showSystemNotice(notice: LocalNotification) {
+    android.os.Handler(android.os.Looper.getMainLooper()).post { presentSystemNotice(notice) }
+}
+
+private fun presentSystemNotice(notice: LocalNotification) {
+    val presentation = currentNoticePresentation(notice) ?: return
     val context = com.onlygoodthings.app.OgtApplication.instance
     ensureChannels(context)
     if (!notifyGranted(context)) return
@@ -118,7 +138,7 @@ actual fun showSystemNotice(notice: LocalNotification) {
         tap,
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
-    val channel = if (notice.kind == "MENTION" || notice.urgent) ChannelMentions else ChannelCommunity
+    val channel = if (!presentation.sound) "ogt_silent_v1" else if (notice.kind == "MENTION" || notice.urgent) ChannelMentions else ChannelCommunity
     val builder = NotificationCompat.Builder(context, channel)
         .setSmallIcon(R.mipmap.ic_launcher)
         .setContentTitle(notice.title)
@@ -126,6 +146,7 @@ actual fun showSystemNotice(notice: LocalNotification) {
         .setStyle(NotificationCompat.BigTextStyle().bigText(notice.body))
         .setContentIntent(pending)
         .setAutoCancel(true)
+        .setSilent(!presentation.sound)
         .setPriority(if (notice.kind == "MENTION" || notice.urgent) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
         .setCategory(NotificationCompat.CATEGORY_SOCIAL)
     NotificationManagerCompat.from(context).notify(notice.id.hashCode(), builder.build())
@@ -134,6 +155,8 @@ actual fun showSystemNotice(notice: LocalNotification) {
 fun ensureChannels(context: Context) {
     if (Build.VERSION.SDK_INT < 26) return
     val manager = context.getSystemService(NotificationManager::class.java) ?: return
+    if(manager.getNotificationChannel("ogt_silent_v1")==null)manager.createNotificationChannel(
+        NotificationChannel("ogt_silent_v1","Avisos sin sonido",NotificationManager.IMPORTANCE_DEFAULT).apply { setSound(null,null);enableVibration(false) })
     if (manager.getNotificationChannel(ChannelMentions) == null) {
         manager.createNotificationChannel(
             NotificationChannel(ChannelMentions, "Menciones", NotificationManager.IMPORTANCE_HIGH).apply {
@@ -151,5 +174,8 @@ fun ensureChannels(context: Context) {
 }
 
 fun notifyGranted(context: Context): Boolean =
-    if (Build.VERSION.SDK_INT < 33) true
-    else ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+    NotificationManagerCompat.from(context).areNotificationsEnabled() &&
+        (Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
+
+actual fun currentPushToken(): String? = OgtPushToken.latest
+actual fun clearSystemNotices() { NotificationManagerCompat.from(com.onlygoodthings.app.OgtApplication.instance).cancelAll() }

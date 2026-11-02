@@ -260,8 +260,8 @@ private fun walletSummary(db: Database, userId: String): WalletSummary = db.with
         """
         SELECT id::text, display_name, photo_url, community_points, role::text
         FROM users
-        WHERE status = 'ACTIVE' AND ${interactionSql(userId,"users.id")}
-        ORDER BY community_points DESC, display_name
+        WHERE status = 'ACTIVE' AND ${interactionSql(userId,"users.id")} AND ${com.onlygoodthings.backend.social.profileVisibilitySql(userId,"users")}
+        ORDER BY community_points DESC, display_name, id
         LIMIT 12
         """.trimIndent(),
     ).use { stmt ->
@@ -283,7 +283,13 @@ private fun walletSummary(db: Database, userId: String): WalletSummary = db.with
             }
         }
     }
-    val goal = 3000
+    val myRank = connection.prepareStatement("""
+        SELECT position FROM (
+            SELECT id, ROW_NUMBER() OVER(ORDER BY community_points DESC,display_name,id)::int AS position
+            FROM users WHERE status='ACTIVE' AND ${interactionSql(userId,"users.id")} AND ${com.onlygoodthings.backend.social.profileVisibilitySql(userId,"users")}
+        ) ranked WHERE id=?::uuid
+    """.trimIndent()).use { q -> q.setString(1,userId);q.executeQuery().use { r -> if(r.next())r.getInt(1) else null } }
+    val goal = com.onlygoodthings.shared.domain.nextCommunityGoal(points) ?: points.coerceAtLeast(3000)
     WalletSummary(
         points = points,
         nextGoal = goal,
@@ -291,6 +297,7 @@ private fun walletSummary(db: Database, userId: String): WalletSummary = db.with
         missing = (goal - points).coerceAtLeast(0),
         activity = activity,
         ranking = ranking,
+        myRank = myRank,
     )
 }
 

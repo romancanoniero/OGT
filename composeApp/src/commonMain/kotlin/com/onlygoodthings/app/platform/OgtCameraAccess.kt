@@ -7,6 +7,6 @@ data class OgtCameraAccess(
     val request: () -> Unit,
 )
 
-/** Permiso de cámara (y fotos en Android). El diálogo es el del sistema. */
+/** Camera permission only. System photo/video pickers do not require broad library access. */
 @Composable
 expect fun rememberOgtCameraAccess(): OgtCameraAccess

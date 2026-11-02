@@ -74,7 +74,6 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
         DispatchQueue.main.async {
             OgtPushRuntime.shared.token = fcmToken
-            if fcmToken != nil { OgtPushRuntime.shared.permissionGranted = true }
         }
     }
 
@@ -83,7 +82,19 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        completionHandler([.banner, .sound, .badge])
+        let info = notification.request.content.userInfo
+        let recipient = info["recipientUserId"] as? String
+        let kind = info["kind"] as? String ?? "MENTION"
+        let sound = info["sound"] as? String != "false"
+        let quiet = info["quietHoursEnabled"] as? String != "false"
+        DispatchQueue.main.async {
+            guard let recipient,
+                  let decision = OgtPushPresentation.shared.forRemote(recipientUserId: recipient, kind: kind, sound: sound, quietHoursEnabled: quiet) else {
+                completionHandler([])
+                return
+            }
+            completionHandler(decision.sound ? [.banner, .sound, .badge] : [.banner, .badge])
+        }
     }
 
     func userNotificationCenter(

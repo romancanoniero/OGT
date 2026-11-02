@@ -42,27 +42,29 @@ import com.onlygoodthings.shared.data.local.OgtIds
 fun MessagesScreen(onOpenChat: (String) -> Unit, onBack: () -> Unit = {}) {
     val db = LocalOgtDb.current
     val me = LocalOgtSession.current.me()
-    val highlight = db.inbox.firstOrNull { it.matchId == OgtIds.MatchCamila }
-    val threads = db.inbox.filter { !it.group }
-    val groups = db.inbox.filter { it.group }
+    val auth = com.onlygoodthings.app.data.LocalAuth.current
+    val remote = com.onlygoodthings.app.ui.components.rememberAccountData(me.id) { auth.account.threads() }
+    val allowedMatches = db.matches.filter { me.owns(it.requesterId) || me.owns(it.providerId) }.map { it.id }.toSet()
+    val threads = db.inbox.filter { it.matchId != null && it.matchId in allowedMatches }
+
     Column(Modifier.fillMaxSize().background(OgtColors.canvas).verticalScroll(rememberScrollState())) {
         OgtTopBar(title = "Mensajes", onBack = onBack)
         ScreenColumn {
-            OgtSectionTitle("Mensajes y Grupos")
-            OgtCaption("Comunidad activa · cerca de ${me.barrio}")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OgtPill("Privados")
-                OgtPill("Grupos de comunidad")
-            }
-            if (highlight != null) {
-                OgtCard {
-                    OgtPill("Encuentro Hoy · 17:30 hs", OgtColors.sunset, OgtColors.sunsetText)
-                    Text("${highlight.title} en Plaza Armenia", fontWeight = FontWeight.Bold)
-                    OgtCaption("Punto de encuentro seguro junto a la pérgola central de aromáticas.")
-                    OgtPrimaryButton("Ver detalles") { onOpenChat(highlight.matchId ?: OgtIds.MatchCamila) }
+            OgtSectionTitle("Tus conversaciones")
+            com.onlygoodthings.app.ui.components.AccountDataStatus(remote)
+            remote.value?.let { rows ->
+                if (rows.isEmpty() && threads.isEmpty()) OgtCaption("Todavía no tenés conversaciones. Podés iniciar una desde un pedido de ayuda.")
+                rows.forEach { thread ->
+                    ThreadRow(thread.peerName,
+                        com.onlygoodthings.shared.domain.relativeTimeLabel(thread.lastAtEpochMs,com.onlygoodthings.shared.realtime.currentEpochMs()),
+                        thread.tagLabel,thread.lastBody.ifBlank { "Abrir conversación" },false,
+                        onClick = { onOpenChat(thread.matchId) })
                 }
             }
-            OgtSectionTitle("Hilos recientes")
+            if (threads.isNotEmpty()) {
+                OgtSectionTitle("En este dispositivo")
+                OgtCaption("Conversaciones locales de adopciones y avistajes. No se sincronizan entre dispositivos.")
+            }
             threads.forEach { thread ->
                 val adopt = thread.matchId?.let { db.adoptRequestOfMatch(it) }
                 val sight = thread.matchId?.let { db.sightingOfMatch(it) }
@@ -76,16 +78,6 @@ fun MessagesScreen(onOpenChat: (String) -> Unit, onBack: () -> Unit = {}) {
                     onClick = thread.matchId?.let { id -> { onOpenChat(id) } },
                 )
             }
-            OgtSectionTitle("Canales de comunidad destacados")
-            groups.forEach { channel ->
-                OgtCard {
-                    Text(channel.title, fontWeight = FontWeight.Bold)
-                    OgtCaption(channel.tag)
-                    Text(channel.preview, fontWeight = FontWeight.SemiBold)
-                    OgtCaption(channel.timeLabel)
-                }
-            }
-            OgtPrimaryButton("Abrir chat de trueque") { onOpenChat(OgtIds.MatchCamila) }
             Spacer(Modifier.height(80.dp))
         }
     }

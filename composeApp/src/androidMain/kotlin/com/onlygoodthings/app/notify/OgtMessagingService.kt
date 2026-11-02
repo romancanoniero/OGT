@@ -19,6 +19,7 @@ class OgtMessagingService : FirebaseMessagingService() {
         val title = message.notification?.title ?: data["title"].orEmpty()
         val body = message.notification?.body ?: data["body"].orEmpty()
         if (title.isBlank()) return
+        val recipient = data["recipientUserId"] ?: return
         showSystemNotice(
             LocalNotification(
                 id = data["id"] ?: "fcm-${currentEpochMs()}",
@@ -27,6 +28,10 @@ class OgtMessagingService : FirebaseMessagingService() {
                 body = body,
                 timeLabel = "Ahora",
                 urgent = data["kind"] == "MENTION",
+                recipientUserId = recipient,
+                serverDelivered = true,
+                serverSound = data["sound"] != "false",
+                serverQuietHours = data["quietHoursEnabled"] != "false",
                 postId = data["postId"],
                 deepLink = data["deepLink"],
             ),

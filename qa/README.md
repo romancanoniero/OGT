@@ -1068,3 +1068,42 @@ La web conserva medios como blobs privados durante la vida del visor/lista, con 
 Validación final: 56 pruebas del cliente iOS sin fallos, compilación Android correcta y nueve pruebas web sin fallos, incluidas las regresiones previas de geometría. Los casos nuevos cubren sumas/orden por autor, límites de progreso, LRU, vencimiento/revocación, reinicio con disco, rotación de firmas, cambio de cuenta, fallos de descarga, invalidación, concurrencia con precarga y timeout recuperable. En CUA se ejerció el StoryPlayer real con dos autores y medios sintéticos, avance 0→42→58 % para un libro de 12 segundos, nuevo autor en 0 %, reapertura/reinicio con archivos existentes sin nuevas peticiones de medios y cambio de hoja. Para capturar la perspectiva se usó además una compilación QA a 3000 ms; la compilación final vuelve a 520 ms. La web se comprobó con foto, video que termina y avanza, pausa/reapertura, una barra y perspectiva visible. No se escribieron publicaciones reales. No se afirma ejecución visual Android ni validación del libro en el teléfono físico.
 
 Compilaciones firmada de iPhone y de simulador correctas: build/story-book-device-final.log y build/story-book-simulator-final.log. Tras confirmar el usuario que OGT estaba en el inicio, se instaló la versión final sin desinstalar ni borrar datos en iPhone 17R. La apertura automática fue rechazada por bloqueo del teléfono. Registros: build/story-book-iphone-{install,launch}.log. Evidencia: qa/artifacts/story-book/validation.json, web.png, web-turn.png e ios-page-turn-slow-qa.png. No hubo despliegue adicional de backend/web ni commit/push.
+
+## Auditoría de Ajustes (02/11/2026)
+
+Las preferencias privadas se consultan en `me/settings` y se actualizan mediante
+parches autenticados en `me/settings/update`. El caché nativo usa el UID de Firebase;
+no se migra una preferencia sin dueño a la cuenta que ingresa. Los perfiles privados
+son visibles para su titular y seguidores; las publicaciones existentes conservan
+su atribución y visibilidad. Los avisos respetan categorías, sonido y silencio
+22–7 según la zona del dispositivo guardada en la cuenta.
+
+Pruebas con servicios locales de QA, sin credenciales productivas:
+
+```sh
+node qa/scripts/settings-e2e.mjs
+node qa/scripts/native-settings-fixtures.mjs
+cd qa
+OGT_FULL_E2E=1 npx playwright test tests/settings-consistency.spec.mjs
+```
+
+El segundo script crea solamente identidades sintéticas y un hilo local; guarda
+sus credenciales privadas en `build/settings-remediation-20261102/native-accounts.json`,
+excluido de Git. No imprimirlo ni subirlo. Para recorrer la interfaz nativa, compilar
+el paquete `.qa` con `-Pogt.instrumentedQa=true -I qa/android-instrumented.init.gradle`.
+Ese paquete debug exige `demo-ogt-qa`, autentica contra Firebase en
+`10.0.2.2:19099` y usa la API en `10.0.2.2:19083`; no solicita tokens FCM reales.
+Las variantes release conservan Firebase y la API productivos.
+
+Instalar y ejecutar las pruebas con un destino explícito autorizado; no usar
+`connectedDebugAndroidTest` sin comprobar todos los dispositivos conectados.
+En esta aceptación se usó exclusivamente `emulator-5566`, AVD
+`OgtReleaseAcceptance20261029`, sin modificar los otros emuladores ni el iPhone.
+El runner instrumentado mantiene sus servicios de plataforma apagados; para
+probar el ingreso normal, terminar ese proceso y abrir `.qa/.MainActivity`.
+
+La exportación usa la hoja de archivos del sistema, contiene registros propios
+y referencias URL a los medios, no las contraseñas ni archivos de otras cuentas.
+Las pruebas de política de notificaciones no sustituyen una entrega física
+APNs/FCM en los paquetes distribuidos por las tiendas. La aceptación final
+en dispositivos y el ingreso/baja con un Apple ID de pruebas siguen separados.

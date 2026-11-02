@@ -102,6 +102,26 @@ fun SettingsScreen(
     var confirmText by remember { mutableStateOf("") }
     val copy = LocalOgtCopy.current
     val me = session.me()
+    var settingsBusy by remember(me.id) { mutableStateOf(false) }
+    var settingsError by remember(me.id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(me.id) {
+        settingsBusy=true
+        try { auth.refreshSettings() }
+        catch(cancel:kotlinx.coroutines.CancellationException) { throw cancel }
+        catch(_:Exception) { settingsError="No pudimos actualizar tus ajustes. Revisá la conexión antes de cambiarlos." }
+        finally { settingsBusy=false }
+    }
+    fun saveSettings(change: (com.onlygoodthings.shared.domain.AccountSettings) -> com.onlygoodthings.shared.domain.AccountSettings) {
+        if (settingsBusy) return
+        settingsBusy = true
+        settingsError = null
+        scope.launch {
+            try { auth.updateSettings(me.id,change) }
+            catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+            catch (_: Exception) { settingsError = "No se guardó el cambio. Revisá la conexión y volvé a intentarlo." }
+            finally { settingsBusy = false }
+        }
+    }
     val gps = LocalOgtLocation.current
     val notify = rememberOgtNotify()
     val contacts = rememberHonorInviteActions()
@@ -222,7 +242,7 @@ fun SettingsScreen(
                 PrefDivider()
                 PrefLine(
                     title = "Notificaciones",
-                    body = "Plazas, matches y menciones. De 22 a 7 se silencia solo.",
+                    body = "Avisos de la comunidad. El silencio nocturno se configura más abajo.",
                     trailing = if (notify.permissionGranted) "Activo" else "Pedir",
                 ) { if (!notify.permissionGranted) notify.retryPermission() }
                 PrefDivider()
@@ -233,41 +253,53 @@ fun SettingsScreen(
                 ) { if (!contacts.contactsAllowed) contacts.requestContacts() }
                 PrefDivider()
                 PrefLine(
-                    title = "Cámara y fotos",
-                    body = "Para publicar un recuerdo o un reporte. Se limpian los EXIF sensibles.",
+                    title = "Cámara",
+                    body = "Para tomar fotos. Las fotos y videos de la biblioteca se eligen con el selector del sistema, sin este permiso.",
                     trailing = if (camera.granted) "Permitido" else "Pedir",
                 ) { if (!camera.granted) camera.request() }
                 PrefDivider()
                 PrefSwitch(
                     title = "Radar de estacionamiento",
-                    body = "Detecta plazas solidarias cerca tuyo",
+                    body = "Guarda tu preferencia por cuenta. Las acciones de estacionamiento que iniciás pueden activarlo temporalmente.",
                     checked = session.radarEnabled,
-                ) { session.radarEnabled = it }
-                PrefDivider()
-                PrefSwitch(
-                    title = "Ahorro de huella",
-                    body = "Agrupa trayectos y avisos eco locales",
-                    checked = session.carbonSaveMode,
-                ) { session.carbonSaveMode = it }
+                    enabled = !settingsBusy,
+                ) { on -> saveSettings { it.copy(radarEnabled = on) } }
+
             }
 
             PrefCategory("Privacidad")
             com.onlygoodthings.app.ui.components.BlockedUsersControl()
             PrefGroup {
-                PrefSwitch(
-                    title = "Ubicación exacta en matches",
-                    body = "Si está apagado, solo se ve la distancia relativa",
-                    checked = session.showExactMatchLocation,
-                ) { session.showExactMatchLocation = it }
+                PrefLine("Ubicación en intercambios", body = "Los hilos de ayuda no muestran tu ubicación exacta. El permiso de GPS para estacionamiento se controla por separado.")
                 PrefDivider()
                 PrefSwitch(
-                    title = "Perfil visible sin cuenta",
-                    body = "Permite validar donaciones comunitarias",
+                    title = "Perfil e historias visibles",
+                    body = "Si lo apagás, solo tus seguidores podrán abrir tu perfil y tus historias. Tus publicaciones y su autoría siguen visibles en el feed.",
                     checked = session.publicProfileVisible,
-                ) { session.publicProfileVisible = it }
+                    enabled = !settingsBusy,
+                ) { on -> saveSettings { it.copy(publicProfileVisible = on) } }
                 PrefDivider()
-                PrefNav("Descargar mis datos", body = "Historial de impacto") {
-                    sharePlainText(impactExport(me, db))
+                PrefNav("Exportar mis datos", body = "Copia de tu cuenta y contenido del servidor, más tus autos guardados en este dispositivo") {
+                    if (!settingsBusy) {
+                        settingsBusy = true
+                        settingsError = null
+                        scope.launch {
+                            try {
+                                val owner = me.id
+                                val exported = auth.account.exportAccount()
+                                check(session.me().id == owner) { "La sesión cambió" }
+                                val complete = kotlinx.serialization.json.buildJsonObject {
+                                    put("server", exported)
+                                    put("deviceParking", kotlinx.serialization.json.Json.encodeToJsonElement(
+                                        com.onlygoodthings.app.data.AccountParking.serializer(),
+                                        com.onlygoodthings.app.data.AccountParking(session.vehicles,session.selectedVehicleId,session.parkedCar)))
+                                }
+                                com.onlygoodthings.app.platform.shareAccountExport(kotlinx.serialization.json.Json { prettyPrint=true }.encodeToString(kotlinx.serialization.json.JsonObject.serializer(),complete)) { session.me().id==owner }
+                            } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+                            catch (_: Exception) { settingsError = "No se pudo exportar tu cuenta. Revisá la conexión y volvé a intentarlo." }
+                            finally { settingsBusy = false }
+                        }
+                    }
                 }
             }
 
@@ -277,20 +309,29 @@ fun SettingsScreen(
                     title = "Animales en riesgo",
                     body = "Alertas push inmediatas",
                     checked = session.animalAlertPush,
-                ) { session.animalAlertPush = it }
+                    enabled = !settingsBusy,
+                ) { on -> saveSettings { it.copy(animalAlertPush = on) } }
                 PrefDivider()
                 PrefSwitch(
                     title = "Intercambio de ayuda",
                     body = "Avisos de una mano por otra",
                     checked = session.skillAlertPush,
-                ) { session.skillAlertPush = it }
+                    enabled = !settingsBusy,
+                ) { on -> saveSettings { it.copy(skillAlertPush = on) } }
                 PrefDivider()
                 PrefSwitch(
                     title = "Sonidos de radar",
                     body = "Aviso al ceder o pedir un lugar",
                     checked = session.parkingRadarSounds,
-                ) { session.parkingRadarSounds = it }
+                    enabled = !settingsBusy,
+                ) { on -> saveSettings { it.copy(parkingRadarSounds = on) } }
             }
+
+            PrefGroup {
+                PrefSwitch("Silencio nocturno", "De 22:00 a 07:00 en tu zona horaria. Los avisos llegan sin sonido.", session.accountSettings.quietHoursEnabled, enabled = !settingsBusy) { on -> saveSettings { it.copy(quietHoursEnabled=on) } }
+            }
+            if (settingsBusy) OgtCaption("Guardando…")
+            settingsError?.let { Text(it, color=OgtColors.error) }
 
             PrefCategory("Comunidad")
             PrefGroup {
@@ -365,20 +406,9 @@ fun SettingsScreen(
                     }
                 }
             }
-            OgtCaption("Only Good Things (OGT) v2.8.4")
+            OgtCaption("Only Good Things · ${com.onlygoodthings.app.auth.appVersionLabel()}")
             Spacer(Modifier.height(80.dp))
         }
-    }
-}
-
-private fun impactExport(me: LocalUser, db: OgtLocalDatabase): String = buildString {
-    appendLine("OnlyGoodThings")
-    appendLine(me.levelLabel)
-    appendLine("${me.communityPoints} pts")
-    if (me.barrio.isNotBlank()) appendLine(me.barrio)
-    db.karma.filter { it.userId == me.id }.forEach { entry ->
-        val sign = if (entry.delta >= 0) "+" else ""
-        appendLine("$sign${entry.delta} · ${entry.title}")
     }
 }
 

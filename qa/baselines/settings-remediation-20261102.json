@@ -1,0 +1,128 @@
+{
+  "date": "2026-11-02",
+  "baselineCommit": "44ca52edc96b364c3899e8a32b834d4bff961b2b",
+  "scope": "Settings audit remediation, not certification of public launch or whole VPS security",
+  "previouslyResolved": [
+    "S04",
+    "S05",
+    "S06",
+    "S13",
+    "S16"
+  ],
+  "remediations": [
+    {
+      "id": "S01",
+      "section": "Privacidad",
+      "resolution": "Private authenticated settings read/update, per-UID persistence, profile/story access enforced for self/followers. Unsupported exact-match sharing control replaced by factual description; ordinary posts unchanged.",
+      "state": "implemented_and_local_regression_passed"
+    },
+    {
+      "id": "S02",
+      "section": "Preferencias de notificaciones",
+      "resolution": "Category preferences enforced at server delivery and local notification presentation, persisted per account. Recipient-bound Android delivery and logout token removal.",
+      "state": "implemented_and_local_regression_passed"
+    },
+    {
+      "id": "S03",
+      "section": "Silencio nocturno",
+      "resolution": "Configurable 22–07 silence by saved device timezone, applied to server APNs sound and native presentation; boundary tests.",
+      "state": "implemented_and_local_regression_passed"
+    },
+    {
+      "id": "S07",
+      "section": "Cámara y fotos / EXIF",
+      "resolution": "JPEG/PNG/WebP metadata sanitized on both optimized and original-byte fallbacks; animated frames preserved. Only essential color/animation/orientation retained.",
+      "state": "implemented_and_local_regression_passed"
+    },
+    {
+      "id": "S08",
+      "section": "Descargar mis datos",
+      "resolution": "Authenticated own-account server export plus only current device parking; native JSON save/share sheet, no automatic sending or other-account data.",
+      "state": "implemented_and_local_regression_passed"
+    },
+    {
+      "id": "S09",
+      "section": "Ahorro de huella",
+      "resolution": "Unsupported carbon-saving switch retired; stored legacy preference preserved without claiming nonexistent behavior.",
+      "state": "implemented_and_local_regression_passed"
+    },
+    {
+      "id": "S10",
+      "section": "Radar",
+      "resolution": "Radar preference persisted per account; existing temporary activation during user-initiated parking retained and explained.",
+      "state": "implemented_and_local_regression_passed"
+    },
+    {
+      "id": "S11",
+      "section": "Ranking",
+      "resolution": "Server-backed visible ranking and caller position; no hardcoded Palermo or device-local ranking.",
+      "state": "implemented_and_local_regression_passed"
+    },
+    {
+      "id": "S12",
+      "section": "Billetera",
+      "resolution": "Server points, confirmed activity and actual next threshold; genuine coupon API preserved.",
+      "state": "implemented_and_local_regression_passed"
+    },
+    {
+      "id": "S14",
+      "section": "Mensajes",
+      "resolution": "Server participant-authorized threads/messages; existing participant-only local adoption/sighting threads explicitly labelled local. Fixed demo chat, presence, meeting and reward text removed; unavailable thread safe.",
+      "state": "implemented_and_local_regression_passed"
+    },
+    {
+      "id": "S15",
+      "section": "Nivel del perfil",
+      "resolution": "Profile points, role and calculated level refreshed from server on session and wallet/ranking reads.",
+      "state": "implemented_and_local_regression_passed"
+    },
+    {
+      "id": "S17",
+      "section": "Versión",
+      "resolution": "Footer reads actual native app version/build.",
+      "state": "implemented_and_local_regression_passed"
+    },
+    {
+      "id": "S18",
+      "section": "Permisos de cámara/fotos",
+      "resolution": "Camera-only permission independent of system photo/video picker; lifecycle refresh and retry/settings routes. Unused broad Android library permissions removed.",
+      "state": "implemented_and_local_regression_passed"
+    }
+  ],
+  "verification": {
+    "backendUnit": 72,
+    "sharedUnit": 150,
+    "androidJvm": 51,
+    "isolatedPostgresIntegration": 2,
+    "androidDevice": 13,
+    "node": 113,
+    "python": 161,
+    "apiEndToEnd": 7,
+    "protectedRoutingBaselineAndCandidate": 271,
+    "settingsBrowserEngines": [
+      "Chromium",
+      "WebKit"
+    ],
+    "accessibilityScreenChecks": 24,
+    "nativeEvidence": "QA-only package on authorized OgtReleaseAcceptance20261029 emulator; server persistence, restart, JSON export, wallet/ranking, exact character-order chat checked"
+  },
+  "intentionalDifferences": [
+    "Unsupported carbon and exact-match-location switches replaced/retired; no precise location sharing added",
+    "Profile/story visibility now enforced for non-followers; post attribution unchanged",
+    "Messages have server threads plus explicitly identified existing local adoption/sighting conversations",
+    "Real server wallet/ranking, export as private JSON file, accurate app version",
+    "Camera permission separated from system picker; unused broad Android photo permissions removed",
+    "Fixed fictional tree/garden counter on the adjacent login screen replaced by a plain community invitation."
+  ],
+  "distributionCandidates": {
+    "ios": "1.0 (14), distribution IPA signature verified",
+    "android": "1.0 (15), APK/AAB signatures verified"
+  },
+  "acceptanceLimits": [
+    "Physical APNs/FCM delivery and OS permission-return behavior need final distributed-package acceptance on iPhone/Android. Policy, owner checks and payload paths tested locally.",
+    "Apple test-identity sign-in/deletion remains deferred by owner.",
+    "Private unsynchronized adoption/sighting conversations are retained and clearly identified; no claim of server synchronization.",
+    "Public store submission/release, reviewer network access, current store evidence and VPS incident closeout remain separate launch gates."
+  ],
+  "evidenceLocation": "build/settings-remediation-20261102/ (private generated reports; no credentials committed)"
+}

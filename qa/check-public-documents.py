@@ -17,6 +17,7 @@ PUBLIC = (VERIFICATION_PATH, '/presentacion', '/presentacion.html', '/privacy', 
           '/.well-known/apple-app-site-association', '/apple-app-site-association',
           '/.well-known/assetlinks.json')
 PRIVATE = ('/', '/index.html', '/auth.js', '/crm/control/', '/crm/empresas/',
+           '/api/v1/me/settings', '/api/v1/me/settings/update', '/api/v1/notifications/unregister', '/api/v1/account/export',
            '/api/v1/auth/session', '/api/v1/account/erase', '/api/v1/social/feed',
            '/api/v1/stories/list', '/media/example.jpg', '/db', '/ws', '/health',
            '/release.json', '/join/example', '/h/example', '/privacy/',

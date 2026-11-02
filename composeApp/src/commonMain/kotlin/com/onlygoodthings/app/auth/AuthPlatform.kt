@@ -43,6 +43,9 @@ expect class AuthPrefs() {
     var vehiclesJson: String
     /** Garage and parked location keyed by immutable Firebase account identity. */
     var parkingAccountsJson: String
+    var settingsAccountsJson: String
+    var noticeOwnerId: String
+    var noticeSettingsJson: String
     var selectedVehicleId: String
     /** Token de mención de honor pendiente de reivindicar. */
     var pendingHonorToken: String
@@ -62,3 +65,4 @@ expect class AuthPrefs() {
 }
 
 expect fun defaultApiBaseUrl(): String
+expect fun appVersionLabel(): String

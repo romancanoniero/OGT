@@ -1,39 +1,31 @@
 package com.onlygoodthings.app.platform
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import platform.AVFoundation.AVAuthorizationStatusAuthorized
-import platform.AVFoundation.AVCaptureDevice
-import platform.AVFoundation.AVMediaTypeVideo
-import platform.AVFoundation.authorizationStatusForMediaType
-import platform.AVFoundation.requestAccessForMediaType
-import platform.Photos.PHAuthorizationStatusAuthorized
-import platform.Photos.PHAuthorizationStatusLimited
-import platform.Photos.PHPhotoLibrary
-import platform.Photos.PHAccessLevelReadWrite
+import androidx.compose.runtime.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import platform.AVFoundation.*
+import platform.Foundation.NSURL
+import platform.UIKit.UIApplication
+import platform.UIKit.UIApplicationOpenSettingsURLString
 
 @Composable
 actual fun rememberOgtCameraAccess(): OgtCameraAccess {
-    fun read(): Boolean {
-        val camera = AVCaptureDevice.authorizationStatusForMediaType(AVMediaTypeVideo) ==
-            AVAuthorizationStatusAuthorized
-        val photos = PHPhotoLibrary.authorizationStatusForAccessLevel(PHAccessLevelReadWrite).let {
-            it == PHAuthorizationStatusAuthorized || it == PHAuthorizationStatusLimited
-        }
-        return camera && photos
-    }
+    fun read()=AVCaptureDevice.authorizationStatusForMediaType(AVMediaTypeVideo)==AVAuthorizationStatusAuthorized
     var granted by remember { mutableStateOf(read()) }
-    return OgtCameraAccess(
-        granted = granted,
-        request = {
-            AVCaptureDevice.requestAccessForMediaType(AVMediaTypeVideo) { _ ->
-                PHPhotoLibrary.requestAuthorizationForAccessLevel(PHAccessLevelReadWrite) { _ ->
-                    granted = read()
-                }
+    val owner=LocalLifecycleOwner.current
+    DisposableEffect(owner) {
+        val observer=LifecycleEventObserver { _,event -> if(event==Lifecycle.Event.ON_RESUME)granted=read() }
+        owner.lifecycle.addObserver(observer)
+        onDispose { owner.lifecycle.removeObserver(observer) }
+    }
+    return OgtCameraAccess(granted) {
+        when(AVCaptureDevice.authorizationStatusForMediaType(AVMediaTypeVideo)) {
+            AVAuthorizationStatusNotDetermined -> AVCaptureDevice.requestAccessForMediaType(AVMediaTypeVideo) { _ ->
+                com.onlygoodthings.app.notify.onMain { granted=read() }
             }
-        },
-    )
+            AVAuthorizationStatusAuthorized -> granted=true
+            else -> NSURL.URLWithString(UIApplicationOpenSettingsURLString)?.let { UIApplication.sharedApplication.openURL(it) }
+        }
+    }
 }

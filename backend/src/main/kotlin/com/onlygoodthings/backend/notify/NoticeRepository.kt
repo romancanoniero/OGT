@@ -5,12 +5,14 @@ import com.google.firebase.messaging.AndroidConfig
 import com.google.firebase.messaging.AndroidNotification
 import com.google.firebase.messaging.ApnsConfig
 import com.google.firebase.messaging.Aps
+import com.google.firebase.messaging.ApsAlert
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.Message
 import com.google.firebase.messaging.Notification
 import com.onlygoodthings.backend.infra.Database
 import com.onlygoodthings.shared.domain.postDeepLink
 import java.util.UUID
+import com.onlygoodthings.shared.domain.noticePresentation
 
 class NoticeSqlRepository(private val db: Database) {
 
@@ -43,6 +45,9 @@ class NoticeSqlRepository(private val db: Database) {
     }
 
     fun send(recipientId: String, title: String, body: String, kind: String, postId: String?, deepLink: String): Int {
+        val settings = db.withConnection { com.onlygoodthings.backend.social.readAccountSettings(it,recipientId) }
+        val presentation = settings.noticePresentation(kind,java.time.ZonedDateTime.now(java.time.ZoneId.of(settings.timeZone)).hour)
+        if (!presentation.deliver) return 0
         if (FirebaseApp.getApps().isEmpty()) return 0
         val tokens = tokensOf(recipientId)
         if (tokens.isEmpty()) return 0
@@ -51,25 +56,24 @@ class NoticeSqlRepository(private val db: Database) {
             runCatching {
                 val message = Message.builder()
                     .setToken(token)
-                    .setNotification(Notification.builder().setTitle(title).setBody(body).build())
+                    // Data-only on Android: account identity is checked before any banner.
                     .putData("kind", kind)
                     .putData("title", title)
                     .putData("body", body)
                     .putData("postId", postId.orEmpty())
                     .putData("deepLink", deepLink)
+                    .putData("recipientUserId", recipientId)
+                    .putData("sound", presentation.sound.toString())
+                    .putData("quietHoursEnabled", settings.quietHoursEnabled.toString())
                     .setAndroidConfig(
                         AndroidConfig.builder()
                             .setPriority(AndroidConfig.Priority.HIGH)
-                            .setNotification(
-                                AndroidNotification.builder()
-                                    .setChannelId("ogt_mentions")
-                                    .build(),
-                            )
                             .build(),
                     )
                     .setApnsConfig(
                         ApnsConfig.builder()
-                            .setAps(Aps.builder().setSound("default").setBadge(1).build())
+                            .setAps(Aps.builder().setAlert(ApsAlert.builder().setTitle(title).setBody(body).build())
+                                .apply { if(presentation.sound)setSound("default") }.setBadge(1).build())
                             .putHeader("apns-priority", "10")
                             .build(),
                     )
@@ -92,6 +96,12 @@ class NoticeSqlRepository(private val db: Database) {
                 stmt.executeUpdate()
             }
         }
+    }
+
+    fun unregister(userId: String, token: String) {
+        db.withConnection { c -> c.prepareStatement("DELETE FROM device_tokens WHERE user_id=?::uuid AND token=?").use { q ->
+            q.setString(1,userId);q.setString(2,token);q.executeUpdate()
+        } }
     }
 
     private fun displayName(userId: String): String? = db.withConnection { connection ->

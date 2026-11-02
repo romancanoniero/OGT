@@ -21,7 +21,11 @@ open class OgtApplication : Application() {
 
     /** Device tests supply an isolated host; ordinary app startup keeps these services. */
     protected open fun initializePlatformServices() {
-        FirebaseApp.initializeApp(this)
+        val firebase = FirebaseApp.initializeApp(this)
+        if (BuildConfig.DEBUG && packageName == "com.onlygoodthings.app.qa") {
+            check(firebase?.options?.projectId == "demo-ogt-qa") { "QA must use only the Firebase emulator project" }
+            FirebaseAuth.getInstance().useEmulator("10.0.2.2",19099)
+        }
         // Emuladores: sin SafetyNet/Play Integrity. El SMS real se reemplaza por números de prueba.
         FirebaseAuth.getInstance().firebaseAuthSettings.setAppVerificationDisabledForTesting(BuildConfig.DEBUG)
         if (AuthPrefs().gpsEnabled && hasForegroundLocation()) {

@@ -175,6 +175,21 @@ class IdentityStore(private val db: Database) {
             q.setString(1,userId);q.executeQuery().use { r ->buildList { while(r.next())add(com.onlygoodthings.shared.domain.BlockedUser(r.getString(1),r.getString(2),r.getLong(3))) } }
         }
         profile.copy(
+            preferences=com.onlygoodthings.backend.social.readAccountSettings(connection,userId),
+            records=mapOf(
+                "profile" to exportJsonRows(connection,"SELECT jsonb_build_object('firebaseUid',firebase_uid,'photoUrl',photo_url,'role',role,'createdAt',created_at,'updatedAt',updated_at,'lastSeenAt',last_seen_at,'latitude',ST_Y(home_location),'longitude',ST_X(home_location),'language',metadata->'settings'->'language','barrio',metadata->'settings'->'barrio') FROM users WHERE id=?::uuid",userId),
+                "anecdotes" to exportJsonRows(connection,"SELECT to_jsonb(a) FROM post_anecdotes a WHERE author_user_id=?::uuid ORDER BY created_at",userId),
+                "uploads" to exportJsonRows(connection,"SELECT to_jsonb(u) FROM uploaded_media_owners u WHERE uploader_user_id=?::uuid ORDER BY created_at",userId),
+                "reactions" to exportJsonRows(connection,"SELECT to_jsonb(i) FROM post_impacts i WHERE user_id=?::uuid ORDER BY created_at",userId),
+                "volunteerSignups" to exportJsonRows(connection,"SELECT to_jsonb(s)-'check_in_location' || jsonb_build_object('latitude',ST_Y(check_in_location),'longitude',ST_X(check_in_location)) FROM volunteer_signups s WHERE user_id=?::uuid ORDER BY created_at",userId),
+                "submittedReports" to exportJsonRows(connection,"SELECT jsonb_build_object('id',id,'postId',post_id,'commentId',comment_id,'reason',reason,'details',details,'createdAt',created_at) FROM content_reports WHERE reporter_id=?::uuid ORDER BY created_at",userId),
+                "authoredPostsAndStories" to exportJsonRows(connection,"SELECT to_jsonb(p)-'location' || jsonb_build_object('latitude',ST_Y(location),'longitude',ST_X(location)) FROM social_posts p WHERE author_user_id=?::uuid ORDER BY created_at",userId),
+                "media" to exportJsonRows(connection,"SELECT to_jsonb(m) FROM post_media m JOIN social_posts p ON p.id=m.post_id WHERE p.author_user_id=?::uuid ORDER BY m.post_id,m.sort_order",userId),
+                "animalListings" to exportJsonRows(connection,"SELECT to_jsonb(a)-'location' || jsonb_build_object('latitude',ST_Y(location),'longitude',ST_X(location)) FROM animal_listings a WHERE reporter_user_id=?::uuid ORDER BY created_at",userId),
+                "skills" to exportJsonRows(connection,"SELECT jsonb_build_object('tag',t.slug,'label',t.label,'offered',s.offered,'requested',s.requested) FROM user_skills s JOIN skill_tags t ON t.id=s.tag_id WHERE s.user_id=?::uuid",userId),
+                "following" to exportJsonRows(connection,"SELECT jsonb_build_object('userId',followed_id,'createdAt',created_at) FROM follows WHERE follower_id=?::uuid",userId),
+                "feedActivity" to exportJsonRows(connection,"SELECT to_jsonb(e) FROM feed_events e WHERE viewer_id=?::uuid ORDER BY created_at",userId),
+            ),
             blockedUsers=blocks,
             coupons=com.onlygoodthings.backend.business.CsrRepository(db).ownCoupons(connection,userId),
             companyTeam=com.onlygoodthings.backend.business.CsrTeam(com.onlygoodthings.backend.business.CsrRepository(db)).export(connection,userId),
@@ -184,6 +199,14 @@ class IdentityStore(private val db: Database) {
             messagesSent = textRows(connection, "SELECT id::text, body, created_at::text FROM timebank_messages WHERE sender_id = ?::uuid ORDER BY created_at", userId),
         )
     }
+
+    private fun exportJsonRows(connection: java.sql.Connection, sql: String, userId: String): List<kotlinx.serialization.json.JsonObject> =
+        connection.prepareStatement(sql).use { q ->
+            q.setString(1,userId)
+            q.executeQuery().use { r -> buildList {
+                while(r.next())add(kotlinx.serialization.json.Json.parseToJsonElement(r.getString(1)) as kotlinx.serialization.json.JsonObject)
+            } }
+        }
 
     /**
      * Baja de la propia cuenta. Borra el contenido cuyo autor es el usuario

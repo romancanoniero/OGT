@@ -88,7 +88,7 @@ fun LoginScreen(onEnter: () -> Unit, onSignUp: () -> Unit, onRecover: () -> Unit
                 }
             }
         }
-        Text("Hoy en la comunidad: se sumaron 14 árboles y 3 huertos comunitarios.", color = OgtColors.muted, fontSize = 13.sp)
+        Text("Compartí buenas noticias y acciones solidarias con tu comunidad.", color = OgtColors.muted, fontSize = 13.sp)
         GhostLink("¿Aún no eres parte de la red? Regístrate aquí") { onSignUp() }
     }
 }

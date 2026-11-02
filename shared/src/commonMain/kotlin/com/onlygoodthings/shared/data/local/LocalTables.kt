@@ -399,6 +399,9 @@ data class LocalNotification(
     val deepLink: String? = null,
     val read: Boolean = false,
     val createdAtEpochMs: Long = 0L,
+    val serverDelivered: Boolean = false,
+    val serverSound: Boolean = true,
+    val serverQuietHours: Boolean = true,
 )
 
 @Serializable

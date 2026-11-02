@@ -51,12 +51,16 @@ class OgtPreviewSession(
     var radarEnabled by mutableStateOf(true)
     var gpsEnabled by mutableStateOf(prefs.gpsEnabled)
     var locationScope by mutableStateOf(locationScopeFromPref(prefs.locationScope))
-    var carbonSaveMode by mutableStateOf(false)
-    var showExactMatchLocation by mutableStateOf(false)
-    var publicProfileVisible by mutableStateOf(true)
-    var animalAlertPush by mutableStateOf(true)
-    var skillAlertPush by mutableStateOf(true)
-    var parkingRadarSounds by mutableStateOf(true)
+    private val settingsStore = AccountSettingsStore({ prefs.settingsAccountsJson }, { prefs.settingsAccountsJson = it })
+    private var settingsOwner = initialUserId
+    var accountSettings by mutableStateOf(settingsStore.load(settingsOwner))
+        private set
+    val carbonSaveMode get() = accountSettings.carbonSaveMode
+    val showExactMatchLocation get() = accountSettings.showExactMatchLocation
+    val publicProfileVisible get() = accountSettings.publicProfileVisible
+    val animalAlertPush get() = accountSettings.animalAlertPush
+    val skillAlertPush get() = accountSettings.skillAlertPush
+    val parkingRadarSounds get() = accountSettings.parkingRadarSounds
     var locationGranted by mutableStateOf(false)
     var locationPermission by mutableStateOf(LocationPermissionState.UNKNOWN)
     var locationServicesEnabled by mutableStateOf(false)
@@ -136,6 +140,27 @@ class OgtPreviewSession(
         prefs.appLanguage = next.code
     }
 
+    fun switchSettingsAccount(firebaseUid: String) {
+        settingsOwner = firebaseUid
+        accountSettings = settingsStore.load(firebaseUid)
+        radarEnabled = accountSettings.radarEnabled
+        prefs.noticeOwnerId = ""
+    }
+
+    fun applyAccountSettings(settings: com.onlygoodthings.shared.domain.AccountSettings) {
+        accountSettings = settings
+        radarEnabled = settings.radarEnabled
+        settingsStore.save(settingsOwner, settings)
+        prefs.noticeSettingsJson = kotlinx.serialization.json.Json.encodeToString(
+            com.onlygoodthings.shared.domain.AccountSettings.serializer(), settings)
+        prefs.noticeOwnerId = currentUserId
+    }
+
+    fun deleteCurrentSettingsAccount() {
+        settingsStore.remove(settingsOwner)
+        switchSettingsAccount("")
+    }
+
     fun applyGpsEnabled(on: Boolean) {
         gpsEnabled = on
         prefs.gpsEnabled = on
@@ -168,6 +193,14 @@ class OgtPreviewSession(
             if (user.id == me.id) db.users[index] = user.copy(photoUrl = local)
         }
         overlayUser = me.copy(photoUrl = local)
+    }
+
+    fun applyCommunityPoints(points: Int) {
+        val current=overlayUser ?: return
+        val updated=current.copy(communityPoints=points,levelLabel=com.onlygoodthings.shared.domain.communityLevelLabel(points))
+        val index=db.users.indexOfFirst { it.id==current.id }
+        if(index>=0)db.users[index]=updated
+        overlayUser=updated
     }
     fun here(): GeoPoint? = deviceLocation
     /** Lugar fijado al estacionar (ESTACIONE), no un pin residual ni el GPS del perfil. */

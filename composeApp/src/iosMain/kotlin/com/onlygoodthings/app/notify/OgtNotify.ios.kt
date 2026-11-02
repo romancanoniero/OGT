@@ -26,6 +26,18 @@ interface IosPushHost {
 actual fun rememberOgtNotify(): OgtNotifyState {
     var granted by remember { mutableStateOf(OgtPushRuntime.permissionGranted) }
     var token by remember { mutableStateOf(OgtPushRuntime.token) }
+    val lifecycleOwner=androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer=androidx.lifecycle.LifecycleEventObserver { _,event ->
+            if(event==androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                UNUserNotificationCenter.currentNotificationCenter().getNotificationSettingsWithCompletionHandler { settings ->
+                    onMain { OgtPushRuntime.permissionGranted = settings?.authorizationStatus == platform.UserNotifications.UNAuthorizationStatusAuthorized || settings?.authorizationStatus == platform.UserNotifications.UNAuthorizationStatusProvisional }
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     LaunchedEffect(Unit) {
         while (true) {
             granted = OgtPushRuntime.permissionGranted
@@ -48,13 +60,17 @@ actual fun rememberOgtNotify(): OgtNotifyState {
 
 actual fun showSystemNotice(notice: LocalNotification) {
     onMain {
+        val presentation = currentNoticePresentation(notice) ?: return@onMain
         val content = UNMutableNotificationContent().apply {
             setTitle(notice.title)
             setBody(notice.body)
-            setSound(UNNotificationSound.defaultSound)
+            if(presentation.sound)setSound(UNNotificationSound.defaultSound)
             setUserInfo(
                 mapOf(
                     "kind" to notice.kind,
+                    "recipientUserId" to com.onlygoodthings.app.auth.AuthPrefs().noticeOwnerId,
+                    "sound" to presentation.sound.toString(),
+                    "quietHoursEnabled" to runCatching { kotlinx.serialization.json.Json.decodeFromString<com.onlygoodthings.shared.domain.AccountSettings>(com.onlygoodthings.app.auth.AuthPrefs().noticeSettingsJson).quietHoursEnabled }.getOrDefault(true).toString(),
                     "postId" to (notice.postId ?: ""),
                     "deepLink" to (notice.deepLink ?: ""),
                 ),
@@ -70,6 +86,12 @@ object OgtPushRuntime {
     var host: IosPushHost? = null
     var token: String? = null
     var permissionGranted: Boolean = false
+}
+
+actual fun currentPushToken(): String? = OgtPushRuntime.token
+actual fun clearSystemNotices() {
+    UNUserNotificationCenter.currentNotificationCenter().removeAllDeliveredNotifications()
+    UNUserNotificationCenter.currentNotificationCenter().removeAllPendingNotificationRequests()
 }
 
 @OptIn(ExperimentalForeignApi::class)

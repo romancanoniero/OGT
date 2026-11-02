@@ -1761,7 +1761,7 @@ class OgtLocalDatabase {
     fun addChatMessage(viewer: LocalUser, matchId: String, body: String): LocalMessage? {
         val trimmed = body.trim()
         if (trimmed.isEmpty()) return null
-        if (matches.none { it.id == matchId }) return null
+        if (matches.none { it.id == matchId && it.chatEnabled && (viewer.owns(it.requesterId) || viewer.owns(it.providerId)) }) return null
         val row = LocalMessage(
             id = "m-${messages.size + 1}",
             matchId = matchId,

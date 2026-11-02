@@ -1,66 +1,43 @@
 package com.onlygoodthings.app.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.onlygoodthings.app.data.LocalOgtDb
+import androidx.compose.ui.unit.sp
+import com.onlygoodthings.app.data.LocalAuth
 import com.onlygoodthings.app.data.LocalOgtSession
 import com.onlygoodthings.app.theme.OgtColors
-import com.onlygoodthings.app.ui.components.OgtCaption
-import com.onlygoodthings.app.ui.components.OgtTopBar
-import com.onlygoodthings.app.ui.components.PrefCategory
-import com.onlygoodthings.app.ui.components.PrefDivider
-import com.onlygoodthings.app.ui.components.PrefGroup
-import com.onlygoodthings.app.ui.components.PrefLine
-import com.onlygoodthings.app.ui.components.ScreenColumn
+import com.onlygoodthings.app.ui.components.*
+import com.onlygoodthings.shared.domain.*
 
 @Composable
 fun RankingScreen(onBack: () -> Unit = {}) {
-    val db = LocalOgtDb.current
-    val me = LocalOgtSession.current.me()
-    val board = db.ranking().filter { it.barrio.contains("Palermo") || it.id == me.id }
-    val podium = board.take(3)
-    val rest = board.drop(3).take(7)
-    val myRank = db.rankOf(me.id)
+    val auth=LocalAuth.current
+    val me=LocalOgtSession.current.me()
+    val session=LocalOgtSession.current
+    val state=rememberAccountData(me.id) { auth.account.wallet() }
+    LaunchedEffect(me.id,state.value) { state.value?.let { session.applyCommunityPoints(it.points) } }
     Column(Modifier.fillMaxSize().background(OgtColors.canvas).verticalScroll(rememberScrollState())) {
-        OgtTopBar(title = "Ranking", onBack = onBack)
+        OgtTopBar(title="Ranking",onBack=onBack)
         ScreenColumn {
-            OgtCaption("El ranking reconoce impacto colectivo, no competencia.")
-            PrefCategory("Cuadro de honor")
-            PrefGroup {
-                podium.forEachIndexed { index, neighbor ->
-                    if (index > 0) PrefDivider()
-                    PrefLine(
-                        title = neighbor.displayName,
-                        body = neighbor.honorTag,
-                        trailing = "${index + 1}º · ${neighbor.communityPoints} pts",
-                    )
-                }
-            }
-            PrefCategory("Tu lugar")
-            PrefGroup {
-                PrefLine(
-                    title = "#$myRank ${me.displayName}",
-                    body = "${me.levelLabel} · ${me.honorTag}",
-                    trailing = "${me.communityPoints} pts",
-                )
-            }
-            PrefCategory("Quienes más aportan", "Top 4–10")
-            PrefGroup {
-                rest.forEachIndexed { index, neighbor ->
-                    if (index > 0) PrefDivider()
-                    PrefLine(
-                        title = neighbor.displayName,
-                        body = neighbor.honorTag,
-                        trailing = "${neighbor.communityPoints} pts",
-                    )
+            OgtCaption("El ranking reconoce impacto colectivo. Muestra los perfiles disponibles para vos, ordenados por sus puntos confirmados.")
+            AccountDataStatus(state)
+            state.value?.let { summary ->
+                PrefCategory("Tu lugar")
+                PrefGroup { PrefLine(summary.myRank?.let { "#$it ${me.displayName}" } ?: me.displayName,body=summary.levelLabel,trailing="${summary.points} pts") }
+                PrefCategory("Cuadro de honor")
+                if(summary.ranking.isEmpty())OgtCaption("Todavía no hay perfiles en el ranking.")
+                else PrefGroup {
+                    summary.ranking.forEachIndexed { index,neighbor ->
+                        if(index>0)PrefDivider()
+                        PrefLine("${index+1}º · ${neighbor.displayName}",body=neighbor.levelLabel,trailing="${neighbor.communityPoints} pts")
+                    }
                 }
             }
             Spacer(Modifier.height(80.dp))

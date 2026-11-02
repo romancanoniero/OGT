@@ -38,7 +38,7 @@ object ImageOptimizer {
                     }
                     // Re-encoding just frame zero would destroy existing animations.
                     // Keep animated PNG/WebP intact until a sequence-aware encoder is available.
-                    if (isAnimated(bytes, extension)) return Result(bytes, extension)
+                    if (isAnimated(bytes, extension)) return Result(ImagePrivacy.strip(bytes, extension), extension)
                     val source = reader.read(0) ?: throw IllegalArgumentException("La imagen no se puede leer")
                     val orientation = runCatching {
                         ImageMetadataReader.readMetadata(bytes.inputStream())
@@ -67,7 +67,8 @@ object ImageOptimizer {
                     // untouched source: a small transparent WebP may be much smaller
                     // than the equivalent PNG.
                     val pixelsChanged = scale < 0.999 || orientation != 1
-                    return if (pixelsChanged || encoded.size < bytes.size) Result(encoded, target) else Result(bytes, extension)
+                    val privateFree = ImagePrivacy.strip(bytes, extension)
+                    return if (pixelsChanged || encoded.size < privateFree.size) Result(encoded, target) else Result(privateFree, extension)
                 } finally { reader.dispose() }
             }
         } catch (e: IllegalArgumentException) {

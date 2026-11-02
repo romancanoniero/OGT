@@ -40,7 +40,7 @@ import kotlin.coroutines.resumeWithException
 private const val GOOGLE_WEB_CLIENT_ID =
     "521063054927-2i8k3qkmh48p5h3qp3nqaunt5t7j4sj0.apps.googleusercontent.com"
 
-actual fun authLabHintsEnabled(): Boolean = com.onlygoodthings.app.BuildConfig.DEBUG
+actual fun authLabHintsEnabled(): Boolean = com.onlygoodthings.app.BuildConfig.DEBUG && com.onlygoodthings.app.BuildConfig.APPLICATION_ID != "com.onlygoodthings.app.qa"
 
 actual class AuthPlatform actual constructor() {
     private val auth: FirebaseAuth get() = FirebaseAuth.getInstance()
@@ -414,6 +414,15 @@ actual class AuthPrefs actual constructor() {
     actual var parkingAccountsJson: String
         get() = prefs.getString("parking_accounts_json", "").orEmpty()
         set(value) { prefs.edit().putString("parking_accounts_json", value).apply() }
+    actual var settingsAccountsJson: String
+        get() = prefs.getString("settings_accounts_json", "").orEmpty()
+        set(value) { prefs.edit().putString("settings_accounts_json", value).apply() }
+    actual var noticeOwnerId: String
+        get() = prefs.getString("notice_owner", "").orEmpty()
+        set(value) { prefs.edit().putString("notice_owner", value).apply() }
+    actual var noticeSettingsJson: String
+        get() = prefs.getString("notice_settings", "").orEmpty()
+        set(value) { prefs.edit().putString("notice_settings", value).apply() }
     actual var selectedVehicleId: String
         get() = prefs.getString("car_sel", "").orEmpty()
         set(value) { prefs.edit().putString("car_sel", value).apply() }
@@ -443,4 +452,6 @@ actual class AuthPrefs actual constructor() {
         set(value) { prefs.edit().putString("gps_scope", value).apply() }
 }
 
-actual fun defaultApiBaseUrl(): String = OGT_DEFAULT_API_BASE
+actual fun defaultApiBaseUrl(): String =
+    if(com.onlygoodthings.app.BuildConfig.DEBUG && com.onlygoodthings.app.BuildConfig.APPLICATION_ID=="com.onlygoodthings.app.qa")"http://10.0.2.2:19083" else OGT_DEFAULT_API_BASE
+actual fun appVersionLabel(): String = "${com.onlygoodthings.app.BuildConfig.VERSION_NAME} (${com.onlygoodthings.app.BuildConfig.VERSION_CODE})"

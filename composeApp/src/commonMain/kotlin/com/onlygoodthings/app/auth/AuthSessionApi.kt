@@ -17,6 +17,30 @@ import kotlinx.serialization.json.buildJsonObject
 class AuthSessionApi(private val session: SessionStore) {
     private val client = createPlatformHttpClient()
 
+    private suspend inline fun <reified T> accountPost(path: String, body: kotlinx.serialization.json.JsonObject = buildJsonObject {}, bearer: String? = session.firebaseJwt): T {
+        val token = bearer ?: error("Iniciá sesión para continuar")
+        val response: ApiResponse<T> = client.post("${session.apiBaseUrl}$path") {
+            contentType(ContentType.Application.Json)
+            header("Authorization", "Bearer $token")
+            setBody(body)
+        }.body()
+        return response.data?.takeIf { response.success } ?: error(response.message ?: "No se pudo completar la operación")
+    }
+
+    suspend fun settings(): com.onlygoodthings.shared.domain.AccountSettings = accountPost("/api/v1/me/settings")
+    suspend fun saveSettings(changes: kotlinx.serialization.json.JsonObject): com.onlygoodthings.shared.domain.AccountSettings =
+        accountPost("/api/v1/me/settings/update", changes)
+    suspend fun wallet(): com.onlygoodthings.shared.domain.WalletSummary = accountPost("/api/v1/wallet/summary")
+    suspend fun threads(): List<com.onlygoodthings.shared.domain.TimebankThread> = accountPost("/api/v1/timebank/inbox")
+    suspend fun messages(matchId: String): List<com.onlygoodthings.shared.domain.TimebankMessageDto> =
+        accountPost("/api/v1/timebank/messages", buildJsonObject { put("matchId", JsonPrimitive(matchId)) })
+    suspend fun sendMessage(matchId: String, body: String): com.onlygoodthings.shared.domain.TimebankMessageDto =
+        accountPost("/api/v1/timebank/message/send", buildJsonObject { put("matchId", JsonPrimitive(matchId)); put("body", JsonPrimitive(body)) })
+    suspend fun exportAccount(): kotlinx.serialization.json.JsonObject = accountPost("/api/v1/account/export")
+    suspend fun unregisterNoticeToken(token: String, bearer: String) {
+        accountPost<String>("/api/v1/notifications/unregister", buildJsonObject { put("token", JsonPrimitive(token)) },bearer)
+    }
+
     suspend fun openSession(token: String, firebaseUid: String): UserProfile = try {
         val response: ApiResponse<UserProfile> = client.post("${session.apiBaseUrl}/api/v1/auth/session") {
             contentType(ContentType.Application.Json)

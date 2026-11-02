@@ -53,6 +53,7 @@ data class WalletSummary(
     val missing: Int,
     val activity: List<WalletActivity> = emptyList(),
     val ranking: List<NeighborCard> = emptyList(),
+    val myRank: Int? = null,
 )
 
 @Serializable

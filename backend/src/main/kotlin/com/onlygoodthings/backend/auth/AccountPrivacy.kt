@@ -24,4 +24,7 @@ data class AccountExport(
     val coupons:List<com.onlygoodthings.shared.domain.BusinessCoupon> = emptyList(),
     val companyTeam:List<com.onlygoodthings.backend.business.CsrPersonalTeamRecord> = emptyList(),
     val companyApplications:List<com.onlygoodthings.backend.business.CsrRegistration> = emptyList(),
+    val preferences: com.onlygoodthings.shared.domain.AccountSettings = com.onlygoodthings.shared.domain.AccountSettings(),
+    val records: Map<String,List<kotlinx.serialization.json.JsonObject>> = emptyMap(),
+    val scopeDescription: String = "Datos de tu cuenta, contenido propio y actividad disponible. Las fotos y videos se referencian por URL; no se incluyen datos privados de otras cuentas ni claves de acceso.",
 )

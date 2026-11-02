@@ -18,6 +18,8 @@ import androidx.compose.foundation.verticalScroll
 import com.onlygoodthings.app.ui.components.OgtOutlinedTextField as OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,18 +47,90 @@ import com.onlygoodthings.app.ui.components.OgtTopBar
 import com.onlygoodthings.app.ui.components.ogtDismissImeOnScroll
 import com.onlygoodthings.shared.data.local.LocalAdoptRequest
 import com.onlygoodthings.shared.data.local.OgtIds
+import kotlinx.coroutines.launch
 
 @Composable
-fun ChatScreen(matchId: String = OgtIds.MatchCamila, onBack: () -> Unit) {
+fun ChatScreen(matchId: String = "", onBack: () -> Unit) {
+    val me=LocalOgtSession.current.me()
+    val db=LocalOgtDb.current
+    if(db.matches.any { it.id==matchId && (me.owns(it.requesterId) || me.owns(it.providerId)) }) {
+        LocalChatScreen(matchId,onBack)
+    } else RemoteChatScreen(matchId,onBack)
+}
+
+@Composable
+private fun RemoteChatScreen(matchId: String,onBack: () -> Unit) {
+    val auth=com.onlygoodthings.app.data.LocalAuth.current
+    val session=LocalOgtSession.current
+    val owner=session.me().id
+    val scope=rememberCoroutineScope()
+    val state=com.onlygoodthings.app.ui.components.rememberAccountData("$owner:$matchId") {
+        val thread=auth.account.threads().firstOrNull { it.matchId==matchId } ?: error("Conversación no disponible")
+        thread to auth.account.messages(matchId)
+    }
+    var draft by remember(owner,matchId) { mutableStateOf("") }
+    var sending by remember(owner,matchId) { mutableStateOf(false) }
+    var error by remember(owner,matchId) { mutableStateOf<String?>(null) }
+    val lifecycle=androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(owner,matchId) {
+        while(true) {
+            kotlinx.coroutines.delay(5000)
+            if(!sending && !state.busy && lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED))state.reload()
+        }
+    }
+    Column(Modifier.fillMaxSize().background(OgtColors.canvas)) {
+        OgtTopBar("Mensajes",onBack=onBack)
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+            com.onlygoodthings.app.ui.components.AccountDataStatus(state)
+            state.value?.let { (thread,messages) ->
+                Text(thread.peerName,fontWeight=FontWeight.Bold,fontSize=20.sp)
+                OgtCaption(thread.tagLabel)
+                OgtCaption("Coordiná en un lugar público y de día. No compartas contraseñas ni datos bancarios.")
+                if(messages.isEmpty())OgtCaption("Todavía no hay mensajes en esta conversación.")
+                messages.forEach { msg -> Bubble(msg.body,msg.mine,com.onlygoodthings.shared.domain.relativeTimeLabel(msg.createdAtEpochMs,com.onlygoodthings.shared.realtime.currentEpochMs())) }
+            }
+        }
+        Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            error?.let { Text(it,color=OgtColors.error) }
+            OutlinedTextField(value=draft,onValueChange={draft=it.take(800)},modifier=Modifier.fillMaxWidth(),enabled=!sending,
+                placeholder={Text("Escribí un mensaje")},colors=ogtOutlinedFieldColors())
+            OgtCaption("${draft.length}/800")
+            OgtPrimaryButton(if(sending)"Enviando…" else "Enviar",enabled=!sending && draft.isNotBlank() && state.value!=null) {
+                val body=draft
+                sending=true;error=null
+                scope.launch {
+                    try {
+                        check(session.me().id==owner)
+                        auth.account.sendMessage(matchId,body)
+                        if(session.me().id==owner) { draft="";state.reload() }
+                    } catch(cancel:kotlinx.coroutines.CancellationException) { throw cancel }
+                    catch(_:Exception) { error="No se pudo confirmar el envío. Actualizá la conversación antes de reintentarlo." }
+                    finally { sending=false }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocalChatScreen(matchId: String, onBack: () -> Unit) {
     val db = LocalOgtDb.current
     val me = LocalOgtSession.current.me()
     var tick by remember { mutableStateOf(0) }
-    val match = db.match(matchId)
-    val peer = db.user(if (match.providerId == me.id) match.requesterId else match.providerId)
+    val match = db.matches.firstOrNull { it.id == matchId && (me.owns(it.requesterId) || me.owns(it.providerId)) }
+    if (match == null) {
+        Column { OgtTopBar("Mensajes",onBack=onBack);OgtCaption("Esta conversación no está disponible para tu cuenta.") }
+        return
+    }
+    val peer = db.userOrNull(if (me.owns(match.providerId)) match.requesterId else match.providerId)
+    if(peer==null) {
+        Column { OgtTopBar("Mensajes",onBack=onBack);OgtCaption("No pudimos recuperar los datos de los participantes de esta conversación.") }
+        return
+    }
     val adopt = remember(matchId, tick, db.inboxEpoch) { db.adoptRequestOfMatch(matchId) }
     val sighting = remember(matchId, tick, db.inboxEpoch, db.lostEpoch) { db.sightingOfMatch(matchId) }
     val msgs = remember(matchId, tick, db.inboxEpoch) { db.messagesOf(matchId) }
-    var draft by remember { mutableStateOf("") }
+    var draft by remember(me.id,matchId) { mutableStateOf("") }
     var openForm by remember(matchId) { mutableStateOf(adopt != null) }
     val adoption = adopt != null
     val lostChat = sighting != null
@@ -71,7 +145,7 @@ fun ChatScreen(matchId: String = OgtIds.MatchCamila, onBack: () -> Unit) {
                     Text(peer.displayName, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                     OgtCaption(
                         if (adoption || lostChat) "${match.requestedLabel} · ${peer.levelLabel}"
-                        else "${peer.levelLabel} · ${peer.communityPoints} pts · En línea",
+                        else "${peer.levelLabel} · ${peer.communityPoints} pts",
                     )
                 }
                 OgtPill(if (adoption) "Postulación" else if (lostChat) "Avistaje" else "Encuentro Seguro")
@@ -91,8 +165,6 @@ fun ChatScreen(matchId: String = OgtIds.MatchCamila, onBack: () -> Unit) {
                 OgtSectionTitle("Acción comunitaria en curso")
                 OgtCaption("${match.offeredLabel} x ${match.requestedLabel}")
                 Text(match.quote ?: match.distanceLabel, fontWeight = FontWeight.SemiBold)
-                OgtCaption("Punto fijado · 2 artículos acordados")
-                OgtPrimaryButton("Confirmar encuentro") { }
             }
             msgs.forEach { msg ->
                 val form = msg.adoptRequestId?.let { id -> db.adoptRequests.firstOrNull { it.id == id } }
@@ -108,21 +180,11 @@ fun ChatScreen(matchId: String = OgtIds.MatchCamila, onBack: () -> Unit) {
                     Bubble(msg.body, mine = msg.senderId == me.id, time = msg.timeLabel)
                 }
             }
-            if (!adoption && !lostChat && matchId == OgtIds.MatchCamila) {
-                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(OgtColors.mint).padding(12.dp)) {
-                    Column {
-                        Text("Pérgola Central · Plaza Armenia", fontWeight = FontWeight.Bold)
-                        OgtCaption("Punto de encuentro verificado · 17:30 hs")
-                        OgtPill("Ambos confirmaron")
-                    }
-                }
-                Text("${peer.displayName.substringBefore(" ")} está escribiendo…", color = OgtColors.muted, fontSize = 13.sp)
-            }
+
         }
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (!adoption && !lostChat) {
-                OgtPrimaryButton("Completar Trueque y Calificar · +80 Karma") { onBack() }
-            }
+            OgtCaption("Conversación local en este dispositivo; no se sincroniza con el servidor.")
+            if(!match.chatEnabled)OgtCaption("Esta conversación solo permite lectura.")
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -131,6 +193,7 @@ fun ChatScreen(matchId: String = OgtIds.MatchCamila, onBack: () -> Unit) {
                 OutlinedTextField(
                     value = draft,
                     onValueChange = { draft = it },
+                    enabled = match.chatEnabled,
                     modifier = Modifier.weight(1f),
                     placeholder = {
                         Text(
@@ -141,7 +204,7 @@ fun ChatScreen(matchId: String = OgtIds.MatchCamila, onBack: () -> Unit) {
                     shape = RoundedCornerShape(OgtDimens.buttonRadius),
                     colors = ogtOutlinedFieldColors(),
                 )
-                val canSend = draft.isNotBlank()
+                val canSend = match.chatEnabled && draft.isNotBlank()
                 Box(
                     Modifier
                         .size(48.dp)

@@ -309,7 +309,7 @@ class SocialSqlRepository(private val db: Database) {
                 """
                 SELECT id::text, display_name, photo_url, community_points, role::text
                 FROM users
-                WHERE status = 'ACTIVE' AND display_name ILIKE ? AND ${interactionSql(viewerId,"id")}
+                WHERE status = 'ACTIVE' AND display_name ILIKE ? AND ${interactionSql(viewerId,"id")} AND ${profileVisibilitySql(viewerId,"users")}
                 ORDER BY community_points DESC
                 LIMIT 12
                 """.trimIndent(),
@@ -341,6 +341,7 @@ class SocialSqlRepository(private val db: Database) {
     }
 
     fun updateOwnProfile(userId: String, data: Map<String, Any?>) {
+        validateSettings(data)
         val name = data.optString("displayName")?.trim().orEmpty()
         val photo = data.optString("photoUrl")?.trim().orEmpty()
         val settings = mapOf(
@@ -353,6 +354,8 @@ class SocialSqlRepository(private val db: Database) {
             "parkingRadarSounds" to data.optBoolean("parkingRadarSounds", true),
             "radarEnabled" to data.optBoolean("radarEnabled", true),
             "carbonSaveMode" to data.optBoolean("carbonSaveMode", false),
+            "quietHoursEnabled" to data.optBoolean("quietHoursEnabled", true),
+            "timeZone" to (data.optString("timeZone") ?: "America/Argentina/Buenos_Aires"),
         )
         val payload = com.onlygoodthings.backend.http.JsonBody.objectMapper.writeValueAsString(
             settings.filterKeys { data.containsKey(it) },
@@ -378,6 +381,20 @@ class SocialSqlRepository(private val db: Database) {
         }
     }
 
+    fun ownSettings(userId: String): com.onlygoodthings.shared.domain.AccountSettings =
+        db.withConnection { readAccountSettings(it, userId) }
+
+    fun updateSettings(userId: String, data: Map<String, Any?>): com.onlygoodthings.shared.domain.AccountSettings {
+        val changes = validateSettings(data)
+        require(changes.size == data.size) { "Ajuste no reconocido" }
+        return db.withConnection { c ->
+            c.prepareStatement("UPDATE users SET metadata=jsonb_set(COALESCE(metadata,'{}'::jsonb),'{settings}',COALESCE(metadata->'settings','{}'::jsonb)||?::jsonb),updated_at=now() WHERE id=?::uuid").use { q ->
+                q.setString(1,com.onlygoodthings.backend.http.JsonBody.objectMapper.writeValueAsString(changes));q.setString(2,userId);q.executeUpdate()
+            }
+            readAccountSettings(c,userId)
+        }
+    }
+
     fun neighborCard(viewerId: String, userId: String): com.onlygoodthings.shared.domain.NeighborCard? =
         db.withConnection { connection ->
             connection.prepareStatement(
@@ -388,7 +405,7 @@ class SocialSqlRepository(private val db: Database) {
                        (SELECT COUNT(*) FROM follows f WHERE f.follower_id = u.id) AS following,
                        EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ?::uuid AND f.followed_id = u.id) AS viewer_follows
                 FROM users u
-                WHERE u.id = ?::uuid AND u.status = 'ACTIVE' AND ${interactionSql(viewerId,"u.id")}
+                WHERE u.id = ?::uuid AND u.status = 'ACTIVE' AND ${interactionSql(viewerId,"u.id")} AND ${profileVisibilitySql(viewerId,"u")}
                 """.trimIndent(),
             ).use { stmt ->
                 stmt.setString(1, viewerId)
