@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Sonda corta de wss://host/db: handshake, auth, listen y child_changed. Siempre corta."""
+"""Sonda corta de wss://host/db: handshake y auth.
+
+En producción el token por defecto es de laboratorio: el rechazo
+UNAUTHENTICATED es el resultado correcto. Con OGT_TOKEN=JWT real
+sigue el flujo listen + child_changed.
+"""
 from __future__ import annotations
 
 import json
@@ -12,7 +17,8 @@ import time
 import urllib.error
 import urllib.request
 
-TOKEN = os.environ.get("OGT_TOKEN", "dev.dev-user-ana.USER")
+LAB_TOKEN = "dev.dev-user-ana.USER"
+TOKEN = os.environ.get("OGT_TOKEN", LAB_TOKEN)
 HOST = os.environ.get("OGT_HOST", "onlygoodthings.lat")
 PATH = "/db"
 DEADLINE_S = 12
@@ -118,6 +124,7 @@ def main() -> int:
     authed = False
     listen_ok = False
     live = False
+    lab_probe = TOKEN.startswith("dev.")
     while time.monotonic() - started < DEADLINE_S:
         try:
             raw = recv_frame(sock)
@@ -145,9 +152,13 @@ def main() -> int:
             live = True
             break
         elif kind == "value" and listen_ok:
-            # snapshot inicial; seguimos esperando child_changed
             continue
         elif kind == "error":
+            code = msg.get("code")
+            # Producción debe rechazar tokens de laboratorio. Eso es verde.
+            if lab_probe and code == "UNAUTHENTICATED":
+                print("ok lab token rejected on /db")
+                return 0
             print("fail", msg)
             return 1
     try:
@@ -158,6 +169,9 @@ def main() -> int:
     if authed and listen_ok and live:
         print("ok auth listen child_changed")
         return 0
+    if lab_probe:
+        print(f"fail expected UNAUTHENTICATED for lab token, got authed={authed}")
+        return 1
     print(f"fail authed={authed} listen={listen_ok} live={live}")
     return 1
 
