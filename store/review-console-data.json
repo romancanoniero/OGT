@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "preparedAt": "2026-11-09",
+  "readyToSubmit": false,
+  "credentialsIncluded": false,
+  "googlePlay": {
+    "packageName": "com.onlygoodthings.app",
+    "appId": "4974603618070417614",
+    "latestUploadedVersionCodeVerified": 12,
+    "localSignedCandidateVersionCode": 16,
+    "candidateUploaded": false,
+    "targetAudience": {"ages": ["18+"], "saved": true, "submitted": false},
+    "dataSafety": {
+      "saved": true,
+      "submitted": false,
+      "addedAddress": "Collected, optional, non-ephemeral, app functionality; explicit user-initiated private adoption application",
+      "adultConsentPurposeAdded": "Fraud prevention, security and compliance under Other personal info",
+      "existingAnswersPreserved": true
+    },
+    "reviewAccess": {
+      "state": "prepared_not_saved",
+      "name": "Only Good Things review account",
+      "instructionsFile": "store/android/review_instructions.txt",
+      "credentialsSource": "Existing ordinary review account held outside Git; do not rotate or publish credentials",
+      "observedLegacyDeclaration": "Lab user account; instructions mention test phone and fixed SMS code",
+      "saveRequires": [
+        "Verify the ordinary review account on the exact candidate",
+        "Deploy and verify access from a network outside the prelaunch IP allowlist",
+        "Then replace the old credentials/instructions and truthfully confirm full mobile feature access"
+      ]
+    },
+    "location": {
+      "state": "prepared_not_saved",
+      "purpose": "OGT conecta a vecinos para compartir ayuda, buenas noticias e historias, encontrar mascotas y colaborar con lugares de estacionamiento cercanos. La ubicación permite mostrar opciones próximas y coordinar el estacionamiento solidario.",
+      "feature": "Al elegir «Siempre», OGT mantiene un servicio de ubicación con notificación visible para actualizar la última posición del usuario aunque cambie de aplicación. Esto mantiene la referencia de proximidad para el estacionamiento comunitario. Se puede elegir «Mientras uses la app» o desactivar GPS en Ajustes. No se almacena un historial de rutas.",
+      "videoUrl": null,
+      "videoRequires": "Genuine demonstration of candidate 16: prominent disclosure before the Android permission request, the background function, visible notification and stopping location when disabled. Use authorized test coordinates and exclude passwords/private notifications.",
+      "runtimeVerificationRequired": ["While in use", "Always", "Deny", "Revoke", "GPS disabled", "Background notification"]
+    }
+  },
+  "appStoreConnect": {
+    "appId": "6813852319",
+    "bundleId": "com.onlygoodthings.app",
+    "localSignedCandidateBuild": 15,
+    "latestUploadedBuildVerified": false,
+    "candidateUploaded": false,
+    "developerLogin": "User action pending in official App Store Connect page",
+    "privacyAmendment": {
+      "state": "prepared_not_saved",
+      "dataType": "Physical Address",
+      "purpose": "App Functionality",
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "evidence": "Optional private adoption application; preserve the existing privacy declarations",
+      "inventory": "store/privacy-data-inventory.json"
+    },
+    "notesFile": "store/ios/review_notes.txt",
+    "dedicatedAppleIdentity": "Not created; approved email rejected as unavailable; Argentina and +54 already selected. User must choose an available email, enter/submit new password, verification and terms. Do not use or delete the owner's existing OGT account."
+  },
+  "remainingEvidence": [
+    "Physical Android and iPhone native acceptance and real notifications",
+    "Real Apple sign-in, account linking, re-entry and OGT account deletion with the dedicated identity",
+    "Current screenshots from the accepted candidate",
+    "Validated deployment and ordinary reviewer access before store submission"
+  ]
+}

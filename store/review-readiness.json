@@ -28,7 +28,7 @@
     {
       "id": "store_packages",
       "work": "Signed Android/iPhone candidates, current screenshots, location demonstration, review credentials and metadata matching the exact builds",
-      "state": "preparing_not_submitted"
+      "state": "signed_aab16_ipa15_verified_not_uploaded_runtime_acceptance_pending"
     }
   ],
   "validation": {
