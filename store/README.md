@@ -18,12 +18,21 @@ identidad, firma, Firebase real, ausencia de depuración y configuración de
 notificaciones de producción. El AAB solicita alineación de 16 KB y también
 se comprobaron el APK derivado y sus bibliotecas de 64 bits. No se subieron estos
 paquetes a las tiendas. Play tiene código 12 como última carga verificada;
-el último build de Apple todavía requiere comprobarse en la sesión del desarrollador.
+Apple tiene build 13 como última carga comprobada en TestFlight y su historial
+de cargas. La cuenta oficial confirma que el titular aceptó el contrato
+actualizado el 09/11/2026. La cuenta Apple de pruebas también está creada y
+se comprobó su sesión; resta su ciclo real dentro de OGT.
 
 `review-readiness.json` conserva el plan, las diferencias intencionales y las
 aceptaciones pendientes. `review-console-data.json` distingue los datos guardados
 de los textos preparados: Google conserva como borrador la edad 18+ y los cambios
-de seguridad de datos; Apple aún necesita la nueva categoría Dirección física.
+de seguridad de datos; Apple ya publica 17 tipos, incluida Dirección física para
+la postulación privada de adopción, vinculada al usuario y sin seguimiento.
+Se comprobaron los tipos y propósitos anteriores contra el inventario.
+Los dos paquetes QA ya están instalados en el Redmi Note 7 con Android 10.
+La respuesta de las pruebas se perdió al cortarse USB; el informe del segundo
+intento se guarda en el dispositivo y debe recuperarse antes de contar sus
+resultados como aprobados. Esto no verifica todavía permisos ni notificaciones.
 Las instrucciones en inglés de `android/review_instructions.txt` reemplazarán
 la referencia de laboratorio después de comprobar el acceso real del revisor.
 Las credenciales permanecen fuera de Git. No confirmar acceso completo ni enviar

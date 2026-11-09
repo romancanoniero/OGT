@@ -42,11 +42,23 @@
     "appId": "6813852319",
     "bundleId": "com.onlygoodthings.app",
     "localSignedCandidateBuild": 15,
-    "latestUploadedBuildVerified": false,
+    "latestUploadedBuildVerified": true,
+    "latestUploadedBuild": 13,
     "candidateUploaded": false,
-    "developerLogin": "User action pending in official App Store Connect page",
+    "developerLogin": "Verified in the official App Store Connect session",
+    "developerAgreement": {
+      "state": "accepted_by_owner",
+      "acceptedAt": "2026-11-09",
+      "verifiedInOfficialAccount": true,
+      "deadline": "2026-11-13",
+      "reviewPageOpened": true,
+      "acceptedByAgent": false
+    },
     "privacyAmendment": {
-      "state": "prepared_not_saved",
+      "state": "saved_privacy_label_published",
+      "savedAt": "2026-11-09",
+      "verifiedCategoryCount": 17,
+      "existingCategoriesAndPurposesPreserved": true,
       "dataType": "Physical Address",
       "purpose": "App Functionality",
       "linkedToUser": true,
@@ -55,10 +67,10 @@
       "inventory": "store/privacy-data-inventory.json"
     },
     "notesFile": "store/ios/review_notes.txt",
-    "dedicatedAppleIdentity": "Not created; approved email rejected as unavailable; Argentina and +54 already selected. User must choose an available email, enter/submit new password, verification and terms. Do not use or delete the owner's existing OGT account."
+    "dedicatedAppleIdentity": "Owner completed creation with another mailbox; verified signed in to account management on the official Apple site. Address held outside Git. Real OGT sign-in/linking/re-entry/deletion remains pending."
   },
   "remainingEvidence": [
-    "Physical Android and iPhone native acceptance and real notifications",
+    "Both Redmi QA packages are installed; recover the device-side report after restoring USB debugging, then complete native Android/iPhone acceptance and real notifications",
     "Real Apple sign-in, account linking, re-entry and OGT account deletion with the dedicated identity",
     "Current screenshots from the accepted candidate",
     "Validated deployment and ordinary reviewer access before store submission"

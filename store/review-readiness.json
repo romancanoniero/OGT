@@ -8,7 +8,7 @@
     {
       "id": "policies",
       "work": "Account-scoped adult and community-terms consent for every native sign-in provider; deletion remains available without acceptance; matching privacy disclosures",
-      "state": "implemented_google_changes_saved_apple_console_pending"
+      "state": "implemented_google_changes_saved_apple_privacy_amendment_published"
     },
     {
       "id": "review_access",
@@ -36,6 +36,11 @@
     "sharedJvm": 152,
     "androidJvm": 79,
     "androidInstrumentedOnDedicatedEmulator": 92,
+    "redmiQaPackagesInstalled": true,
+    "redmiPortableResultVerified": false,
+    "dedicatedAppleIdentityCreationVerified": true,
+    "appleDeveloperAgreementAcceptedAt": "2026-11-09",
+    "applePrivacyCategoryCountVerified": 17,
     "businessTransactionsOnSeparateQaDatabase": 21,
     "durableErasureWorkersOnSeparateQaDatabase": 2,
     "node": 113,
@@ -62,9 +67,8 @@
     "Google Play target audience is saved as 18+; optional adoption address collection and age-consent purpose are declared"
   ],
   "remainingEvidence": [
-    "Finish the dedicated Apple test identity and verify real sign-in, linking, re-entry and OGT account deletion without using the owner's real account",
-    "Complete App Store Connect privacy changes and verify the available build number using the developer session",
-    "Complete Redmi installation and native permission/media acceptance, then verify targeted FCM/APNs delivery on the exact signed candidates",
+    "Dedicated Apple identity creation is verified; finish real OGT sign-in, linking, re-entry and deletion without using the owner's real account",
+    "Both Redmi QA packages are installed; restore its USB debugging connection and recover the device-side test report, then complete native permission/media acceptance and targeted FCM/APNs on the exact signed candidates",
     "Record the genuine background-location disclosure and permission demonstration and complete Google's location declaration",
     "Validate the PR and deploy through the existing release workflow; verify the exact deployed commit and health; configure and verify bounded reviewer access",
     "Verify signed AAB/IPA, current screenshots and review instructions before marking either store ready"

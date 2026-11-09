@@ -275,7 +275,16 @@
   },
   "reviewReadinessAmendment": {
     "date": "2026-11-09",
-    "status": "google_changes_saved_apple_form_and_native_acceptance_pending",
+    "status": "google_changes_saved_apple_privacy_amendment_published_native_acceptance_pending",
+    "applePrivacyLabel": {
+      "publishedAt": "2026-11-09",
+      "verifiedCategoryCount": 17,
+      "physicalAddressPurpose": "APP_FUNCTIONALITY",
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "existingCategoriesAndPurposesPreserved": true,
+      "appReviewSubmitted": false
+    },
     "changes": [
       "Private server adoption applications and synchronized sightings",
       "Account-scoped adult/terms consent",
