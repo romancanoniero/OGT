@@ -36,8 +36,11 @@
     "sharedJvm": 152,
     "androidJvm": 79,
     "androidInstrumentedOnDedicatedEmulator": 92,
+    "androidInstrumentedOnPhysicalRedmi": 92,
     "redmiQaPackagesInstalled": true,
-    "redmiPortableResultVerified": false,
+    "redmiPortableResultVerified": true,
+    "redmiInstalledQaApkSha256": "cee2819051bdf71297b03fc6a94bd6656e4d8590dfdb050c654a4de55c2e9e0c",
+    "redmiEvidenceLimit": "Portable assertions passed on the installed QA APK; final signed UI, real provider, permission and notification acceptance remain separate",
     "dedicatedAppleIdentityCreationVerified": true,
     "appleDeveloperAgreementAcceptedAt": "2026-11-09",
     "applePrivacyCategoryCountVerified": 17,
@@ -68,7 +71,7 @@
   ],
   "remainingEvidence": [
     "Dedicated Apple identity creation is verified; finish real OGT sign-in, linking, re-entry and deletion without using the owner's real account",
-    "Both Redmi QA packages are installed; restore its USB debugging connection and recover the device-side test report, then complete native permission/media acceptance and targeted FCM/APNs on the exact signed candidates",
+    "Redmi portable report recovered: 92 passed; complete native UI/permission/media acceptance and targeted FCM/APNs on the exact signed candidates after stabilizing its USB connection",
     "Record the genuine background-location disclosure and permission demonstration and complete Google's location declaration",
     "Validate the PR and deploy through the existing release workflow; verify the exact deployed commit and health; configure and verify bounded reviewer access",
     "Verify signed AAB/IPA, current screenshots and review instructions before marking either store ready"

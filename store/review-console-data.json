@@ -70,7 +70,7 @@
     "dedicatedAppleIdentity": "Owner completed creation with another mailbox; verified signed in to account management on the official Apple site. Address held outside Git. Real OGT sign-in/linking/re-entry/deletion remains pending."
   },
   "remainingEvidence": [
-    "Both Redmi QA packages are installed; recover the device-side report after restoring USB debugging, then complete native Android/iPhone acceptance and real notifications",
+    "Both Redmi QA packages are installed and its 92-test portable report is verified; native Android/iPhone UI, permission and real notification acceptance remain pending",
     "Real Apple sign-in, account linking, re-entry and OGT account deletion with the dedicated identity",
     "Current screenshots from the accepted candidate",
     "Validated deployment and ordinary reviewer access before store submission"

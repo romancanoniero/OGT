@@ -30,9 +30,12 @@ de seguridad de datos; Apple ya publica 17 tipos, incluida Dirección física pa
 la postulación privada de adopción, vinculada al usuario y sin seguimiento.
 Se comprobaron los tipos y propósitos anteriores contra el inventario.
 Los dos paquetes QA ya están instalados en el Redmi Note 7 con Android 10.
-La respuesta de las pruebas se perdió al cortarse USB; el informe del segundo
-intento se guarda en el dispositivo y debe recuperarse antes de contar sus
-resultados como aprobados. Esto no verifica todavía permisos ni notificaciones.
+Se recuperó del dispositivo el informe completo: 92 comprobaciones portables
+aprobadas, sin fallos. La huella del APK probado queda en `review-readiness.json`;
+estos resultados no verifican todavía la UI final, los permisos, Apple real ni
+las notificaciones. La conexión USB sigue interrumpiéndose durante la preparación
+de la aceptación de pantallas. El titular eligió completar primero las pruebas
+físicas, por lo que el PR y la publicación del servidor siguen pendientes.
 Las instrucciones en inglés de `android/review_instructions.txt` reemplazarán
 la referencia de laboratorio después de comprobar el acceso real del revisor.
 Las credenciales permanecen fuera de Git. No confirmar acceso completo ni enviar
