@@ -2,8 +2,11 @@ import {test,expect} from '@playwright/test';
 import {readFile} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
+import assert from 'node:assert/strict';
 test.skip(process.env.OGT_FULL_E2E!=='1','Requires isolated QA API, database and emulator identities.');
-const sql=text=>execFileSync('docker',['exec','-i','ogt-qa-postgres-1','psql','-X','-qAt','-v','ON_ERROR_STOP=1','-U','ogt','-d','onlygoodthings'],{input:text,encoding:'utf8'}).trim();
+const qaPostgres=process.env.OGT_QA_POSTGRES_CONTAINER || 'ogt-qa-postgres-1';
+assert.match(qaPostgres,/^ogt-(qa|store-review-[0-9]{8})-postgres-1$/);
+const sql=text=>execFileSync('docker',['exec','-i',qaPostgres,'psql','-X','-qAt','-v','ON_ERROR_STOP=1','-U','ogt','-d','onlygoodthings'],{input:text,encoding:'utf8'}).trim();
 test('team invitation, exact roles and ownership acceptance work through the UI without losing typed input',async({page,request},info)=>{
  const fixture=JSON.parse(await readFile(new URL('../../build/team-qa-account.json',import.meta.url),'utf8'));
  const {owner,member,outsider}=fixture,companyId=randomUUID(),companyName='Empresa de equipo '+companyId.slice(0,8);

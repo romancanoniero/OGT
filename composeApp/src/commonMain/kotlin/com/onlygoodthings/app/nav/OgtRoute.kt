@@ -11,6 +11,7 @@ enum class OgtRoute(val title: String) {
     Login("Iniciar sesión"),
     Otp("Verificación OTP"),
     Recover("Recuperar contraseña"),
+    CommunityAgreement("Bienvenido a Only Good Things"),
     Permissions("Permisos"),
     Gps("Permiso GPS"),
     Identity("Verificación"),

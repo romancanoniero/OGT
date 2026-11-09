@@ -201,6 +201,19 @@
       "evidence": [
         "deploy/vps/docker-compose.yml"
       ]
+    },
+    {
+      "appleName": "Dirección física",
+      "purposes": [
+        "APP_FUNCTIONALITY"
+      ],
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "evidence": [
+        "shared/src/commonMain/kotlin/com/onlygoodthings/shared/domain/AnimalContact.kt",
+        "backend/src/main/kotlin/com/onlygoodthings/backend/community/AnimalContacts.kt"
+      ],
+      "scope": "Optional adoption application flow; address or home area is shared privately with the listing owner, not published to the feed."
     }
   ],
   "limits": {
@@ -212,7 +225,9 @@
     "retention": "Owner selected 30 days for automatic backups. Complete recent verified copy required before expiry; legacy/manual/unknown copies are preserved. External destination DEV_MAC is provisional and depends on the Mac being available.",
     "publication": "Prepared inventory; final owner review and store publication separate.",
     "accountPreferences": "Privacy/notification/radar choices and device time zone are stored per account. Time zone is used for quiet hours, not to infer a precise location.",
-    "photoAccess": "Native clients use the system photo/video picker. Broad Android READ_MEDIA_IMAGES and READ_EXTERNAL_STORAGE declarations have been removed; camera permission is requested separately."
+    "photoAccess": "Native clients use the system photo/video picker. Broad Android READ_MEDIA_IMAGES and READ_EXTERNAL_STORAGE declarations have been removed; camera permission is requested separately.",
+    "adoptionApplications": "Applicant name, phone, home area/address and voluntary household/pet-care answers are shared only between the application participants. Never shown on public sightings or to other accounts.",
+    "communityConsent": "Current terms version, acceptance timestamp and self-declared adulthood; no birth date or identity document collected."
   },
   "primaryReferences": [
     "https://developer.apple.com/app-store/app-privacy-details/",
@@ -228,12 +243,43 @@
       "Contacts",
       "Voice or sound recordings within videos",
       "App interactions",
-      "Other actions (reactions/follows)"
+      "Other actions (reactions/follows)",
+      "Address (optional private adoption application)"
     ],
     "locationSharing": "Map providers receive IP addresses and viewport tile requests. Location sharing disclosed for app functionality; collection also used for proximity/ranking. No advertising purpose.",
     "otherSharing": "Firebase operates as service provider; public content and chosen invitations are user-initiated transfers. No ads or data brokers.",
     "accountCollection": "Name and user ID required; email and phone optional across available sign-in methods.",
     "preservedBaseline": "Existing selected data types and purposes retained. Added functionality to diagnostics and personalization to user ID and location/interaction categories.",
-    "finalOwnerReviewPending": true
+    "finalOwnerReviewPending": true,
+    "readinessChangesSavedAt": "2026-11-09",
+    "readinessChangesSubmitted": false,
+    "adoptionAddress": {
+      "collected": true,
+      "optional": true,
+      "ephemeral": false,
+      "purposes": [
+        "APP_FUNCTIONALITY"
+      ],
+      "sharing": "User-initiated transfer to the explicitly identified listing owner; sharing exemption per Google Data safety guidance"
+    },
+    "adultConsent": {
+      "category": "Other personal info",
+      "requiredForCommunityUse": true,
+      "purposes": [
+        "APP_FUNCTIONALITY",
+        "ACCOUNT_MANAGEMENT",
+        "FRAUD_PREVENTION_SECURITY_COMPLIANCE"
+      ],
+      "birthDateCollected": false
+    }
+  },
+  "reviewReadinessAmendment": {
+    "date": "2026-11-09",
+    "status": "google_changes_saved_apple_form_and_native_acceptance_pending",
+    "changes": [
+      "Private server adoption applications and synchronized sightings",
+      "Account-scoped adult/terms consent",
+      "Physical address disclosure added for optional adoption flow"
+    ]
   }
 }

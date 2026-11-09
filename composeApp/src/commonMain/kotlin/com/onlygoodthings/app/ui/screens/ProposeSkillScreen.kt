@@ -25,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.onlygoodthings.app.data.LocalOgtDb
 import com.onlygoodthings.app.data.LocalOgtSession
-import com.onlygoodthings.app.data.announcePublishedPost
 import kotlinx.coroutines.launch
 import com.onlygoodthings.app.i18n.LocalOgtCopy
 import com.onlygoodthings.app.theme.OgtColors
@@ -40,13 +39,18 @@ import com.onlygoodthings.app.ui.components.ogtDismissImeOnScroll
 @Composable
 fun ProposeSkillScreen(onDone: () -> Unit) {
     val db = LocalOgtDb.current
-    val me = LocalOgtSession.current.me()
+    val session = LocalOgtSession.current
+    val me = session.me()
+    val auth = com.onlygoodthings.app.data.LocalAuth.current
     val copy = LocalOgtCopy.current
     val scope = rememberCoroutineScope()
     var need by remember { mutableStateOf("") }
     var give by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var triedPublish by remember { mutableStateOf(false) }
+    var publishing by remember(me.id) { mutableStateOf(false) }
+    var publishError by remember(me.id) { mutableStateOf<String?>(null) }
+    var localDraftSaved by remember(me.id) { mutableStateOf(false) }
     val missingNeed = need.trim().isEmpty()
     val missingGive = give.trim().isEmpty()
     val canPublish = !missingNeed && !missingGive
@@ -92,16 +96,33 @@ fun ProposeSkillScreen(onDone: () -> Unit) {
                     fontWeight = FontWeight.Medium,
                 )
             }
-            OgtPrimaryButton("Publicar el intercambio") {
+            publishError?.let { Text(it,color=OgtColors.error) }
+            OgtPrimaryButton(if(publishing) "Publicando…" else "Publicar el intercambio",enabled=!publishing) {
                 if (!canPublish) {
                     triedPublish = true
                     return@OgtPrimaryButton
                 }
-                val row = db.publishHelpExchange(me.id, need, give, note) ?: return@OgtPrimaryButton
-                val post = db.posts.firstOrNull { it.id == "post-pub-${row.createdAtEpochMs}" }
-                if (post != null) scope.launch { announcePublishedPost(db, post) }
-                onDone()
+                val owner=me.id
+                val wanted=need.trim();val offered=give.trim();val detail=note.trim()
+                publishing=true;publishError=null
+                scope.launch {
+                    try {
+                        check(session.me().id==owner)
+                        auth.account.publishExchange(wanted,offered,detail)
+                        check(session.me().id==owner)
+                        onDone()
+                    } catch(cancel:kotlinx.coroutines.CancellationException) { throw cancel }
+                    catch(_:Exception) {
+                        if(session.me().id==owner) {
+                            if(db.helpExchangesOf(owner).none { it.need==wanted && it.give==offered && it.note.orEmpty()==detail })
+                                db.publishHelpExchange(owner,wanted,offered,detail)
+                            localDraftSaved=true
+                            publishError="No se confirmó la publicación. Guardamos tu aviso en este dispositivo; podés reintentar el envío."
+                        }
+                    } finally { publishing=false }
+                }
             }
+            if(localDraftSaved)com.onlygoodthings.app.ui.components.OgtSecondaryButton("Ver mi aviso en este dispositivo",onClick=onDone)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 OgtCaption("Sin dinero. Una mano por otra.")
             }

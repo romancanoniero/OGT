@@ -4,7 +4,9 @@ import {randomUUID} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {writeFile} from 'node:fs/promises';
 const base='http://127.0.0.1:19083',checks=[];
-const sql=text=>execFileSync('docker',['exec','-i','ogt-qa-postgres-1','psql','-X','-qAt','-v','ON_ERROR_STOP=1','-U','ogt','-d','onlygoodthings'],{input:text,encoding:'utf8'}).trim();
+const qaPostgres=process.env.OGT_QA_POSTGRES_CONTAINER || 'ogt-qa-postgres-1';
+assert.match(qaPostgres,/^ogt-(qa|store-review-[0-9]{8})-postgres-1$/);
+const sql=text=>execFileSync('docker',['exec','-i',qaPostgres,'psql','-X','-qAt','-v','ON_ERROR_STOP=1','-U','ogt','-d','onlygoodthings'],{input:text,encoding:'utf8'}).trim();
 async function account(name){
  const email=`qa-business-${name}-${randomUUID()}@example.test`;
  const response=await fetch('http://127.0.0.1:19099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=demo-key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:'OnlyGoodThings-QA-2468',returnSecureToken:true})});

@@ -105,6 +105,17 @@ class AuthController(
     }
     var busy by mutableStateOf(false)
     var error by mutableStateOf<String?>(null)
+    var needsCommunityConsent by mutableStateOf(true)
+        private set
+
+    suspend fun acceptCommunityConsent(): Boolean = wrap {
+        val owner = preview.currentUserId
+        check(owner.isNotBlank()) { "Iniciá sesión para continuar" }
+        val saved = api.acceptCommunityConsent()
+        check(preview.currentUserId == owner) { "La sesión cambió" }
+        check(saved.current) { "No se pudo confirmar la aceptación" }
+        needsCommunityConsent = false
+    }
 
     private val _signedIn = MutableStateFlow(false)
     val signedIn: StateFlow<Boolean> = _signedIn
@@ -290,13 +301,18 @@ class AuthController(
     }
 
     suspend fun signOut() {
+        needsCommunityConsent = true
+        com.onlygoodthings.app.media.StoreReviewMedia.clear()
+        com.onlygoodthings.shared.realtime.OgtSdk.shutdown()
         prefs.noticeOwnerId = ""
         com.onlygoodthings.app.notify.clearSystemNotices()
         val previousToken=com.onlygoodthings.app.notify.currentPushToken()
         val previousBearer=session.firebaseJwt
+        val previousBase=session.apiBaseUrl
         stories.clear()
         runCatching { platform.signOut() }
         session.firebaseJwt = null
+        if(session.apiBaseUrl==com.onlygoodthings.shared.data.OGT_DEFAULT_API_BASE+"/store-review")session.apiBaseUrl=com.onlygoodthings.shared.data.OGT_DEFAULT_API_BASE
         pendingPhone = null
         secondFactorSignIn.clear()
         _signedIn.value = false
@@ -307,7 +323,7 @@ class AuthController(
         ensureDevBearer()
         if(previousToken!=null && previousBearer!=null)accountWorkScope.launch {
             kotlinx.coroutines.withTimeoutOrNull(3000) {
-                try { api.unregisterNoticeToken(previousToken,previousBearer) }
+                try { api.unregisterNoticeToken(previousToken,previousBearer,previousBase) }
                 catch(cancel:kotlinx.coroutines.CancellationException) { throw cancel }
                 catch(_:Exception) { /* Best effort offline; a new registration also reassigns this token. */ }
             }
@@ -344,6 +360,13 @@ class AuthController(
         }
     }
 
+    suspend fun refreshAnimalSightings(listingId: String) {
+        val owner=preview.currentUserId
+        val rows=animals.sightings(listingId)
+        check(owner.isNotBlank() && preview.currentUserId==owner) { "La sesión cambió" }
+        db.applyRemoteSightings(listingId,rows)
+    }
+
     /** JWT Firebase o token de lab para el handshake de db-kmp-sdk. */
     fun realtimeTokenProvider(): suspend (Boolean) -> String? = { force ->
         platform.idToken(force)
@@ -368,9 +391,16 @@ class AuthController(
         val profile = api.openSession(bearer, user.firebaseUid)
         session.firebaseJwt = bearer
         attachLocal(user, profile)
+        needsCommunityConsent = !api.communityConsent().current
         refreshSettings()
         val zone=kotlinx.datetime.TimeZone.currentSystemDefault().id
         if(preview.accountSettings.timeZone!=zone)preview.applyAccountSettings(api.saveSettings(kotlinx.serialization.json.buildJsonObject { put("timeZone",kotlinx.serialization.json.JsonPrimitive(zone)) }))
+        val reviewTransport=session.apiBaseUrl==com.onlygoodthings.shared.data.OGT_DEFAULT_API_BASE+"/store-review"
+        com.onlygoodthings.app.media.StoreReviewMedia.configure(reviewTransport) {
+            check(platform.currentUser()?.firebaseUid==user.firebaseUid) { "La sesión cambió" }
+            platform.idToken(false)
+        }
+        com.onlygoodthings.shared.realtime.OgtSdk.restart(com.onlygoodthings.shared.realtime.gatewayEndpointFromApiBase(session.apiBaseUrl),realtimeTokenProvider())
         stories.start(preview.currentUserId)
         ensureDevBearer()
         _signedIn.value = true

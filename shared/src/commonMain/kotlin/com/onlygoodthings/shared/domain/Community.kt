@@ -134,6 +134,8 @@ data class TimebankThread(
     val lastBody: String = "",
     val lastAtEpochMs: Long = 0L,
     val status: String = "ACTIVE",
+    val animalListingId: String? = null,
+    val animalContactKind: String? = null,
 )
 
 @Serializable
@@ -145,6 +147,7 @@ data class TimebankMessageDto(
     val body: String,
     val createdAtEpochMs: Long,
     val mine: Boolean = false,
+    val adoptionForm: AdoptionApplicationForm? = null,
 )
 
 fun communityLevelLabel(points: Int): String = when {

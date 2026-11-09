@@ -29,6 +29,18 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
 
 fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
+    post("/api/v1/me/consent") {
+        val me = call.principal<AuthPrincipal>() ?: return@post call.respond(HttpStatusCode.Unauthorized, ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"))
+        call.respond(ApiResponse.ok(repository.ownConsent(me.userId)))
+    }
+    post("/api/v1/me/consent/accept") {
+        val me = call.principal<AuthPrincipal>() ?: return@post call.respond(HttpStatusCode.Unauthorized, ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"))
+        val consent = try { repository.acceptConsent(me.userId, JsonBody.receiveMap(call)) }
+        catch (failure: IllegalArgumentException) {
+            return@post call.respond(HttpStatusCode.BadRequest, ApiResponse.fail<Unit>(failure.message ?: "Confirmación inválida", "BAD_REQUEST"))
+        }
+        call.respond(ApiResponse.ok(consent))
+    }
     post("/api/v1/me/settings") {
         val principal = call.principal<AuthPrincipal>() ?: return@post call.respond(HttpStatusCode.Unauthorized,ApiResponse.fail<Unit>("Token requerido","UNAUTHENTICATED"))
         call.respond(ApiResponse.ok(repository.ownSettings(principal.userId)))

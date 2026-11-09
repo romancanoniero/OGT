@@ -5,7 +5,7 @@ test.skip(process.env.OGT_FULL_E2E !== '1','Requires isolated QA services and te
 test('viewer reports a real story and CRM resolves it without exposing normal post tools',async({page,request},info)=>{
  const a=JSON.parse(await readFile(new URL('../../build/stories-qa-account.json',import.meta.url),'utf8'));
  const id=randomUUID(),caption=`Historia CRM QA ${id} <script>window.storyInjected=true</script>`;
- const r=await request.post('http://127.0.0.1:19083/api/v1/stories/publish',{headers:{Authorization:`Bearer ${a.token}`},data:{requestId:id,kind:'IMAGE',audience:'COMMUNITY',caption,bytesBase64:(await readFile(new URL('../artifacts/story-photo.png',import.meta.url))).toString('base64')}});
+ const r=await request.post('http://127.0.0.1:19083/api/v1/stories/publish',{headers:{Authorization:`Bearer ${a.token}`},data:{requestId:id,kind:'IMAGE',audience:'COMMUNITY',caption,bytesBase64:(await readFile(new URL('../../backend/src/test/resources/images/transparent.webp',import.meta.url))).toString('base64')}});
  expect(r.ok()).toBe(true);const story=(await r.json()).data;
  await page.goto('/privacy.html');
  await page.addStyleTag({url:'/styles.css'});

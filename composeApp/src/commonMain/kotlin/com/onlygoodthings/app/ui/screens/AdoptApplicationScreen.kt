@@ -20,11 +20,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.onlygoodthings.app.data.LocalAuth
+import com.onlygoodthings.app.data.isUuid
+import kotlinx.coroutines.launch
 import com.onlygoodthings.app.data.LocalOgtDb
 import com.onlygoodthings.app.data.LocalOgtSession
 import com.onlygoodthings.app.i18n.LocalOgtCopy
@@ -55,11 +59,19 @@ fun AdoptApplicationScreen(
     onSent: (matchId: String) -> Unit = { onBack() },
 ) {
     val db = LocalOgtDb.current
-    val me = LocalOgtSession.current.me()
+    val session = LocalOgtSession.current
+    val me = session.me()
+    val auth = LocalAuth.current
+    val scope = rememberCoroutineScope()
+    var sending by remember(me.id,postId) { mutableStateOf(false) }
+    var sendError by remember(me.id,postId) { mutableStateOf<String?>(null) }
     val copy = LocalOgtCopy.current
     val es = copy.lang == OgtLang.ES
     val post = db.post(postId)
     val listing = post.listingId?.let { id -> db.animals.firstOrNull { it.id == id } }
+    val remote = com.onlygoodthings.app.ui.components.rememberAccountData("${me.id}:$postId") {
+        if (listing?.id?.isUuid() == true) auth.account.threads().firstOrNull { it.animalListingId == listing.id && it.animalContactKind == "ADOPTION" } else null
+    }
     val existing = remember(postId, me.id) {
         db.adoptRequests.firstOrNull { it.postId == postId && it.applicantUserId == me.id }
     }
@@ -69,20 +81,10 @@ fun AdoptApplicationScreen(
     var home by remember { mutableStateOf(if (es) "Depto" else "Apartment") }
     var otherPets by remember { mutableStateOf(if (es) "No" else "No") }
     var species by remember { mutableStateOf(setOf<String>()) }
-    var household by remember {
-        mutableStateOf(
-            if (es) "Vivo con mi pareja. No hay niñes en casa."
-            else "I live with my partner. No kids at home.",
-        )
-    }
+    var household by remember { mutableStateOf("") }
     var hours by remember { mutableStateOf(if (es) "4 a 8 h" else "4–8 h") }
     var experience by remember { mutableStateOf(if (es) "Ya tuve mascotas" else "I've had pets") }
-    var motive by remember {
-        mutableStateOf(
-            if (es) "Quiero darle un hogar estable, con paseos y veterinario de cabecera."
-            else "I can offer a stable home, walks, and a regular vet.",
-        )
-    }
+    var motive by remember { mutableStateOf("") }
     var sent by remember { mutableStateOf(false) }
     var sentMatchId by remember { mutableStateOf(existing?.matchId) }
     val homes = if (es) listOf("Depto", "Casa", "Casa con patio") else listOf("Apartment", "House", "House with yard")
@@ -112,30 +114,40 @@ fun AdoptApplicationScreen(
             OgtSectionTitle(listing?.title ?: post.tag)
             OgtCaption(listing?.description ?: post.body)
             if (post.place.isNotBlank()) OgtCaption(post.place)
-            if (existing != null || sent) {
+            if (existing != null || remote.value != null || sent) {
                 OgtCard {
                     Text(
-                        if (es) "Ya enviaste tu postulación. Quedó en la casilla de quien publicó, junto al formulario."
-                        else "You already applied. The poster has the form in their inbox.",
+                        if (listing?.id?.isUuid() == true && (remote.value != null || sent)) {
+                            if (es) "Ya enviaste tu postulación. Quedó en la casilla de quien publicó, junto al formulario."
+                            else "You already applied. The poster has the form in their inbox."
+                        } else {
+                            if (es) "Tu postulación anterior se conserva en este dispositivo, junto al formulario."
+                            else "Your previous application and form are preserved on this device."
+                        },
                         fontWeight = FontWeight.SemiBold,
                         color = OgtColors.ink,
                     )
                 }
-                val matchId = sentMatchId ?: existing?.matchId
+                val matchId = sentMatchId ?: remote.value?.matchId ?: existing?.matchId
                 if (!matchId.isNullOrBlank()) {
                     OgtPrimaryButton(if (es) "Ver conversación" else "Open conversation") { onSent(matchId) }
                 }
                 OgtPrimaryButton(if (es) "Volver a la ficha" else "Back to the post", onClick = onBack)
             } else {
             OgtCaption(
-                if (es) "Formulario comunitario. Se envía a la casilla de quien publicó. No se publica en el feed."
-                else "Community form. It goes to the poster's inbox — not the feed.",
+                if (listing?.id?.isUuid() == true) {
+                    if (es) "Formulario comunitario. Se envía a la casilla de quien publicó. No se publica en el feed."
+                    else "Community form. It goes to the poster's inbox, outside the public feed."
+                } else {
+                    if (es) "Ficha anterior de este dispositivo. El formulario y la conversación se guardan localmente."
+                    else "Previous listing on this device. The form and conversation are saved locally."
+                },
             )
             AdoptField(if (es) "Tu nombre" else "Your name", if (es) "Nombre y apellido" else "Full name", name) { name = it }
             AdoptField(if (es) "Teléfono" else "Phone", "11 0000 0000", phone, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Phone)) { phone = it }
             AdoptField(
-                if (es) "Domicilio" else "Address",
-                if (es) "Calle y altura · barrio" else "Street and neighborhood",
+                if (es) "Domicilio o zona del hogar" else "Address or home area",
+                if (es) "Podés indicar sólo el barrio o la zona" else "You can provide only your neighborhood or area",
                 address,
             ) { address = it }
             if (post.place.isNotBlank()) {
@@ -169,8 +181,8 @@ fun AdoptApplicationScreen(
                 minLines = 2,
                 placeholder = {
                     Text(
-                        if (es) "Quién vive ahí, edades, si hay niñes o personas mayores."
-                        else "Who lives there, ages, kids or older adults.",
+                        if (es) "Cómo es la convivencia. No incluyas nombres ni edades exactas."
+                        else "Describe the household without names or exact ages.",
                         color = OgtColors.muted,
                     )
                 },
@@ -192,9 +204,28 @@ fun AdoptApplicationScreen(
                 if (es) "Adopción responsable: no es un regalo, incluye veterinario y un hogar para toda la vida."
                 else "Responsible adoption: not a gift. Includes a vet and a lifelong home.",
             )
-            OgtPrimaryButton(if (es) "Enviar postulación" else "Send application") {
+            sendError?.let { Text(it,color=OgtColors.error) }
+            OgtPrimaryButton(if(sending) "Enviando…" else if (es) "Enviar postulación" else "Send application", enabled=!sending) {
+
                 val needsSpecies = otherPets == yesPets && species.isEmpty()
                 if (name.isBlank() || phone.isBlank() || address.isBlank() || household.isBlank() || motive.isBlank() || needsSpecies) {
+                    sendError = if(es) "Completá los datos del formulario antes de enviarlo." else "Complete the application before sending it."
+                    return@OgtPrimaryButton
+                }
+                if (listing?.id?.isUuid() == true) {
+                    sending=true;sendError=null
+                    val owner=me.id
+                    val form=com.onlygoodthings.shared.domain.AdoptionApplicationForm(titleCasePersonName(name),phone.trim(),address.trim(),home,otherPets,if(otherPets==yesPets)species.joinToString(", ") else "",household.trim(),hours,experience,motive.trim())
+                    scope.launch {
+                        try {
+                            check(session.me().id==owner)
+                            val thread=auth.animals.contact(com.onlygoodthings.shared.domain.AnimalContactRequest(listing.id,"ADOPTION",form))
+                            check(session.me().id==owner)
+                            sentMatchId=thread.matchId;sent=true
+                        } catch(cancel:kotlinx.coroutines.CancellationException) { throw cancel }
+                        catch(_:Exception) { sendError=if(es) "No se pudo confirmar el envío. Tu formulario se conserva para reintentarlo." else "Could not confirm delivery. Your form is preserved for retry." }
+                        finally { sending=false }
+                    }
                     return@OgtPrimaryButton
                 }
                 val ok = db.addAdoptRequest(

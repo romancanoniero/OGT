@@ -583,10 +583,12 @@ private fun startMatch(db: Database, me: String, peerId: String, slug: String): 
     } }
 }
 
-private fun timebankInbox(db: Database, userId: String): List<TimebankThread> = db.withConnection { connection ->
+internal fun timebankInbox(db: Database, userId: String): List<TimebankThread> = db.withConnection { connection ->
     connection.prepareStatement(
         """
-        SELECT m.id::text, m.status::text, t.slug, t.label,
+        SELECT m.id::text, m.status::text, t.slug,
+               CASE a.kind WHEN 'ADOPTION' THEN 'Adopción · ' || a.listing_title WHEN 'SIGHTING' THEN 'Avistaje · ' || a.listing_title ELSE t.label END AS label,
+               a.kind AS animal_kind, a.listing_id::text AS animal_listing_id,
                CASE WHEN m.requester_id = ?::uuid THEN m.provider_id ELSE m.requester_id END AS peer_id,
                peer.display_name,
                COALESCE(
@@ -598,6 +600,7 @@ private fun timebankInbox(db: Database, userId: String): List<TimebankThread> = 
                    EXTRACT(EPOCH FROM m.created_at) * 1000
                ) AS last_ms
         FROM timebank_matches m
+        LEFT JOIN animal_contacts a ON a.match_id=m.id
         JOIN skill_tags t ON t.id = m.tag_id
         JOIN users peer ON peer.id = CASE WHEN m.requester_id = ?::uuid THEN m.provider_id ELSE m.requester_id END
         WHERE (m.requester_id = ?::uuid OR m.provider_id = ?::uuid) AND ogt_users_can_interact(m.requester_id,m.provider_id)
@@ -618,6 +621,8 @@ private fun timebankInbox(db: Database, userId: String): List<TimebankThread> = 
                             lastBody = rs.getString("last_body").orEmpty(),
                             lastAtEpochMs = rs.getLong("last_ms"),
                             status = rs.getString("status"),
+                            animalListingId = rs.getString("animal_listing_id"),
+                            animalContactKind = rs.getString("animal_kind"),
                         ),
                     )
                 }
@@ -643,9 +648,10 @@ private fun timebankMessages(db: Database, userId: String, matchId: String): Lis
             """
             SELECT m.id::text, m.match_id::text, m.sender_id::text, m.body,
                    EXTRACT(EPOCH FROM m.created_at) * 1000 AS created_ms,
-                   u.display_name
+                   u.display_name, a.request_payload::text AS animal_payload
             FROM timebank_messages m
             JOIN users u ON u.id = m.sender_id
+            LEFT JOIN animal_contacts a ON a.initial_message_id=m.id AND a.kind='ADOPTION'
             WHERE m.match_id = ?::uuid
             ORDER BY m.created_at
             """.trimIndent(),
@@ -664,6 +670,7 @@ private fun timebankMessages(db: Database, userId: String, matchId: String): Lis
                                 body = rs.getString("body"),
                                 createdAtEpochMs = rs.getLong("created_ms"),
                                 mine = sender == userId,
+                                adoptionForm = rs.getString("animal_payload")?.let { kotlinx.serialization.json.Json.decodeFromString<com.onlygoodthings.shared.domain.AnimalContactRequest>(it).form },
                             ),
                         )
                     }
@@ -1431,7 +1438,7 @@ private fun ensureSkillTag(db: Database, rawLabel: String): String {
     }
 }
 
-private fun ensureMensajeTag(db: Database) {
+internal fun ensureMensajeTag(db: Database) {
     db.withConnection { connection ->
         connection.prepareStatement(
             """

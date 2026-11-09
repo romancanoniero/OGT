@@ -68,6 +68,28 @@ services:
       # Same installation, temporarily restricted to the reviewer's networks.
       # No forwarded-header IP strategy: do not trust client-supplied X-Forwarded-For.
       - traefik.http.routers.ogt-web.middlewares=ogt-prelaunch@docker
+      # Temporary store review access authenticates exact, expiring Firebase UIDs.
+      # The original router, IP gate and all CRM paths remain unchanged.
+      - traefik.http.routers.ogt-store-review.entrypoints=websecure
+      - traefik.http.routers.ogt-store-review.rule=Host(`onlygoodthings.lat`) && (PathPrefix(`/store-review/api/v1/`) || PathPrefix(`/store-review/media/`)) && !PathPrefix(`/store-review/api/v1/crm`) && !PathPrefix(`/store-review/api/v1/payments`)
+      - traefik.http.routers.ogt-store-review.tls.certresolver=le
+      - traefik.http.routers.ogt-store-review.priority=90
+      - traefik.http.routers.ogt-store-review.service=ogt-web
+      - traefik.http.routers.ogt-store-review.middlewares=ogt-review-auth@docker,ogt-review-strip@docker
+      - traefik.http.middlewares.ogt-review-auth.forwardauth.address=http://ogt-web/internal/store-review/authorize
+      - traefik.http.middlewares.ogt-review-auth.forwardauth.authRequestHeaders=Authorization
+      - traefik.http.middlewares.ogt-review-auth.forwardauth.trustForwardHeader=false
+      - traefik.http.middlewares.ogt-review-strip.stripprefix.prefixes=/store-review
+      # WebSocket credentials are checked in the auth frame before any data/listen.
+      - traefik.http.routers.ogt-store-review-db.entrypoints=websecure
+      - traefik.http.routers.ogt-store-review-db.rule=Host(`onlygoodthings.lat`) && Path(`/store-review/db`) && Method(`GET`)
+      - traefik.http.routers.ogt-store-review-db.tls.certresolver=le
+      - traefik.http.routers.ogt-store-review-db.priority=90
+      - traefik.http.routers.ogt-store-review-db.service=ogt-web
+      - traefik.http.routers.ogt-store-review-db.middlewares=ogt-review-db-rate@docker,ogt-review-db-connections@docker
+      - traefik.http.middlewares.ogt-review-db-rate.ratelimit.average=5
+      - traefik.http.middlewares.ogt-review-db-rate.ratelimit.burst=20
+      - traefik.http.middlewares.ogt-review-db-connections.inflightreq.amount=30
       # Public brand information, legal documents and app-link proofs only.
       # Exact paths and read methods only; app, CRM, API and assets keep the gate.
       - traefik.http.routers.ogt-legal.entrypoints=websecure

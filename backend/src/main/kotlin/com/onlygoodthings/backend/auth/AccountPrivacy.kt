@@ -17,6 +17,7 @@ data class AccountExport(
     val phone: String? = null,
     val displayName: String,
     val communityPoints: Int,
+    val communityConsent: com.onlygoodthings.shared.domain.CommunityConsent = com.onlygoodthings.shared.domain.CommunityConsent(),
     val posts: List<AccountTextRow> = emptyList(),
     val comments: List<AccountTextRow> = emptyList(),
     val messagesSent: List<AccountTextRow> = emptyList(),

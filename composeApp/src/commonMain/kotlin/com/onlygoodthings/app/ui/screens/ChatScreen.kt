@@ -87,7 +87,18 @@ private fun RemoteChatScreen(matchId: String,onBack: () -> Unit) {
                 OgtCaption(thread.tagLabel)
                 OgtCaption("Coordiná en un lugar público y de día. No compartas contraseñas ni datos bancarios.")
                 if(messages.isEmpty())OgtCaption("Todavía no hay mensajes en esta conversación.")
-                messages.forEach { msg -> Bubble(msg.body,msg.mine,com.onlygoodthings.shared.domain.relativeTimeLabel(msg.createdAtEpochMs,com.onlygoodthings.shared.realtime.currentEpochMs())) }
+                messages.forEach { msg ->
+                    val time = com.onlygoodthings.shared.domain.relativeTimeLabel(msg.createdAtEpochMs,com.onlygoodthings.shared.realtime.currentEpochMs())
+                    val form = msg.adoptionForm
+                    if (form == null) Bubble(msg.body,msg.mine,time)
+                    else {
+                        var expanded by remember(msg.id) { mutableStateOf(false) }
+                        FormDocumentBubble(
+                            LocalAdoptRequest(msg.id,"",null,msg.senderId,form.applicantName,form.phone,form.address,form.homeKind,form.otherPets,form.otherSpecies,form.household,form.hoursAway,form.experience,form.motive,msg.matchId,msg.createdAtEpochMs),
+                            expanded,{ expanded = !expanded },time,msg.mine,
+                        )
+                    }
+                }
             }
         }
         Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {

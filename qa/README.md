@@ -197,6 +197,29 @@ normal de `iosMain`/`iosTest`. No sustituirla por una dependencia manual que
 suprima esa jerarquía. La configuración Firebase y la clave release reales se
 usan únicamente al generar la distribución, nunca para el paquete de QA.
 
+Para un Android físico autorizado, agregar `-Pogt.qaHost=127.0.0.1` al paquete
+`.qa` y conectar únicamente ese dispositivo con `adb -s <serial> reverse
+tcp:19083 tcp:19083` y `reverse tcp:19099 tcp:19099`. El host alternativo solo
+admite loopback o el puente del emulador; las versiones release conservan
+Firebase y HTTPS productivos. Los avisos de instalación del dispositivo los
+confirma su propietario. No usar `-g` para conceder todos los permisos.
+
+La aceptación de revisión de tiendas agrega `node
+qa/scripts/store-review-e2e.mjs`: consentimiento por cuenta, ayuda entre cuentas,
+formulario privado de adopción, reintentos concurrentes, avistajes, bloqueo,
+exportación y baja sin aceptar términos. Usa exclusivamente loopback e identidades
+del emulador. `python3 qa/check-store-review-routing.py` comprueba las reglas
+reales del proxy en contenedores temporales y conserva las rutas originales.
+
+`qa/scripts/store-review-authorization-e2e.mjs` requiere otra API de demo en
+`127.0.0.1:19085`, el UID del fixture privado `review-emulator.json` y un
+vencimiento corto guardado como `expiresAt` en `review-expiry-context.json`, ambos
+en `build/store-readiness`. Verifica el cierre de conexiones activas al vencer,
+el plazo de autenticación y la renovación sin cambiar de identidad. No imprimir
+los tokens del fixture ni usar credenciales o cuentas productivas para estas
+pruebas. Con otro proyecto Compose, definir `COMPOSE_PROJECT_NAME` y, para las
+suites que llaman al contenedor directamente, `OGT_QA_POSTGRES_CONTAINER`.
+
 ## Límites y diferencias intencionales
 
 La empresa debe operar con MFA y permisos vigentes por organización. Las cargas,

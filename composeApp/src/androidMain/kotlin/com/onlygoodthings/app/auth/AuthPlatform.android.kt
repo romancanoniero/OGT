@@ -453,5 +453,5 @@ actual class AuthPrefs actual constructor() {
 }
 
 actual fun defaultApiBaseUrl(): String =
-    if(com.onlygoodthings.app.BuildConfig.DEBUG && com.onlygoodthings.app.BuildConfig.APPLICATION_ID=="com.onlygoodthings.app.qa")"http://10.0.2.2:19083" else OGT_DEFAULT_API_BASE
+    if(com.onlygoodthings.app.BuildConfig.DEBUG && com.onlygoodthings.app.BuildConfig.APPLICATION_ID=="com.onlygoodthings.app.qa")"http://${com.onlygoodthings.app.BuildConfig.OGT_QA_HOST}:19083" else OGT_DEFAULT_API_BASE
 actual fun appVersionLabel(): String = "${com.onlygoodthings.app.BuildConfig.VERSION_NAME} (${com.onlygoodthings.app.BuildConfig.VERSION_CODE})"

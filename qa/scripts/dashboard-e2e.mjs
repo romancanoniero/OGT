@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {readFile,writeFile} from 'node:fs/promises';
-const sql=text=>execFileSync('docker',['exec','-i','ogt-qa-postgres-1','psql','-X','-qAt','-v','ON_ERROR_STOP=1','-U','ogt','-d','onlygoodthings'],{input:text,encoding:'utf8'}).trim();
+const qaPostgres=process.env.OGT_QA_POSTGRES_CONTAINER || 'ogt-qa-postgres-1';
+assert.match(qaPostgres,/^ogt-(qa|store-review-[0-9]{8})-postgres-1$/);
+const sql=text=>execFileSync('docker',['exec','-i',qaPostgres,'psql','-X','-qAt','-v','ON_ERROR_STOP=1','-U','ogt','-d','onlygoodthings'],{input:text,encoding:'utf8'}).trim();
 async function account(label){
  const r=await fetch('http://127.0.0.1:19099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=demo-key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:`qa-dashboard-${label}-${randomUUID()}@example.test`,password:'OnlyGoodThings-QA-2468',returnSecureToken:true})});assert.equal(r.status,200);
  const plain=(await r.json()).idToken;const parts=plain.split('.');const claims=JSON.parse(Buffer.from(parts[1],'base64url'));assert.equal(claims.aud,'demo-ogt-qa');claims.email_verified=true;claims.firebase.sign_in_second_factor='totp';parts[1]=Buffer.from(JSON.stringify(claims)).toString('base64url');const token=parts.join('.');

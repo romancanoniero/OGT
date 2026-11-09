@@ -515,6 +515,7 @@ fun Route.timebankRoutes(db: Database) {
                 UPDATE timebank_matches
                 SET status = 'CLOSED', chat_enabled = FALSE
                 WHERE id = ?::uuid AND requester_id = ?::uuid AND status <> 'CLOSED'
+                  AND NOT EXISTS (SELECT 1 FROM animal_contacts a WHERE a.match_id=timebank_matches.id)
                 RETURNING provider_id::text, requester_id::text
                 """.trimIndent(),
             ).use { stmt ->

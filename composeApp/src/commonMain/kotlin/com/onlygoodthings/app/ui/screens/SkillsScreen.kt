@@ -10,7 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -31,10 +32,18 @@ import com.onlygoodthings.shared.data.local.LocalHelpExchange
 fun SkillsScreen(onPropose: () -> Unit, onChat: (String) -> Unit) {
     val db = LocalOgtDb.current
     val me = LocalOgtSession.current.me()
+    val session = LocalOgtSession.current
+    val auth = com.onlygoodthings.app.data.LocalAuth.current
+    val scope = rememberCoroutineScope()
+    val remote = com.onlygoodthings.app.ui.components.rememberAccountData(me.id) { auth.account.timebankBoard() }
+    var opening by remember(me.id) { mutableStateOf<String?>(null) }
+    var contactError by remember(me.id) { mutableStateOf<String?>(null) }
     val copy = LocalOgtCopy.current
     val mine = db.helpExchangesOf(me.id)
     val nearby = db.helpExchanges.filter { it.authorUserId != me.id }
     val matches = db.matches.filter { it.requesterId == me.id || it.providerId == me.id }
+    val localNeeds = db.skillsOf(me.id, offered = false)
+    val localOffers = db.skillsOf(me.id, offered = true)
     val chatByAuthor = matches.associate { match ->
         val peer = if (match.providerId == me.id) match.requesterId else match.providerId
         peer to match.id
@@ -44,18 +53,64 @@ fun SkillsScreen(onPropose: () -> Unit, onChat: (String) -> Unit) {
         ScreenColumn {
             OgtCaption("Pedí una tarea o un saber y ofrecé lo tuyo: una clase, un arreglo, un trámite. El día y la hora se hablan en privado.")
             OgtPrimaryButton("Publicar un intercambio") { onPropose() }
+            com.onlygoodthings.app.ui.components.AccountDataStatus(remote)
+            contactError?.let { Text(it,color=OgtColors.error) }
+            remote.value?.let { board ->
+                OgtSectionTitle("Tus intercambios publicados")
+                if(board.mine.isEmpty())OgtCaption("Todavía no publicaste un intercambio.")
+                board.mine.forEach { row ->
+                    OgtCard {
+                        Text(row.tagLabel,fontWeight=FontWeight.Bold)
+                        OgtCaption(row.body)
+                    }
+                }
+                val offered = board.tags.filter { it.offered }
+                if (offered.isNotEmpty()) {
+                    OgtCaption("Ofrecés a cambio")
+                    offered.forEach { OgtPill(it.label) }
+                }
+                OgtSectionTitle("Pedidos de la comunidad")
+                val others=(board.seekingMine+board.others).distinctBy { it.needId }
+                if(others.isEmpty())OgtCaption("Todavía no hay pedidos disponibles.")
+                others.forEach { row ->
+                    OgtCard {
+                        Text(row.displayName,fontWeight=FontWeight.Bold)
+                        Text("Necesita: ${row.tagLabel}")
+                        OgtCaption(row.body)
+                        OgtPrimaryButton(if(opening==row.needId)"Abriendo…" else "Conversar",enabled=opening==null) {
+                            opening=row.needId;contactError=null
+                            scope.launch {
+                                try {
+                                    check(session.me().id==me.id)
+                                    val thread=auth.account.startConversation(row.userId,row.tag)
+                                    check(session.me().id==me.id)
+                                    onChat(thread.matchId)
+                                } catch(cancel:kotlinx.coroutines.CancellationException) { throw cancel }
+                                catch(_:Exception) { contactError="No pudimos abrir la conversación. Volvé a intentarlo." }
+                                finally { opening=null }
+                            }
+                        }
+                    }
+                }
+            }
+            if(mine.isNotEmpty() || nearby.isNotEmpty() || matches.isNotEmpty() || localNeeds.isNotEmpty() || localOffers.isNotEmpty()) {
+                OgtSectionTitle("En este dispositivo")
+                OgtCaption("Estos avisos y conversaciones anteriores se conservan localmente.")
+            if (mine.isNotEmpty() || localNeeds.isNotEmpty() || localOffers.isNotEmpty()) {
             OgtSectionTitle("Tu aviso")
             OgtCaption("Necesito")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                db.skillsOf(me.id, offered = false).forEach { OgtPill(it.label) }
+                localNeeds.forEach { OgtPill(it.label) }
             }
             OgtCaption("Doy a cambio")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                db.skillsOf(me.id, offered = true).forEach { OgtPill(it.label) }
+                localOffers.forEach { OgtPill(it.label) }
             }
             mine.forEach { listing ->
                 HelpListingCard(listing, authorName = "Vos", onChat = null)
             }
+            }
+            if (nearby.isNotEmpty() || matches.isNotEmpty()) {
             OgtSectionTitle("Cerca tuyo")
             nearby.forEach { listing ->
                 val author = db.user(listing.authorUserId)
@@ -78,6 +133,8 @@ fun SkillsScreen(onPropose: () -> Unit, onChat: (String) -> Unit) {
                     match.quote?.let { OgtCaption(it) }
                     OgtPrimaryButton("Escribirle a ${peer.displayName.substringBefore(" ")}") { onChat(match.id) }
                 }
+            }
+            }
             }
             Spacer(Modifier.height(80.dp))
         }

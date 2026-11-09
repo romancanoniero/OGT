@@ -75,6 +75,7 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
+            implementation("io.ktor:ktor-client-mock:3.1.3")
         }
         androidInstrumentedTest {
             dependencies { implementation("androidx.test:runner:1.7.0") }
@@ -102,9 +103,10 @@ android {
         applicationId = "com.onlygoodthings.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 15
+        versionCode = 16
         versionName = "1.0"
         testInstrumentationRunner = "com.onlygoodthings.app.qa.QaTestRunner"
+        buildConfigField("String", "OGT_QA_HOST", "\"10.0.2.2\"")
         manifestPlaceholders["ogtAppLabel"] = "Only Good Things"
         manifestPlaceholders["ogtFcmAutoInit"] = true
     }
@@ -127,6 +129,9 @@ android {
     buildTypes {
         getByName("debug") {
             if(providers.gradleProperty("ogt.instrumentedQa").orNull=="true") {
+                val qaHost = providers.gradleProperty("ogt.qaHost").orNull ?: "10.0.2.2"
+                check(qaHost in setOf("10.0.2.2", "127.0.0.1")) { "QA host must be the emulator bridge or USB loopback" }
+                buildConfigField("String", "OGT_QA_HOST", "\"$qaHost\"")
                 applicationIdSuffix=".qa"
                 manifestPlaceholders["ogtAppLabel"]="Only Good Things QA"
                 manifestPlaceholders["ogtFcmAutoInit"]=false
