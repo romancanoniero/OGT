@@ -23,6 +23,17 @@ import kotlinx.coroutines.launch
 /** Continues the same Firebase sign-in; it never enrolls, resets or removes a factor. */
 @Composable
 fun SecondFactorDialog(auth: AuthController, onAuthenticated: () -> Unit) {
+    if (auth.secondFactorExpired) {
+        AlertDialog(
+            onDismissRequest = { auth.cancelSecondFactor() },
+            title = { Text("La verificación venció") },
+            text = { Text(auth.error ?: "Volvé a iniciar sesión y usá el código actual de tu aplicación autenticadora.") },
+            confirmButton = {
+                TextButton(onClick = { auth.cancelSecondFactor() }) { Text("Volver al ingreso") }
+            },
+        )
+        return
+    }
     if (auth.secondFactors.isEmpty()) return
     val scope = rememberCoroutineScope()
     val selected = auth.selectedSecondFactor

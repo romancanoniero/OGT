@@ -86,6 +86,7 @@ class AuthController(
     )
     val secondFactors: List<AuthSecondFactor> get() = secondFactorSignIn.factors
     val selectedSecondFactor: AuthSecondFactor? get() = secondFactorSignIn.selected
+    val secondFactorExpired: Boolean get() = secondFactorSignIn.expired
 
     private fun beginPrimarySignIn(keep: Boolean) {
         secondFactorSignIn.clear()

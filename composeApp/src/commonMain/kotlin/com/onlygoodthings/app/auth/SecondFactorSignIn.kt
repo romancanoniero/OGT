@@ -14,6 +14,7 @@ internal class SecondFactorSignIn(
 ) {
     var factors by mutableStateOf<List<AuthSecondFactor>>(emptyList()); private set
     var selected by mutableStateOf<AuthSecondFactor?>(null); private set
+    var expired by mutableStateOf(false); private set
     private var keepSession = true
     private var verifiedUser: AuthUser? = null
     private var generation = 0
@@ -25,6 +26,7 @@ internal class SecondFactorSignIn(
         this.keepSession = keepSession
         selected = null
         verifiedUser = null
+        expired = false
     }
 
     fun clear() {
@@ -33,6 +35,7 @@ internal class SecondFactorSignIn(
         factors = emptyList()
         selected = null
         verifiedUser = null
+        expired = false
     }
 
     suspend fun choose(index: Int): Boolean {
@@ -41,7 +44,7 @@ internal class SecondFactorSignIn(
         val expected = generation
         selected = null
         verifiedUser = null
-        val codeRequired = begin(index)
+        val codeRequired = challengeStep(expected) { begin(index) }
         checkCurrent(expected)
         selected = factor
         if (codeRequired) return false
@@ -58,7 +61,7 @@ internal class SecondFactorSignIn(
     private suspend fun complete(code: String, expected: Int) {
         // If OGT was temporarily unavailable after Firebase verified the code,
         // retry only opening OGT; do not consume the one-time code a second time.
-        val user = verifiedUser ?: verify(code).also {
+        val user = verifiedUser ?: challengeStep(expected) { verify(code) }.also {
             checkCurrent(expected)
             verifiedUser = it
         }
@@ -68,7 +71,29 @@ internal class SecondFactorSignIn(
         clear()
     }
 
+    private suspend fun <T> challengeStep(expected: Int, operation: suspend () -> T): T = try {
+        checkCurrent(expected)
+        operation()
+    } catch (cancel: CancellationException) {
+        throw cancel
+    } catch (failure: Exception) {
+        // A response from a discarded attempt must never clear its replacement.
+        checkCurrent(expected)
+        val timedOut = generateSequence<Throwable>(failure) { it.cause }.take(8).any {
+            it.message?.contains(TotpChallengeTimeout) == true
+        }
+        if (!timedOut) throw failure
+        clear()
+        expired = true
+        throw AuthException(
+            "La verificación venció. Volvé a iniciar sesión y usá el código actual de tu aplicación autenticadora.",
+            failure,
+        )
+    }
+
     private fun checkCurrent(expected: Int) {
         if (generation != expected) throw CancellationException("Sign-in challenge changed")
     }
 }
+
+private val TotpChallengeTimeout = Regex("\\bTOTP_CHALLENGE_TIMEOUT\\b", RegexOption.IGNORE_CASE)

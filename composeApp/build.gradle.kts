@@ -103,7 +103,7 @@ android {
         applicationId = "com.onlygoodthings.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 16
+        versionCode = 17
         versionName = "1.0"
         testInstrumentationRunner = "com.onlygoodthings.app.qa.QaTestRunner"
         buildConfigField("String", "OGT_QA_HOST", "\"10.0.2.2\"")
