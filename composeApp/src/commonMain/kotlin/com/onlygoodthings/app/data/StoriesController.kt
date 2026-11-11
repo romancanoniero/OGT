@@ -10,6 +10,7 @@ import com.onlygoodthings.shared.domain.*
 import com.onlygoodthings.shared.realtime.*
 import kotlinx.coroutines.*
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsBytes
 import io.ktor.http.isSuccess
 import kotlin.random.Random
@@ -17,7 +18,8 @@ import kotlin.random.Random
 class StoriesController(private val session: SessionStore, private val prefs: AuthPrefs, private val tokenProvider: suspend () -> String? = { session.firebaseJwt }) {
     private val http=createPlatformHttpClient()
     private val mediaCache=StoryMediaCache(fetch={ url ->
-        val response=http.get(url)
+        val (requestUrl,bearer)=com.onlygoodthings.app.media.StoreReviewMedia.request(url)
+        val response=http.get(requestUrl) { bearer?.let { header("Authorization","Bearer $it") } }
         check(response.status.isSuccess()) { "Esta historia ya no está disponible" }
         response.bodyAsBytes()
     })

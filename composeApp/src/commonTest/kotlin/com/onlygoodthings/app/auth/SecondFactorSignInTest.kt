@@ -83,4 +83,78 @@ class SecondFactorSignInTest {
         assertFailsWith<AuthException> { flow.choose(0) }
         assertNull(flow.selected)
     }
+
+    @Test fun expiredTotpChallengeIsDiscardedAndFreshSignInCanSucceed() = runBlocking {
+        var verified = 0
+        var opened = 0
+        var cancelled = 0
+        val flow = SecondFactorSignIn(begin = { true }, verify = {
+            verified++
+            if (verified == 1) throw AuthException("An internal error has occurred. [ TOTP_CHALLENGE_TIMEOUT:TOTP challenge timeout, provide first factor again. ]")
+            user
+        }, openSession = { _, keep -> assertFalse(keep); opened++ }, cancelNative = { cancelled++ })
+        flow.require(listOf(factor), false); flow.choose(2)
+        val failure = assertFailsWith<AuthException> { flow.confirm("123456") }
+        assertFalse(failure.message.orEmpty().contains("TOTP_CHALLENGE_TIMEOUT"))
+        assertTrue(flow.factors.isEmpty())
+        assertNull(flow.selected)
+        assertEquals(1, cancelled)
+        assertEquals(0, opened)
+        assertTrue(flow.expired)
+        assertFailsWith<IllegalStateException> { flow.confirm("123456") }
+        assertEquals(1, verified)
+        flow.require(listOf(factor), false)
+        assertFalse(flow.expired)
+        flow.choose(2); flow.confirm("654321")
+        assertEquals(1, opened)
+        assertEquals(2, verified)
+        assertTrue(flow.factors.isEmpty())
+        assertFalse(flow.expired)
+    }
+
+    @Test fun expirationWhileChoosingAFactorDiscardsItsNativeChallenge() = runBlocking {
+        var cancelled = 0
+        val flow = SecondFactorSignIn(begin = {
+            throw AuthException("No se pudo verificar", IllegalStateException("TOTP_CHALLENGE_TIMEOUT: provide first factor again"))
+        }, verify = { error("Expired challenge must not verify") }, openSession = { _, _ -> error("Expired challenge must not open OGT") }, cancelNative = { cancelled++ })
+        flow.require(listOf(factor), true)
+        assertFailsWith<AuthException> { flow.choose(2) }
+        assertTrue(flow.factors.isEmpty())
+        assertNull(flow.selected)
+        assertEquals(1, cancelled)
+        assertTrue(flow.expired)
+        flow.clear()
+        assertFalse(flow.expired)
+    }
+
+    @Test fun aLateExpirationCannotDiscardANewerChallenge() = runBlocking {
+        val reply = CompletableDeferred<AuthUser>()
+        var opened = false
+        val flow = SecondFactorSignIn(begin = { true }, verify = { reply.await() }, openSession = { _, _ -> opened = true }, cancelNative = {})
+        flow.require(listOf(factor), true); flow.choose(2)
+        val pending = async(start = CoroutineStart.UNDISPATCHED) { flow.confirm("123456") }
+        flow.clear(); flow.require(listOf(factor), false); flow.choose(2)
+        reply.completeExceptionally(AuthException("TOTP_CHALLENGE_TIMEOUT"))
+        assertFailsWith<CancellationException> { pending.await() }
+        assertEquals(listOf(factor), flow.factors)
+        assertEquals(factor, flow.selected)
+        assertFalse(flow.expired)
+        assertFalse(opened)
+    }
+
+    @Test fun backendErrorsNeverDiscardAnAlreadyVerifiedUser() = runBlocking {
+        var verified = 0
+        var opened = 0
+        val flow = SecondFactorSignIn(begin = { true }, verify = { verified++; user }, openSession = { _, _ ->
+            opened++
+            if (opened == 1) throw AuthException("TOTP_CHALLENGE_TIMEOUT from a downstream service")
+        }, cancelNative = {})
+        flow.require(listOf(factor), true); flow.choose(2)
+        assertFailsWith<AuthException> { flow.confirm("123456") }
+        assertEquals(listOf(factor), flow.factors)
+        assertFalse(flow.expired)
+        flow.confirm("123456")
+        assertEquals(1, verified)
+        assertEquals(2, opened)
+    }
 }

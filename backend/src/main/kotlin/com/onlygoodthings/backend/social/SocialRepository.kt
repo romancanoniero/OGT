@@ -31,6 +31,9 @@ import com.onlygoodthings.backend.community.interactionSql
 
 class SocialSqlRepository(private val db: Database) {
 
+    fun ownConsent(userId: String) = db.withConnection { readCommunityConsent(it, userId) }
+    fun acceptConsent(userId: String, data: Map<String, Any?>) = db.withConnection { saveCommunityConsent(it, userId, data) }
+
     private val blocks=UserBlocks(db)
     fun requireContentInteraction(viewer:String,postId:String?,commentId:String?,anecdoteId:String?) {
         val refs=listOfNotNull(postId?.let { Triple("social_posts","author_user_id",it) },commentId?.let { Triple("post_comments","author_user_id",it) },anecdoteId?.let { Triple("post_anecdotes","author_user_id",it) })

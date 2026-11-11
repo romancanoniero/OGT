@@ -29,6 +29,8 @@ import com.onlygoodthings.backend.modules.crowdfundingRoutes
 import com.onlygoodthings.backend.modules.csrRoutes
 import com.onlygoodthings.backend.modules.referralRoutes
 import com.onlygoodthings.backend.community.neighborRoutes
+import com.onlygoodthings.backend.community.animalContactRoutes
+import com.onlygoodthings.backend.auth.storeReviewAuthorization
 import com.onlygoodthings.backend.modules.timebankRoutes
 import com.onlygoodthings.backend.parking.ParkingSqlRepository
 import com.onlygoodthings.backend.parking.parkingRoutes
@@ -218,7 +220,12 @@ fun Application.module() {
         publicMediaRoutes(mediaStore) { com.onlygoodthings.backend.crm.crmPublicMediaAvailable(db,it) }
         storyMediaRoutes(stories)
         val blocks=com.onlygoodthings.backend.community.UserBlocks(db)
-        dbGatewayRoutes(verifier, identity, hub) { viewer,path ->blocks.canReceiveTree(db,viewer,path) }
+        dbGatewayRoutes(verifier, identity, hub, canReceive = { viewer,path ->blocks.canReceiveTree(db,viewer,path) })
+        val storeReview = com.onlygoodthings.backend.auth.StoreReviewAccess.from(System::getenv)
+        storeReviewAuthorization(verifier,storeReview)
+        dbGatewayRoutes(verifier, identity, hub, canReceive = { viewer,path ->blocks.canReceiveTree(db,viewer,path) },
+            socketPath="/store-review/db", acceptsIdentity=storeReview::allows,
+            authTimeoutMillis=5000, authorizationLifetimeMillis=storeReview::remainingMillis)
         authenticate("firebase") {
             // One security boundary for web, Android and iOS. Reading, reports,
             // account exports and removal of own content remain possible.
@@ -261,6 +268,7 @@ fun Application.module() {
             geoRoutes()
             timebankRoutes(db)
             neighborRoutes(db, hub)
+            animalContactRoutes(db)
             csrRoutes(db)
             businessRoutes(csr,verifier,payments)
             crowdfundingRoutes(db)

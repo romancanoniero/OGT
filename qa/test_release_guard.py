@@ -39,6 +39,22 @@ class ReleaseGuardTests(unittest.TestCase):
         values = self.env(); values['OGT_PRELAUNCH_CIDRS'] = '2001:db8::1/128'
         self.assertTrue(guard.validate_env(values))
 
+    def test_bounded_review_configuration_keeps_the_original_network_gate(self):
+        values=self.env()
+        values.update(OGT_STORE_REVIEW_UIDS='reviewer-a, reviewer-b',OGT_STORE_REVIEW_EXPIRES_AT='2026-12-01T00:00:00Z')
+        self.assertTrue(guard.validate_env(values))
+        self.assertEqual(values['OGT_LAUNCH_MODE'],'prelaunch')
+        self.assertTrue(guard.validate_env(self.env()))
+
+    def test_invalid_review_configuration_is_rejected_before_activation(self):
+        valid=dict(self.env(),OGT_STORE_REVIEW_UIDS='reviewer-a',OGT_STORE_REVIEW_EXPIRES_AT='2026-12-01T00:00:00Z')
+        for key,value in [('OGT_STORE_REVIEW_UIDS','*'),('OGT_STORE_REVIEW_UIDS','a'*129),
+                          ('OGT_STORE_REVIEW_UIDS',','.join('reviewer-'+str(i) for i in range(11))),
+                          ('OGT_STORE_REVIEW_EXPIRES_AT',''),('OGT_STORE_REVIEW_EXPIRES_AT','later'),
+                          ('OGT_STORE_REVIEW_EXPIRES_AT','2026-12-01T00:00:00'),
+                          ('OGT_STORE_REVIEW_EXPIRES_AT','2026-12-01 00:00:00+00:00')]:
+            with self.subTest(key=key),self.assertRaises(ValueError):guard.validate_env(dict(valid,**{key:value}))
+
     def test_payment_candidate_cannot_enable_real_money_or_inline_credentials(self):
         values=self.env();values.update(OGT_MP_MODE='sandbox',OGT_MP_COLLECTOR_ID='12345',
             OGT_MP_ACCESS_TOKEN_FILE='/run/secrets/mercadopago/access-token-test',

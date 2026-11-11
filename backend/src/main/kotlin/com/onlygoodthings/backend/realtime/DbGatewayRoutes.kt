@@ -11,6 +11,8 @@ import io.ktor.websocket.close
 import io.ktor.websocket.readText
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -33,13 +35,22 @@ fun Route.dbGatewayRoutes(
     identity: IdentityStore,
     hub: RealtimeHub,
     canReceive:(String,String)->Boolean={_,_->true},
+    socketPath: String = "/db",
+    acceptsIdentity: (com.onlygoodthings.backend.auth.VerifiedFirebaseUser) -> Boolean = { true },
+    authTimeoutMillis: Long? = null,
+    authorizationLifetimeMillis: (() -> Long)? = null,
 ) {
-    webSocket("/db") {
+    webSocket(socketPath) {
         var authed = false
         var viewerId: String? = null
         val listens = mutableMapOf<Long, String>()
         val mutex = Mutex()
         val sendLock = Mutex()
+        val authDeadline = authTimeoutMillis?.let { timeout -> launch {
+            delay(timeout)
+            if (!authed) close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "authentication timeout"))
+        } }
+        var accessDeadline: Job? = null
 
         suspend fun emit(obj: JsonObject) {
             sendLock.withLock {
@@ -77,9 +88,22 @@ fun Route.dbGatewayRoutes(
                     "auth" -> {
                         val token = obj["token"]?.jsonPrimitive?.contentOrNull.orEmpty()
                         runCatching {
-                            identity.upsertFromFirebase(verifier.verify(token))
+                            val verified=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { verifier.verify(token) }
+                            require(acceptsIdentity(verified)) { "Acceso de revisión no disponible" }
+                            identity.upsertFromFirebase(verified)
                         }.onSuccess { profile ->
+                            if (authed && viewerId != profile.id) {
+                                emit(errorMsg(id=null,code="IDENTITY_CHANGE_DENIED",message="Abrí una nueva conexión para cambiar de cuenta"))
+                                close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT,"identity change denied"))
+                                return@webSocket
+                            }
                             authed = true
+                            authDeadline?.cancel()
+                            accessDeadline?.cancel()
+                            authorizationLifetimeMillis?.let { remaining -> accessDeadline = launch {
+                                delay(remaining().coerceAtLeast(0))
+                                close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "review access expired"))
+                            } }
                             viewerId = profile.id
                             emit(ackAuth())
                         }.onFailure { err ->
@@ -117,6 +141,8 @@ fun Route.dbGatewayRoutes(
         } catch (_: ClosedReceiveChannelException) {
             // cliente cortó
         } finally {
+            authDeadline?.cancel()
+            accessDeadline?.cancel()
             hub.removeTreeListener(treeHandler)
         }
     }

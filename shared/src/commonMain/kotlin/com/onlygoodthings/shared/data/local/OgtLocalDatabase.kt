@@ -1481,6 +1481,20 @@ class OgtLocalDatabase {
     fun adoptRequestOfMatch(matchId: String): LocalAdoptRequest? =
         adoptRequests.firstOrNull { it.matchId == matchId }
 
+    fun applyRemoteSightings(listingId: String, rows: List<com.onlygoodthings.shared.domain.AnimalSightingDto>) {
+        val ids = rows.map { "remote:${it.id}" }.toSet()
+        // Only replace this server snapshot. Historical device-local sightings are retained.
+        sightings.removeAll { it.listingId == listingId && it.id.startsWith("remote:") && it.id !in ids }
+        rows.forEach { row ->
+            applyUserLive(row.userId,row.displayName,row.photoUrl)
+            val local = LocalSighting("remote:${row.id}",listingId,row.postId,row.userId,row.note,row.latitude,row.longitude,"SEEN",row.matchId.orEmpty(),com.onlygoodthings.shared.domain.relativeTimeLabel(row.createdAtEpochMs,currentEpochMs()),row.createdAtEpochMs)
+            val index = sightings.indexOfFirst { it.id == local.id }
+            if (index < 0) sightings.add(local) else sightings[index] = local
+        }
+        bumpLost()
+        bumpSocial()
+    }
+
     fun sightingsOf(listingId: String): List<LocalSighting> =
         sightings.filter { it.listingId == listingId && it.status != "DISMISSED" }
             .sortedByDescending { it.createdAtEpochMs }

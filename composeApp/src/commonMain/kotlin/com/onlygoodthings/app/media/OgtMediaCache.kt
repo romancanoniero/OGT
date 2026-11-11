@@ -107,8 +107,10 @@ object OgtMediaCache {
         }
         if (!isRemoteUrl(key)) return null
         val bytes = runCatching {
-            val response = http.get(key) {
+            val (requestUrl,bearer)=StoreReviewMedia.request(key)
+            val response = http.get(requestUrl) {
                 header("User-Agent", "OnlyGoodThings/0.1 (Compose Multiplatform; media)")
+                bearer?.let { header("Authorization","Bearer $it") }
             }
             if (!response.status.isSuccess()) null else response.bodyAsBytes()
         }.getOrNull()

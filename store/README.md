@@ -10,7 +10,45 @@
 - Android: `store/android/es-419/`
 - Capturas: `store/screenshots/ios/` y `store/screenshots/android/`
 
-## Candidato actual (29/10/2026)
+## Candidato actual (09/11/2026)
+
+Los paquetes locales firmados son Android 1.0/código 16 e iOS 1.0/build 15,
+compilados desde `ff10a539ed08951180b587fdabcfbc6820d3d5ba`. Se verificaron su
+identidad, firma, Firebase real, ausencia de depuración y configuración de
+notificaciones de producción. El AAB solicita alineación de 16 KB y también
+se comprobaron el APK derivado y sus bibliotecas de 64 bits. No se subieron estos
+paquetes a las tiendas. Play tiene código 12 como última carga verificada;
+Apple tiene build 13 como última carga comprobada en TestFlight y su historial
+de cargas. La cuenta oficial confirma que el titular aceptó el contrato
+actualizado el 09/11/2026. La cuenta Apple de pruebas también está creada y
+se comprobó su sesión; resta su ciclo real dentro de OGT.
+
+`review-readiness.json` conserva el plan, las diferencias intencionales y las
+aceptaciones pendientes. `review-console-data.json` distingue los datos guardados
+de los textos preparados: Google conserva como borrador la edad 18+ y los cambios
+de seguridad de datos; Apple ya publica 17 tipos, incluida Dirección física para
+la postulación privada de adopción, vinculada al usuario y sin seguimiento.
+Se comprobaron los tipos y propósitos anteriores contra el inventario.
+Los dos paquetes QA ya están instalados en el Redmi Note 7 con Android 10.
+Se recuperó del dispositivo el informe completo: 92 comprobaciones portables
+aprobadas, sin fallos. La huella del APK probado queda en `review-readiness.json`;
+estos resultados no verifican todavía la UI final, los permisos, Apple real ni
+las notificaciones. La conexión USB sigue interrumpiéndose durante la preparación
+de la aceptación de pantallas. El titular eligió completar primero las pruebas
+físicas, por lo que el PR y la publicación del servidor siguen pendientes.
+Las instrucciones en inglés de `android/review_instructions.txt` reemplazarán
+la referencia de laboratorio después de comprobar el acceso real del revisor.
+Las credenciales permanecen fuera de Git. No confirmar acceso completo ni enviar
+a revisión mientras falten la aceptación física, el ciclo Apple real, el video
+de ubicación, las capturas y la comprobación del despliegue.
+
+El PR de preparación permanece en borrador:
+https://github.com/romancanoniero/OGT/pull/68. Sus comprobaciones de fuente,
+base de datos, backend y navegador aprobaron; no publicó en producción.
+El historial siguiente conserva las decisiones y evidencias anteriores, con
+los números de versión correspondientes a cada fecha.
+
+## Preparación anterior (29/10/2026)
 
 La fuente mantiene `com.onlygoodthings.app`: Android 1.0/versionCode 10 e iOS
 1.0/build 9. Estos candidatos locales conservan la fuente debajo de la imagen y

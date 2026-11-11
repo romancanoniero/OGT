@@ -1,4 +1,5 @@
 package com.onlygoodthings.app
+import androidx.compose.runtime.collectAsState
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -213,7 +214,7 @@ fun App() {
         LaunchedEffect(session.gpsEnabled, session.locationScope, location.permission, location.servicesEnabled) {
             OgtLocationSync.enabled = session.gpsEnabled && location.permission.isGranted()
             val always = session.locationScope == LocationScope.ALWAYS
-            if (session.gpsEnabled && always && location.permission.isGranted() && location.servicesEnabled) {
+            if (session.gpsEnabled && always && location.permission.covers(LocationScope.ALWAYS) && location.servicesEnabled) {
                 OgtBackgroundLocation.start()
             } else {
                 OgtBackgroundLocation.stop()
@@ -326,10 +327,15 @@ fun App() {
             return fallback
         }
         fun goHomeOrOnboard() {
+            if (auth.needsCommunityConsent) {
+                route = OgtRoute.CommunityAgreement
+                return
+            }
             val home = if (auth.hasFinishedOnboarding()) OgtRoute.Feed else OgtRoute.Permissions
             route = applyHonorRoute(home)
         }
         val authGate = route == OgtRoute.Splash || route == OgtRoute.Landing ||
+            route == OgtRoute.CommunityAgreement ||
             route == OgtRoute.Onboarding ||
             route == OgtRoute.OnboardingFeatures ||
             route == OgtRoute.Login ||
@@ -344,7 +350,8 @@ fun App() {
                 route = OgtRoute.ClaimHonor
             }
         }
-        LaunchedEffect(Unit) {
+        val realtimeGeneration by OgtSdk.generation.collectAsState()
+        LaunchedEffect(realtimeGeneration) {
             if (!OgtSdk.isStarted()) return@LaunchedEffect
             runCatching {
                 OgtRealtime().observeUserProfiles().collect { live ->
@@ -517,8 +524,8 @@ fun App() {
                             route = when (restored) {
                                 AuthRestore.LoggedOut -> OgtRoute.Landing
                                 AuthRestore.NeedsBiometric -> OgtRoute.Login
-                                AuthRestore.FirstRun -> OgtRoute.Permissions
-                                AuthRestore.Home -> applyHonorRoute(OgtRoute.Feed)
+                                AuthRestore.FirstRun -> if (auth.needsCommunityConsent) OgtRoute.CommunityAgreement else OgtRoute.Permissions
+                                AuthRestore.Home -> if (auth.needsCommunityConsent) OgtRoute.CommunityAgreement else applyHonorRoute(OgtRoute.Feed)
                             }
                             scope.launch {
                                 auth.hydratePublishedAnimals(db)
@@ -543,6 +550,10 @@ fun App() {
                     OgtRoute.Onboarding -> OnboardingScreen(
                         onDone = { route = OgtRoute.SignUp },
                         onLogin = { route = OgtRoute.Login },
+                    )
+                    OgtRoute.CommunityAgreement -> com.onlygoodthings.app.ui.screens.CommunityAgreementScreen(
+                        onAccepted = { goHomeOrOnboard() },
+                        onSignOut = { scope.launch { auth.signOut(); route = OgtRoute.Login } },
                     )
                     OgtRoute.SignUp -> SignUpScreen(
                         onOtp = {

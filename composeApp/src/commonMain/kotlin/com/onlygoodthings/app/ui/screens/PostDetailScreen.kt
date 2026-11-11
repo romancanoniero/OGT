@@ -73,6 +73,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.launch
 import com.onlygoodthings.app.data.LocalAuth
+import com.onlygoodthings.app.data.isUuid
 import com.onlygoodthings.app.data.LocalOgtDb
 import com.onlygoodthings.app.data.LocalOgtSession
 import com.onlygoodthings.app.data.optimisticClapPost
@@ -165,17 +166,24 @@ fun PostDetailScreen(
     val listing = remember(post.id, db.lostEpoch) {
         post.listingId?.let { id -> db.animals.firstOrNull { it.id == id } }
     }
+    var sightingError by remember(postId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(listing?.id) {
+        val id=listing?.id ?: return@LaunchedEffect
+        if (id.isUuid()) {
+            try { auth.refreshAnimalSightings(id) }
+            catch(cancel:kotlinx.coroutines.CancellationException) { throw cancel }
+            catch(_:Exception) { sightingError="No pudimos actualizar los avistajes. Volvé a abrir la ficha para reintentar." }
+        }
+    }
     val sightings = remember(listing?.id, db.lostEpoch) {
         listing?.let { db.sightingsOf(it.id) }.orEmpty()
     }
-    val here = LocalOgtSession.current.here()
+    val here = session.here()
     var sawOpen by remember { mutableStateOf(false) }
     var mediaPage by remember { mutableStateOf<Int?>(null) }
     var mapOpen by remember { mutableStateOf(false) }
     var report by remember { mutableStateOf<LocalSighting?>(null) }
-    var sawNote by remember {
-        mutableStateOf("Creo que lo vi cerca. Collar rojo, oreja caída.")
-    }
+    var sawNote by remember(post.id, me.id) { mutableStateOf("") }
     val kind = feedCardKind(post.tag, listing?.kind, post.sourceUrl)
     val media = remember(post.id, socialTick) { db.mediaOf(post.id) }
     var comment by remember { mutableStateOf("") }
@@ -383,7 +391,10 @@ fun PostDetailScreen(
                             sightings = sightings,
                             isAuthor = me.owns(listing?.reporterUserId),
                             here = here,
-                            onSaw = { sawOpen = true },
+                            onSaw = {
+                                val existing = listing?.let { db.mySighting(it.id, me.id) }
+                                if (existing != null) report = existing else sawOpen = true
+                            },
                             onFound = { listing?.let { db.resolveLostListing(me, it.id) } },
                             onOpenSighting = { row -> report = row },
                             onExpandMap = { mapOpen = true },
@@ -716,11 +727,39 @@ fun PostDetailScreen(
                     shape = RoundedCornerShape(OgtDimens.buttonRadius),
                     colors = ogtOutlinedFieldColors(),
                 )
-                OgtPrimaryButton("Marcar en el mapa") {
-                    val originLat = listing.latitude ?: author?.latitude ?: 0.0
-                    val originLng = listing.longitude ?: author?.longitude ?: 0.0
-                    val lat = here?.latitude ?: (originLat + 0.0008)
-                    val lng = here?.longitude ?: (originLng - 0.0006)
+                var point by remember(listing.id) { mutableStateOf(here ?: listing.latitude?.let { lat -> listing.longitude?.let { lng -> com.onlygoodthings.shared.domain.GeoPoint(lat,lng) } }) }
+                var sendingSighting by remember { mutableStateOf(false) }
+                val center=point ?: com.onlygoodthings.shared.domain.GeoPoint(-34.6037,-58.3816)
+                OgtCaption("Mové el mapa para elegir dónde la viste y confirmá el pin.")
+                com.onlygoodthings.app.map.OgtLibreMap(
+                    center=center,radiusMeters=1000,
+                    markers=point?.let { listOf(com.onlygoodthings.app.ui.components.BarrioMarker("sighting-point","SIGHT","Lugar del avistaje",it.latitude,it.longitude)) }.orEmpty(),
+                    selectedId="sighting-point",onSelect={},
+                    onViewMoved={ point=it },modifier=Modifier.fillMaxWidth().height(220.dp),
+                )
+                sightingError?.let { Text(it,color=OgtColors.error) }
+                OgtPrimaryButton(if(sendingSighting) "Enviando…" else "Confirmar avistaje",enabled=!sendingSighting && point!=null) {
+                    val chosen=point ?: return@OgtPrimaryButton
+                    val lat=chosen.latitude
+                    val lng=chosen.longitude
+                    if (listing.id.isUuid()) {
+                        sendingSighting=true;sightingError=null
+                        val owner=me.id
+                        val request=com.onlygoodthings.shared.domain.AnimalContactRequest(listing.id,"SIGHTING",note=sawNote,latitude=lat,longitude=lng)
+                        scope.launch {
+                            try {
+                                check(session.me().id==owner)
+                                auth.animals.contact(request)
+                                auth.refreshAnimalSightings(listing.id)
+                                check(session.me().id==owner)
+                                sawOpen=false
+                                report=db.mySighting(listing.id,owner)
+                            } catch(cancel:kotlinx.coroutines.CancellationException) { throw cancel }
+                            catch(_:Exception) { sightingError="No se pudo confirmar el avistaje. Conservamos tu mensaje para reintentarlo." }
+                            finally { sendingSighting=false }
+                        }
+                        return@OgtPrimaryButton
+                    }
                     val row = db.addSighting(
                         viewer = me,
                         postId = post.id,

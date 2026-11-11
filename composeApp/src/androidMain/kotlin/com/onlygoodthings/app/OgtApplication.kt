@@ -24,11 +24,14 @@ open class OgtApplication : Application() {
         val firebase = FirebaseApp.initializeApp(this)
         if (BuildConfig.DEBUG && packageName == "com.onlygoodthings.app.qa") {
             check(firebase?.options?.projectId == "demo-ogt-qa") { "QA must use only the Firebase emulator project" }
-            FirebaseAuth.getInstance().useEmulator("10.0.2.2",19099)
+            FirebaseAuth.getInstance().useEmulator(BuildConfig.OGT_QA_HOST,19099)
         }
         // Emuladores: sin SafetyNet/Play Integrity. El SMS real se reemplaza por números de prueba.
         FirebaseAuth.getInstance().firebaseAuthSettings.setAppVerificationDisabledForTesting(BuildConfig.DEBUG)
-        if (AuthPrefs().gpsEnabled && hasForegroundLocation()) {
+        val prefs = AuthPrefs()
+        val backgroundGranted = android.os.Build.VERSION.SDK_INT < 29 ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (prefs.gpsEnabled && prefs.locationScope == "always" && backgroundGranted && hasForegroundLocation()) {
             runCatching { OgtBackgroundLocation.start() }
         }
     }

@@ -22,6 +22,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
@@ -48,6 +49,9 @@ actual fun rememberOgtLocation(track: Boolean): OgtLocationState {
     val context = LocalContext.current
     val activity = context as? Activity
     val lifecycleOwner = LocalLifecycleOwner.current
+    var foreground by remember(lifecycleOwner) { mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) }
+    val trackingNow by rememberUpdatedState(track)
+    var currentFixRequest by remember { mutableStateOf<LiveSession?>(null) }
     var permission by remember { mutableStateOf(readPermission(context)) }
     var servicesEnabled by remember { mutableStateOf(isLocationEnabled(context)) }
     var fix by remember { mutableStateOf<DeviceLocation?>(null) }
@@ -135,9 +139,11 @@ actual fun rememberOgtLocation(track: Boolean): OgtLocationState {
     }
 
     fun pullCurrent() {
-        if (!readPermission(context).isGranted()) return
+        if (!track || !foreground || !readPermission(context).isGranted()) return
         acquiring = true
-        requestCurrentFix(context) { next ->
+        currentFixRequest?.close?.invoke()
+        currentFixRequest = requestCurrentFix(context) { next ->
+            if (!trackingNow || !foreground) return@requestCurrentFix
             if (next != null) fix = next
             acquiring = false
         }
@@ -180,21 +186,35 @@ actual fun rememberOgtLocation(track: Boolean): OgtLocationState {
             }
     }
 
-    LaunchedEffect(permission, servicesEnabled) {
-        if (permission.isGranted() && servicesEnabled) {
+    LaunchedEffect(permission, servicesEnabled, track, foreground) {
+        if (track && foreground && permission.isGranted() && servicesEnabled) {
             pullCurrent()
+        } else if (!track || !permission.isGranted()) {
+            currentFixRequest?.close?.invoke()
+            currentFixRequest = null
+            fix = null
+            acquiring = false
+        } else if (!foreground || !servicesEnabled) {
+            currentFixRequest?.close?.invoke()
+            currentFixRequest = null
+            acquiring = false
         }
     }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START) foreground = true
+            if (event == Lifecycle.Event.ON_STOP) foreground = false
             if (event == Lifecycle.Event.ON_RESUME) resync()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            currentFixRequest?.close?.invoke()
+        }
     }
 
-    DisposableEffect(permission, servicesEnabled, track) {
+    DisposableEffect(permission, servicesEnabled, track, foreground) {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context?, intent: Intent?) {
                 servicesEnabled = isLocationEnabled(context)
@@ -205,8 +225,9 @@ actual fun rememberOgtLocation(track: Boolean): OgtLocationState {
         }
         ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_EXPORTED)
 
-        val canListen = permission.isGranted() && servicesEnabled && track
+        val canListen = permission.isGranted() && servicesEnabled && track && foreground
         val session = if (canListen) startLiveUpdates(context) { next ->
+            if (!trackingNow || !foreground) return@startLiveUpdates
             acquiring = false
             fix = next
             OgtLocationSync.offer(next)
@@ -323,15 +344,18 @@ private fun lastKnownFromManager(context: Context): DeviceLocation? {
 }
 
 @SuppressLint("MissingPermission")
-private fun requestCurrentFix(context: Context, onResult: (DeviceLocation?) -> Unit) {
+private fun requestCurrentFix(context: Context, onResult: (DeviceLocation?) -> Unit): LiveSession {
+    var closed = false
+    val cancel = CancellationTokenSource()
+    val session = LiveSession { closed = true; cancel.cancel() }
+    fun deliver(result: DeviceLocation?) { if (!closed) onResult(result) }
     val cached = lastKnownFromManager(context)
-    if (cached != null) onResult(cached)
+    if (cached != null) deliver(cached)
     if (!hasPlayServices(context)) {
-        if (cached == null) onResult(null)
-        return
+        if (cached == null) deliver(null)
+        return session
     }
     val fused = LocationServices.getFusedLocationProviderClient(context)
-    val cancel = CancellationTokenSource()
     val current = CurrentLocationRequest.Builder()
         .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
         .setDurationMillis(15_000L)
@@ -341,16 +365,17 @@ private fun requestCurrentFix(context: Context, onResult: (DeviceLocation?) -> U
         .addOnSuccessListener { location ->
             val live = location?.toDeviceOrNull()
             if (live != null) {
-                onResult(live)
+                deliver(live)
             } else {
                 fused.lastLocation
                     .addOnSuccessListener { last ->
-                        onResult(last?.toDeviceOrNull() ?: cached)
+                        deliver(last?.toDeviceOrNull() ?: cached)
                     }
-                    .addOnFailureListener { onResult(cached) }
+                    .addOnFailureListener { deliver(cached) }
             }
         }
-        .addOnFailureListener { onResult(cached) }
+        .addOnFailureListener { deliver(cached) }
+    return session
 }
 
 internal class LiveSession(val close: () -> Unit)

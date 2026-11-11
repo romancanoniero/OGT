@@ -12,6 +12,19 @@ import com.iyr.db.database.DbDatabase
  * `persistenceEnabled`. No hay `persistenceDir` ni `forceReconnect`.
  */
 object OgtSdk {
+    private var active = false
+    private val _generation = kotlinx.coroutines.flow.MutableStateFlow(0L)
+    val generation: kotlinx.coroutines.flow.StateFlow<Long> get() = _generation
+
+    /** Replace only the app-owned connection when its authenticated transport changes. */
+    fun restart(gatewayEndpoint: String, tokenProvider: suspend (Boolean) -> String?): DbDatabase {
+        shutdown()
+        DbApp.initialize(DbOptions(endpoint=gatewayEndpoint,tokenProvider={ tokenProvider(false) },persistenceEnabled=false))
+        val database=DbDatabase.getInstance()
+        active = true
+        _generation.value++
+        return database
+    }
     fun start(
         gatewayEndpoint: String,
         tokenProvider: suspend (forceRefresh: Boolean) -> String?,
@@ -44,23 +57,30 @@ object OgtSdk {
                 ),
             )
         }
+        active = true
         return DbDatabase.getInstance()
     }
 
-    fun database(): DbDatabase = DbDatabase.getInstance()
+    fun database(): DbDatabase {
+        check(active) { "OGT realtime no está conectado" }
+        return DbDatabase.getInstance()
+    }
 
-    fun isStarted(): Boolean = runCatching { DbApp.isInitialized() }.getOrDefault(false)
+    fun isStarted(): Boolean = active && runCatching { DbApp.isInitialized() }.getOrDefault(false)
 
     /** El SDK actual no tiene forceReconnect; goOnline reabre el socket si está caído. */
     fun reconnect() {
-        if (DbApp.isInitialized()) {
+        if (isStarted()) {
             DbDatabase.getInstance().goOnline()
         }
     }
 
     fun shutdown() {
-        if (DbApp.isInitialized()) {
+        val wasActive = active
+        active = false
+        if (wasActive && DbApp.isInitialized()) {
             DbDatabase.getInstance().close()
+            _generation.value++
         }
     }
 }

@@ -11,6 +11,7 @@ actual fun OgtPostedVideo(url: String, modifier: Modifier) {
     AndroidView(
         factory = { context ->
             VideoView(context).apply {
+                tag = url
                 setVideoURI(Uri.parse(url))
                 setOnPreparedListener { player ->
                     player.isLooping = true
@@ -19,6 +20,13 @@ actual fun OgtPostedVideo(url: String, modifier: Modifier) {
             }
         },
         modifier = modifier,
+        update = { view ->
+            if(view.tag!=url) {
+                view.tag=url
+                view.stopPlayback()
+                view.setVideoURI(Uri.parse(url))
+            }
+        },
         onRelease = { it.stopPlayback() },
     )
 }

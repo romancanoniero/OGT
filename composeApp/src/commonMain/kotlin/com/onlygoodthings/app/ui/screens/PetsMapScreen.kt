@@ -10,6 +10,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -18,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.onlygoodthings.app.data.LocalOgtDb
+import com.onlygoodthings.app.data.LocalAuth
 import com.onlygoodthings.app.data.LocalOgtSession
 import com.onlygoodthings.app.i18n.LocalOgtCopy
 import com.onlygoodthings.app.theme.OgtColors
@@ -36,10 +39,25 @@ import com.onlygoodthings.app.ui.components.ScreenColumn
 fun PetsMapScreen(onBack: () -> Unit, onReport: () -> Unit) {
     val db = LocalOgtDb.current
     val session = LocalOgtSession.current
+    val auth = LocalAuth.current
     val copy = LocalOgtCopy.current
     val here = session.here()
     var selectedId by remember { mutableStateOf<String?>(null) }
-    val lost = db.animals.filter { it.kind == "LOST" && !it.resolved }
+    val owner = session.me().id
+    val socialTick by db.socialTick.collectAsState()
+    val lost = remember(owner, socialTick) { db.animals.filter { it.kind == "LOST" && !it.resolved } }
+    val remoteIds = lost.map { it.id }.filter {
+        it.matches(Regex("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"))
+    }.sorted()
+    var sightingsError by remember(owner) { mutableStateOf(false) }
+    LaunchedEffect(owner, remoteIds) {
+        sightingsError = false
+        remoteIds.forEach { id ->
+            try { auth.refreshAnimalSightings(id) }
+            catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+            catch (_: Exception) { sightingsError = true }
+        }
+    }
     val pins = db.mapPins.filter { it.kind == "ANIMAL" }
     val markers = buildList {
         if (here != null) add(BarrioMarker("me", "ME", copy.mePin, here.latitude, here.longitude))
@@ -83,6 +101,7 @@ fun PetsMapScreen(onBack: () -> Unit, onReport: () -> Unit) {
         OgtTopBar(title = copy.petsMapTitle, onBack = onBack)
         ScreenColumn {
             OgtCaption(copy.petsMapHint)
+            if (sightingsError) OgtCaption("No pudimos actualizar todos los avistajes. Se conserva la última información disponible.")
             if (here == null) OgtGpsBanner()
         }
         if (center != null) {

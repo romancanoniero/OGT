@@ -20,6 +20,7 @@ private val UuidPattern = Regex(
 
 fun String.isUuid(): Boolean = UuidPattern.matches(this)
 
+
 private val FallbackPoint = GeoPoint(-34.6037, -58.3816)
 
 /** Reenvía una ficha que quedó solo en el dispositivo (`animal-pub-*`). */

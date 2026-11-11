@@ -3,6 +3,8 @@ import {randomUUID} from 'node:crypto';
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 const base='http://127.0.0.1:19083',checks=[];
+const qaPostgres=process.env.OGT_QA_POSTGRES_CONTAINER || 'ogt-qa-postgres-1';
+assert.match(qaPostgres,/^ogt-(qa|store-review-[0-9]{8})-postgres-1$/);
 async function account(name){
  const email=`qa-block-${name}-${randomUUID()}@example.test`;
  const r=await fetch('http://127.0.0.1:19099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=demo-key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:'OnlyGoodThings-QA-2468',returnSecureToken:true})});
@@ -16,7 +18,7 @@ const a=await account('A'),b=await account('B'),c=await account('C');
 const removedLabel='Encuadernación QA '+Date.now();
 const removedNeed=(await a.api('timebank/need',{label:removedLabel,note:'Pedido retirado por moderación de prueba'})).mine[0];
 assert.match(removedNeed.postId,/^[0-9a-f-]{36}$/);
-execFileSync('docker',['exec','-i','ogt-qa-postgres-1','psql','-X','-qAt','-v','ON_ERROR_STOP=1','-U','ogt','-d','onlygoodthings'],{input:`UPDATE social_posts SET moderation_status='REMOVED' WHERE id='${removedNeed.postId}';`,encoding:'utf8'});
+execFileSync('docker',['exec','-i',qaPostgres,'psql','-X','-qAt','-v','ON_ERROR_STOP=1','-U','ogt','-d','onlygoodthings'],{input:`UPDATE social_posts SET moderation_status='REMOVED' WHERE id='${removedNeed.postId}';`,encoding:'utf8'});
 assert.ok(!(await a.api('timebank/board')).mine.some(n=>n.needId===removedNeed.needId));
 const renewed=(await a.api('timebank/need',{label:removedLabel,note:'Nuevo pedido explícito después de la moderación'})).mine.find(n=>n.tag===removedNeed.tag);
 assert.ok(renewed&&renewed.needId!==removedNeed.needId&&renewed.postId!==removedNeed.postId);

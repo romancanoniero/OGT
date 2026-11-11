@@ -197,6 +197,29 @@ normal de `iosMain`/`iosTest`. No sustituirla por una dependencia manual que
 suprima esa jerarquía. La configuración Firebase y la clave release reales se
 usan únicamente al generar la distribución, nunca para el paquete de QA.
 
+Para un Android físico autorizado, agregar `-Pogt.qaHost=127.0.0.1` al paquete
+`.qa` y conectar únicamente ese dispositivo con `adb -s <serial> reverse
+tcp:19083 tcp:19083` y `reverse tcp:19099 tcp:19099`. El host alternativo solo
+admite loopback o el puente del emulador; las versiones release conservan
+Firebase y HTTPS productivos. Los avisos de instalación del dispositivo los
+confirma su propietario. No usar `-g` para conceder todos los permisos.
+
+La aceptación de revisión de tiendas agrega `node
+qa/scripts/store-review-e2e.mjs`: consentimiento por cuenta, ayuda entre cuentas,
+formulario privado de adopción, reintentos concurrentes, avistajes, bloqueo,
+exportación y baja sin aceptar términos. Usa exclusivamente loopback e identidades
+del emulador. `python3 qa/check-store-review-routing.py` comprueba las reglas
+reales del proxy en contenedores temporales y conserva las rutas originales.
+
+`qa/scripts/store-review-authorization-e2e.mjs` requiere otra API de demo en
+`127.0.0.1:19085`, el UID del fixture privado `review-emulator.json` y un
+vencimiento corto guardado como `expiresAt` en `review-expiry-context.json`, ambos
+en `build/store-readiness`. Verifica el cierre de conexiones activas al vencer,
+el plazo de autenticación y la renovación sin cambiar de identidad. No imprimir
+los tokens del fixture ni usar credenciales o cuentas productivas para estas
+pruebas. Con otro proyecto Compose, definir `COMPOSE_PROJECT_NAME` y, para las
+suites que llaman al contenedor directamente, `OGT_QA_POSTGRES_CONTAINER`.
+
 ## Límites y diferencias intencionales
 
 La empresa debe operar con MFA y permisos vigentes por organización. Las cargas,
@@ -1120,3 +1143,31 @@ el token vigente a Firebase antes de cada solicitud. Se conserva su caché
 normal y se rechaza una renovación que termina después de cambiar de cuenta
 o cerrar sesión. La baja de un token de notificaciones usa expresamente la
 credencial capturada del titular anterior y no la de la cuenta nueva.
+
+## Recuperación de sesión TOTP vencida (11/11/2026)
+
+En el Redmi, la versión firmada 16 abrió Google y alcanzó el segundo factor.
+Firebase devolvió `TOTP_CHALLENGE_TIMEOUT` al confirmar una sesión vencida. La
+app conservaba el reto y mostraba el error interno, permitiendo reintentar sobre
+la misma sesión inválida.
+
+La recuperación descarta solo el reto transitorio y su código. Muestra
+«La verificación venció» con «Volver al ingreso», que permite iniciar nuevamente
+el proveedor y usar un código actual. No se reinicia el proveedor silenciosamente
+ni se desactiva MFA. Los códigos incorrectos mantienen su reintento; un fallo
+de OGT posterior a la validación Firebase conserva el usuario ya verificado y
+no consume otra vez el código. Las respuestas tardías de un reto descartado
+no afectan a su reemplazo.
+
+Se reprodujeron tres fallos en diez casos del segundo factor antes del cambio.
+Después pasaron los diez casos y las **83 pruebas Android**. La fuente compartida
+y sus pruebas también compilaron para el simulador iOS, sin operar simuladores
+de otros proyectos. Android 17 se generó firmado y se actualizó sobre Android
+16 en el Redmi: mismo identificador de datos y las dos apps QA conservadas.
+La finalización real de Google/TOTP sigue pendiente del código introducido por
+el propietario en el teléfono. Los informes de validación no incluyen códigos,
+contraseñas ni tokens.
+
+Los paquetes 17 no se subieron a las tiendas. El IPA 15 anterior requiere
+recompilación con esta corrección compartida. El servidor conserva la versión
+`a91ed447`; se mantiene la decisión de completar primero las pruebas físicas.

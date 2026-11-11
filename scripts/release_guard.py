@@ -5,6 +5,7 @@ import hashlib
 import ipaddress
 import json
 import re
+from datetime import datetime
 from pathlib import Path
 
 REPOSITORY = "romancanoniero/OGT"
@@ -23,7 +24,7 @@ REQUIRED = (
     "database/migrations/26_crm_publication_index.sql",
     "database/migrations/28_crm_user_moderation.sql",
     "database/migrations/29_stories.sql", "database/migrations/30_story_frame.sql",
-    "database/migrations/31_account_erasure.sql", "database/migrations/32_user_blocks.sql", "database/migrations/33_csr_operations.sql", "database/migrations/34_company_registration.sql", "database/migrations/35_company_teams.sql", "database/migrations/36_content_attribution.sql", "database/migrations/37_media_processing_metrics.sql",
+    "database/migrations/31_account_erasure.sql", "database/migrations/32_user_blocks.sql", "database/migrations/33_csr_operations.sql", "database/migrations/34_company_registration.sql", "database/migrations/35_company_teams.sql", "database/migrations/36_content_attribution.sql", "database/migrations/37_media_processing_metrics.sql", "database/migrations/38_animal_contacts.sql",
     "web-app/apple-continue-es.png", "web-app/coupon-wallet.js", "web-app/crm/crm-business.js", "web-app/crm/crm-registration.js", "web-app/crm/crm-team.js", "web-app/crm/crm-operations.js", "web-app/crm/crm-dashboard.js",
     "scripts/ogt_operations.py", "scripts/ogt_backup.py", "scripts/install_ogt_operations.py", "scripts/restore_ogt_application.py",
     "web-app/user-safety.js",
@@ -64,6 +65,21 @@ def validate_env(values):
         raise ValueError("This release targets the existing ogt database owner")
     if values.get("OGT_LAUNCH_MODE") != "prelaunch":
         raise ValueError("OGT_LAUNCH_MODE must be prelaunch; public launch is a separate approval")
+    reviewers = {item.strip() for item in values.get("OGT_STORE_REVIEW_UIDS", "").split(",") if item.strip()}
+    if len(reviewers) > 10 or any(not re.fullmatch(r"[A-Za-z0-9:_-]{1,128}", uid) for uid in reviewers):
+        raise ValueError("Invalid store-review identity configuration; no values were printed")
+    review_expiry = values.get("OGT_STORE_REVIEW_EXPIRES_AT", "").strip()
+    if reviewers and not review_expiry:
+        raise ValueError("Store-review identities require an explicit expiry")
+    if review_expiry:
+        try:
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})", review_expiry):
+                raise ValueError()
+            parsed_expiry = datetime.fromisoformat(review_expiry.replace("Z", "+00:00"))
+            if parsed_expiry.tzinfo is None:
+                raise ValueError()
+        except ValueError:
+            raise ValueError("Invalid store-review expiry; no values were printed") from None
     payment_mode=values.get("OGT_MP_MODE","disabled")
     if payment_mode not in ("disabled","sandbox") or values.get("OGT_MP_LIVE_PAYMENTS","false")!="false":
         raise ValueError("This candidate permits only disabled or sandbox payments")

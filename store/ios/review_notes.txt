@@ -4,6 +4,17 @@ Only Good Things permite compartir publicaciones e historias, solicitar y ofrece
 ayuda comunitaria, colaborar con animales y compartir estacionamiento. Utiliza
 Firebase Authentication y el backend de onlygoodthings.lat. No es una demo local.
 
+El acceso comunitario es para mayores de 18 años. El primer ingreso de cada
+cuenta solicita confirmar la mayoría de edad y aceptar las normas, también si
+se ingresa con Google, Apple o teléfono. Se puede cerrar sesión o solicitar la
+baja de la cuenta desde esa pantalla sin aceptar los términos nuevos.
+
+Las nuevas solicitudes de ayuda, postulaciones a adopción y conversaciones de
+avistajes se guardan en el servidor. Los formularios de adopción solo están
+disponibles para sus participantes. Los hilos anteriores de un dispositivo se
+conservan con su identificación de historial local. Al informar un avistaje,
+el usuario elige el punto en el mapa antes de confirmar.
+
 La cuenta exclusiva de revisión se creó y se validó contra Firebase y la API real:
 rol USER, sin accesos a Control ni a empresas. Sus credenciales están fuera de Git
 y se cargaron en App Review Information. Ingresar con correo y contraseña; ese
@@ -13,6 +24,10 @@ notas ni en las capturas.
 PENDIENTE: verificar esa cuenta en el build exacto de TestFlight y comprobar el
 acceso desde la red del revisor. La app conserva la restricción prelaunch. Las
 antiguas credenciales de laboratorio no son válidas para esta revisión.
+
+El candidato incorpora un acceso temporal para las identidades de revisión
+autorizadas, con vencimiento y sin permisos de CRM. Debe activarse y comprobarse
+en producción antes del envío; no se considera validado por las pruebas locales.
 
 Ingreso: correo/contraseña, Google, teléfono y Apple. Completar las comprobaciones
 reales del candidato antes de enviarlo. La baja y exportación se encuentran en

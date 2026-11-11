@@ -57,7 +57,8 @@ fun MessagesScreen(onOpenChat: (String) -> Unit, onBack: () -> Unit = {}) {
                 rows.forEach { thread ->
                     ThreadRow(thread.peerName,
                         com.onlygoodthings.shared.domain.relativeTimeLabel(thread.lastAtEpochMs,com.onlygoodthings.shared.realtime.currentEpochMs()),
-                        thread.tagLabel,thread.lastBody.ifBlank { "Abrir conversación" },false,
+                        thread.tagLabel,thread.lastBody.ifBlank { "Abrir conversación" },thread.animalContactKind == "ADOPTION",
+                        sighting = thread.animalContactKind == "SIGHTING",
                         onClick = { onOpenChat(thread.matchId) })
                 }
             }

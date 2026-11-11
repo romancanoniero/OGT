@@ -39,6 +39,7 @@ actual fun OgtPostedVideo(url: String, modifier: Modifier) {
         modifier = modifier,
         update = { view ->
             val layer = view.layer.sublayers?.firstOrNull() as? AVPlayerLayer
+            layer?.player = player
             layer?.frame = view.bounds
         },
     )
