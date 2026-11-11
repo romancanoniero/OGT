@@ -1143,3 +1143,31 @@ el token vigente a Firebase antes de cada solicitud. Se conserva su caché
 normal y se rechaza una renovación que termina después de cambiar de cuenta
 o cerrar sesión. La baja de un token de notificaciones usa expresamente la
 credencial capturada del titular anterior y no la de la cuenta nueva.
+
+## Recuperación de sesión TOTP vencida (11/11/2026)
+
+En el Redmi, la versión firmada 16 abrió Google y alcanzó el segundo factor.
+Firebase devolvió `TOTP_CHALLENGE_TIMEOUT` al confirmar una sesión vencida. La
+app conservaba el reto y mostraba el error interno, permitiendo reintentar sobre
+la misma sesión inválida.
+
+La recuperación descarta solo el reto transitorio y su código. Muestra
+«La verificación venció» con «Volver al ingreso», que permite iniciar nuevamente
+el proveedor y usar un código actual. No se reinicia el proveedor silenciosamente
+ni se desactiva MFA. Los códigos incorrectos mantienen su reintento; un fallo
+de OGT posterior a la validación Firebase conserva el usuario ya verificado y
+no consume otra vez el código. Las respuestas tardías de un reto descartado
+no afectan a su reemplazo.
+
+Se reprodujeron tres fallos en diez casos del segundo factor antes del cambio.
+Después pasaron los diez casos y las **83 pruebas Android**. La fuente compartida
+y sus pruebas también compilaron para el simulador iOS, sin operar simuladores
+de otros proyectos. Android 17 se generó firmado y se actualizó sobre Android
+16 en el Redmi: mismo identificador de datos y las dos apps QA conservadas.
+La finalización real de Google/TOTP sigue pendiente del código introducido por
+el propietario en el teléfono. Los informes de validación no incluyen códigos,
+contraseñas ni tokens.
+
+Los paquetes 17 no se subieron a las tiendas. El IPA 15 anterior requiere
+recompilación con esta corrección compartida. El servidor conserva la versión
+`a91ed447`; se mantiene la decisión de completar primero las pruebas físicas.

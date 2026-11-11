@@ -1,13 +1,14 @@
 {
   "schemaVersion": 1,
   "preparedAt": "2026-11-09",
+  "updatedAt": "2026-11-11",
   "readyToSubmit": false,
   "credentialsIncluded": false,
   "googlePlay": {
     "packageName": "com.onlygoodthings.app",
     "appId": "4974603618070417614",
     "latestUploadedVersionCodeVerified": 12,
-    "localSignedCandidateVersionCode": 16,
+    "localSignedCandidateVersionCode": 17,
     "candidateUploaded": false,
     "targetAudience": {"ages": ["18+"], "saved": true, "submitted": false},
     "dataSafety": {
@@ -34,7 +35,7 @@
       "purpose": "OGT conecta a vecinos para compartir ayuda, buenas noticias e historias, encontrar mascotas y colaborar con lugares de estacionamiento cercanos. La ubicación permite mostrar opciones próximas y coordinar el estacionamiento solidario.",
       "feature": "Al elegir «Siempre», OGT mantiene un servicio de ubicación con notificación visible para actualizar la última posición del usuario aunque cambie de aplicación. Esto mantiene la referencia de proximidad para el estacionamiento comunitario. Se puede elegir «Mientras uses la app» o desactivar GPS en Ajustes. No se almacena un historial de rutas.",
       "videoUrl": null,
-      "videoRequires": "Genuine demonstration of candidate 16: prominent disclosure before the Android permission request, the background function, visible notification and stopping location when disabled. Use authorized test coordinates and exclude passwords/private notifications.",
+      "videoRequires": "Genuine demonstration of candidate 17: prominent disclosure before the Android permission request, the background function, visible notification and stopping location when disabled. Use authorized test coordinates and exclude passwords/private notifications.",
       "runtimeVerificationRequired": ["While in use", "Always", "Deny", "Revoke", "GPS disabled", "Background notification"]
     }
   },
@@ -42,6 +43,7 @@
     "appId": "6813852319",
     "bundleId": "com.onlygoodthings.app",
     "localSignedCandidateBuild": 15,
+    "candidateNeedsSharedOtpRecoveryRebuild": true,
     "latestUploadedBuildVerified": true,
     "latestUploadedBuild": 13,
     "candidateUploaded": false,

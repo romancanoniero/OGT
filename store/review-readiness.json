@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "preparedAt": "2026-11-09",
+  "updatedAt": "2026-11-11",
   "app": "com.onlygoodthings.app",
   "baseline": "a91ed4472993dbfbd8f3504ff6e841490c65ebb2",
   "readyToSubmit": false,
@@ -28,13 +29,21 @@
     {
       "id": "store_packages",
       "work": "Signed Android/iPhone candidates, current screenshots, location demonstration, review credentials and metadata matching the exact builds",
-      "state": "signed_aab16_ipa15_verified_not_uploaded_runtime_acceptance_pending"
+      "state": "signed_aab17_apk17_redmi_updated_ios15_rebuild_required_not_uploaded"
     }
   ],
   "validation": {
     "backendUnit": 82,
     "sharedJvm": 152,
-    "androidJvm": 79,
+    "androidJvm": 83,
+    "secondFactorSignInCases": 10,
+    "totpExpirationRegressionCasesFailedBeforeFix": 3,
+    "iosSharedAndTestCompilationAfterOtpFix": true,
+    "signedAndroidVersionInstalledOnRedmi": 17,
+    "redmiSameAppUidAfterSignedUpdate": true,
+    "redmiGoogleFirstFactorObserved": true,
+    "redmiRealMfaCompletionVerified": false,
+    "iosSignedCandidateNeedsSharedOtpRebuild": true,
     "androidInstrumentedOnDedicatedEmulator": 92,
     "androidInstrumentedOnPhysicalRedmi": 92,
     "redmiQaPackagesInstalled": true,
@@ -67,9 +76,12 @@
     "The native review transport is selected only after a non-JSON production network rejection and verification of the same Firebase identity",
     "Reviewer media credentials are restricted to the first-party HTTPS media origin; review sockets expire and reject identity changes while same-account renewal remains supported",
     "A public deletion request can be initiated by email when prelaunch networking prevents the existing authenticated web flow",
-    "Google Play target audience is saved as 18+; optional adoption address collection and age-consent purpose are declared"
+    "Google Play target audience is saved as 18+; optional adoption address collection and age-consent purpose are declared",
+    "Expired TOTP challenges discard their native resolver and show a recovery dialog requiring fresh sign-in; valid-code retries and already-verified backend retries are preserved"
   ],
   "remainingEvidence": [
+    "Signed Android 17 is installed without wiping app data or QA; complete fresh Google/TOTP verification on the phone, then distinguish pending backend deployment errors",
+    "Rebuild and reverify the signed iOS candidate with the shared OTP recovery before submission; iOS source and tests compile but signed build 15 predates this correction",
     "Dedicated Apple identity creation is verified; finish real OGT sign-in, linking, re-entry and deletion without using the owner's real account",
     "Redmi portable report recovered: 92 passed; complete native UI/permission/media acceptance and targeted FCM/APNs on the exact signed candidates after stabilizing its USB connection",
     "Record the genuine background-location disclosure and permission demonstration and complete Google's location declaration",
