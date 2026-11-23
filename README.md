@@ -14,6 +14,8 @@ Plataforma social de impacto positivo. Este monorepositorio contiene el contrato
 - `scripts` — verificación, empaquetado y despliegue
 - `docs/` — arquitectura, protocolo WS, Postman
 
+Resumen de producto para crear spots publicitarios: [OGT brief publicitario](docs/OGT_BRIEF_PUBLICITARIO.md).
+
 ## Boot del cliente
 
 ```kotlin
