@@ -12,6 +12,7 @@ enum class OgtRoute(val title: String) {
     Otp("Verificación OTP"),
     Recover("Recuperar contraseña"),
     CommunityAgreement("Bienvenido a Only Good Things"),
+    CompleteProfile("Completá tu perfil"),
     Permissions("Permisos"),
     Gps("Permiso GPS"),
     Identity("Verificación"),
@@ -49,6 +50,13 @@ val OgtBottomTabs = listOf(
     OgtRoute.Parking,
     OgtRoute.Skills,
 )
+
+internal fun authenticatedStartRoute(needsConsent: Boolean, needsProfile: Boolean, onboardingDone: Boolean): OgtRoute = when {
+    needsConsent -> OgtRoute.CommunityAgreement
+    needsProfile -> OgtRoute.CompleteProfile
+    !onboardingDone -> OgtRoute.Permissions
+    else -> OgtRoute.Feed
+}
 
 /** Tipos de aviso que se publican desde el + del dock. */
 enum class ComposePostKind {

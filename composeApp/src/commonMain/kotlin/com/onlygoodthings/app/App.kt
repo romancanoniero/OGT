@@ -159,6 +159,12 @@ fun App() {
             )
         }
         val auth = LocalAuth.current
+        LaunchedEffect(auth.requiresLogin) {
+            if (auth.requiresLogin) {
+                settingsResume = false
+                route = OgtRoute.Login
+            }
+        }
         if (storePreview) auth.markOnboardingDone()
         val session = LocalOgtSession.current
         val db = LocalOgtDb.current
@@ -327,15 +333,14 @@ fun App() {
             return fallback
         }
         fun goHomeOrOnboard() {
-            if (auth.needsCommunityConsent) {
-                route = OgtRoute.CommunityAgreement
-                return
-            }
-            val home = if (auth.hasFinishedOnboarding()) OgtRoute.Feed else OgtRoute.Permissions
-            route = applyHonorRoute(home)
+            val next = com.onlygoodthings.app.nav.authenticatedStartRoute(
+                auth.needsCommunityConsent, auth.needsProfileCompletion, auth.hasFinishedOnboarding(),
+            )
+            route = if (next == OgtRoute.Feed || next == OgtRoute.Permissions) applyHonorRoute(next) else next
         }
         val authGate = route == OgtRoute.Splash || route == OgtRoute.Landing ||
             route == OgtRoute.CommunityAgreement ||
+            route == OgtRoute.CompleteProfile ||
             route == OgtRoute.Onboarding ||
             route == OgtRoute.OnboardingFeatures ||
             route == OgtRoute.Login ||
@@ -521,11 +526,10 @@ fun App() {
                     OgtRoute.Splash -> SplashScreen(
                         restore = { auth.restore() },
                         onReady = { restored ->
-                            route = when (restored) {
-                                AuthRestore.LoggedOut -> OgtRoute.Landing
-                                AuthRestore.NeedsBiometric -> OgtRoute.Login
-                                AuthRestore.FirstRun -> if (auth.needsCommunityConsent) OgtRoute.CommunityAgreement else OgtRoute.Permissions
-                                AuthRestore.Home -> if (auth.needsCommunityConsent) OgtRoute.CommunityAgreement else applyHonorRoute(OgtRoute.Feed)
+                            when (restored) {
+                                AuthRestore.LoggedOut -> route = OgtRoute.Landing
+                                AuthRestore.NeedsBiometric, AuthRestore.LoginRequired -> route = OgtRoute.Login
+                                AuthRestore.FirstRun, AuthRestore.Home -> goHomeOrOnboard()
                             }
                             scope.launch {
                                 auth.hydratePublishedAnimals(db)
@@ -553,6 +557,10 @@ fun App() {
                     )
                     OgtRoute.CommunityAgreement -> com.onlygoodthings.app.ui.screens.CommunityAgreementScreen(
                         onAccepted = { goHomeOrOnboard() },
+                        onSignOut = { scope.launch { auth.signOut(); route = OgtRoute.Login } },
+                    )
+                    OgtRoute.CompleteProfile -> com.onlygoodthings.app.ui.screens.CompleteProfileScreen(
+                        onSaved = { goHomeOrOnboard() },
                         onSignOut = { scope.launch { auth.signOut(); route = OgtRoute.Login } },
                     )
                     OgtRoute.SignUp -> SignUpScreen(

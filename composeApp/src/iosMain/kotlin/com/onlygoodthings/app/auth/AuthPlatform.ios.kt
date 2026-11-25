@@ -17,7 +17,9 @@ actual class AuthPlatform actual constructor() {
 
     actual suspend fun idToken(forceRefresh: Boolean): String? = suspendCancellableCoroutine { cont ->
         host().idToken(forceRefresh) { token, err ->
-            if (err != null) cont.resumeWithException(AuthException(err))
+            if (!cont.isActive) return@idToken
+            if (isExpiredSessionCode(err)) cont.resumeWithException(AuthSessionExpired())
+            else if (err != null) cont.resumeWithException(AuthException(err))
             else cont.resume(token)
         }
     }

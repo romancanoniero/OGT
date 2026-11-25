@@ -488,6 +488,11 @@ final class OgtFirebaseHost: NSObject, IosAuthHost, ASAuthorizationControllerDel
             return
         }
         user.getIDTokenForcingRefresh(forceRefresh) { token, error in
+            if let error, let code = AuthErrorCode(rawValue: (error as NSError).code),
+               code == .userTokenExpired || code == .invalidUserToken {
+                onResult(nil, "auth/user-token-expired")
+                return
+            }
             onResult(token, error.map(Self.mensaje))
         }
     }

@@ -73,7 +73,8 @@ jobs:
         with:
           repository: romancanoniero/db-kmp-sdk
           ref: ${{ vars.OGT_SDK_REVISION || '0a881b7a15c9a7d99b77da8547aabe2dd493a8b0' }}
-          token: ${{ secrets.OGT_SDK_READ_TOKEN || secrets.OGT_SDK_CHECKOUT_TOKEN }}
+          # The SDK is public; an expired personal token must not block its checkout.
+          token: ${{ github.token }}
           path: _sdk
           persist-credentials: false
       - uses: actions/setup-java@v4
@@ -184,18 +185,17 @@ jobs:
           ref: ${{ github.sha }}
           path: ogt
           persist-credentials: false
-      - name: Check deploy and private build dependency configuration
+      - name: Check deploy and build dependency configuration
         env:
           HOST: ${{ secrets.OGT_VPS_HOST || '217.216.82.209' }}
           USER: ${{ secrets.OGT_VPS_USER || 'iankmp' }}
           KEY: ${{ secrets.OGT_VPS_SSH_KEY }}
           KNOWN: ${{ secrets.OGT_VPS_KNOWN_HOSTS }}
-          SDK_TOKEN: ${{ secrets.OGT_SDK_READ_TOKEN || secrets.OGT_SDK_CHECKOUT_TOKEN }}
           SDK_REF: ${{ vars.OGT_SDK_REVISION || '0a881b7a15c9a7d99b77da8547aabe2dd493a8b0' }}
           SSH_PORT: ${{ vars.OGT_VPS_SSH_PORT || '22' }}
         run: |
           set -euo pipefail
-          for name in HOST USER KEY KNOWN SDK_TOKEN SDK_REF; do
+          for name in HOST USER KEY KNOWN SDK_REF; do
             test -n "${!name}" || { echo "::error::Falta configuracion de ogt-launch: $name. Ver docs/FIRST_RELEASE.md"; exit 1; }
           done
           [[ "$HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
@@ -206,7 +206,7 @@ jobs:
         with:
           repository: romancanoniero/db-kmp-sdk
           ref: ${{ vars.OGT_SDK_REVISION || '0a881b7a15c9a7d99b77da8547aabe2dd493a8b0' }}
-          token: ${{ secrets.OGT_SDK_READ_TOKEN || secrets.OGT_SDK_CHECKOUT_TOKEN }}
+          token: ${{ github.token }}
           path: _sdk
           persist-credentials: false
       - uses: actions/setup-java@v4

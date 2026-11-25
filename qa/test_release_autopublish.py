@@ -39,6 +39,23 @@ def allowed(event, ref, repo, confirm, success):
 
 
 class AutomaticPublicationTests(unittest.TestCase):
+    def test_public_sdk_uses_the_run_scoped_read_token_in_both_builds(self):
+        checkouts = SOURCE.split('repository: romancanoniero/db-kmp-sdk\n')[1:]
+        self.assertEqual(len(checkouts), 2)
+        for checkout in checkouts:
+            settings = checkout.split('      - ', 1)[0]
+            self.assertIn('token: ${{ github.token }}', settings)
+            self.assertIn('persist-credentials: false', settings)
+            self.assertIn('0a881b7a15c9a7d99b77da8547aabe2dd493a8b0', settings)
+        self.assertNotIn('OGT_SDK_READ_TOKEN', SOURCE)
+        self.assertNotIn('OGT_SDK_CHECKOUT_TOKEN', SOURCE)
+
+    def test_activation_checks_the_account_routes_required_after_mfa(self):
+        activation = (ROOT / 'scripts/activate-ogt-release.sh').read_text(encoding='utf-8')
+        self.assertIn('for path in me/consent me/consent/accept me/settings; do', activation)
+        self.assertIn('http://127.0.0.1:19081/api/v1/$path', activation)
+        self.assertIn('test "$code" = 401', activation)
+
     def test_event_branch_repository_and_success_matrix(self):
         combinations = itertools.product(
             ['push', 'workflow_dispatch', 'pull_request', 'pull_request_target', 'schedule'],

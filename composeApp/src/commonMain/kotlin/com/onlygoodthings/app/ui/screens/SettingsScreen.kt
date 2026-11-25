@@ -401,7 +401,7 @@ fun SettingsScreen(
 
 /** Foto centrada. El origen se elige en un sheet, después de cerrarlo. */
 @Composable
-private fun ProfilePhotoEditor() {
+internal fun ProfilePhotoEditor(enabled: Boolean = true, onSavingChanged: (Boolean) -> Unit = {}) {
     val session = LocalOgtSession.current
     val auth = LocalAuth.current
     val photoScope = rememberCoroutineScope()
@@ -422,8 +422,9 @@ private fun ProfilePhotoEditor() {
             return@rememberOgtMediaPicker
         }
         photoError = null
-        if (!savingPhoto) photoScope.launch {
+        if (!savingPhoto && enabled) photoScope.launch {
             savingPhoto = true
+            onSavingChanged(true)
             try {
                 auth.updateProfilePhoto(picked.path)
             } catch (cancel: kotlinx.coroutines.CancellationException) {
@@ -432,6 +433,7 @@ private fun ProfilePhotoEditor() {
                 photoError = failure.message ?: "No se pudo guardar la foto. Volvé a intentarlo."
             } finally {
                 savingPhoto = false
+                onSavingChanged(false)
             }
         }
     }
@@ -450,7 +452,7 @@ private fun ProfilePhotoEditor() {
             Modifier
                 .size(112.dp)
                 .scale(scale)
-                .clickable(enabled = !savingPhoto, interactionSource = press, indication = null) { sheet = true },
+                .clickable(enabled = enabled && !savingPhoto, interactionSource = press, indication = null) { sheet = true },
             contentAlignment = Alignment.Center,
         ) {
             OgtSessionAvatar(

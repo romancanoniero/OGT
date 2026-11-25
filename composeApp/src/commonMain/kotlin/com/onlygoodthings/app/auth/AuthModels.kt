@@ -2,7 +2,15 @@ package com.onlygoodthings.app.auth
 
 import com.onlygoodthings.shared.domain.UserProfile
 
-class AuthException(message: String, cause: Throwable? = null) : Exception(message, cause)
+open class AuthException(message: String, cause: Throwable? = null) : Exception(message, cause)
+
+class AuthSessionExpired(cause: Throwable? = null) : AuthException("Volvé a ingresar", cause)
+
+internal fun isExpiredSessionCode(code: String?): Boolean = code in setOf(
+    "ERROR_USER_TOKEN_EXPIRED", "ERROR_INVALID_USER_TOKEN",
+    "auth/user-token-expired", "auth/invalid-user-token",
+    "INVALID_TOKEN", "UNAUTHENTICATED",
+)
 
 /** Only the public choices are shared; the Firebase resolver remains native and in memory. */
 data class AuthSecondFactor(val index: Int, val kind: String, val label: String)
@@ -31,6 +39,7 @@ data class PendingPhoneAuth(
 
 enum class AuthRestore {
     LoggedOut,
+    LoginRequired,
     NeedsBiometric,
     FirstRun,
     Home,

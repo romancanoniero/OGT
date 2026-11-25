@@ -26,4 +26,33 @@ class AuthSessionPolicyTest {
         assertFailsWith<AuthException> { confirmedSessionProfile(ApiResponse.ok(profile), "") }
         assertFailsWith<AuthException> { confirmedSessionProfile(ApiResponse.ok(profile.copy(id = "")), "firebase-id") }
     }
+
+    @Test fun rejectedSessionTokensRequireLoginWithoutForwardingProviderDetails() {
+        for (code in listOf("INVALID_TOKEN", "UNAUTHENTICATED")) {
+            val failure = assertFailsWith<AuthSessionExpired> {
+                confirmedSessionProfile(ApiResponse(false, profile, "The user's credential is no longer valid", code), "firebase-id")
+            }
+            assertEquals("Volvé a ingresar", failure.message)
+        }
+    }
+
+    @Test fun sessionExpiryIsDistinctFromWrongPasswordMfaAndTemporaryFailures() {
+        for (code in listOf("ERROR_USER_TOKEN_EXPIRED", "ERROR_INVALID_USER_TOKEN", "auth/user-token-expired", "auth/invalid-user-token")) {
+            assertTrue(isExpiredSessionCode(code), code)
+        }
+        for (code in listOf(null, "ERROR_INVALID_CREDENTIAL", "ERROR_WRONG_PASSWORD", "ERROR_SESSION_EXPIRED", "auth/code-expired", "auth/network-request-failed", "ACCOUNT_UNAVAILABLE")) {
+            assertFalse(isExpiredSessionCode(code), code)
+        }
+    }
+
+    @Test fun googleNamesDoNotSubstituteForTheMissingCommunityAndSavedProfilesStayComplete() {
+        val photo = "https://example.test/google.jpg"
+        assertTrue(profileNeedsCompletion("Nombre Google", "", "google-uid", photo))
+        assertTrue(profileNeedsCompletion("persona@example.test", "Palermo", "google-uid", photo))
+        assertTrue(profileNeedsCompletion("google-uid", "Palermo", "google-uid", photo))
+        assertTrue(profileNeedsCompletion("Alguien De La Comunidad", "Palermo", "google-uid", photo))
+        assertTrue(profileNeedsCompletion("Nombre Google", "Palermo", "google-uid", null))
+        assertTrue(profileNeedsCompletion("Nombre Google", "Palermo", "google-uid", "  "))
+        assertFalse(profileNeedsCompletion("Nombre guardado en OGT", "Palermo", "google-uid", photo))
+    }
 }

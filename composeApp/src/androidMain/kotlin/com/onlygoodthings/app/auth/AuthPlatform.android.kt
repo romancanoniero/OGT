@@ -121,8 +121,12 @@ actual class AuthPlatform actual constructor() {
 
     actual suspend fun currentUser(): AuthUser? = auth.currentUser?.toAuthUser()
 
-    actual suspend fun idToken(forceRefresh: Boolean): String? =
+    actual suspend fun idToken(forceRefresh: Boolean): String? = try {
         auth.currentUser?.getIdToken(forceRefresh)?.await()?.token
+    } catch (failure: com.google.firebase.auth.FirebaseAuthException) {
+        if (isExpiredSessionCode(failure.errorCode)) throw AuthSessionExpired(failure)
+        throw failure
+    }
 
     actual suspend fun signInEmail(email: String, password: String): AuthUser = runAuth {
         auth.signInWithEmailAndPassword(email, password).await().user
@@ -345,6 +349,7 @@ private fun sinIdDeProyecto(message: String?): String {
 
 private fun mapFirebase(error: Throwable?): AuthException {
     val code = (error as? com.google.firebase.auth.FirebaseAuthException)?.errorCode
+    if (isExpiredSessionCode(code)) return AuthSessionExpired(error)
     val message = when (code) {
         "ERROR_INVALID_EMAIL" -> "El correo no es válido"
         "ERROR_WRONG_PASSWORD", "ERROR_INVALID_CREDENTIAL" -> "Correo o contraseña incorrectos"

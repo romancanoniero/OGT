@@ -28,11 +28,14 @@ class AuthController(
     private val platform = AuthPlatform()
     private val prefs = AuthPrefs()
     init { prefs.noticeOwnerId = "" }
-    val account = AuthSessionApi(session) {
+    val account = AuthSessionApi(session, onSessionExpired = { rejectedToken ->
+        check(session.firebaseJwt == rejectedToken) { "La sesión cambió" }
+        expireSession()
+    }) {
         ownerScopedAccountToken({ preview.overlayUser?.firebaseUid.orEmpty() }) { uid ->
             if (allowDevTokens) session.firebaseJwt else {
                 check(platform.currentUser()?.firebaseUid == uid) { "La sesión cambió" }
-                platform.idToken(false)
+                sessionToken(false)
             }
         }.also { session.firebaseJwt = it }
     }
@@ -60,7 +63,7 @@ class AuthController(
             preview.applyAccountSettings(saved)
         } finally { settingsMutex.unlock() }
     }
-    val stories = com.onlygoodthings.app.data.StoriesController(session,prefs) { platform.idToken(false) }
+    val stories = com.onlygoodthings.app.data.StoriesController(session,prefs) { sessionToken(false) }
     val honor = RestHonorRepository(createPlatformHttpClient(), session)
     val notices = RestNoticeRepository(createPlatformHttpClient(), session)
     val animals = RestAnimalsRepository(createPlatformHttpClient(), session)
@@ -106,8 +109,26 @@ class AuthController(
     }
     var busy by mutableStateOf(false)
     var error by mutableStateOf<String?>(null)
+    var requiresLogin by mutableStateOf(false)
+        private set
     var needsCommunityConsent by mutableStateOf(true)
         private set
+    val needsProfileCompletion: Boolean get() = preview.overlayUser?.let {
+        profileNeedsCompletion(it.displayName, preview.accountSettings.barrio, it.firebaseUid, it.photoUrl)
+    } ?: true
+
+    suspend fun completeProfile(name: String, barrio: String): Boolean = wrap {
+        val me = preview.overlayUser ?: error("Iniciá sesión para continuar")
+        val titled = titleCasePersonName(name.trim())
+        require(!profileNeedsCompletion(titled, barrio, me.firebaseUid, me.photoUrl)) { "Completá tu nombre, tu zona o comunidad y tu foto" }
+        require(barrio.trim().length <= 80) { "La zona o comunidad debe tener hasta 80 caracteres" }
+        val card = api.completeProfile(titled, barrio.trim(), me.photoUrl.orEmpty())
+        check(preview.currentUserId == me.id) { "La sesión cambió" }
+        val photo = card.photoUrl ?: me.photoUrl
+        db.applyUserLive(card.userId, card.displayName, photo)
+        preview.overlayUser = me.copy(displayName = card.displayName, photoUrl = photo, barrio = barrio.trim())
+        refreshSettings()
+    }
 
     suspend fun acceptCommunityConsent(): Boolean = wrap {
         val owner = preview.currentUserId
@@ -122,6 +143,7 @@ class AuthController(
     val signedIn: StateFlow<Boolean> = _signedIn
 
     suspend fun restore(): AuthRestore {
+        error = null
         val user = platform.currentUser() ?: return AuthRestore.LoggedOut
         if (prefs.biometricEnabled) return AuthRestore.NeedsBiometric
         if (!prefs.keepSession) {
@@ -132,6 +154,9 @@ class AuthController(
             finishSession(user)
         } catch (cancel: kotlinx.coroutines.CancellationException) {
             throw cancel
+        } catch (expired: AuthSessionExpired) {
+            if (!requiresLogin) expireSession()
+            return AuthRestore.LoginRequired
         } catch (failure: Exception) {
             error = failure.message ?: "No se pudo recuperar la sesión"
             return AuthRestore.LoggedOut
@@ -248,7 +273,7 @@ class AuthController(
     suspend fun deleteAccount(): Boolean = wrap {
         if (session.firebaseJwt.isNullOrBlank()) error("Iniciá sesión para borrar la cuenta")
         platform.prepareAccountDeletion()
-        platform.idToken(true)?.let { session.firebaseJwt = it }
+        session.firebaseJwt = sessionToken(true)
         api.deleteAccount()
         preview.deleteCurrentSettingsAccount()
         preview.deleteCurrentParkingAccount()
@@ -258,7 +283,7 @@ class AuthController(
     suspend fun uploadPostMedia(items: List<com.onlygoodthings.app.platform.OgtPickedMedia>, altText: String): List<com.onlygoodthings.shared.domain.PostMediaItem> {
         ensureDevBearer()
         val owner = preview.currentUserId
-        val refreshed = if (allowDevTokens) null else platform.idToken(false)
+        val refreshed = if (allowDevTokens) null else sessionToken(false)
         check(owner == preview.currentUserId) { "La sesión cambió. Volvé a intentarlo." }
         if (!refreshed.isNullOrBlank()) session.firebaseJwt = refreshed
         val token = session.firebaseJwt ?: error("Iniciá sesión para publicar.")
@@ -302,6 +327,7 @@ class AuthController(
     }
 
     suspend fun signOut() {
+        error = null
         needsCommunityConsent = true
         com.onlygoodthings.app.media.StoreReviewMedia.clear()
         com.onlygoodthings.shared.realtime.OgtSdk.shutdown()
@@ -370,7 +396,7 @@ class AuthController(
 
     /** JWT Firebase o token de lab para el handshake de db-kmp-sdk. */
     fun realtimeTokenProvider(): suspend (Boolean) -> String? = { force ->
-        platform.idToken(force)
+        (if (allowDevTokens) platform.idToken(force) else sessionToken(force))
             ?: session.firebaseJwt
             ?: if (allowDevTokens) "dev.${preview.me().firebaseUid.ifBlank { preview.me().id }}.USER" else null
     }
@@ -385,9 +411,20 @@ class AuthController(
         prefs.biometricEnabled = true
     }
 
+    private suspend fun expireSession() {
+        signOut()
+        requiresLogin = true
+    }
+
+    private suspend fun sessionToken(forceRefresh: Boolean): String = renewedSessionToken(
+        owner = { platform.currentUser()?.firebaseUid },
+        load = { platform.idToken(forceRefresh) },
+        onExpired = { expireSession() },
+    )
+
     private suspend fun finishSession(user: AuthUser, keep: Boolean = true) {
         prefs.keepSession = keep
-        val token = platform.idToken(true) ?: error("No se pudo obtener el token Firebase")
+        val token = sessionToken(true)
         val bearer = if (allowDevTokens) "dev.${user.firebaseUid}.USER" else token
         val profile = api.openSession(bearer, user.firebaseUid)
         session.firebaseJwt = bearer
@@ -399,12 +436,13 @@ class AuthController(
         val reviewTransport=session.apiBaseUrl==com.onlygoodthings.shared.data.OGT_DEFAULT_API_BASE+"/store-review"
         com.onlygoodthings.app.media.StoreReviewMedia.configure(reviewTransport) {
             check(platform.currentUser()?.firebaseUid==user.firebaseUid) { "La sesión cambió" }
-            platform.idToken(false)
+            sessionToken(false)
         }
         com.onlygoodthings.shared.realtime.OgtSdk.restart(com.onlygoodthings.shared.realtime.gatewayEndpointFromApiBase(session.apiBaseUrl),realtimeTokenProvider())
         stories.start(preview.currentUserId)
         ensureDevBearer()
         _signedIn.value = true
+        requiresLogin = false
         error = null
     }
 
@@ -453,8 +491,9 @@ class AuthController(
         )
     }
 
-    private fun applyBarrio(barrio: String) {
+    private suspend fun applyBarrio(barrio: String) {
         val me = preview.overlayUser ?: return
+        if (barrio.isNotBlank()) updateSettings(me.id) { it.copy(barrio = barrio.trim()) }
         val updated = me.copy(barrio = barrio.ifBlank { me.barrio })
         val idx = db.users.indexOfFirst { it.id == me.id }
         if (idx >= 0) db.users[idx] = updated
@@ -481,6 +520,9 @@ class AuthController(
         } catch (challenge: AuthSecondFactorRequired) {
             secondFactorSignIn.require(challenge.factors, secondFactorKeepSession)
             error = null
+            false
+        } catch (expired: AuthSessionExpired) {
+            if (!requiresLogin) expireSession()
             false
         } catch (e: AuthException) {
             error = e.message

@@ -82,6 +82,11 @@ for path in access platform/summary company/summary; do
   code="$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '{}' "http://127.0.0.1:19081/api/v1/crm/$path")"
   test "$code" = 401 || { echo "Unauthenticated CRM request returned $code" >&2; exit 1; }
 done
+# A healthy API without the account routes cannot finish mobile sign-in after MFA.
+for path in me/consent me/consent/accept me/settings; do
+  code="$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '{}' "http://127.0.0.1:19081/api/v1/$path")"
+  test "$code" = 401 || { echo "Required account route $path returned $code instead of 401" >&2; exit 1; }
+done
 # Both direct ports must be loopback-only; external clients must pass the review gate.
 for spec in 'ogt-api 8080/tcp' 'ogt-web 80/tcp'; do
   set -- $spec

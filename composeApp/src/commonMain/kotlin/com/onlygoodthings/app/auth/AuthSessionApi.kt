@@ -19,16 +19,35 @@ import kotlinx.serialization.json.buildJsonObject
 class AuthSessionApi(
     private val session: SessionStore,
     private val client: HttpClient = createPlatformHttpClient(),
+    private val onSessionExpired: suspend (String) -> Unit = {},
     private val tokenProvider: suspend () -> String? = { session.firebaseJwt },
 ) {
 
     private suspend inline fun <reified T> accountPost(path: String, body: kotlinx.serialization.json.JsonObject = buildJsonObject {}, bearer: String? = null, base: String = session.apiBaseUrl): T {
         val token = bearer ?: tokenProvider() ?: error("Iniciá sesión para continuar")
-        val response: ApiResponse<T> = client.post("$base$path") {
+        val reply = client.post("$base$path") {
             contentType(ContentType.Application.Json)
             header("Authorization", "Bearer $token")
             setBody(body)
-        }.body()
+        }
+        if (reply.status == HttpStatusCode.Unauthorized && bearer == null) {
+            onSessionExpired(token)
+            throw AuthSessionExpired()
+        }
+        if (reply.status == HttpStatusCode.NotFound) {
+            throw AuthException("Esta función de OGT no está disponible por el momento. Volvé a intentarlo en unos minutos.")
+        }
+        val response: ApiResponse<T> = try {
+            reply.body()
+        } catch (cancel: kotlinx.coroutines.CancellationException) {
+            throw cancel
+        } catch (failure: Exception) {
+            throw AuthException("No pudimos completar la operación con OGT. Volvé a intentarlo en unos minutos.", failure)
+        }
+        if (!response.success && isExpiredSessionCode(response.errorCode) && bearer == null) {
+            onSessionExpired(token)
+            throw AuthSessionExpired()
+        }
         return response.data?.takeIf { response.success } ?: error(response.message ?: "No se pudo completar la operación")
     }
 
@@ -42,6 +61,12 @@ class AuthSessionApi(
         })
     suspend fun saveSettings(changes: kotlinx.serialization.json.JsonObject): com.onlygoodthings.shared.domain.AccountSettings =
         accountPost("/api/v1/me/settings/update", changes)
+    suspend fun completeProfile(name: String, barrio: String, photoUrl: String): com.onlygoodthings.shared.domain.NeighborCard =
+        accountPost("/api/v1/users/profile/update", buildJsonObject {
+            put("displayName", JsonPrimitive(name))
+            put("barrio", JsonPrimitive(barrio))
+            put("photoUrl", JsonPrimitive(photoUrl))
+        })
     suspend fun wallet(): com.onlygoodthings.shared.domain.WalletSummary = accountPost("/api/v1/wallet/summary")
     suspend fun timebankBoard(): com.onlygoodthings.shared.domain.TimebankBoard = accountPost("/api/v1/timebank/board")
     suspend fun publishExchange(need: String, give: String, note: String): com.onlygoodthings.shared.domain.TimebankBoard =
