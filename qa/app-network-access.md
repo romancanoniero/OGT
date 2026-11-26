@@ -1,6 +1,6 @@
-# Acceso normal de las apps conservando el CRM privado — preparado 26/11/2026
+# Acceso normal de las apps conservando el CRM privado — activado 26/11/2026
 
-Estado: **preparado y probado localmente; no activado en Contabo**. El pedido inicial autorizaba cuentas de testers con vencimiento. La propuesta posterior es que las tiendas filtren la instalación y cualquier cuenta Firebase válida pueda usar la app; activar ese alcance requiere la decisión explícita del usuario.
+Estado: **activado en Contabo y verificado desde una red externa**. El usuario aprobó explícitamente «Sí, activar acceso normal de la app», reemplazando la limitación temporal a cuentas de testers. Las tiendas administran quién puede instalar sus versiones de prueba; el servidor acepta cuentas Firebase válidas desde cualquier red y conserva los controles de cuenta y permisos. Esto no convierte la instalación desde una tienda en una credencial de autenticación.
 
 ## Alcance concreto
 
@@ -24,4 +24,19 @@ La entrada temporal `/store-review` con identidades y vencimiento se conserva, p
 
 `python3 -m unittest qa.test_release_guard -v` correcto. `:backend:test` correcto: **82 pruebas**, sin fallos; Gradle reutiliza resultados vigentes porque no cambia el código del backend. No se modifican fuentes ni ejecutables de Android/iOS. La prueba de proxies utiliza una simulación de autenticación y no certifica por sí misma una sesión real de Firebase/MFA.
 
-Tras autorizar la activación: respaldar privadamente la configuración y fijar únicamente la opción de acceso normal. Publicar la revisión mediante el procedimiento integral protegido del proyecto, conservando sus verificaciones, respaldo y manifiesto; no copiar un Compose por fuera del release verificado. El procedimiento existente recrea web/API y conserva sus volúmenes, credenciales y datos. Comprobar desde una red externa el rechazo de tokens inválidos con respuesta de la API, el bloqueo del CRM, la salud desde la red autorizada y las restricciones del socket. El ingreso real desde 5G debe comprobarse en el iPhone del usuario; nunca se extraen sus tokens.
+## Activación y regresión en Contabo
+
+Revisión instalada: `1ff9684adfce978c6235bf49686023a651f4c3b2`. Publicación integral [45868319107](https://github.com/romancanoniero/OGT/actions/runs/45868319107), con checks, backend e integraciones, navegador, base de datos y publicación correctos. La comprobación de 144 rutas también se ejecutó correctamente en CI. El checkout del trabajo de checks conserva el historial para comparar sus etiquetas con la revisión base; no se omitió ninguna verificación.
+
+Se respaldó privadamente `.env` en el servidor y se agregó únicamente `OGT_PUBLIC_APP_HOST=onlygoodthings.lat`; la comparación posterior confirma que todas las otras opciones siguen idénticas. La instalación se realizó mediante el procedimiento integral protegido, con sus verificaciones, respaldo y manifiesto. No se copiaron archivos de despliegue por fuera del release verificado.
+
+Verificación real posterior, sin credenciales ni datos personales de usuarios:
+
+- Manifiesto del servidor con la revisión exacta; API saludable, web activa, cero reinicios y puertos directos solo en loopback.
+- Desde una red fuera de la lista autorizada: **15 comprobaciones HTTPS correctas**. La sesión con un token deliberadamente inválido responde `401` JSON `INVALID_TOKEN`, en lugar del bloqueo de red anterior. Feed, ajustes y consentimiento sin credenciales responden `401`, como exige el autenticador existente de Ktor; ese rechazo puede no tener cuerpo JSON.
+- CRM de control y empresas, API del CRM, raíz web, salud y manifiesto continúan en `403` desde esa red. También se rechazan intentos con encabezados de IP falsificados y rutas del CRM codificadas o normalizadas. La política de privacidad sigue disponible; un medio inexistente devuelve `404`.
+- Socket TLS `/db` verificado tanto desde la red externa como desde la red autorizada: acepta la conexión, rechaza escuchar datos sin autenticar y rechaza un token inválido con `UNAUTHENTICATED`; luego cierra con el código existente `1003` (`CANNOT_ACCEPT`). No se recibieron datos de usuarios ni se generaron identidades de prueba en producción.
+- Salud por HTTPS correcta desde la red autorizada. Firebase de producción conservado, tokens de desarrollo deshabilitados, emulador de autenticación deshabilitado, CRM con las mismas cuatro redes permitidas y pagos en sandbox.
+- Base antes/después: **16 usuarios y 43 publicaciones**, con el mismo resumen de identificadores de publicaciones. No se alteraron datos para probar el acceso.
+
+La diferencia intencional es el acceso a las rutas nativas de la app desde otras redes; la web completa y el CRM conservan sus restricciones. La evidencia sin datos personales queda en `qa/artifacts/app-network-access-20261126.json`, excluida de Git. Se solicitó al usuario reintentar el ingreso desde 5G: esa aceptación con una cuenta real continúa pendiente y no se sustituye por las pruebas negativas de autenticación. Nunca se extrajeron sus tokens ni códigos de doble factor.
