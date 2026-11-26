@@ -298,6 +298,7 @@ data class SocialFeedSnapshot(
     val anecdotes: List<LocalAnecdote> = emptyList(),
     val follows: List<LocalFollow> = emptyList(),
     val hideEvents: List<LocalFeedEvent> = emptyList(),
+    val viewerId: String? = null,
 )
 
 @Serializable

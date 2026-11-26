@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -47,7 +46,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -70,6 +68,7 @@ import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.onlygoodthings.app.data.FeedQuery
 import com.onlygoodthings.app.data.LocalAuth
 import com.onlygoodthings.app.data.LocalOgtDb
 import com.onlygoodthings.app.data.LocalOgtSession
@@ -131,8 +130,6 @@ import com.onlygoodthings.shared.domain.postMetaLine
 import com.onlygoodthings.shared.domain.postShareText
 import com.onlygoodthings.shared.data.local.anecdoteParentId
 import com.onlygoodthings.shared.data.local.isAnecdoteShare
-import com.onlygoodthings.shared.realtime.OgtRealtime
-import com.onlygoodthings.shared.realtime.OgtSdk
 import com.onlygoodthings.shared.realtime.currentEpochMs
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
@@ -161,102 +158,28 @@ fun FeedScreen(
     val socialTick by db.socialTick.collectAsState()
     val feedTick by db.feedTick.collectAsState()
     val followed = remember { followedNeighbors() }
-    var feedMode by remember { mutableStateOf(FeedMode.HOME) }
-    var feedFamily by remember { mutableStateOf<FeedTopicFamily?>(null) }
+    val timeline=auth.feedTimeline
+    val presentation=timeline.presentation
+    val feedMode=presentation.mode
+    val feedFamily=presentation.family
+    val query=FeedQuery(feedMode,feedFamily)
+    val pages by timeline.pages.collectAsState()
+    val feedState=pages[query] ?: timeline.cached(query)
     val copy = LocalOgtCopy.current
-    val listState = rememberLazyListState()
+    val listState = remember(presentation,query) { presentation.position(query) }
     val scope = rememberCoroutineScope()
     var page by remember { mutableStateOf(1) }
-    var refreshTick by remember { mutableStateOf(0) }
-    var refreshing by remember { mutableStateOf(false) }
-    var pullPx by remember { mutableStateOf(0f) }
-    var initialSyncComplete by remember(me.id) { mutableStateOf(false) }
-    var feedPosts by remember(me.id) { mutableStateOf(emptyList<LocalSocialPost>()) }
-    var lastRemoteOrder by remember { mutableStateOf<List<String>?>(null) }
-    var incomingToast by remember { mutableStateOf(false) }
-    var suppressIncomingToast by remember { mutableStateOf(false) }
-    val seenPostIds = remember { mutableStateListOf<String>() }
-    fun paintRiver(remoteOrder: List<String>? = lastRemoteOrder) {
-        // La caché aún no validada no debe aparecer por un instante al iniciar.
-        if (!initialSyncComplete) return
-        feedPosts = db.composeVisibleRiver(me.id, feedMode, feedFamily, remoteOrder)
-    }
-    LaunchedEffect(feedMode, feedFamily) { page = 1 }
-    LaunchedEffect(me.id, feedMode, feedFamily, feedTick, socialTick) {
-        paintRiver()
-    }
-    LaunchedEffect(me.id, feedMode, feedFamily, refreshTick) {
-        paintRiver()
-        auth.ensureDevBearer()
-        val remote = try {
-            val serverId = Regex("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")
-            val cachedIds = db.feedPosts().map { it.id }.filter { serverId.matches(it) }
-            cachedIds.chunked(100).forEach { ids ->
-                // A failed check leaves the offline cache intact; never prune by page membership.
-                try {
-                    val visible = auth.feed.visiblePostIds(ids)
-                    session.reconcileFeedVisibility(ids.toSet(), visible.toSet())
-                } catch (cancel: CancellationException) {
-                    throw cancel
-                } catch (_: Exception) {
-                    // Keep feed loading compatible with servers that predate cache validation.
-                }
-            }
-            auth.feed.loadFeed(cursor = "0", pageSize = 40, mode = feedMode, family = feedFamily)
-        } catch (cancel: CancellationException) {
-            throw cancel
-        } catch (_: Exception) {
-            null
-        }
-        if (remote != null) {
-            remote.forEach { db.upsertRemoteSocial(it, silent = true) }
-            lastRemoteOrder = remote.map { it.id }
-            session.persistSocialFeed()
-        }
-        // También libera la caché si falla la red: mantiene el uso sin conexión.
-        initialSyncComplete = true
-        paintRiver(lastRemoteOrder)
-        if (remote != null) {
-            val mediaUrls = remote.flatMap { post ->
-                post.media.flatMap { listOfNotNull(it.url, it.posterUrl) } + post.mediaUrls
-            }
-            runCatching { OgtMediaCache.prefetch(mediaUrls) }
-        }
-        if (seenPostIds.isEmpty()) seenPostIds.addAll(db.feedPosts().map { it.id })
-    }
-    LaunchedEffect(feedTick) {
-        session.persistSocialFeed()
-        val first = feedPosts.firstOrNull()
-        if (first != null && db.isOwnPost(first, me.aliases())) listState.animateScrollToItem(0)
-    }
-    LaunchedEffect(Unit) {
-        if (!OgtSdk.isStarted()) return@LaunchedEffect
-        runCatching {
-            OgtRealtime().observeSocialPosts().collect { live ->
-                db.applySocialLive(live)
-            }
-        }
-    }
-    LaunchedEffect(db.posts.size, feedTick) {
-        if (seenPostIds.isEmpty()) {
-            seenPostIds.addAll(db.feedPosts().map { it.id })
-            return@LaunchedEffect
-        }
-        val fresh = db.feedPosts().filter { post ->
-            post.id !in seenPostIds &&
-                post.authorUserId != null &&
-                post.authorUserId != me.id &&
-                db.shouldShowInFeed(me.id, post, feedMode, feedFamily)
-        }
-        seenPostIds.addAll(db.feedPosts().map { it.id })
-        if (fresh.isNotEmpty() && !suppressIncomingToast) incomingToast = true
+    var refreshing by remember(query) { mutableStateOf(false) }
+    var pullPx by remember(query) { mutableStateOf(0f) }
+    val initialSyncComplete=feedState.ready
+    val feedPosts=feedState.posts
+    var suppressIncomingToast by remember(query) { mutableStateOf(false) }
+    val incomingToast=feedState.pendingIds.isNotEmpty() && !suppressIncomingToast
+    LaunchedEffect(query) { page=1;timeline.refresh(query) }
+    LaunchedEffect(query,feedState.ownPublication) {
+        if(presentation.acknowledgeOwn(query,feedState.ownPublication))listState.animateScrollToItem(0)
     }
     val hasMore = false
-    LaunchedEffect(incomingToast) {
-        if (!incomingToast) return@LaunchedEffect
-        delay(4_200)
-        incomingToast = false
-    }
     LaunchedEffect(listState, hasMore, feedPosts.size) {
         snapshotFlow {
             val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
@@ -269,26 +192,21 @@ fun FeedScreen(
         }
     }
     fun revealFresh() {
-        incomingToast = false
-        page = 1
-        refreshTick += 1
+        timeline.reveal(query)
+        page=1
         scope.launch { listState.animateScrollToItem(0) }
     }
     fun forceRefresh() {
-        if (refreshing) return
+        if(refreshing)return
         scope.launch {
-            suppressIncomingToast = true
-            refreshing = true
-            delay(380)
-            page = 1
-            refreshTick += 1
-            refreshing = false
-            pullPx = 0f
-            delay(80)
-            suppressIncomingToast = false
+            suppressIncomingToast=true;refreshing=true
+            try {
+                timeline.refresh(query,force=true,reveal=true)?.join()
+                timeline.reveal(query);page=1
+            } finally { refreshing=false;pullPx=0f;suppressIncomingToast=false }
         }
     }
-    val pull = remember(listState) {
+    val pull = remember(listState,query) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 val atTop = listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
@@ -329,10 +247,10 @@ fun FeedScreen(
                 StoriesRail()
             }
             item(key = "chrome-mode") {
-                FeedModeRow(mode = feedMode, onMode = { feedMode = it }, copy = copy)
+                FeedModeRow(mode = feedMode, onMode = { presentation.mode = it }, copy = copy)
             }
             item(key = "chrome-family") {
-                FeedFamilyRow(family = feedFamily, onFamily = { feedFamily = it }, copy = copy)
+                FeedFamilyRow(family = feedFamily, onFamily = { presentation.family = it }, copy = copy)
             }
             if (!initialSyncComplete || refreshing || pullPx > 16f) {
                 item(key = "chrome-refresh") {
@@ -455,7 +373,7 @@ fun FeedScreen(
                 onSubmit = { reason, details ->
                     optimisticReportPost(db, auth.feed, scope, me.id, postId, reason, details) {
                         session.persistSocialFeed()
-                        paintRiver()
+                        timeline.localChanged()
                     }
                 },
                 onOpenRules = onOpenRules,
@@ -473,7 +391,7 @@ fun FeedScreen(
                 onHide = {
                     optimisticHidePost(db, auth.feed, scope, me.id, post.id) {
                         session.persistSocialFeed()
-                        paintRiver()
+                        timeline.localChanged()
                     }
                 },
                 onReport = { reportPostId = post.id },
@@ -481,7 +399,7 @@ fun FeedScreen(
                 onDelete = {
                     optimisticDeletePost(db, auth.feed, scope, me.id, post.id, persistFeed = {
                         session.persistSocialFeed()
-                        paintRiver()
+                        timeline.localChanged()
                     })
                 },
             )

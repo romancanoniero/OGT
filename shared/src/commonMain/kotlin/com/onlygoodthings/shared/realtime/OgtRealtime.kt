@@ -18,6 +18,8 @@ import com.onlygoodthings.shared.protocol.frames.LocationTickFrame
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 
 /**
  * Fachada de dominio sobre db-kmp-sdk.
@@ -43,9 +45,12 @@ class OgtRealtime(
         ((snap.getValue() as? Map<String, Any?>)?.get("at") as? Number)?.toLong()
     }
 
-    /** Initial snapshot (including an empty revision), reconnect and subsequent invalidations. */
-    fun observeStoryInvalidations(): Flow<Unit> = callbackFlow {
-        val query = db.getReference(OgtDbPaths.STORY_CHANGES)
+    /** Story revisions arrive as child_changed; the gateway does not send a root value here. */
+    fun observeStoryInvalidations(): Flow<Unit> = observeStoryChanges().map { Unit }.onStart { emit(Unit) }
+
+    /** The gateway sends a root value on each successful feed subscription, including reconnect. */
+    fun observeFeedConnections(): Flow<Unit> = callbackFlow {
+        val query = db.getReference(OgtDbPaths.SOCIAL_FEED)
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) { trySend(Unit) }
             override fun onCancelled(error: DatabaseError) { close(error.toException()) }

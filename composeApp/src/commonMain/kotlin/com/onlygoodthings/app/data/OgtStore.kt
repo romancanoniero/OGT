@@ -4,6 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -330,7 +333,9 @@ fun OgtPreviewStore(content: @Composable () -> Unit) {
     val db = remember { OgtLocalDatabase() }
     val session = remember(db) { OgtPreviewSession(db) }
     val auth = remember(db, session) { AuthController(db, session) }
-    androidx.compose.runtime.DisposableEffect(auth) { onDispose { auth.stories.close() } }
+    androidx.compose.runtime.DisposableEffect(auth) { onDispose { auth.feedTimeline.close();auth.stories.close() } }
+    val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
+    LaunchedEffect(auth,lifecycle) { auth.feedTimeline.setForeground(lifecycle.isAtLeast(Lifecycle.State.RESUMED)) }
     LaunchedEffect(db, session) { session.observeProfileUpdates() }
     remember(auth, inspectionMode) {
         auth.ensureDevBearer()

@@ -1039,6 +1039,21 @@ class OgtLocalDatabase {
         bumpSocial()
     }
 
+    var socialFeedViewerId:String?=null
+        private set
+
+    /** Viewer reactions in a cache belong to one authenticated account, including after restart. */
+    fun bindSocialFeedViewer(viewerId:String) {
+        if(socialFeedViewerId==viewerId)return
+        posts.indices.forEach { index ->
+            val post=posts[index]
+            if(post.viewerHasImpacted || post.viewerHasHearted)
+                posts[index]=post.copy(viewerHasImpacted=false,viewerHasHearted=false)
+        }
+        socialFeedViewerId=viewerId
+        bumpSocial()
+    }
+
     fun exportSocialFeed(viewerId: String): String {
         val cached = feedPosts()
             .sortedByDescending { it.createdAtEpochMs }
@@ -1046,6 +1061,7 @@ class OgtLocalDatabase {
         val postIds = cached.map { it.id }.toSet()
         return honorJson.encodeToString(
             SocialFeedSnapshot(
+                viewerId = viewerId,
                 posts = cached,
                 media = postMedia.filter { it.postId in postIds },
                 comments = comments.filter { it.postId in postIds },
@@ -1059,6 +1075,7 @@ class OgtLocalDatabase {
     fun importSocialFeed(raw: String) {
         if (raw.isBlank()) return
         val snap = runCatching { honorJson.decodeFromString<SocialFeedSnapshot>(raw) }.getOrNull() ?: return
+        socialFeedViewerId=snap.viewerId
         snap.posts.forEach { row ->
             if (row.id in OgtIds.phoneFixturePostIds && posts.none { it.id == row.id }) return@forEach
             val idx = posts.indexOfFirst { it.id == row.id }

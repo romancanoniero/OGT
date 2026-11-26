@@ -63,6 +63,7 @@ fun optimisticToggleFollow(
 ) {
     val wasFollowing = db.isFollowing(viewerId, followedId)
     db.toggleFollow(viewerId, followedId)
+    db.bumpFeed()
     val nowFollowing = db.isFollowing(viewerId, followedId)
     scope.launch {
         val result = if (nowFollowing) {
@@ -73,6 +74,7 @@ fun optimisticToggleFollow(
         result.onFailure {
             if (db.isFollowing(viewerId, followedId) != wasFollowing) {
                 db.toggleFollow(viewerId, followedId)
+                db.bumpFeed()
             }
         }
         persistFeed()

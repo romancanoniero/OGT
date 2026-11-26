@@ -68,6 +68,23 @@ class AuthController(
     val notices = RestNoticeRepository(createPlatformHttpClient(), session)
     val animals = RestAnimalsRepository(createPlatformHttpClient(), session)
     val feed = RestFeedRepository(createPlatformHttpClient(), session)
+    val feedTimeline = com.onlygoodthings.app.data.FeedTimeline(
+        db=db,
+        prepare={
+            if(allowDevTokens)ensureDevBearer() else {
+                val owner=preview.currentUserId
+                val token=sessionToken(false)
+                check(owner.isNotBlank() && preview.currentUserId==owner) { "La sesión cambió" }
+                session.firebaseJwt=token
+            }
+        },
+        load={ query -> feed.loadFeed("0",40,query.mode,query.family) },
+        visible=feed::visiblePostIds,
+        loadPost=feed::getPost,
+        reconcile=preview::reconcileFeedVisibility,
+        persist=preview::persistSocialFeed,
+        prefetch={ com.onlygoodthings.app.media.OgtMediaCache.prefetch(it) },
+    )
     val postInvitations = com.onlygoodthings.shared.data.remote.RestPostInvitations(createPlatformHttpClient(), session)
 
     suspend fun updateMyLocation(latitude: Double, longitude: Double, accuracyMeters: Double?) {
@@ -335,6 +352,7 @@ class AuthController(
         val previousToken=com.onlygoodthings.app.notify.currentPushToken()
         val previousBearer=session.firebaseJwt
         val previousBase=session.apiBaseUrl
+        feedTimeline.clear()
         stories.clear()
         runCatching { platform.signOut() }
         session.firebaseJwt = null
@@ -438,6 +456,7 @@ class AuthController(
         }
         com.onlygoodthings.shared.realtime.OgtSdk.restart(com.onlygoodthings.shared.realtime.gatewayEndpointFromApiBase(session.apiBaseUrl),realtimeTokenProvider())
         stories.start(preview.currentUserId)
+        feedTimeline.start(preview.currentUserId)
         ensureDevBearer()
         prefs.sessionSignedOut = false
         _signedIn.value = true
