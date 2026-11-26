@@ -14,6 +14,8 @@ import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsBytes
 import io.ktor.http.isSuccess
 import kotlin.random.Random
+import kotlin.time.TimeSource
+import kotlinx.coroutines.flow.collectLatest
 
 class StoriesController(private val session: SessionStore, private val prefs: AuthPrefs, private val tokenProvider: suspend () -> String? = { session.firebaseJwt }) {
     private val http=createPlatformHttpClient()
@@ -47,9 +49,15 @@ class StoriesController(private val session: SessionStore, private val prefs: Au
     private val draftStore=StoryDraftStore({ prefs.storyDraftsJson }, { prefs.storyDraftsJson=it })
     init { scope.launch { draftStore.failure.collect { if(it!=null) publishError="No se pudo guardar el borrador. Podés reintentar antes de cerrar la app." } } }
     private var owner=""
-    private var offset=0L
-    private var lastVerifiedAt=0L
-    var now by mutableStateOf(currentEpochMs());private set
+    private val origin=TimeSource.Monotonic.markNow()
+    private val clock=StoryLeaseClock({ origin.elapsedNow().inWholeMilliseconds },::currentEpochMs)
+    private var expiryJob:Job?=null
+    private var verificationJob:Job?=null
+    private var refreshRequested=false
+    private var failures=0
+    private var hasLoaded=false
+    private var visibleRows by mutableStateOf<List<Story>>(emptyList())
+    val now:Long get()=clock.now
     var stories by mutableStateOf<List<Story>>(emptyList());private set
     var draft by mutableStateOf<StoryDraft?>(null);private set
     var loading by mutableStateOf(false);private set
@@ -57,7 +65,23 @@ class StoriesController(private val session: SessionStore, private val prefs: Au
     var error by mutableStateOf<String?>(null);private set
     var publishError by mutableStateOf<String?>(null);private set
     var publishedId by mutableStateOf<String?>(null);private set
-    val readable: List<Story> get() = if(currentEpochMs()-lastVerifiedAt>30_000) emptyList() else activeStories(stories,now)
+    val readable:List<Story> get() {
+        val rows=visibleRows // Subscribe even before the first server verification.
+        return if(clock.fresh) activeStories(rows,now) else emptyList()
+    }
+
+    private fun updateVisibility() {
+        expiryJob?.cancel()
+        stories=activeStories(stories,now)
+        visibleRows=if(clock.fresh) stories else emptyList()
+        clock.nextInvalidation(visibleRows)?.let { remaining ->
+            expiryJob=scope.launch { delay(remaining);updateVisibility() }
+        }
+    }
+    private fun scheduleVerification(delayMs:Long) {
+        verificationJob?.cancel()
+        verificationJob=scope.launch { delay(delayMs);refresh() }
+    }
 
     fun start(userId: String) {
         if(owner==userId && accountJob?.isActive==true) return
@@ -65,57 +89,76 @@ class StoriesController(private val session: SessionStore, private val prefs: Au
         draft=draftStore.get(owner)
         val cleanup=cacheClear
         cacheBinding=scope.launch { cleanup?.join();mediaCache.bind(userId) }
+        refresh()
         accountJob=scope.launch {
             cacheBinding?.join()
-            launch {
-                while(isActive) {
-                    now=currentEpochMs()+offset
-                    stories=activeStories(stories,now)
-                    delay(250)
+            OgtSdk.generation.collectLatest {
+                var attempt=0
+                while(isActive && OgtSdk.isStarted()) {
+                    try {
+                        OgtRealtime().observeStoryInvalidations().collect { attempt=0;refresh() }
+                    } catch(cancel:CancellationException) { throw cancel }
+                    catch(_:Exception) { delay(storyRetryDelay(attempt++)) }
                 }
-            }
-            launch { while(isActive) { refresh();delay(10_000) } }
-            launch {
-                if(OgtSdk.isStarted()) runCatching { OgtRealtime().observeStoryChanges().collect { refresh() } }
             }
         }
     }
+
     fun excludeAuthor(id:String) {
         refreshJob?.cancel()
         val remaining=stories.filterNot { it.authorId==id }
         stories=remaining
+        updateVisibility()
         val user=owner
         scope.launch { mediaCache.authorize(user,remaining,now) }
     }
     fun refresh() {
-        if(owner.isBlank() || refreshJob?.isActive==true) return
+        if(owner.isBlank()) return
+        // Keep one request in flight and replay invalidations received while it is running.
+        refreshRequested=true
+        verificationJob?.cancel()
+        if(refreshJob?.isActive==true) return
         val user=owner
         val version=generation
         refreshJob=scope.launch {
-            loading=true
+            loading=!hasLoaded
             try {
-                cacheBinding?.join()
-                val api=accountApi(user,version)
-                var page=api.list()
-                val rows=page.stories.toMutableList()
-                while(page.nextCursor!=null && rows.size<2000) { page=api.list(page.nextCursor);rows+=page.stories }
-                if(owner==user && generation==version) {
+                do {
+                    refreshRequested=false
+                    cacheBinding?.join()
+                    val api=accountApi(user,version)
+                    var page=api.list()
+                    val rows=page.stories.toMutableList()
+                    while(page.nextCursor!=null && rows.size<2000) { page=api.list(page.nextCursor);rows+=page.stories }
+                    if(owner!=user || generation!=version) return@launch
                     val fresh=activeStories(rows.distinctBy { it.id },page.serverNowEpochMs)
                     mediaCache.authorize(user,fresh,page.serverNowEpochMs)
-                    if(owner!=user || generation!=version)return@launch
-                    offset=page.serverNowEpochMs-currentEpochMs();now=page.serverNowEpochMs
-                    stories=fresh
-                    lastVerifiedAt=currentEpochMs();error=null
+                    if(owner!=user || generation!=version) return@launch
+                    clock.verify(page.serverNowEpochMs)
+                    stories=fresh;updateVisibility()
+                    hasLoaded=true;failures=0;error=null
                     val pending=draft
                     if(!publishing && pending!=null && stories.any { it.id==pending.id }) {
                         updateDraft(null);publishedId=pending.id
                     }
-                }
+                } while(refreshRequested)
             } catch(cancel:CancellationException) { throw cancel }
-            catch(failure:Exception) { if(owner==user && generation==version) error=failure.message ?: "No se pudieron cargar las historias" }
-            finally { if(owner==user && generation==version) loading=false }
+            catch(failure:Exception) {
+                if(owner==user && generation==version) {
+                    failures++
+                    error=failure.message ?: "No se pudieron cargar las historias"
+                }
+            } finally {
+                if(owner==user && generation==version) {
+                    loading=false
+                    // The SDK has no connection-health API. Renew the privacy lease before 30 s,
+                    // resetting this deadline on every successful socket-triggered verification.
+                    scheduleVerification(if(failures==0) 20_000 else storyRetryDelay(failures-1))
+                }
+            }
         }
     }
+
     fun choose(item: OgtPickedMedia) {
         val id=buildString {
             repeat(36) { index->append(if(index in listOf(8,13,18,23)) '-' else if(index==14) '4' else if(index==19) "89ab"[Random.nextInt(4)] else "0123456789abcdef"[Random.nextInt(16)]) }
@@ -165,7 +208,7 @@ class StoriesController(private val session: SessionStore, private val prefs: Au
                     publishing=false;updateDraft(null);publishedId=saved.id
                     stories=(listOf(saved)+stories).distinctBy { it.id }
                     mediaCache.authorize(user,stories,now)
-                    lastVerifiedAt=currentEpochMs();refresh()
+                    clock.verify(now);updateVisibility();refresh()
                 }
             } catch(cancel:CancellationException) { throw cancel }
             catch(failure:Exception) { if(user==owner && generation==version) publishError=failure.message ?: "No se pudo publicar. Podés reintentar." }
@@ -179,7 +222,7 @@ class StoriesController(private val session: SessionStore, private val prefs: Au
         scope.launch {
             try {
                 accountApi(user,version).seen(id)
-                if(user==owner && generation==version) stories=stories.map { if(it.id==id) it.copy(seen=true) else it }
+                if(user==owner && generation==version) { stories=stories.map { if(it.id==id) it.copy(seen=true) else it };updateVisibility() }
             } catch(cancel:CancellationException) { throw cancel }
             catch(_:Exception) { /* Leave unread so the next viewing retries. */ }
         }
@@ -192,7 +235,7 @@ class StoriesController(private val session: SessionStore, private val prefs: Au
         val user=owner
         val version=generation
         scope.launch {
-            try { accountApi(user,version).remove(id);if(user==owner && generation==version) { stories=stories.filterNot { it.id==id };mediaCache.authorize(user,stories,now);refresh() } }
+            try { accountApi(user,version).remove(id);if(user==owner && generation==version) { stories=stories.filterNot { it.id==id };updateVisibility();mediaCache.authorize(user,stories,now);refresh() } }
             catch(cancel:CancellationException) { throw cancel }
             catch(failure:Exception) { if(user==owner && generation==version) error=failure.message ?: "No se pudo eliminar la historia" }
         }
@@ -201,7 +244,8 @@ class StoriesController(private val session: SessionStore, private val prefs: Au
         if(clearMedia) { val previous=cacheClear;cacheClear=scope.launch { previous?.join();mediaCache.clear() } }
         generation++
         cacheBinding?.cancel();accountJob?.cancel();refreshJob?.cancel();uploadJob?.cancel()
-        owner="";stories=emptyList();draft=null;publishedId=null;lastVerifiedAt=0
+        expiryJob?.cancel();verificationJob?.cancel();refreshRequested=false;failures=0;hasLoaded=false;clock.clear()
+        owner="";stories=emptyList();visibleRows=emptyList();draft=null;publishedId=null
         error=null;publishError=null;publishing=false;loading=false
     }
     fun close() { clear(clearMedia=false);draftStore.close();mediaCache.close();scope.cancel();http.close() }

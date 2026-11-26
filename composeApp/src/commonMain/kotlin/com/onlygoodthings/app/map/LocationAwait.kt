@@ -5,7 +5,7 @@ import com.onlygoodthings.shared.domain.GeoPoint
 import kotlinx.coroutines.delay
 
 /** Espera el fix real del chip; no usa lat/lng de seed. */
-suspend fun awaitHere(session: OgtPreviewSession, gps: OgtLocationState): GeoPoint? {
+suspend fun awaitHere(session: OgtPreviewSession, gps: LocationUiState): GeoPoint? {
     gps.refreshNow()
     repeat(24) {
         session.here()?.let { return it }

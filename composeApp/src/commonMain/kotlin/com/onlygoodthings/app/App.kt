@@ -22,11 +22,8 @@ import com.onlygoodthings.app.data.OgtPreviewStore
 import com.onlygoodthings.app.i18n.LocalOgtCopy
 import com.onlygoodthings.app.map.LocalOgtLocation
 import com.onlygoodthings.app.map.LocationPermissionState
-import com.onlygoodthings.app.map.OgtBackgroundLocation
-import com.onlygoodthings.app.map.OgtLocationSync
 import com.onlygoodthings.app.map.covers
 import com.onlygoodthings.app.map.isGranted
-import com.onlygoodthings.app.map.rememberOgtLocation
 import com.onlygoodthings.app.notify.rememberOgtNotify
 import com.onlygoodthings.app.platform.OgtIncomingLinks
 import com.onlygoodthings.app.platform.isStorePreviewLaunch
@@ -202,122 +199,13 @@ fun App() {
         }
         val copy = LocalOgtCopy.current
         val notify = rememberOgtNotify()
-        val location = rememberOgtLocation(track = session.gpsEnabled)
-        val detector = remember { DriveParkingDetector() }
+        val location = remember { com.onlygoodthings.app.map.LocationUiState() }
         var detectedManeuver by remember { mutableStateOf<ParkingManeuver?>(null) }
-        LaunchedEffect(location.permission, location.servicesEnabled, location.fix, location.acquiring) {
-            session.locationPermission = location.permission
-            session.locationGranted = location.permission.isGranted()
-            session.locationServicesEnabled = location.servicesEnabled
-            session.locationAcquiring = location.acquiring
-            session.locationAccuracy = location.fix?.accuracyMeters
-            session.deviceLocation = location.fix?.toGeoPoint()
-        }
-        LaunchedEffect(Unit) {
-            OgtLocationSync.bind { lat, lng, acc ->
-                auth.updateMyLocation(lat, lng, acc)
-            }
-        }
-        LaunchedEffect(session.gpsEnabled, session.locationScope, location.permission, location.servicesEnabled) {
-            OgtLocationSync.enabled = session.gpsEnabled && location.permission.isGranted()
-            val always = session.locationScope == LocationScope.ALWAYS
-            if (session.gpsEnabled && always && location.permission.covers(LocationScope.ALWAYS) && location.servicesEnabled) {
-                OgtBackgroundLocation.start()
-            } else {
-                OgtBackgroundLocation.stop()
-            }
-        }
-        LaunchedEffect(route, session.gpsEnabled, location.permission) {
-            val needsFix = route == OgtRoute.Parking ||
-                route == OgtRoute.ParkingConfirm ||
-                route == OgtRoute.ParkHere ||
-                route == OgtRoute.Map ||
-                route == OgtRoute.PetsMap ||
-                route == OgtRoute.ReportAnimal
-            if (!session.gpsEnabled || !needsFix) return@LaunchedEffect
-            when {
-                // No saltar a Ajustes solos: tapa el diálogo del sistema y Play lo toma como permiso sin aviso.
-                location.permission == LocationPermissionState.DENIED_FOREVER -> Unit
-                !location.permission.covers(session.locationScope) -> location.ensureScope(session.locationScope)
-                !location.servicesEnabled -> location.ensureServices()
-                else -> location.resync()
-            }
-        }
-        LaunchedEffect(location.fix?.epochMs, location.fix?.latitude, location.fix?.longitude) {
-            val fix = location.fix ?: return@LaunchedEffect
-            val found = detector.onSample(
-                MotionSample(fix.latitude, fix.longitude, fix.speedMps, fix.bearingDegrees, fix.epochMs),
-            )
-            if (found != null) {
-                val existing = session.parkedCar
-                val alreadyHere = existing != null &&
-                    GeoMath.haversineMeters(existing.point(), GeoPoint(fix.latitude, fix.longitude)) < 40.0
-                if (!alreadyHere) detectedManeuver = found
-            }
-        }
-        LaunchedEffect(location.permission, location.servicesEnabled, gpsAwaiting, route) {
-            if (!gpsAwaiting) return@LaunchedEffect
-            if (location.permission.isGranted() && !location.servicesEnabled) {
-                location.ensureServices()
-            }
-            if (location.permission.isGranted()) {
-                location.refreshNow()
-                gpsAwaiting = false
-                if (route == OgtRoute.Gps) route = gpsReturn
-            }
-        }
         val scope = rememberCoroutineScope()
-        LaunchedEffect(
-            location.fix?.latitude,
-            location.fix?.longitude,
-            location.fix?.speedMps,
-            location.fix?.epochMs,
-            session.parkedCar,
-            session.willLeaveParked,
-            db.parkingEpoch,
-        ) {
-            val car = session.parkedCar ?: return@LaunchedEffect
-            val fix = location.fix ?: return@LaunchedEffect
-            val meters = GeoMath.haversineMeters(GeoPoint(fix.latitude, fix.longitude), car.point())
-            if (meters > session.farthestFromParkedMeters) session.farthestFromParkedMeters = meters
-            if (shouldAskYieldOnApproach(session.willLeaveParked, session.farthestFromParkedMeters, meters, session.yieldAsked)) {
-                session.yieldAsked = true
-                session.askYieldApproach = true
-            }
-            val yielding = db.parkingSpots.any {
-                it.ownerUserId == session.me().id &&
-                    it.status in listOf(ParkingStatus.AVAILABLE, ParkingStatus.CLAIMED)
-            }
-            val confirmAt = session.lastParkedConfirmEpochMs.takeIf { it > 0L } ?: car.parkedAtEpochMs
-            when (
-                decideParkedPresence(
-                    ParkedPresenceTick(
-                        metersFromCar = meters,
-                        speedMps = fix.speedMps,
-                        nowEpochMs = currentEpochMs(),
-                        lastConfirmEpochMs = confirmAt,
-                        wasNearCar = session.wasNearParkedCar,
-                        sawVehicleDepart = session.sawVehicleDepart,
-                        leaveAsked = session.leaveAsked,
-                        hasActiveYield = yielding,
-                        staleAsked = session.staleAsked,
-                    ),
-                )
-            ) {
-                ParkedPresenceAction.MARK_NEAR -> session.wasNearParkedCar = true
-                ParkedPresenceAction.ASK_LEAVE -> {
-                    session.sawVehicleDepart = true
-                    session.leaveAsked = true
-                    session.askLeaveWithoutYield = true
-                }
-                ParkedPresenceAction.FORGET_SILENT, ParkedPresenceAction.FORGET_STALE -> session.forgetParked()
-                ParkedPresenceAction.ASK_STALE -> {
-                    session.staleAsked = true
-                    session.askStaleParked = true
-                }
-                ParkedPresenceAction.NONE -> Unit
-            }
-        }
+        com.onlygoodthings.app.map.LocationCoordinator(location,session,auth,db,route,gpsAwaiting,
+            onGpsReady={ gpsAwaiting=false;if(route==OgtRoute.Gps)route=gpsReturn },
+            onManeuver={ detectedManeuver=it },
+        )
         val showBar = (route in OgtBottomTabs || route == OgtRoute.Settings) &&
             !session.askLocationScope &&
             detectedManeuver == null &&

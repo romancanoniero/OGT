@@ -65,7 +65,7 @@ data class OgtLocationState(
     }
 }
 
-val LocalOgtLocation = staticCompositionLocalOf<OgtLocationState> {
+val LocalOgtLocation = staticCompositionLocalOf<LocationUiState> {
     error("OgtLocationState no fue provisto. Envolvé la UI con rememberOgtLocation.")
 }
 

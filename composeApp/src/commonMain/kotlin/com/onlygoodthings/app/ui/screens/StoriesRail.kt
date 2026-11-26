@@ -13,6 +13,8 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -86,15 +88,17 @@ fun StoriesRail() {
         when(action) { "camera"->picker.takeCamera();"record"->picker.recordVideo();"video"->picker.pickVideo();else->picker.pickPhoto() }
     }
     val rows=controller.readable
-    val grouped=rows.groupBy { it.authorId }
+    val grouped=remember(rows) { rows.groupBy { it.authorId } }
+    val neighbors=remember(grouped,me.id) { grouped.filterKeys { it!=me.id }.entries.sortedByDescending { (_,items)->items.any { !it.seen } } }
+    val own=remember(grouped,me.id) { grouped[me.id].orEmpty().sortedBy { it.createdAtEpochMs } }
     fun add() {
         if(picker.isProcessing.value) return
         // A new story and resuming the saved draft are separate actions.
         if(controller.publishing) editor=true else source=true
     }
     Column {
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal=16.dp,vertical=8.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-            val own=grouped[me.id].orEmpty().sortedBy { it.createdAtEpochMs }
+        LazyRow(Modifier.fillMaxWidth(),contentPadding=PaddingValues(horizontal=16.dp,vertical=8.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+            item(key="self",contentType="self") {
             Column(Modifier.width(68.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)) {
                 Box(Modifier.size(64.dp)) {
                     OgtSessionAvatar(contentDescription="Tu historia",modifier=Modifier.fillMaxSize().clip(CircleShape)
@@ -104,7 +108,8 @@ fun StoriesRail() {
                 }
                 Text(if(controller.publishing) "Publicando…" else "Tu historia",fontSize=11.sp,maxLines=1,overflow=TextOverflow.Ellipsis)
             }
-            grouped.filterKeys { it!=me.id }.entries.sortedByDescending { (_,items)->items.any { !it.seen } }.forEach { (_,items)->
+            }
+            items(neighbors,key={ "author:${it.key}" },contentType={ "author" }) { (_,items)->
                 val first=items.minBy { it.createdAtEpochMs }
                 Column(Modifier.width(68.dp).clickable { viewing=items.sortedBy { it.createdAtEpochMs }.firstOrNull { !it.seen }?.id ?: first.id },horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(6.dp)) {
                     OgtNeighborAvatar(first.authorId,first.authorPhotoUrl,first.authorName,Modifier.size(64.dp).clip(CircleShape)
@@ -113,7 +118,7 @@ fun StoriesRail() {
                 }
             }
         }
-        if(controller.loading && rows.isEmpty()) Box(Modifier.fillMaxWidth().height(28.dp),contentAlignment=Alignment.Center) { OgtLoader(size=20.dp) }
+        if(rows.isEmpty() && controller.loading) Box(Modifier.fillMaxWidth().height(28.dp),contentAlignment=Alignment.Center) { OgtLoader(size=20.dp) }
         if(picker.isProcessing.value) com.onlygoodthings.app.ui.components.OgtMediaImportProgress(Modifier.padding(horizontal=16.dp))
         picker.errorMessage.value?.let { message -> Text(message,color=OgtColors.error,fontSize=12.sp) }
         controller.error?.let { message -> TextButton(onClick={ controller.refresh() }) { Text("$message · Reintentar",color=OgtColors.muted,fontSize=12.sp) } }
@@ -246,7 +251,8 @@ private data class StoryPageVisual(val story:Story,val url:String)
 
 @Composable
 private fun StoryPlayer(controller: StoriesController,story: Story,foreground:Boolean,owner:String,onClose:()->Unit,onNavigate:(String?)->Unit) {
-    val queue=controller.readable.groupBy { it.authorId }.values.flatMap { it.sortedBy { row->row.createdAtEpochMs } }
+    val rows=controller.readable
+    val queue=remember(rows) { rows.groupBy { it.authorId }.values.flatMap { it.sortedBy { row->row.createdAtEpochMs } } }
     val scope=rememberCoroutineScope()
     val index=queue.indexOfFirst { it.id==story.id }
     val book=storyBookProgress(queue,story,0)

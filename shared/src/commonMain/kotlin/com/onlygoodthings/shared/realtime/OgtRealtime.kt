@@ -3,6 +3,7 @@ package com.onlygoodthings.shared.realtime
 import com.iyr.db.database.ChildEventListener
 import com.iyr.db.database.DataSnapshot
 import com.iyr.db.database.DatabaseError
+import com.iyr.db.database.ValueEventListener
 import com.iyr.db.database.DbDatabase
 import com.onlygoodthings.shared.domain.GeoPoint
 import com.onlygoodthings.shared.domain.ParkingSpot
@@ -40,6 +41,17 @@ class OgtRealtime(
     fun observeStoryChanges(): Flow<Long> = observeChildren(OgtDbPaths.STORY_CHANGES) { snap ->
         @Suppress("UNCHECKED_CAST")
         ((snap.getValue() as? Map<String, Any?>)?.get("at") as? Number)?.toLong()
+    }
+
+    /** Initial snapshot (including an empty revision), reconnect and subsequent invalidations. */
+    fun observeStoryInvalidations(): Flow<Unit> = callbackFlow {
+        val query = db.getReference(OgtDbPaths.STORY_CHANGES)
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) { trySend(Unit) }
+            override fun onCancelled(error: DatabaseError) { close(error.toException()) }
+        }
+        query.addValueEventListener(listener)
+        awaitClose { query.removeEventListener(listener) }
     }
 
     fun observePostComments(postId: String): Flow<SocialComment> =
