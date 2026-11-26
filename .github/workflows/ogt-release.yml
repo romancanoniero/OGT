@@ -47,6 +47,8 @@ jobs:
         run: bash scripts/deploy-ogt-vps.sh --check
       - name: Shell syntax
         run: bash -n scripts/deploy-ogt-vps.sh scripts/activate-ogt-release.sh scripts/ogt-ios-wifi.sh
+      - name: App access routing preserves private CRM and default prelaunch restrictions
+        run: python3 qa/check-app-network-access.py --baseline-ref 9474f6d
   backend:
     needs: checks
     runs-on: ubuntu-24.04

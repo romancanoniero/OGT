@@ -39,6 +39,16 @@ class ReleaseGuardTests(unittest.TestCase):
         values = self.env(); values['OGT_PRELAUNCH_CIDRS'] = '2001:db8::1/128'
         self.assertTrue(guard.validate_env(values))
 
+    def test_app_access_can_be_explicitly_enabled_without_removing_the_crm_network_gate(self):
+        for host in ('', 'disabled.invalid', 'onlygoodthings.lat'):
+            self.assertTrue(guard.validate_env(dict(self.env(), OGT_PUBLIC_APP_HOST=host)))
+        for host in ('*', 'other.example', 'www.onlygoodthings.lat', 'onlygoodthings.lat`) || PathPrefix(`/crm'):
+            with self.subTest(host=host), self.assertRaises(ValueError):
+                guard.validate_env(dict(self.env(), OGT_PUBLIC_APP_HOST=host))
+        for key, value in [('OGT_ALLOW_DEV_TOKENS', 'true'), ('OGT_PRELAUNCH_CIDRS', '0.0.0.0/0'), ('OGT_LAUNCH_MODE', 'public')]:
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                guard.validate_env(dict(self.env(), OGT_PUBLIC_APP_HOST='onlygoodthings.lat', **{key: value}))
+
     def test_bounded_review_configuration_keeps_the_original_network_gate(self):
         values=self.env()
         values.update(OGT_STORE_REVIEW_UIDS='reviewer-a, reviewer-b',OGT_STORE_REVIEW_EXPIRES_AT='2026-12-01T00:00:00Z')

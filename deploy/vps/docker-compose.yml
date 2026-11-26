@@ -68,6 +68,32 @@ services:
       # Same installation, temporarily restricted to the reviewer's networks.
       # No forwarded-header IP strategy: do not trust client-supplied X-Forwarded-For.
       - traefik.http.routers.ogt-web.middlewares=ogt-prelaunch@docker
+      # Opt-in app access from any network; backend Firebase/permissions still apply.
+      # Both Host checks must match: an unset switch cannot expose even a forged host.
+      # Web/CRM, internal paths, health and release metadata retain the original gate.
+      - traefik.http.routers.ogt-app-api.entrypoints=websecure
+      - traefik.http.routers.ogt-app-api.rule=Host(`onlygoodthings.lat`) && Host(`${OGT_PUBLIC_APP_HOST:-disabled.invalid}`) && PathRegexp(`^/api/v1/(account|ads|animals|auth|causes|companies|coupons|csr|geo|honor|me|media|notifications|parking|referrals|social|stories|timebank|users|volunteer|wallet)/`)
+      - traefik.http.routers.ogt-app-api.tls.certresolver=le
+      - traefik.http.routers.ogt-app-api.priority=60
+      - traefik.http.routers.ogt-app-api.service=ogt-web
+      - traefik.http.routers.ogt-app-api.middlewares=ogt-app-api-rate@docker
+      - traefik.http.middlewares.ogt-app-api-rate.ratelimit.average=20
+      - traefik.http.middlewares.ogt-app-api-rate.ratelimit.burst=100
+      # Media privacy/signatures are checked by the existing backend media routes.
+      - traefik.http.routers.ogt-app-media.entrypoints=websecure
+      - traefik.http.routers.ogt-app-media.rule=Host(`onlygoodthings.lat`) && Host(`${OGT_PUBLIC_APP_HOST:-disabled.invalid}`) && PathPrefix(`/media/`) && (Method(`GET`) || Method(`HEAD`))
+      - traefik.http.routers.ogt-app-media.tls.certresolver=le
+      - traefik.http.routers.ogt-app-media.priority=60
+      - traefik.http.routers.ogt-app-media.service=ogt-web
+      # Opening the socket never authenticates a client: /db requires a Firebase auth frame.
+      - traefik.http.routers.ogt-app-db.entrypoints=websecure
+      - traefik.http.routers.ogt-app-db.rule=Host(`onlygoodthings.lat`) && Host(`${OGT_PUBLIC_APP_HOST:-disabled.invalid}`) && Path(`/db`) && Method(`GET`)
+      - traefik.http.routers.ogt-app-db.tls.certresolver=le
+      - traefik.http.routers.ogt-app-db.priority=60
+      - traefik.http.routers.ogt-app-db.service=ogt-web
+      - traefik.http.routers.ogt-app-db.middlewares=ogt-app-db-rate@docker
+      - traefik.http.middlewares.ogt-app-db-rate.ratelimit.average=5
+      - traefik.http.middlewares.ogt-app-db-rate.ratelimit.burst=20
       # Temporary store review access authenticates exact, expiring Firebase UIDs.
       # The original router, IP gate and all CRM paths remain unchanged.
       - traefik.http.routers.ogt-store-review.entrypoints=websecure

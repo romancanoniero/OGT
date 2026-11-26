@@ -66,6 +66,8 @@ def validate_env(values):
         raise ValueError("This release targets the existing ogt database owner")
     if values.get("OGT_LAUNCH_MODE") != "prelaunch":
         raise ValueError("OGT_LAUNCH_MODE must be prelaunch; public launch is a separate approval")
+    if values.get("OGT_PUBLIC_APP_HOST", "") not in ("", "disabled.invalid", "onlygoodthings.lat"):
+        raise ValueError("App access must be disabled or explicitly target the canonical OGT host")
     reviewers = {item.strip() for item in values.get("OGT_STORE_REVIEW_UIDS", "").split(",") if item.strip()}
     if len(reviewers) > 10 or any(not re.fullmatch(r"[A-Za-z0-9:_-]{1,128}", uid) for uid in reviewers):
         raise ValueError("Invalid store-review identity configuration; no values were printed")
