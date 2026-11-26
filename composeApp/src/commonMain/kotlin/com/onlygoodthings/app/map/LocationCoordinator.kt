@@ -43,11 +43,17 @@ fun LocationCoordinator(ui:LocationUiState,session:OgtPreviewSession,auth:AuthCo
             route == OgtRoute.Map ||
             route == OgtRoute.PetsMap ||
             route == OgtRoute.ReportAnimal
-        if (!session.gpsEnabled || !needsFix) return@LaunchedEffect
+        if (!needsFix) return@LaunchedEffect
+        if (!session.gpsEnabled) {
+            if(promptsForParkingLocation(route,session.hasParkedPlace()))session.askLocationScope=true
+            return@LaunchedEffect
+        }
+        // An explicit disclosure confirmation owns its permission request below.
+        if(gpsAwaiting)return@LaunchedEffect
         when {
             // No saltar a Ajustes solos: tapa el diálogo del sistema y Play lo toma como permiso sin aviso.
-            location.permission == LocationPermissionState.DENIED_FOREVER -> Unit
-            !location.permission.covers(session.locationScope) -> location.ensureScope(session.locationScope)
+            location.permission in listOf(LocationPermissionState.DENIED_FOREVER,LocationPermissionState.DENIED,LocationPermissionState.UNSUPPORTED) -> Unit
+            !location.permission.isGranted() -> location.requestPermission(LocationScope.WHILE_USING)
             !location.servicesEnabled -> location.ensureServices()
             else -> location.resync()
         }
@@ -64,10 +70,13 @@ fun LocationCoordinator(ui:LocationUiState,session:OgtPreviewSession,auth:AuthCo
             if (!alreadyHere) onManeuver(found)
         }
     }
-    LaunchedEffect(location.permission, location.servicesEnabled, gpsAwaiting, route) {
-        if (!gpsAwaiting) return@LaunchedEffect
+    val activationRoute=remember(gpsAwaiting) { route }
+    LaunchedEffect(location.permission, location.servicesEnabled, gpsAwaiting, route, session.gpsEnabled) {
+        if (!gpsAwaiting || !session.gpsEnabled) return@LaunchedEffect
+        if(route!=activationRoute) { onGpsReady();return@LaunchedEffect }
         if (location.permission.isGranted() && !location.servicesEnabled) {
             location.ensureServices()
+            return@LaunchedEffect
         }
         if (location.permission.isGranted()) {
             location.refreshNow()

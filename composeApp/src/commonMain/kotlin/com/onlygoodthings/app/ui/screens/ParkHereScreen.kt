@@ -33,6 +33,7 @@ import com.onlygoodthings.app.i18n.OgtLang
 import com.onlygoodthings.app.map.AddressHit
 import com.onlygoodthings.app.map.LocalOgtLocation
 import com.onlygoodthings.app.map.awaitHere
+import com.onlygoodthings.app.map.ensureLocationAccess
 import com.onlygoodthings.app.map.reverseGeocode
 import com.onlygoodthings.app.map.searchAddress
 import com.onlygoodthings.app.theme.OgtColors
@@ -197,7 +198,8 @@ fun ParkHereScreen(onDone: () -> Unit, onBack: () -> Unit) {
                     mapLabel = copy.locateOnMap,
                     selected = mode,
                     enabled = !busy,
-                    onHere = {
+                    onHere = here@{
+                        if(!ensureLocationAccess(session.gpsEnabled,gps) { session.askLocationScope=true })return@here
                         mode = PlacePickKind.HERE
                         hits = emptyList()
                         scope.launch {
@@ -205,7 +207,6 @@ fun ParkHereScreen(onDone: () -> Unit, onBack: () -> Unit) {
                             error = null
                             val fix = awaitHere(session, gps)
                             if (fix == null) {
-                                session.askLocationScope = true
                                 placeReady = false
                                 error = copy.needGps
                             } else {

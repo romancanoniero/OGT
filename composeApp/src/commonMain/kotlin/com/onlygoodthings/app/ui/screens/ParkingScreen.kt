@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import com.onlygoodthings.app.data.LocalOgtDb
 import com.onlygoodthings.app.data.LocalOgtSession
 import com.onlygoodthings.app.i18n.LocalOgtCopy
+import com.onlygoodthings.app.map.ensureLocationAccess
 import com.onlygoodthings.app.map.openWalkingDirections
 import com.onlygoodthings.app.map.playParkingFoundSound
 import com.onlygoodthings.app.theme.OgtColors
@@ -411,6 +412,7 @@ fun ParkingScreen(
                 progress = reveal,
                 onParked = { onParkHere() },
                 onYield = {
+                    if(!ensureLocationAccess(session.gpsEnabled,gps) { session.askLocationScope=true })return@ParkingActionRow
                     val fix = here
                     if (fix == null) {
                         error = copy.needGps
@@ -440,6 +442,7 @@ fun ParkingScreen(
                 },
                 onSearch = {
                     if (!seeking) return@ParkingActionRow
+                    if(!ensureLocationAccess(session.gpsEnabled,gps) { session.askLocationScope=true })return@ParkingActionRow
                     session.radarEnabled = true
                     searching = true
                     scope.launch {

@@ -21,6 +21,7 @@ import com.onlygoodthings.app.data.LocalOgtSession
 import com.onlygoodthings.app.data.OgtPreviewStore
 import com.onlygoodthings.app.i18n.LocalOgtCopy
 import com.onlygoodthings.app.map.LocalOgtLocation
+import com.onlygoodthings.app.map.requestLocationAuthorization
 import com.onlygoodthings.app.map.LocationPermissionState
 import com.onlygoodthings.app.map.covers
 import com.onlygoodthings.app.map.isGranted
@@ -331,7 +332,7 @@ fun App() {
                 session.askYieldApproach = false
                 session.willLeaveParked = false
             })
-            session.askLocationScope && route != OgtRoute.Gps -> ({ session.askLocationScope = false })
+            session.askLocationScope && route != OgtRoute.Gps -> ({ gpsAwaiting=false;session.askLocationScope = false })
             else -> routeBack
         }
         OgtBackHandler(enabled = stackBack != null) { stackBack?.invoke() }
@@ -506,13 +507,7 @@ fun App() {
                             session.askLocationScope = false
                             session.applyGpsEnabled(true)
                             session.applyLocationScope(scope)
-                            location.requestPermission(scope)
-                            location.ensureServices()
-                            location.refreshNow()
-                            if (location.permission.isGranted()) {
-                                gpsAwaiting = false
-                                route = gpsReturn
-                            }
+                            requestLocationAuthorization(location,scope)
                         },
                         onSkip = {
                             gpsAwaiting = false
@@ -750,12 +745,10 @@ fun App() {
                             gpsAwaiting = true
                             session.applyGpsEnabled(true)
                             session.applyLocationScope(scope)
-                            location.requestPermission(scope)
-                            location.ensureServices()
-                            location.refreshNow()
+                            requestLocationAuthorization(location,scope)
                         },
-                        onSkip = { session.askLocationScope = false },
-                        onBack = { session.askLocationScope = false },
+                        onSkip = { gpsAwaiting=false;session.askLocationScope = false },
+                        onBack = { gpsAwaiting=false;session.askLocationScope = false },
                     )
                 }
                 if (session.askYieldApproach && detectedManeuver == null) {

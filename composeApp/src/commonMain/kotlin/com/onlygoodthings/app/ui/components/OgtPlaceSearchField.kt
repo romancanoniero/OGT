@@ -30,6 +30,7 @@ import com.onlygoodthings.app.i18n.OgtLang
 import com.onlygoodthings.app.map.AddressHit
 import com.onlygoodthings.app.map.LocalOgtLocation
 import com.onlygoodthings.app.map.awaitHere
+import com.onlygoodthings.app.map.ensureLocationAccess
 import com.onlygoodthings.app.map.reverseGeocode
 import com.onlygoodthings.app.map.searchAddress
 import com.onlygoodthings.app.resources.Res
@@ -143,6 +144,7 @@ fun OgtPlaceSearchField(
                 art = Res.drawable.qs_gps,
                 label = copy.useMyLocation,
                 onClick = {
+                    if(!ensureLocationAccess(session.gpsEnabled,gps) { session.askLocationScope=true })return@CircleIconButton
                     mapOpen = false
                     hits = emptyList()
                     val revision=manualRevision
@@ -151,7 +153,6 @@ fun OgtPlaceSearchField(
                         error = null
                         val fix = awaitHere(session, gps)
                         if (fix == null) {
-                            session.askLocationScope = true
                             error = copy.needGps
                         } else {
                             val hit = try { reverseGeocode(fix, lang) }
