@@ -84,7 +84,7 @@ fun PublishGatheringScreen(editPostId:String?=null,onDone:()->Unit,onBack:()->Un
                 OgtOutlinedTextField(value=clock,onValueChange={clock=it.take(5)},label={Text("Hora (HH:mm)")},singleLine=true,modifier=Modifier.weight(1f),enabled=!busy)
             }
             OgtCaption("Usá el horario local de tu dispositivo. Asistiré estará disponible hasta que empiece la actividad.")
-            OgtOutlinedTextField(value=place,onValueChange={place=it.take(200)},label={Text("Lugar o punto de encuentro")},modifier=Modifier.fillMaxWidth(),enabled=!busy)
+            PublicationPlaceField(value=place,onValueChange={place=it},label="Lugar o punto de encuentro",enabled=!busy)
             if(!editing)OgtDraftMediaStrip(items=media,missing=false,heroDescription="La actividad",onBusyChange={preparing=it}) else OgtCaption("Se conservan las fotos y videos de esta publicación.")
             AttributionField(attribution,{attribution=it},enabled=!busy)
             PublicationRightsNotice()

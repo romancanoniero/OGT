@@ -37,6 +37,7 @@ test('Publicar combines official and free hashtags, preserves media on edit and 
   const free='MiHuerta'+randomUUID().slice(0,8);
   await page.getByLabel('Hashtag libre',{exact:true}).fill('#'+free);await page.getByRole('button',{name:'Agregar hashtag',exact:true}).click();
   await page.getByLabel('La historia',{exact:true}).fill('Un momento tierno en nuestra huerta.');
+  await page.getByLabel('Incluir lugar (opcional)',{exact:true}).check();
   await page.getByLabel('Lugar (opcional)',{exact:true}).fill('Plaza de la comunidad');
   await page.locator('[data-file]').setInputFiles({name:'photo.jpg',mimeType:'image/jpeg',buffer:await readFile(new URL('../../backend/src/test/resources/images/rotated.jpg',import.meta.url))});
   const savedResponse=page.waitForResponse(response=>response.url().endsWith('/api/v1/social/publish'));

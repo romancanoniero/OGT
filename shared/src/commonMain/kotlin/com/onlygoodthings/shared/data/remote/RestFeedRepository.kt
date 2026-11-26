@@ -35,6 +35,12 @@ class RestFeedRepository(
 
     suspend fun recognitionCategories():List<com.onlygoodthings.shared.domain.RecognitionCategory> = post("/api/v1/social/categories",buildJsonObject {})
 
+    suspend fun publicationPlaces(query:String,lang:String="es"):List<com.onlygoodthings.shared.domain.GeoHit> =
+        post("/api/v1/geo/places/search",buildJsonObject { put("query",query);put("lang",lang) })
+
+    suspend fun publicationPlace(point:com.onlygoodthings.shared.domain.GeoPoint,lang:String="es"):com.onlygoodthings.shared.domain.GeoHit =
+        post("/api/v1/geo/places/reverse",buildJsonObject { put("latitude",point.latitude);put("longitude",point.longitude);put("lang",lang) })
+
     suspend fun publishRecognition(draft:com.onlygoodthings.shared.domain.RecognitionPostDraft):SocialPost =
         post("/api/v1/social/publish",json.encodeToJsonElement(com.onlygoodthings.shared.domain.RecognitionPostDraft.serializer(),draft) as JsonObject)
 

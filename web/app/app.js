@@ -1857,6 +1857,7 @@ function postCard(post, { openable = true, previewStories = true, compose = fals
     ${pill ? `<div class="pill-row">${pill}</div>` : ""}
     ${honoreeLine}
     ${post.publicationKind==="CONVOCATORIA" && post.eventStartsAtEpochMs ? `<p class="meta">${escapeHtml(new Date(post.eventStartsAtEpochMs).toLocaleString("es-AR"))} · ${escapeHtml(post.place || "")}</p>` : ""}
+    ${post.publicationKind==="POST" && post.place ? `<p class="meta publication-place">${escapeHtml(post.place)}</p>` : ""}
     ${lostExtrasHtml(post)}
     ${truequeExtrasHtml(post)}
     ${truequeBodyHtml(post)}
@@ -2937,7 +2938,7 @@ function bindTruequeNeedForm() {
   });
 }
 
-function bindPublishForm(kind, catalog=[], invitationsModule=null) {
+function bindPublishForm(kind, catalog=[], invitationsModule=null,placeModule=null) {
   const spec = PUBLISH_KINDS.find((k) => k.id === kind);
   const form = document.getElementById("publish-form");
   if (!form || !spec) return;
@@ -2954,6 +2955,7 @@ function bindPublishForm(kind, catalog=[], invitationsModule=null) {
   let attemptKey="",requestId="",uploadedForAttempt=null;
   const story = form.querySelector("[name=body]");
   const submit = form.querySelector("[data-submit]");
+  const gatheringPlace=kind==="convocatoria"?placeModule?.bindPublicationPlace(form.querySelector('[data-publication-place]'),{api}):null;
 
   function paintChips() {
     form.querySelectorAll("[data-topic]").forEach((btn) => {
@@ -3047,6 +3049,7 @@ function bindPublishForm(kind, catalog=[], invitationsModule=null) {
     catch (error) { toast(error.message); return; }
     if(recognition && !catalog.length){toast("No hay categorías disponibles para publicar.");return;}
     submit.disabled = true;
+    gatheringPlace?.pause();
     try {
       const invitations=invitationDrafts();
       const key=JSON.stringify({body,topic,place,eventStartsAtEpochMs,honoree,account:recognizedPerson?.userId,attributionUrl,invitations,files:publishFiles.map(f=>[f.file?.name,f.file?.size,f.url])});
@@ -3095,6 +3098,8 @@ async function renderPublicar(kind) {
     catch(e){document.getElementById("main").innerHTML=`<h1>Publicar</h1><p role="alert">${escapeHtml(e.message)}</p><a href="#/publicar">Volver a intentar</a>`;return;}
   }
   if(kind==="accion"){await renderUnifiedPublication(catalog,invitationsModule,initialTag);return;}
+  const placeModule=await import('./publication-place.js');
+  const {publicationPlaceHtml}=placeModule;
   const topics = PUBLISH_TOPICS[kind] || [];
   const honor = kind === "homenaje";
   const main = document.getElementById("main");
@@ -3208,7 +3213,7 @@ async function renderPublicar(kind) {
       ${kind === "convocatoria" ? `<p class="hint">Invitá a la comunidad a una actividad que van a realizar. Se publica a tu nombre como organizador.</p>
       <label class="field">Día y hora de la actividad<input name="gatheringStart" type="datetime-local" required></label>
       <p class="hint">Usá tu horario local.</p>
-      <label class="field">Lugar o punto de encuentro<input name="gatheringPlace" maxlength="200" minlength="3" required></label>` : ""}
+      ${publicationPlaceHtml({optional:false,name:'gatheringPlace',label:'Lugar o punto de encuentro'})}` : ""}
       ${honor ? `
         <p class="hint">Persona o mascota. Contá una enseñanza, una anécdota o las gracias que no llegaste a decir.</p>
         <label class="field">¿A quién homenajeás?
@@ -3233,11 +3238,12 @@ async function renderPublicar(kind) {
       <p class="hint publication-rights-notice">Al publicar declarás que el contenido es tuyo o que tenés los permisos necesarios. Citar la fuente no reemplaza la autorización. <a href="/terms#propiedad-intelectual" target="_blank" rel="noopener">Leer el acuerdo de publicación</a>.</p>
       <button type="submit" class="publish-cta" data-submit>${icon(spec.icon)} Publicar</button>
     </form>`;
-  bindPublishForm(kind,catalog,invitationsModule);
+  bindPublishForm(kind,catalog,invitationsModule,placeModule);
 }
 
 async function renderUnifiedPublication(catalog,invitationsModule,initialTag=null) {
   const {hashtagKey}=await import('./hashtags.js');
+  const {publicationPlaceHtml,bindPublicationPlace}=await import('./publication-place.js');
   const main=document.getElementById('main');
   const selected=new Map();
   const officialKey=category=>category.tagKey||hashtagKey(category.label);
@@ -3259,7 +3265,7 @@ async function renderUnifiedPublication(catalog,invitationsModule,initialTag=nul
       </section>
       <div class="media-pick"><button type="button" class="media-add" data-add-media>${icon('qs-plus')} Foto o video</button>
         <input type="file" data-file accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" multiple><div class="media-thumbs" data-thumbs></div></div>
-      <label class="field">Lugar (opcional)<input name="publicationPlace" maxlength="200" placeholder="Plaza o barrio"></label>
+      ${publicationPlaceHtml()}
       <label class="field">La historia<textarea name="body" maxlength="500" required></textarea></label>
       <p class="count" data-count>0 / 500</p>
       <label class="field">Fuente o enlace original (opcional)<input name="attributionUrl" type="url" maxlength="2048" autocapitalize="off"></label>
@@ -3270,6 +3276,7 @@ async function renderUnifiedPublication(catalog,invitationsModule,initialTag=nul
   const form=document.getElementById('publish-form'),name=form.elements.honoree,account=form.elements.recognitionAccount;
   form.noValidate=true;
   const error=form.querySelector('[data-publication-error]'),submit=form.querySelector('[data-submit]');
+  const publicationPlace=bindPublicationPlace(form.querySelector('[data-publication-place]'),{api});
   let person=null,searchVersion=0,busy=false,attemptKey='',requestId='',uploaded=null;
   const invitationDrafts=invitationsModule.bindInvitationDrafts(form,{honoreeName:()=>name.value,honoreeId:()=>person?.userId});
   const recognition=()=>[...selected.values()].some(tag=>tag.category?.requiresRecognition!==false && tag.category);
@@ -3315,10 +3322,11 @@ async function renderUnifiedPublication(catalog,invitationsModule,initialTag=nul
       const attributionUrl=globalThis.OgtAttribution.normalize(form.elements.attributionUrl.value),invitations=invitationDrafts();
       if(!requiresRecognition && invitations.some(row=>row.purpose==='RECOGNITION'))throw new Error('Elegí un hashtag de buena acción o quitá la invitación de reconocimiento.');
       const hashtags=[...selected.values()].map(tag=>tag.category?tag.key:tag.label);
-      const place=form.elements.publicationPlace.value.trim() || undefined;
+      const place=publicationPlace.value();
+      if(place && place.length<2)throw new Error('Completá el lugar o desactivá la ubicación opcional.');
       const key=JSON.stringify({body,hashtags,place,honoree,person:person?.userId,attributionUrl,invitations,files:publishFiles.map(file=>[file.file?.name,file.file?.size,file.url])});
       if(key!==attemptKey){attemptKey=key;requestId=crypto.randomUUID();uploaded=null;}
-      busy=true;form.inert=true;submit.textContent='Subiendo publicación…';
+      publicationPlace.pause();busy=true;form.inert=true;submit.textContent='Subiendo publicación…';
       const media=uploaded || (uploaded=await uploadPublishMedia([...selected.values()][0].label));
       const saved=await api('/api/v1/social/publish',{body,hashtags,place,media,requestId,publicationKind:'POST',
         honoreeFullName:requiresRecognition?honoree:undefined,protagonistUserId:requiresRecognition?person?.userId:undefined,invitations,attributionUrl});

@@ -8,7 +8,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/** Resultado de Nominatim para última vista (mascota perdida) u otra calle. */
+/** A resolved address or locality, shared by the existing and publication geocoders. */
 @Serializable
 data class GeoHit(
     val label: String,

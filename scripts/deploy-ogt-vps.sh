@@ -14,6 +14,7 @@ for path in web/app/crm/control/index.html web/app/crm/empresas/index.html backe
   test -s "$path" || { echo "Missing integrated component: $path" >&2; exit 1; }
 done
 node --check web/app/post-invitations.js
+node --check web/app/publication-place.js
 node --check web/app/app.js
 node --check web/app/auth.js
 node --check web/app/content-attribution.js

@@ -34,6 +34,7 @@ private val geoJson = Json { ignoreUnknownKeys = true }
  */
 fun Route.geoRoutes() {
     val nominatim = NominatimClient()
+    publicationPlaceRoutes()
 
     post("/api/v1/geo/search") {
         requireUser(call) ?: return@post

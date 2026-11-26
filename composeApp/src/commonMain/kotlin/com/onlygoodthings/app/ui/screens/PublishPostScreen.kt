@@ -49,7 +49,7 @@ fun PublishPostScreen(editPostId:String?=null,onDone:()->Unit,onBack:()->Unit=on
     var protagonist by remember(editPostId) { mutableStateOf<MentionCandidate?>(null) }
     var attribution by remember(editPostId) { mutableStateOf(existing?.attributionUrl.orEmpty()) }
     var includePlace by remember(editPostId) { mutableStateOf(!existing?.place.isNullOrBlank()) }
-    var place by remember(editPostId) { mutableStateOf(existing?.place?.takeIf(String::isNotBlank) ?: me.barrio) }
+    var place by remember(editPostId) { mutableStateOf(existing?.place.orEmpty()) }
     val media=remember { mutableStateListOf<OgtPickedMedia>() }
     val invitations=remember { mutableStateListOf<PostInvitationDraft>() }
     val participants=remember { mutableStateListOf<MentionCandidate>() }
@@ -170,7 +170,7 @@ fun PublishPostScreen(editPostId:String?=null,onDone:()->Unit,onBack:()->Unit=on
                 Checkbox(includePlace,{includePlace=it},enabled=!busy)
                 Text("Incluir lugar (opcional)")
             }
-            if(includePlace)OgtOutlinedTextField(place,{place=it.take(200)},label={Text("Lugar")},enabled=!busy,modifier=Modifier.fillMaxWidth())
+            if(includePlace)PublicationPlaceField(place,{place=it},enabled=!busy,locateInitially=!editing && place.isBlank())
             OgtOutlinedTextField(body,{body=it.take(500)},label={Text("La historia")},minLines=4,enabled=!busy,modifier=Modifier.fillMaxWidth())
             AttributionField(attribution,{attribution=it},enabled=!busy)
             PublicationRightsNotice()
