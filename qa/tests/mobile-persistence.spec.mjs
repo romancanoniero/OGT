@@ -28,7 +28,9 @@ test('profile photo survives a new session; cache visibility excludes removed po
   expect(restored.displayName).toBe('Foto móvil QA');
   const image = await request.get(upload.url);
   expect(image.ok()).toBe(true);
-  const sql = statement => execFileSync('docker', ['compose', '-f', 'compose.yml', 'exec', '-T', 'postgres', 'psql', '-U', 'ogt', '-d', 'onlygoodthings', '-tAc', statement], { encoding: 'utf8' }).trim();
+  const qaDatabase=process.env.OGT_QA_DATABASE || 'onlygoodthings';
+  expect(qaDatabase).toMatch(/^(onlygoodthings|ogt_business_qa_[a-z0-9]+)$/);
+  const sql = statement => execFileSync('docker', ['compose', '-f', 'compose.yml', 'exec', '-T', 'postgres', 'psql', '-U', 'ogt', '-d', qaDatabase, '-tAc', statement], { encoding: 'utf8' }).trim();
   // This command is confined to the named QA compose project; UUID comes from its own API.
   expect(me.userId).toMatch(/^[0-9a-f-]{36}$/);
   const settings = JSON.parse(sql(`SELECT metadata->'settings' FROM users WHERE id='${me.userId}'::uuid`));

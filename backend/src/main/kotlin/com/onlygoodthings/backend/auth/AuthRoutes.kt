@@ -56,6 +56,7 @@ fun Route.protectedAuthRoutes(identity: IdentityStore,onErased:(List<String>)->U
                     photoUrl = profile?.photoUrl,
                     communityPoints = profile?.communityPoints ?: 0,
                     inviteCode = profile?.inviteCode,
+                    nickname = profile?.nickname,
                     levelLabel = communityLevelLabel(profile?.communityPoints ?: 0),
                 ),
             ),

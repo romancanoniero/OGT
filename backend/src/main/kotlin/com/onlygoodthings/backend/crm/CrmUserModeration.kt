@@ -207,6 +207,8 @@ internal fun crmModerateUsers(
             // An erased sender cannot leave apparently usable team offers behind.
             conn.executeForIds("UPDATE csr_team_invitations SET status='REVOKED',decided_at=now() WHERE invited_by=ANY(?::uuid[]) AND status='PENDING'",ids)
             conn.executeForIds("UPDATE csr_ownership_transfers SET status='CANCELLED',decided_at=now() WHERE status='PENDING' AND (proposed_by=ANY(?::uuid[]) OR recipient_id=ANY(?::uuid[]))",ids,count=2)
+            conn.executeForIds("DELETE FROM post_invitations WHERE recipient_user_id=ANY(?::uuid[]) OR claimed_user_id=ANY(?::uuid[])",ids,count=2)
+            conn.executeForIds("DELETE FROM post_invitations WHERE (channel='EMAIL' AND lower(contact) IN (SELECT lower(email) FROM users WHERE id=ANY(?::uuid[]))) OR (channel='SMS' AND contact IN (SELECT phone_e164 FROM users WHERE id=ANY(?::uuid[])))",ids,count=2)
             val deleted = conn.executeForIds("DELETE FROM users WHERE id = ANY(?::uuid[])", ids)
             check(deleted == ids.size) { "La eliminación no fue completa" }
             // Cascades removed comments, impacts, anecdotes and their likes. Repair counters
@@ -305,6 +307,8 @@ internal val crmContributionPaths = setOf(
     "/api/v1/volunteer/check-in", "/api/v1/timebank/match",
     "/api/v1/causes/progress", "/api/v1/causes/deliver",
     "/api/v1/users/profile/update",
+    "/api/v1/social/invitations/create", "/api/v1/social/invitations/accept",
+    "/api/v1/social/invitations/share-opened", "/api/v1/users/nickname",
     "/api/v1/referrals/link", "/api/v1/referrals/claim",
     "/api/v1/parking/interest", "/api/v1/parking/claim", "/api/v1/parking/tick",
     "/api/v1/notifications/mention", "/api/v1/csr/finance-action",

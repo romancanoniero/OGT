@@ -173,6 +173,7 @@ fun SettingsScreen(
             )
 
             PrefCategory("Tu identidad")
+            com.onlygoodthings.app.ui.components.NicknameEditor()
             PrefGroup {
                 PrefNav("Sobre tu identidad") {onOpen("identity")}
             }

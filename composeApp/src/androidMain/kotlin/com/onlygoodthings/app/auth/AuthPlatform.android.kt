@@ -43,7 +43,11 @@ private const val GOOGLE_WEB_CLIENT_ID =
 actual fun authLabHintsEnabled(): Boolean = com.onlygoodthings.app.BuildConfig.DEBUG && com.onlygoodthings.app.BuildConfig.APPLICATION_ID != "com.onlygoodthings.app.qa"
 
 actual class AuthPlatform actual constructor() {
-    private val auth: FirebaseAuth get() = FirebaseAuth.getInstance()
+    private val auth: FirebaseAuth? get() = try {
+        FirebaseAuth.getInstance()
+    } catch (t: Throwable) {
+        null
+    }
     private var factorResolver: MultiFactorResolver? = null
     private var factorIndex: Int? = null
     private var factorVerificationId: String? = null
@@ -86,7 +90,8 @@ actual class AuthPlatform actual constructor() {
                     if (cont.isActive && generation == factorGeneration) cont.resumeWithException(mapFirebase(error))
                 }
             }
-            val options = PhoneAuthOptions.newBuilder(auth)
+            val a = auth ?: throw AuthException("Autenticación no disponible")
+            val options = PhoneAuthOptions.newBuilder(a)
                 .setActivity(AndroidAuthHost.requireActivity())
                 .setMultiFactorHint(hint)
                 .setMultiFactorSession(resolver.session)
@@ -119,22 +124,24 @@ actual class AuthPlatform actual constructor() {
         return runAuth { resolver.resolveSignIn(assertion).await().user ?: error("No se pudo confirmar el ingreso") }
     }
 
-    actual suspend fun currentUser(): AuthUser? = auth.currentUser?.toAuthUser()
+    actual suspend fun currentUser(): AuthUser? = auth?.currentUser?.toAuthUser()
 
     actual suspend fun idToken(forceRefresh: Boolean): String? = try {
-        auth.currentUser?.getIdToken(forceRefresh)?.await()?.token
+        auth?.currentUser?.getIdToken(forceRefresh)?.await()?.token
     } catch (failure: com.google.firebase.auth.FirebaseAuthException) {
         if (isExpiredSessionCode(failure.errorCode)) throw AuthSessionExpired(failure)
         throw failure
     }
 
     actual suspend fun signInEmail(email: String, password: String): AuthUser = runAuth {
-        auth.signInWithEmailAndPassword(email, password).await().user
+        val a = auth ?: throw AuthException("Autenticación no disponible")
+        a.signInWithEmailAndPassword(email, password).await().user
             ?: error("Firebase no devolvió usuario")
     }
 
     actual suspend fun signUpEmail(email: String, password: String, displayName: String): AuthUser = runAuth {
-        val user = auth.createUserWithEmailAndPassword(email, password).await().user
+        val a = auth ?: throw AuthException("Autenticación no disponible")
+        val user = a.createUserWithEmailAndPassword(email, password).await().user
             ?: error("No se pudo crear la cuenta")
         user.updateProfile(UserProfileChangeRequest.Builder().setDisplayName(displayName).build()).await()
         user.reload().await()
@@ -142,16 +149,18 @@ actual class AuthPlatform actual constructor() {
     }
 
     actual suspend fun sendPasswordReset(email: String) {
-        runCatching { auth.sendPasswordResetEmail(email).await() }
+        val a = auth ?: throw AuthException("Autenticación no disponible")
+        runCatching { a.sendPasswordResetEmail(email).await() }
             .getOrElse { throw mapFirebase(it) }
     }
 
     actual suspend fun startPhoneAuth(phoneE164: String): PendingPhoneAuth {
+        val a = auth ?: throw AuthException("Autenticación no disponible")
         val activity = AndroidAuthHost.requireActivity()
         return suspendCancellableCoroutine { cont ->
             val callbacks = object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
                 override fun onVerificationCompleted(credential: PhoneAuthCredential) {
-                    auth.signInWithCredential(credential).addOnCompleteListener { task ->
+                    a.signInWithCredential(credential).addOnCompleteListener { task ->
                         if (!cont.isActive) return@addOnCompleteListener
                         if (task.isSuccessful) {
                             cont.resume(PendingPhoneAuth(verificationId = "auto", phoneE164 = phoneE164))
@@ -171,7 +180,8 @@ actual class AuthPlatform actual constructor() {
                     }
                 }
             }
-            val options = PhoneAuthOptions.newBuilder(auth)
+            val a = auth ?: throw AuthException("Autenticación no disponible")
+            val options = PhoneAuthOptions.newBuilder(a)
                 .setPhoneNumber(phoneE164)
                 .setTimeout(60L, TimeUnit.SECONDS)
                 .setActivity(activity)
@@ -182,14 +192,16 @@ actual class AuthPlatform actual constructor() {
     }
 
     actual suspend fun confirmPhone(pending: PendingPhoneAuth, code: String): AuthUser = runAuth {
+        val a = auth ?: throw AuthException("Autenticación no disponible")
         if (pending.verificationId == "auto") {
-            return@runAuth auth.currentUser ?: error("La verificación automática no dejó sesión")
+            return@runAuth a.currentUser ?: error("La verificación automática no dejó sesión")
         }
         val credential = PhoneAuthProvider.getCredential(pending.verificationId, code)
-        auth.signInWithCredential(credential).await().user ?: error("Código inválido")
+        a.signInWithCredential(credential).await().user ?: error("Código inválido")
     }
 
     actual suspend fun signInGoogle(): AuthUser {
+        val a = auth ?: throw AuthException("Autenticación no disponible")
         val activity = AndroidAuthHost.requireActivity()
         val manager = CredentialManager.create(activity)
         // El botón de Google debe abrir el selector. GetGoogleIdOption es One Tap y,
@@ -218,7 +230,7 @@ actual class AuthPlatform actual constructor() {
         ) {
             val google = GoogleIdTokenCredential.createFrom(credential.data)
             return runAuth {
-                auth.signInWithCredential(GoogleAuthProvider.getCredential(google.idToken, null))
+                a.signInWithCredential(GoogleAuthProvider.getCredential(google.idToken, null))
                     .await().user ?: error("Google no devolvió usuario")
             }
         }
@@ -229,14 +241,15 @@ actual class AuthPlatform actual constructor() {
     actual suspend fun signInApple(): AuthUser = signInOAuth("apple.com", listOf("email", "name"))
 
     actual suspend fun prepareAccountDeletion() {
-        val user=auth.currentUser ?: throw AuthException("Iniciá sesión para borrar la cuenta")
+        val a = auth ?: throw AuthException("Autenticación no disponible")
+        val user=a.currentUser ?: throw AuthException("Iniciá sesión para borrar la cuenta")
         if(user.providerData.none { it.providerId=="apple.com" })return
         val provider=OAuthProvider.newBuilder("apple.com").setScopes(listOf("email","name")).build()
         val result=user.startActivityForReauthenticateWithProvider(AndroidAuthHost.requireActivity(),provider).await()
-        check(result.user?.uid==user.uid && auth.currentUser?.uid==user.uid) { "La sesión cambió. Volvé a solicitar la baja." }
+        check(result.user?.uid==user.uid && a.currentUser?.uid==user.uid) { "La sesión cambió. Volvé a solicitar la baja." }
         val accessToken=(result.credential as? OAuthCredential)?.accessToken
             ?: throw AuthException("Apple no devolvió la autorización necesaria para la baja. Tu cuenta se conserva.")
-        auth.revokeAccessToken(accessToken).await()
+        a.revokeAccessToken(accessToken).await()
     }
 
     actual suspend fun unlockBiometric(): Boolean {
@@ -274,7 +287,7 @@ actual class AuthPlatform actual constructor() {
     }
 
     actual suspend fun canUseBiometric(): Boolean {
-        val ctx = OgtApplication.instance
+        val ctx = runCatching { OgtApplication.instance }.getOrNull() ?: return false
         val manager = BiometricManager.from(ctx)
         val flags = if (Build.VERSION.SDK_INT >= 30) {
             BiometricManager.Authenticators.BIOMETRIC_STRONG or
@@ -286,14 +299,15 @@ actual class AuthPlatform actual constructor() {
     }
 
     actual suspend fun signOut() {
-        auth.signOut()
+        auth?.signOut()
     }
 
     private suspend fun signInOAuth(providerId: String, scopes: List<String>): AuthUser {
+        val a = auth ?: throw AuthException("Autenticación no disponible")
         val activity = AndroidAuthHost.requireActivity()
         val built = OAuthProvider.newBuilder(providerId).setScopes(scopes).build()
         return runAuth {
-            auth.startActivityForSignInWithProvider(activity, built).await().user
+            a.startActivityForSignInWithProvider(activity, built).await().user
                 ?: error("No se completó el ingreso con $providerId")
         }
     }
@@ -367,10 +381,15 @@ private fun mapFirebase(error: Throwable?): AuthException {
 }
 
 actual class AuthPrefs actual constructor() {
-    private val prefs = OgtApplication.instance.getSharedPreferences("ogt_auth", 0)
-    actual var keepSession: Boolean
-        get() = prefs.getBoolean("keep", true)
-        set(value) { prefs.edit().putBoolean("keep", value).apply() }
+    private val prefs = try {
+        OgtApplication.instance.getSharedPreferences("ogt_auth", 0)
+    } catch (t: Throwable) {
+        InMemorySharedPreferences()
+    }
+    actual var sessionSignedOut: Boolean
+        get() = prefs.getBoolean("signed_out", false)
+        // Persist logout before clearing Firebase so a process restart cannot revive it.
+        set(value) { prefs.edit().putBoolean("signed_out", value).commit() }
     actual var biometricEnabled: Boolean
         get() = prefs.getBoolean("bio", false)
         set(value) { prefs.edit().putBoolean("bio", value).apply() }
@@ -431,6 +450,9 @@ actual class AuthPrefs actual constructor() {
     actual var selectedVehicleId: String
         get() = prefs.getString("car_sel", "").orEmpty()
         set(value) { prefs.edit().putString("car_sel", value).apply() }
+    actual var pendingInvitationToken: String
+        get() = prefs.getString("invitation_token", "").orEmpty()
+        set(value) { prefs.edit().putString("invitation_token", value).apply() }
     actual var pendingHonorToken: String
         get() = prefs.getString("honor_token", "").orEmpty()
         set(value) { prefs.edit().putString("honor_token", value).apply() }
@@ -455,6 +477,92 @@ actual class AuthPrefs actual constructor() {
     actual var locationScope: String
         get() = prefs.getString("gps_scope", "while").orEmpty().ifBlank { "while" }
         set(value) { prefs.edit().putString("gps_scope", value).apply() }
+}
+
+private class InMemorySharedPreferences : android.content.SharedPreferences {
+    private val map = java.util.Collections.synchronizedMap(HashMap<String, Any?>())
+
+    private class Editor(
+        private val map: MutableMap<String, Any?>,
+        private val onCommit: () -> Unit = {}
+    ) : android.content.SharedPreferences.Editor {
+        private val modified = HashMap<String, Any?>()
+        private var clear = false
+
+        override fun putString(key: String, value: String?): android.content.SharedPreferences.Editor {
+            if (value == null) modified[key] = this else modified[key] = value
+            return this
+        }
+        override fun putStringSet(key: String, values: Set<String>?): android.content.SharedPreferences.Editor {
+            if (values == null) modified[key] = this else modified[key] = HashSet(values)
+            return this
+        }
+        override fun putInt(key: String, value: Int): android.content.SharedPreferences.Editor {
+            modified[key] = value
+            return this
+        }
+        override fun putLong(key: String, value: Long): android.content.SharedPreferences.Editor {
+            modified[key] = value
+            return this
+        }
+        override fun putFloat(key: String, value: Float): android.content.SharedPreferences.Editor {
+            modified[key] = value
+            return this
+        }
+        override fun putBoolean(key: String, value: Boolean): android.content.SharedPreferences.Editor {
+            modified[key] = value
+            return this
+        }
+        override fun remove(key: String): android.content.SharedPreferences.Editor {
+            modified[key] = this
+            return this
+        }
+        override fun clear(): android.content.SharedPreferences.Editor {
+            clear = true
+            return this
+        }
+        override fun commit(): Boolean {
+            apply()
+            return true
+        }
+        override fun apply() {
+            synchronized(map) {
+                if (clear) map.clear()
+                for ((k, v) in modified) {
+                    if (v === this) map.remove(k) else map[k] = v
+                }
+            }
+            onCommit()
+        }
+    }
+
+    override fun getAll(): Map<String, *> = HashMap(map)
+
+    override fun getString(key: String, defValue: String?): String? =
+        (map[key] as? String) ?: defValue
+
+    override fun getStringSet(key: String, defValue: Set<String>?): Set<String>? =
+        (map[key] as? Set<*>)?.filterIsInstance<String>()?.toSet() ?: defValue
+
+    override fun getInt(key: String, defValue: Int): Int =
+        (map[key] as? Int) ?: defValue
+
+    override fun getLong(key: String, defValue: Long): Long =
+        (map[key] as? Long) ?: defValue
+
+    override fun getFloat(key: String, defValue: Float): Float =
+        (map[key] as? Float) ?: defValue
+
+    override fun getBoolean(key: String, defValue: Boolean): Boolean =
+        (map[key] as? Boolean) ?: defValue
+
+    override fun contains(key: String): Boolean = map.containsKey(key)
+
+    override fun edit(): android.content.SharedPreferences.Editor = Editor(map)
+
+    override fun registerOnSharedPreferenceChangeListener(listener: android.content.SharedPreferences.OnSharedPreferenceChangeListener) {}
+
+    override fun unregisterOnSharedPreferenceChangeListener(listener: android.content.SharedPreferences.OnSharedPreferenceChangeListener) {}
 }
 
 actual fun defaultApiBaseUrl(): String =

@@ -13,6 +13,15 @@ snapshot = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(snapshot)
 
 
+class ExplicitSdkBuildTests(unittest.TestCase):
+    def test_release_uses_explicit_sdk_without_reopening_it_in_normal_ide_imports(self):
+        source=(ROOT/'settings.gradle.kts').read_text()
+        self.assertIn('gradleProperty("ogt.dbKmpSdkPath")',source)
+        self.assertIn('if (!releaseSdkPath.isNullOrBlank())',source)
+        self.assertIn('includeBuild(releaseSdk)',source)
+        self.assertNotIn('/Users/romancanoniero/',source)
+
+
 class SnapshotTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='ogt sdk test ')

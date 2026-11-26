@@ -44,6 +44,11 @@ import com.onlygoodthings.backend.social.SocialSqlRepository
 import com.onlygoodthings.backend.social.honorRoutes
 import com.onlygoodthings.backend.social.publicHonorRoutes
 import com.onlygoodthings.backend.social.socialRoutes
+import com.onlygoodthings.backend.social.recognitionCategoryRoutes
+import com.onlygoodthings.backend.social.postInvitationRoutes
+import com.onlygoodthings.backend.social.publicPostInvitationRoutes
+import com.onlygoodthings.backend.social.InvitationDeliveryWorker
+import com.onlygoodthings.backend.social.nicknameRoutes
 import com.onlygoodthings.backend.media.MediaStore
 import com.onlygoodthings.backend.media.mediaRoutes
 import com.onlygoodthings.backend.media.publicMediaRoutes
@@ -103,6 +108,14 @@ fun Application.module() {
     val db = Database(jdbcUrl, dbUser, dbPassword)
     val redis = RedisCache(redisUrl)
     val identity = IdentityStore(db)
+    val invitationDelivery = InvitationDeliveryWorker(db)
+    launch(kotlinx.coroutines.Dispatchers.IO) {
+        while(isActive) {
+            runCatching { invitationDelivery.processPending() }
+                .onFailure { org.slf4j.LoggerFactory.getLogger("Invitations").warn("Invitation delivery deferred") }
+            delay(5_000)
+        }
+    }
     val hub = RealtimeHub(redis)
     val stories = StorySqlRepository(db, StoryMediaStore(
         Path.of(env("OGT_MEDIA_DIR", "data/media")), env("OGT_PUBLIC_BASE", "http://217.216.82.209:19080"),
@@ -123,7 +136,7 @@ fun Application.module() {
         },
     )
 
-    install(CallLogging) { level = Level.INFO }
+    install(CallLogging) { level = Level.INFO; filter { call -> !call.request.path().startsWith("/i/") } }
     install(DoubleReceive)
     install(ContentNegotiation) {
         json(
@@ -217,6 +230,7 @@ fun Application.module() {
         paymentWebhook(payments,mercadoPago?.webhookSecret)
         publicAuthRoutes(verifier, identity)
         publicHonorRoutes(honors)
+        publicPostInvitationRoutes(db)
         publicMediaRoutes(mediaStore) { com.onlygoodthings.backend.crm.crmPublicMediaAvailable(db,it) }
         storyMediaRoutes(stories)
         val blocks=com.onlygoodthings.backend.community.UserBlocks(db)
@@ -247,6 +261,9 @@ fun Application.module() {
             storyRoutes(stories, hub)
             parkingRoutes(ParkingSqlRepository(db), redis, hub, FootRoutingService.fromEnv(), parkingProximity)
             socialRoutes(SocialSqlRepository(db), hub)
+            recognitionCategoryRoutes(db)
+            nicknameRoutes(db)
+            postInvitationRoutes(db,hub)
             userBlockRoutes(com.onlygoodthings.backend.community.UserBlocks(db),hub)
             mediaRoutes(mediaStore,onMeasuredUpload = { owner,upload ->
                 db.withConnection { c ->

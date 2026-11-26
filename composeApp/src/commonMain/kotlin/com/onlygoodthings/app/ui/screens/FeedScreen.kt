@@ -346,7 +346,7 @@ fun FeedScreen(
                 val listing = remember(post.id, lostTick) { post.listingId?.let { id -> db.animals.firstOrNull { it.id == id } } }
                 val comments = remember(post.id, socialTick) { db.commentsOf(post.id) }
                 val media = remember(post.id, socialTick) { db.mediaOf(post.id) }
-                val kind = feedCardKind(post.tag, listing?.kind, post.sourceUrl)
+                val kind = feedCardKind(post.tag, listing?.kind, post.sourceUrl, post.publicationKind)
                 NeighborPostCard(
                     post = post.copy(commentCount = maxOf(post.commentCount, comments.size)),
                     profile = look,
@@ -450,7 +450,7 @@ fun FeedScreen(
             val post = remember(postId, socialTick) { db.posts.firstOrNull { it.id == postId } }
             val listing = post?.listingId?.let { id -> db.animals.firstOrNull { it.id == id } }
             PostReportSheet(
-                kind = post?.let { feedCardKind(it.tag, listing?.kind, it.sourceUrl) },
+                kind = post?.let { feedCardKind(it.tag, listing?.kind, it.sourceUrl, it.publicationKind) },
                 onDismiss = { reportPostId = null },
                 onSubmit = { reason, details ->
                     optimisticReportPost(db, auth.feed, scope, me.id, postId, reason, details) {
@@ -1098,7 +1098,7 @@ private fun StoryFeedCard(
         )
         Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             ImpactTruthPills(post)
-            val whenWhere = if (isGatheringPost(post.tag)) {
+            val whenWhere = if (isGatheringPost(post.tag,post.publicationKind)) {
                 gatheringWhenWhere(post.place, post.eventStartsAtEpochMs, currentEpochMs())
             } else {
                 null
@@ -1134,7 +1134,7 @@ private fun StoryFeedCard(
                 }
             }
         }
-        if (canRsvpToGathering(post.tag, post.eventStartsAtEpochMs, currentEpochMs())) {
+        if (canRsvpToGathering(post.tag, post.eventStartsAtEpochMs, currentEpochMs(),post.publicationKind)) {
             val db = LocalOgtDb.current
             val me = LocalOgtSession.current.me()
             var going by remember(post.id) { mutableStateOf(false) }

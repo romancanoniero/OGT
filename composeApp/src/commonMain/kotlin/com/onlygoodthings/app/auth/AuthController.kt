@@ -68,6 +68,7 @@ class AuthController(
     val notices = RestNoticeRepository(createPlatformHttpClient(), session)
     val animals = RestAnimalsRepository(createPlatformHttpClient(), session)
     val feed = RestFeedRepository(createPlatformHttpClient(), session)
+    val postInvitations = com.onlygoodthings.shared.data.remote.RestPostInvitations(createPlatformHttpClient(), session)
 
     suspend fun updateMyLocation(latitude: Double, longitude: Double, accuracyMeters: Double?) {
         val ok = api.updateLocation(latitude, longitude, accuracyMeters)
@@ -80,20 +81,18 @@ class AuthController(
     }
 
     var pendingPhone by mutableStateOf<PendingPhoneAuth?>(null)
-    private var secondFactorKeepSession = true
     private val secondFactorSignIn = SecondFactorSignIn(
         begin = platform::beginSecondFactor,
         verify = platform::confirmSecondFactor,
-        openSession = { user, keep -> finishSession(user, keep) },
+        openSession = { user, _ -> finishSession(user) },
         cancelNative = platform::cancelSecondFactor,
     )
     val secondFactors: List<AuthSecondFactor> get() = secondFactorSignIn.factors
     val selectedSecondFactor: AuthSecondFactor? get() = secondFactorSignIn.selected
     val secondFactorExpired: Boolean get() = secondFactorSignIn.expired
 
-    private fun beginPrimarySignIn(keep: Boolean) {
+    private fun beginPrimarySignIn() {
         secondFactorSignIn.clear()
-        secondFactorKeepSession = keep
     }
 
     suspend fun chooseSecondFactor(index: Int): Boolean {
@@ -144,32 +143,29 @@ class AuthController(
 
     suspend fun restore(): AuthRestore {
         error = null
-        val user = platform.currentUser() ?: return AuthRestore.LoggedOut
-        if (prefs.biometricEnabled) return AuthRestore.NeedsBiometric
-        if (!prefs.keepSession) {
-            platform.signOut()
-            return AuthRestore.LoggedOut
-        }
-        try {
-            finishSession(user)
+        return try {
+            restoreSavedAuthSession(
+                explicitlySignedOut = prefs.sessionSignedOut,
+                biometricEnabled = prefs.biometricEnabled,
+                currentUser = platform::currentUser,
+                openSession = { finishSession(it) },
+                onboardingDone = { prefs.onboardingDone },
+                onSessionExpired = { if (!requiresLogin) expireSession() },
+            )
         } catch (cancel: kotlinx.coroutines.CancellationException) {
             throw cancel
-        } catch (expired: AuthSessionExpired) {
-            if (!requiresLogin) expireSession()
-            return AuthRestore.LoginRequired
         } catch (failure: Exception) {
             error = failure.message ?: "No se pudo recuperar la sesión"
-            return AuthRestore.LoggedOut
+            throw failure
         }
-        return if (prefs.onboardingDone) AuthRestore.Home else AuthRestore.FirstRun
     }
 
-    suspend fun signInIdentifier(identifier: String, password: String, keep: Boolean): Boolean = wrap {
-        beginPrimarySignIn(keep)
+    suspend fun signInIdentifier(identifier: String, password: String): Boolean = wrap {
+        beginPrimarySignIn()
         when (val contact = parseContact(identifier)) {
             is AuthContact.Email -> {
                 if (password.isBlank()) error("Ingresá tu contraseña")
-                finishSession(platform.signInEmail(contact.email, password), keep)
+                finishSession(platform.signInEmail(contact.email, password))
             }
             is AuthContact.Phone -> {
                 pendingPhone = platform.startPhoneAuth(contact.e164)
@@ -183,13 +179,13 @@ class AuthController(
         password: String,
         barrio: String,
     ): Boolean = wrap {
-        beginPrimarySignIn(true)
+        beginPrimarySignIn()
         require(name.isNotBlank()) { "Ingresá tu nombre" }
         val titled = titleCasePersonName(name.trim())
         when (val contact = parseContact(identifier)) {
             is AuthContact.Email -> {
                 require(password.length >= 6) { "La contraseña debe tener al menos 6 caracteres" }
-                finishSession(platform.signUpEmail(contact.email, password, titled), keep = true)
+                finishSession(platform.signUpEmail(contact.email, password, titled))
                 applyBarrio(barrio)
             }
             is AuthContact.Phone -> {
@@ -206,7 +202,7 @@ class AuthController(
     suspend fun confirmOtp(code: String): Boolean = wrap {
         val pending = pendingPhone ?: error("No hay verificación pendiente")
         require(code.length == 6) { "El código debe tener 6 dígitos" }
-        finishSession(platform.confirmPhone(pending, code), keep = true)
+        finishSession(platform.confirmPhone(pending, code))
         pending.displayName?.let { applyDisplayName(it) }
         pending.barrio?.let { applyBarrio(it) }
         pendingPhone = null
@@ -225,13 +221,13 @@ class AuthController(
     }
 
     suspend fun signInProvider(provider: String): Boolean = wrap {
-        beginPrimarySignIn(true)
+        beginPrimarySignIn()
         val user = when (provider) {
             "google" -> platform.signInGoogle()
             "apple" -> platform.signInApple()
             else -> error("Proveedor no soportado")
         }
-        finishSession(user, keep = true)
+        finishSession(user)
     }
 
     suspend fun recover(identifier: String, byMail: Boolean): Boolean = wrap {
@@ -244,6 +240,8 @@ class AuthController(
         }
     }
 
+    suspend fun canUseBiometric(): Boolean = runCatching { platform.canUseBiometric() }.getOrElse { false }
+
     suspend fun unlockWithBiometric(): Boolean = wrap {
         if (!platform.canUseBiometric()) {
             throw AuthException("Este dispositivo no tiene huella o rostro configurados")
@@ -252,7 +250,7 @@ class AuthController(
             ?: throw AuthException("Primero iniciá sesión para activar el ingreso biométrico")
         if (!platform.unlockBiometric()) throw AuthException("No se pudo validar la biometría")
         prefs.biometricEnabled = true
-        finishSession(user, keep = true)
+        finishSession(user)
     }
 
     /** Borra la fila de OGT y el contenido de esta cuenta, y después cierra la sesión local. */
@@ -327,6 +325,7 @@ class AuthController(
     }
 
     suspend fun signOut() {
+        prefs.sessionSignedOut = true
         error = null
         needsCommunityConsent = true
         com.onlygoodthings.app.media.StoreReviewMedia.clear()
@@ -422,8 +421,7 @@ class AuthController(
         onExpired = { expireSession() },
     )
 
-    private suspend fun finishSession(user: AuthUser, keep: Boolean = true) {
-        prefs.keepSession = keep
+    private suspend fun finishSession(user: AuthUser) {
         val token = sessionToken(true)
         val bearer = if (allowDevTokens) "dev.${user.firebaseUid}.USER" else token
         val profile = api.openSession(bearer, user.firebaseUid)
@@ -441,6 +439,7 @@ class AuthController(
         com.onlygoodthings.shared.realtime.OgtSdk.restart(com.onlygoodthings.shared.realtime.gatewayEndpointFromApiBase(session.apiBaseUrl),realtimeTokenProvider())
         stories.start(preview.currentUserId)
         ensureDevBearer()
+        prefs.sessionSignedOut = false
         _signedIn.value = true
         requiresLogin = false
         error = null
@@ -455,6 +454,7 @@ class AuthController(
             id = profile?.id ?: existing.id,
             firebaseUid = user.firebaseUid,
             displayName = profile?.displayName ?: user.displayName ?: existing.displayName,
+            nickname = profile?.nickname ?: existing.nickname,
             email = user.email ?: existing.email,
             phoneE164 = user.phone ?: existing.phoneE164,
             photoUrl = profile?.photoUrl ?: user.photoUrl ?: existing.photoUrl,
@@ -467,6 +467,7 @@ class AuthController(
             email = user.email,
             phoneE164 = user.phone,
             displayName = profile?.displayName ?: user.displayName ?: user.email ?: "Alguien de la comunidad",
+            nickname = profile?.nickname,
             photoUrl = profile?.photoUrl ?: user.photoUrl,
             role = profile?.role ?: UserRole.USER,
             communityPoints = profile?.communityPoints ?: 0,
@@ -518,7 +519,7 @@ class AuthController(
         } catch (cancel: kotlinx.coroutines.CancellationException) {
             throw cancel
         } catch (challenge: AuthSecondFactorRequired) {
-            secondFactorSignIn.require(challenge.factors, secondFactorKeepSession)
+            secondFactorSignIn.require(challenge.factors, keepSession = true)
             error = null
             false
         } catch (expired: AuthSessionExpired) {

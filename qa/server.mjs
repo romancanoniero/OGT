@@ -10,7 +10,7 @@ const root = path.resolve(here, process.env.OGT_QA_WEB_ROOT || '../web/app');
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg' };
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost:19082');
-  if (/^\/(api\/|media\/|health$)/.test(url.pathname)) {
+  if (/^\/(api\/|media\/|i\/|h\/|health$)/.test(url.pathname)) {
     const upstream = http.request({ hostname: '127.0.0.1', port: 19083, path: req.url, method: req.method, headers: req.headers }, reply => {
       res.writeHead(reply.statusCode, reply.headers); reply.pipe(res);
     });

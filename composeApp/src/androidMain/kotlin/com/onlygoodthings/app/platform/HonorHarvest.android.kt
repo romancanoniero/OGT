@@ -7,6 +7,7 @@ import com.android.installreferrer.api.InstallReferrerStateListener
 import com.onlygoodthings.app.OgtApplication
 import com.onlygoodthings.shared.domain.parseHonorClipboard
 import com.onlygoodthings.shared.domain.parseHonorReferrer
+import com.onlygoodthings.shared.domain.parseInvitationReferrer
 
 actual fun readHonorClipboard(): String? {
     val context = OgtApplication.instance
@@ -25,7 +26,10 @@ actual fun startHonorInstallReferrer(onToken: (String) -> Unit) {
             if (responseCode == InstallReferrerClient.InstallReferrerResponse.OK) {
                 runCatching { client.installReferrer.installReferrer }
                     .getOrNull()
-                    ?.let { parseHonorReferrer(it) }
+                    ?.let { raw ->
+                        parseInvitationReferrer(raw)?.let { OgtIncomingLinks.offer("ogt://i/$it") }
+                        parseHonorReferrer(raw)
+                    }
                     ?.let(onToken)
             }
             runCatching { client.endConnection() }

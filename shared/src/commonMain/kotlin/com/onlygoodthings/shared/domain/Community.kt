@@ -16,6 +16,7 @@ data class NeighborCard(
     val inviteCode: String? = null,
     val role: String = "USER",
     val levelLabel: String = "",
+    val nickname: String? = null,
 )
 
 @Serializable

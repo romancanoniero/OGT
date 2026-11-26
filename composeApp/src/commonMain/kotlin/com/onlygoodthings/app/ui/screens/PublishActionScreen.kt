@@ -38,6 +38,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -45,15 +46,18 @@ import androidx.compose.ui.unit.sp
 import com.onlygoodthings.app.data.LocalAuth
 import com.onlygoodthings.app.data.LocalOgtDb
 import com.onlygoodthings.app.data.LocalOgtSession
+import com.onlygoodthings.app.data.OgtPreviewStore
 import com.onlygoodthings.app.data.announcePublishedPost
 import com.onlygoodthings.app.data.optimisticEditPost
 import com.onlygoodthings.app.media.OgtMediaCache
 import com.onlygoodthings.app.nav.ComposePostKind
 import com.onlygoodthings.app.notify.showSystemNotice
 import com.onlygoodthings.app.theme.OgtColors
+import com.onlygoodthings.app.theme.LushImpactTheme
 import com.onlygoodthings.app.theme.OgtDimens
 import com.onlygoodthings.app.theme.ogtOutlinedFieldColors
 import com.onlygoodthings.app.platform.OgtPickedMedia
+import com.onlygoodthings.app.platform.HonorInviteActions
 import com.onlygoodthings.app.platform.rememberHonorInviteActions
 import com.onlygoodthings.app.ui.components.OgtDraftMediaStrip
 import com.onlygoodthings.app.platform.sharePlainText
@@ -64,13 +68,19 @@ import com.onlygoodthings.app.ui.components.OgtPrimaryButton
 import com.onlygoodthings.app.ui.components.OgtTopBar
 import com.onlygoodthings.app.ui.components.ogtDismissImeOnScroll
 import com.onlygoodthings.app.resources.Res
-import com.onlygoodthings.app.resources.feed_avatar_me
 import com.onlygoodthings.app.resources.publish_map
 import com.onlygoodthings.shared.data.local.LocalPostMedia
 import com.onlygoodthings.shared.data.local.LocalPostPerson
 import com.onlygoodthings.shared.data.local.LocalSocialPost
+import com.onlygoodthings.shared.domain.*
+import com.onlygoodthings.app.ui.components.AccountMentionPicker
+import com.onlygoodthings.app.ui.components.PostInvitationDraftEditor
+import com.onlygoodthings.app.ui.components.PostInvitationManager
+import com.onlygoodthings.app.ui.components.GhostLink
+import kotlin.random.Random
 import com.onlygoodthings.shared.domain.AuthorKind
 import com.onlygoodthings.shared.domain.FeedEventKind
+import com.onlygoodthings.shared.domain.GoodActionRecognition
 import com.onlygoodthings.shared.domain.MediaKind
 import com.onlygoodthings.shared.domain.MentionCandidate
 import com.onlygoodthings.shared.domain.mentionHandle
@@ -83,8 +93,8 @@ import com.onlygoodthings.shared.realtime.currentEpochMs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.ui.tooling.preview.Preview
 
 private data class ImpactCategory(val id: String, val label: String, val icon: String)
 private data class BarrioSpot(val title: String, val detail: String)
@@ -126,7 +136,7 @@ private val BarrioSpots = listOf(
 
 /**
  * Dar a conocer una buena acción, una ternura o un homenaje.
- * En la acción el caso habitual es contar lo que hizo otra persona.
+ * Las buenas acciones reconocen siempre lo que hizo otra persona.
  */
 @Composable
 fun PublishActionScreen(
@@ -135,26 +145,54 @@ fun PublishActionScreen(
     onDone: () -> Unit,
     onBack: () -> Unit = onDone,
 ) {
+    if(kind==ComposePostKind.GATHERING) { PublishGatheringScreen(editPostId,onDone,onBack);return }
     val db = LocalOgtDb.current
     val session = LocalOgtSession.current
     val auth = LocalAuth.current
     val scope = rememberCoroutineScope()
-    val invite = rememberHonorInviteActions()
+    val invite = if (LocalInspectionMode.current) {
+        remember { HonorInviteActions(emptyList(), false, {}, { _, _ -> }, { _, _ -> }) }
+    } else rememberHonorInviteActions()
     val me = session.me()
     val editing = !editPostId.isNullOrBlank()
     val existing = remember(editPostId) { editPostId?.let { db.post(it) } }
-    val categories = categoriesFor(kind)
+    val preview=LocalInspectionMode.current
+    var catalog by remember { mutableStateOf(legacyRecognitionCategories) }
+    var catalogReady by remember { mutableStateOf(preview) }
+    var catalogError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(kind) {
+        if(kind!=ComposePostKind.ACTION || preview)return@LaunchedEffect
+        try { catalog=auth.feed.recognitionCategories();catalogReady=true }
+        catch(cancel:CancellationException) { throw cancel }
+        catch(_:Exception) { catalogError="No pudimos cargar las categorías. Volvé a abrir el formulario para reintentar." }
+    }
+    val categories = if(kind==ComposePostKind.ACTION) buildList {
+        addAll(catalog.map { ImpactCategory(it.id,it.label,it.icon) })
+        if(existing!=null && none { it.id == existing.categoryId || it.label.equals(existing.tag,true) })add(ImpactCategory(existing.categoryId ?: "historical",existing.tag,""))
+    } else categoriesFor(kind)
     val storyMode = kind == ComposePostKind.TERNURA || kind == ComposePostKind.HOMENAJE
     val ternuraForm = kind == ComposePostKind.TERNURA
     val honorForm = kind == ComposePostKind.HOMENAJE
-    var authorIsSelf by remember(kind) { mutableStateOf(false) }
+    val actionForm = kind == ComposePostKind.ACTION
+    val newAction = actionForm && !editing
     var storyTouched by remember(kind) { mutableStateOf(editing) }
     var category by remember(kind) {
         mutableStateOf(
-            existing?.let { post -> categories.firstOrNull { it.label.equals(post.tag, ignoreCase = true) }?.id }
+            existing?.let { post -> post.categoryId ?: categories.firstOrNull { it.label.equals(post.tag, ignoreCase = true) }?.id ?: if(actionForm)"historical" else null }
                 ?: defaultCategory(kind),
         )
     }
+    LaunchedEffect(catalogReady,catalog) {
+        if(kind==ComposePostKind.ACTION && !editing && catalogReady && catalog.none { it.id==category })category=catalog.firstOrNull()?.id.orEmpty()
+    }
+    var fullName by remember(editPostId) { mutableStateOf(existing?.let { db.creditName(it) }.orEmpty()) }
+    val draftInvitations=remember { mutableStateListOf<PostInvitationDraft>() }
+    var invitationPurpose by remember { mutableStateOf<String?>(null) }
+    var publishedPostId by remember { mutableStateOf<String?>(null) }
+    var attemptKey by remember { mutableStateOf<List<Any?>?>(null) }
+    var requestId by remember { mutableStateOf("") }
+    var uploadedForAttempt by remember { mutableStateOf<List<PostMediaItem>?>(null) }
+    var categoryTouched by remember { mutableStateOf(false) }
     var categoryOpen by remember(kind) { mutableStateOf(false) }
     var story by remember(kind) {
         mutableStateOf(existing?.body?.takeIf { it.isNotBlank() }.orEmpty())
@@ -172,13 +210,13 @@ fun PublishActionScreen(
     val neighbors = remember { mutableStateListOf<MentionCandidate>() }
     var inviteName by remember { mutableStateOf<String?>(null) }
     var inviteSlot by remember { mutableStateOf<HonorSlot?>(null) }
-    val heroName = protagonist?.displayName ?: "esta persona"
+    val heroName = if(actionForm)fullName.ifBlank { "esta persona" } else protagonist?.displayName ?: "esta persona"
     val heroAt = protagonist?.atHandle ?: "@vecina"
     val spot = BarrioSpots[spotIndex % BarrioSpots.size]
-    val missingHonoree = honorForm && protagonist == null
-    val missingType = honorForm && category.isBlank()
-    val missingMedia = storyMode && draftMedia.isEmpty()
-    val missingStory = storyMode && story.trim().isEmpty()
+    val missingHonoree = if(actionForm)fullName.trim().length<2 else honorForm && protagonist == null
+    val missingType = (honorForm && category.isBlank()) || (actionForm && (!catalogReady || categories.none { it.id==category }))
+    val missingMedia = (storyMode || newAction) && draftMedia.isEmpty()
+    val missingStory = (storyMode || actionForm) && story.trim().isEmpty()
     val missingHonorBits = buildList {
         if (missingHonoree) add("a quién")
         if (missingType) add("si es en vida o post mortem")
@@ -189,7 +227,14 @@ fun PublishActionScreen(
         if (ternuraForm && missingMedia) add("una foto o un video")
         if (ternuraForm && missingStory) add("lo que viste")
     }
+    val missingActionBits = buildList {
+        if (actionForm && missingHonoree) add("el nombre completo de la persona")
+        if (actionForm && missingType) add("una categoría disponible")
+        if (newAction && missingMedia) add("una foto o un video")
+        if (actionForm && missingStory) add("la historia")
+    }
     val canPublish = when {
+        actionForm -> missingActionBits.isEmpty()
         honorForm -> missingHonorBits.isEmpty()
         ternuraForm -> missingTernuraBits.isEmpty()
         else -> true
@@ -202,27 +247,34 @@ fun PublishActionScreen(
         category = if (namedOnly) "postmortem" else "envida"
     }
 
-    fun chooseAuthor(self: Boolean) {
-        authorIsSelf = self
-    }
-
     fun publish() {
         if (publishing || mediaPreparing || toast) return
-        if ((honorForm || ternuraForm) && !canPublish) {
+        if (!canPublish) {
             triedPublish = true
             return
         }
         val tag = when {
             ternuraForm -> "Ternura"
+            editing && actionForm && !categoryTouched -> existing?.tag.orEmpty()
             else -> categories.firstOrNull { it.id == category }?.label ?: "Ayuda vecinal"
         }
         val credit = try { com.onlygoodthings.shared.domain.ContentAttribution.normalize(attribution) }
             catch (error: IllegalArgumentException) { publishError = error.message; return }
         if (editing && existing != null) {
-            optimisticEditPost(db, auth.feed, scope, me.id, existing.id, story, tag, credit.orEmpty()) {
-                session.persistSocialFeed()
+            if(actionForm) {
+                publishing=true;publishError=null
+                scope.launch {
+                    try {
+                        val saved=auth.feed.editRecognition(existing.id,story,tag,credit.orEmpty(),fullName.trim(),catalog.firstOrNull { it.id==category }?.id)
+                        db.upsertRemoteSocial(saved);session.persistSocialFeed();toast=true
+                    } catch(cancel:CancellationException) { throw cancel }
+                    catch(e:Exception) { publishError=e.message }
+                    finally { publishing=false }
+                }
+            } else {
+                optimisticEditPost(db, auth.feed, scope, me.id, existing.id, story, tag, credit.orEmpty()) { session.persistSocialFeed() }
+                toast=true
             }
-            toast = true
             return
         }
         // Capture one coherent draft. Failed requests keep all form inputs for retry.
@@ -230,28 +282,47 @@ fun PublishActionScreen(
         val selectedMedia = draftMedia.toList()
         val selectedHero = protagonist
         val selectedNeighbors = neighbors.toList()
-        val selfAuthor = authorIsSelf
         val place = if (includePlace) spot.title else if (ternuraForm) "" else me.barrio
-        val heroId = when { ternuraForm -> null; selfAuthor -> me.id; else -> selectedHero?.userId }
+        val heroId = if (ternuraForm) null else selectedHero?.userId
+        if (newAction) {
+            try {
+                GoodActionRecognition.validate(me.id, heroId, fullName, me.displayName)
+            } catch (error: IllegalArgumentException) {
+                publishError = error.message
+                return
+            }
+        }
         val mentionedIds = buildList {
-            if (!ternuraForm && !selfAuthor) selectedHero?.userId?.let(::add)
+            if (!ternuraForm) selectedHero?.userId?.let(::add)
             selectedNeighbors.mapNotNull { it.userId }.forEach(::add)
         }
         val honorHits = buildList {
-            if (!ternuraForm && !selfAuthor) selectedHero?.let { add(it to PostPersonRole.PROTAGONIST) }
+            if (!ternuraForm) selectedHero?.let { add(it to PostPersonRole.PROTAGONIST) }
             selectedNeighbors.forEach { add(it to PostPersonRole.PARTICIPANT) }
         }
+        val selectedFullName=fullName.trim()
+        val selectedInvitations=draftInvitations.toList()
+        val selectedCategory=category
+        val key=listOf(body,tag,selectedMedia,heroId,selectedNeighbors,credit,selectedFullName,selectedInvitations,selectedCategory)
+        if(attemptKey!=key) {
+            attemptKey=key;requestId="post_${currentEpochMs()}_${Random.nextLong().toULong().toString(16)}";uploadedForAttempt=null
+        }
+        val selectedRequestId=requestId
         publishing = true
         publishError = null
         scope.launch {
             try {
-                val uploaded = auth.uploadPostMedia(selectedMedia, tag)
+                val uploaded = uploadedForAttempt ?: auth.uploadPostMedia(selectedMedia, tag).also { uploadedForAttempt=it }
                 check(session.currentUserId == me.id) { "La sesión cambió. Volvé a intentarlo." }
-                val remote = auth.feed.publishPost(
+                val remote = if(newAction) auth.feed.publishRecognition(RecognitionPostDraft(
+                    body=body,topic=tag,categoryId=selectedCategory,requestId=selectedRequestId,media=uploaded,
+                    honoreeName=selectedFullName,protagonistUserId=heroId,
+                    participantUserIds=selectedNeighbors.mapNotNull { it.userId }.distinct(),invitations=selectedInvitations,attributionUrl=credit,
+                )) else auth.feed.publishPost(
                     body = body, topic = tag, media = uploaded,
                     protagonistUserId = heroId,
                     participantUserIds = selectedNeighbors.mapNotNull { it.userId }.distinct(),
-                    honoreeName = selectedHero?.takeIf { it.namedOnly }?.displayName,
+                    honoreeName = selectedHero?.takeIf { it.userId == null }?.displayName,
                     attributionUrl = credit,
                 )
                 check(session.currentUserId == me.id) { "La sesión cambió. Volvé a intentarlo." }
@@ -270,9 +341,9 @@ fun PublishActionScreen(
                 db.bumpFeed()
                 session.persistHonors()
                 session.persistSocialFeed()
-                announcePublishedPost(db, db.post(postId))
                 db.notifyMentionedUsers(me.id, postId, mentionedIds).forEach(::showSystemNotice)
                 // The post is already confirmed; auxiliary notifications cannot turn it into a failed draft.
+                scope.launch { announcePublishedPost(db, db.post(postId)) }
                 scope.launch {
                     honorHits.forEach { (hit, role) ->
                         val token = db.honors.firstOrNull { it.id == hit.honorId }?.claimToken ?: return@forEach
@@ -282,6 +353,7 @@ fun PublishActionScreen(
                         runCatching { auth.notices.notifyMention(rid, postId, if (rid == heroId) "PROTAGONIST" else "PARTICIPANT") }
                     }
                 }
+                if(selectedInvitations.isNotEmpty())publishedPostId=postId
                 toast = true
             } catch (cancel: CancellationException) { throw cancel }
             catch (failure: Exception) { publishError = failure.message ?: "No se pudo publicar. Tu contenido sigue aquí para reintentar." }
@@ -289,8 +361,8 @@ fun PublishActionScreen(
         }
     }
 
-    LaunchedEffect(toast) {
-        if (!toast) return@LaunchedEffect
+    LaunchedEffect(toast,publishedPostId) {
+        if (!toast || publishedPostId!=null) return@LaunchedEffect
         delay(1600)
         onDone()
     }
@@ -324,43 +396,26 @@ fun PublishActionScreen(
                                     else -> "1. ¿Quién hizo esta buena acción?"
                                 },
                                 required = true,
-                                complete = if (honorForm && triedPublish) !missingHonoree else null,
+                                complete = if ((honorForm || newAction) && triedPublish) !missingHonoree else null,
                             )
                             Text(
                                 when {
                                     kind == ComposePostKind.HOMENAJE ->
                                         "Persona o mascota. Contá una enseñanza, una anécdota o las gracias que no llegaste a decir."
+                                    editing && actionForm -> "Podés actualizar el relato de esta publicación."
                                     else ->
-                                        "Lo más habitual es hacer visible lo bueno que hizo otra persona. Contar lo propio también se puede."
+                                        "Reconocé una buena acción de otra persona y contá cómo ayudó a los demás."
                                 },
                                 color = OgtColors.muted,
                                 fontSize = 13.sp,
                             )
-                            if (kind != ComposePostKind.HOMENAJE) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    AuthorChoiceCard(
-                                        title = "Alguien más",
-                                        subtitle = "Lo más habitual",
-                                        selected = !authorIsSelf,
-                                        modifier = Modifier.weight(1f),
-                                    ) { chooseAuthor(false) }
-                                    AuthorChoiceCard(
-                                        title = "Yo la hice",
-                                        subtitle = "Mi propia acción",
-                                        selected = authorIsSelf,
-                                        modifier = Modifier.weight(1f),
-                                    ) { chooseAuthor(true) }
+                            if (actionForm) {
+                                OutlinedTextField(value=fullName,onValueChange={fullName=it.take(100)},label={Text("Nombre y apellido")},placeholder={Text("Ej. Irma Sartirana")},singleLine=true,modifier=Modifier.fillMaxWidth())
+                                Text("El nombre completo aparece en el título. La cuenta @nick se elige por separado y es opcional.",color=OgtColors.muted,fontSize=13.sp)
+                                if(!editing) {
+                                    AccountMentionPicker(protagonist) { hit -> protagonist=hit;if(hit!=null && fullName.isBlank())fullName=hit.displayName }
+                                    GhostLink("Invitar a esta persona a ver el reconocimiento") { invitationPurpose="RECOGNITION" }
                                 }
-                            }
-                            if (authorIsSelf) {
-                                ProtagonistRow(
-                                    photo = Res.drawable.feed_avatar_me,
-                                    sessionFace = true,
-                                    title = "Vos",
-                                    subtitle = "Estás contando algo que hiciste.",
-                                    actionLabel = null,
-                                    onAction = null,
-                                )
                             } else {
                                 Text(
                                     if (kind == ComposePostKind.HOMENAJE) {
@@ -381,6 +436,7 @@ fun PublishActionScreen(
                                     onRemove = { protagonist = null },
                                     pool = mentionPool,
                                     single = true,
+                                    excludeIds = if (actionForm) setOf(me.id) else emptySet(),
                                     placeholder = if (kind == ComposePostKind.HOMENAJE) {
                                         "Nombre o @nick"
                                     } else {
@@ -390,8 +446,13 @@ fun PublishActionScreen(
                                     missing = showMissing && missingHonoree,
                                     allowNameOnly = kind == ComposePostKind.HOMENAJE,
                                     onInvite = { name ->
-                                        inviteName = name
-                                        inviteSlot = HonorSlot.HERO
+                                        val valid = !actionForm || runCatching {
+                                            GoodActionRecognition.validate(me.id, null, name, me.displayName)
+                                        }.onFailure { publishError = it.message }.isSuccess
+                                        if (valid) {
+                                            inviteName = name
+                                            inviteSlot = HonorSlot.HERO
+                                        }
                                     },
                                     onNameOnly = { name ->
                                         protagonist = namedMention(name)
@@ -406,7 +467,6 @@ fun PublishActionScreen(
                             PublishSectionLabel(
                                 when {
                                     kind == ComposePostKind.HOMENAJE -> "2. ¿Qué tipo de homenaje es?"
-                                    authorIsSelf -> "2. ¿Qué tipo de impacto generaste?"
                                     else -> "2. ¿Qué tipo de impacto se generó?"
                                 },
                                 required = true,
@@ -416,18 +476,18 @@ fun PublishActionScreen(
                                 when {
                                     kind == ComposePostKind.HOMENAJE ->
                                         "En vida, si todavía está. Post mortem, si ya no está. Podés cambiarlo."
-                                    authorIsSelf -> "Seleccioná el eje positivo que mejor define tu iniciativa."
                                     else -> "Seleccioná el eje positivo que mejor define lo que hizo $heroName."
                                 },
                                 color = OgtColors.muted,
                                 fontSize = 13.sp,
                             )
+                            catalogError?.let { if(actionForm)Text(it,color=OgtColors.error) }
                             ImpactCategoryCombo(
                                 categories = categories,
                                 selectedId = category,
                                 expanded = categoryOpen,
                                 onExpandedChange = { categoryOpen = it },
-                                onSelect = { category = it },
+                                onSelect = { category = it;categoryTouched=true },
                                 placeholder = if (honorForm) "Elegí: en vida o post mortem" else null,
                                 missing = showMissing && missingType,
                             )
@@ -440,8 +500,8 @@ fun PublishActionScreen(
                                     storyMode -> "3. Fotos o un video"
                                     else -> "3. Evidencia visual de la acción"
                                 },
-                                required = storyMode,
-                                complete = if (storyMode && triedPublish) !missingMedia else null,
+                                required = storyMode || actionForm,
+                                complete = if ((storyMode || newAction) && triedPublish) !missingMedia else null,
                             )
                             OgtDraftMediaStrip(
                                 items = draftMedia,
@@ -456,11 +516,10 @@ fun PublishActionScreen(
                                 when {
                                     ternuraForm -> "2. Contá lo que viste"
                                     kind == ComposePostKind.HOMENAJE -> "4. La enseñanza o la anécdota"
-                                    authorIsSelf -> "4. La historia de cambio"
                                     else -> "4. Contá lo que hizo $heroName"
                                 },
-                                required = storyMode,
-                                complete = if (storyMode && triedPublish) !missingStory else null,
+                                required = storyMode || actionForm,
+                                complete = if ((storyMode || actionForm) && triedPublish) !missingStory else null,
                             )
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 OutlinedTextField(
@@ -567,12 +626,11 @@ fun PublishActionScreen(
                             }
                         }
 
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (!editing || !actionForm) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(
                                 when {
                                     kind == ComposePostKind.HOMENAJE -> "5. ¿Quién más quiere sumar un recuerdo?"
                                     ternuraForm -> "¿Alguien aparece en la foto?"
-                                    authorIsSelf -> "5. ¿Quién más participó?"
                                     else -> "5. ¿Quién más acompañó a $heroName?"
                                 },
                                 fontWeight = FontWeight.SemiBold,
@@ -589,12 +647,22 @@ fun PublishActionScreen(
                                 excludeIds = setOfNotNull(protagonist?.userId),
                                 placeholder = "Añadí @nick o nombre",
                                 onInvite = { name ->
-                                    inviteName = name
-                                    inviteSlot = HonorSlot.CREW
+                                    if(actionForm)invitationPurpose="PARTICIPATION" else { inviteName = name;inviteSlot = HonorSlot.CREW }
                                 },
                             )
                         }
 
+                        if(actionForm && !editing)Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                            Text("Invitaciones (opcional)",fontWeight=FontWeight.SemiBold)
+                            Text("Invitá a ver el post sin atribuirles la acción. Después de publicar elegís la app y confirmás cada envío.",color=OgtColors.muted,fontSize=13.sp)
+                            draftInvitations.toList().forEach { draft ->
+                                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+                                    Text(draft.recipientName,modifier=Modifier.weight(1f))
+                                    GhostLink("Quitar") { draftInvitations.remove(draft) }
+                                }
+                            }
+                            GhostLink("Invitar a ver y participar") { invitationPurpose="PARTICIPATION" }
+                        }
                         com.onlygoodthings.app.ui.components.AttributionField(attribution, { attribution = it }, enabled = !publishing)
                         com.onlygoodthings.app.ui.components.PublicationRightsNotice()
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -605,13 +673,15 @@ fun PublishActionScreen(
                                     editing -> "Guardar cambios"
                                     kind == ComposePostKind.TERNURA -> "Compartir esta ternura"
                                     kind == ComposePostKind.HOMENAJE -> "Publicar el homenaje"
-                                    authorIsSelf -> "Compartir con la comunidad"
                                     else -> "Hacerlo visible en la comunidad"
                                 },
                                 onClick = ::publish,
                                 enabled = !publishing && !mediaPreparing && !toast,
                             )
                             publishError?.let { Text(it, color = OgtColors.error, fontSize = 13.sp) }
+                            if (showMissing && actionForm && missingActionBits.isNotEmpty()) {
+                                Text("Falta ${joinHonorMissing(missingActionBits)}.", color = OgtColors.error, fontSize = 12.sp)
+                            }
                             if (showMissing && honorForm && missingHonorBits.isNotEmpty()) {
                                 Text(
                                     "Falta ${joinHonorMissing(missingHonorBits)}.",
@@ -634,8 +704,8 @@ fun PublishActionScreen(
                                         "Cualquiera puede contarlo. Si buscan hogar, publicá una adopción."
                                     kind == ComposePostKind.HOMENAJE ->
                                         "El aplauso es un gracias por contar, no un festejo."
-                                    authorIsSelf ->
-                                        "Contar lo que hiciste puede inspirar a más gente a sumarse."
+                                    editing && actionForm ->
+                                        "Los cambios conservan a la persona y el crédito de esta publicación."
                                     else ->
                                         "Hacer visible lo bueno de $heroName suma a la comunidad y a quien lo hizo."
                                 },
@@ -661,10 +731,10 @@ fun PublishActionScreen(
                 ) {
                     Text(
                         when {
+                            editing -> "Los cambios ya se guardaron."
                             kind == ComposePostKind.TERNURA -> "Ya se ve en la comunidad."
                             kind == ComposePostKind.HOMENAJE -> "El homenaje ya está publicado."
-                            authorIsSelf -> "🎉  ¡Buena acción contada!"
-                            else -> "🎉  ¡Lo bueno de $heroAt ya se ve en la comunidad!"
+                            else -> "🎉  ¡Lo bueno de $heroName ya se ve en la comunidad!"
                         },
                         color = OgtColors.canvas,
                         fontSize = 13.sp,
@@ -672,6 +742,22 @@ fun PublishActionScreen(
                 }
             }
         }
+    }
+    publishedPostId?.let { id -> PostInvitationManager(id) { publishedPostId=null;onDone() } }
+    invitationPurpose?.let { purpose ->
+        PostInvitationDraftEditor(
+            givenName=if(purpose=="RECOGNITION")fullName else "",purpose=purpose,
+            initialAccount=if(purpose=="RECOGNITION")protagonist else null,
+            onDismiss={invitationPurpose=null},onAdd={ draft ->
+                if(purpose=="RECOGNITION") {
+                    fullName=draft.recipientName
+                    protagonist=draft.recipientUserId?.let { id -> db.userOrNull(id)?.let { db.toMention(it) } }
+                    draftInvitations.removeAll { it.purpose==purpose }
+                }
+                if(draftInvitations.none { it==draft })draftInvitations+=draft
+                invitationPurpose=null
+            },
+        )
     }
     val pendingName = inviteName
     val slot = inviteSlot
@@ -713,73 +799,12 @@ fun PublishActionScreen(
 
 private enum class HonorSlot { HERO, CREW }
 
+@Preview
 @Composable
-private fun AuthorChoiceCard(
-    title: String,
-    subtitle: String,
-    selected: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    Column(
-        modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (selected) OgtColors.secondary else OgtColors.stone)
-            .tap(onClick)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        Text(
-            title,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 14.sp,
-            color = if (selected) OgtColors.onPrimary else OgtColors.ink,
-        )
-        Text(
-            subtitle,
-            fontSize = 11.sp,
-            color = if (selected) OgtColors.onPrimary.copy(alpha = 0.85f) else OgtColors.muted,
-        )
-    }
-}
-
-@Composable
-private fun ProtagonistRow(
-    photo: DrawableResource,
-    title: String,
-    subtitle: String,
-    actionLabel: String?,
-    onAction: (() -> Unit)?,
-    sessionFace: Boolean = false,
-) {
-    val face = Modifier.size(40.dp).clip(CircleShape).border(2.dp, OgtColors.secondary.copy(alpha = 0.25f), CircleShape)
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(OgtColors.sand).padding(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (sessionFace) {
-            OgtSessionAvatar(contentDescription = title, modifier = face)
-        } else {
-            Image(
-                painterResource(photo),
-                contentDescription = null,
-                modifier = face,
-                contentScale = ContentScale.Crop,
-            )
-        }
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
-            Text(subtitle, color = OgtColors.muted, fontSize = 12.sp)
-        }
-        if (actionLabel != null && onAction != null) {
-            Box(
-                Modifier.clip(CircleShape).background(OgtColors.stone)
-                    .tap(onAction)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-            ) {
-                Text(actionLabel, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = OgtColors.ink)
-            }
+private fun PublishActionScreenPreview() {
+    LushImpactTheme {
+        OgtPreviewStore {
+            PublishActionScreen(kind = ComposePostKind.ACTION, onDone = {})
         }
     }
 }

@@ -21,6 +21,7 @@ biometric = "1.1.0"
 jackson = "2.18.3"
 junit = "5.12.1"
 db-kmp-sdk = "0.1.0-SNAPSHOT"
+commonlibversion="0.1.2"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
@@ -74,6 +75,8 @@ jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jackson-dat
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
 db-core = { module = "io.github.romancanoniero:db-core", version.ref = "db-kmp-sdk" }
 db-database = { module = "io.github.romancanoniero:db-database", version.ref = "db-kmp-sdk" }
+commonlib = {module = "io.github.romancanoniero:iyrcommonlib", version.ref = "commonlibversion"}
+
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

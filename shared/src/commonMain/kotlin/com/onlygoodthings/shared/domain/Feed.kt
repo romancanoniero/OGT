@@ -36,10 +36,12 @@ fun feedCardKind(
     tag: String,
     listingKind: String? = null,
     sourceUrl: String? = null,
+    publicationKind: String? = null,
 ): FeedCardKind {
     val kind = listingKind?.uppercase()
     if (kind == "LOST") return FeedCardKind.LOST_PET
     if (kind == "ADOPTION") return FeedCardKind.ADOPTION
+    if(publicationKind=="ACTION")return FeedCardKind.COMMUNITY
     val t = tag.trim().lowercase()
     if (t.contains("perdid")) return FeedCardKind.LOST_PET
     if (t in TERNURA_TAGS) return FeedCardKind.TERNURA
@@ -72,15 +74,20 @@ fun anecdoteParentPostId(parentPostId: String?, sourceUrl: String?): String? =
     parentPostId?.takeIf { it.isNotBlank() } ?: sourceUrl?.let(::parsePostDeepLink)
 
 /** Convocatoria a la que alguien de la comunidad puede decir “asistiré” y avisar a sus contactos. */
-fun isGatheringPost(tag: String): Boolean = tag.trim().lowercase() in GATHERING_TAGS
+fun isGatheringPost(tag: String, publicationKind: String? = null): Boolean = when(publicationKind) {
+    "CONVOCATORIA" -> true
+    null -> tag.trim().lowercase() in GATHERING_TAGS
+    else -> false
+}
 
 /** Asistiré solo si hay horario de inicio y el evento todavía no empezó. */
 fun canRsvpToGathering(
     tag: String,
     eventStartsAtEpochMs: Long?,
     nowEpochMs: Long,
+    publicationKind: String? = null,
 ): Boolean {
-    if (!isGatheringPost(tag)) return false
+    if (!isGatheringPost(tag,publicationKind)) return false
     val start = eventStartsAtEpochMs ?: return false
     return nowEpochMs < start
 }

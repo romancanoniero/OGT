@@ -1,6 +1,7 @@
 package com.onlygoodthings.app.ui.screens
 
 import com.onlygoodthings.app.resources.Res
+import com.onlygoodthings.app.resources.anecdote_action
 import com.onlygoodthings.app.resources.onboard_feed
 import com.onlygoodthings.app.resources.onboard_parking
 import com.onlygoodthings.app.resources.onboard_pets
@@ -14,6 +15,7 @@ internal data class OnboardPage(
     val kicker: String,
     val title: String,
     val body: String,
+    val reelImage: DrawableResource? = null,
 )
 
 internal val OnboardPages = listOf(
@@ -40,6 +42,7 @@ internal val OnboardPages = listOf(
         kicker = "COMUNIDAD ACTIVA",
         title = "Feed de buenas acciones",
         body = "Sumá karma ecológico por cada acto solidario y canjealo en comercios de cercanía de tu comunidad.",
+        reelImage = Res.drawable.anecdote_action,
     ),
     OnboardPage(
         image = Res.drawable.onboard_puntos,

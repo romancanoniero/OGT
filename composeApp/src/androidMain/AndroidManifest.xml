@@ -77,6 +77,23 @@
                 <data
                     android:scheme="https"
                     android:host="onlygoodthings.lat"
+                    android:pathPrefix="/i/" />
+                <data
+                    android:scheme="https"
+                    android:host="www.onlygoodthings.lat"
+                    android:pathPrefix="/i/" />
+                <data
+                    android:scheme="https"
+                    android:host="ogt-app-links.web.app"
+                    android:pathPrefix="/i/" />
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="onlygoodthings.lat"
                     android:pathPrefix="/p/" />
                 <data
                     android:scheme="https"
@@ -86,6 +103,12 @@
                     android:scheme="https"
                     android:host="ogt-app-links.web.app"
                     android:pathPrefix="/p/" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="ogt" android:host="i" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

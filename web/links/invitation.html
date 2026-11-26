@@ -1,0 +1,6 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Invitación a OGT</title></head>
+<body style="font-family:system-ui;max-width:480px;margin:40px auto;padding:20px"><h1>Te invitaron a OGT</h1><p>Ingresá o registrate para volver a la publicación.</p><p><a id="continue" href="https://onlygoodthings.lat/">Continuar con la invitación</a></p><script>
+const token=location.pathname.split('/')[2];
+if(/^[A-Za-z0-9_-]{32,64}$/.test(token||''))document.getElementById('continue').href='https://onlygoodthings.lat/i/'+token;
+</script></body></html>

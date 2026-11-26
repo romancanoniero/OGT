@@ -23,7 +23,8 @@ expect class AuthPlatform() {
 }
 
 expect class AuthPrefs() {
-    var keepSession: Boolean
+    /** Local logout takes precedence even if native credential cleanup fails. */
+    var sessionSignedOut: Boolean
     var biometricEnabled: Boolean
     var onboardingDone: Boolean
     var parkedLatitude: Double
@@ -49,6 +50,7 @@ expect class AuthPrefs() {
     var selectedVehicleId: String
     /** Token de mención de honor pendiente de reivindicar. */
     var pendingHonorToken: String
+    var pendingInvitationToken: String
     /** Mentions de honor emitidas en este dispositivo. */
     var honorsJson: String
     /** Fichas de adopción/perdido publicadas en este dispositivo. */

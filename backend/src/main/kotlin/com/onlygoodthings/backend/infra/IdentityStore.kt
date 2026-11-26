@@ -21,7 +21,7 @@ class IdentityStore(private val db: Database) {
         check(!erased) { "Cuenta eliminada" }
 
         val existing = connection.prepareStatement(
-            "SELECT id, firebase_uid, display_name, photo_url, role, community_points, invite_code FROM users WHERE firebase_uid = ?",
+            "SELECT id, firebase_uid, display_name, photo_url, role, community_points, invite_code, nickname FROM users WHERE firebase_uid = ?",
         ).use { stmt ->
             stmt.setString(1, verified.firebaseUid)
             stmt.executeQuery().use { rs ->
@@ -34,6 +34,7 @@ class IdentityStore(private val db: Database) {
                         role = UserRole.valueOf(rs.getString("role")),
                         communityPoints = rs.getInt("community_points"),
                         inviteCode = rs.getString("invite_code"),
+                        nickname = rs.stringOrNull("nickname"),
                     )
                 } else {
                     null
@@ -101,7 +102,7 @@ class IdentityStore(private val db: Database) {
 
     fun byId(userId: String): UserProfile? = db.withConnection { connection ->
         connection.prepareStatement(
-            "SELECT id, firebase_uid, display_name, photo_url, role, community_points, invite_code FROM users WHERE id = ?::uuid",
+            "SELECT id, firebase_uid, display_name, photo_url, role, community_points, invite_code, nickname FROM users WHERE id = ?::uuid",
         ).use { stmt ->
             stmt.setString(1, userId)
             stmt.executeQuery().use { rs ->
@@ -114,6 +115,7 @@ class IdentityStore(private val db: Database) {
                     role = UserRole.valueOf(rs.getString("role")),
                     communityPoints = rs.getInt("community_points"),
                     inviteCode = rs.getString("invite_code"),
+                        nickname = rs.stringOrNull("nickname"),
                 )
             }
         }
@@ -178,7 +180,9 @@ class IdentityStore(private val db: Database) {
         profile.copy(
             preferences=com.onlygoodthings.backend.social.readAccountSettings(connection,userId),
             records=mapOf(
-                "profile" to exportJsonRows(connection,"SELECT jsonb_build_object('firebaseUid',firebase_uid,'photoUrl',photo_url,'role',role,'createdAt',created_at,'updatedAt',updated_at,'lastSeenAt',last_seen_at,'latitude',ST_Y(home_location),'longitude',ST_X(home_location),'language',metadata->'settings'->'language','barrio',metadata->'settings'->'barrio') FROM users WHERE id=?::uuid",userId),
+                "profile" to exportJsonRows(connection,"SELECT jsonb_build_object('firebaseUid',firebase_uid,'nickname',nickname,'photoUrl',photo_url,'role',role,'createdAt',created_at,'updatedAt',updated_at,'lastSeenAt',last_seen_at,'latitude',ST_Y(home_location),'longitude',ST_X(home_location),'language',metadata->'settings'->'language','barrio',metadata->'settings'->'barrio') FROM users WHERE id=?::uuid",userId),
+                "postInvitations" to exportJsonRows(connection,"SELECT to_jsonb(i)-'delivery_token'-'token_hash'-'target_key' FROM post_invitations i WHERE issuer_user_id=?::uuid ORDER BY created_at",userId),
+                "receivedPostInvitations" to exportJsonRows(connection,"SELECT jsonb_build_object('id',id,'postId',post_id,'purpose',purpose,'status',status,'createdAt',created_at) FROM post_invitations WHERE recipient_user_id=?::uuid ORDER BY created_at",userId),
                 "anecdotes" to exportJsonRows(connection,"SELECT to_jsonb(a) FROM post_anecdotes a WHERE author_user_id=?::uuid ORDER BY created_at",userId),
                 "uploads" to exportJsonRows(connection,"SELECT to_jsonb(u) FROM uploaded_media_owners u WHERE uploader_user_id=?::uuid ORDER BY created_at",userId),
                 "reactions" to exportJsonRows(connection,"SELECT to_jsonb(i) FROM post_impacts i WHERE user_id=?::uuid ORDER BY created_at",userId),

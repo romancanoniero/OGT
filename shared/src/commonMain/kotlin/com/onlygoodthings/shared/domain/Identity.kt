@@ -20,6 +20,7 @@ data class AuthMe(
     val communityPoints: Int = 0,
     val inviteCode: String? = null,
     val levelLabel: String = "",
+    val nickname: String? = null,
 )
 
 /**
@@ -31,6 +32,7 @@ data class UserLive(
     val id: String,
     val displayName: String,
     val photoUrl: String? = null,
+    val nickname: String? = null,
 )
 
 @Serializable
@@ -42,6 +44,7 @@ data class UserProfile(
     val role: UserRole,
     val communityPoints: Int,
     val inviteCode: String,
+    val nickname: String? = null,
 )
 
 @Serializable

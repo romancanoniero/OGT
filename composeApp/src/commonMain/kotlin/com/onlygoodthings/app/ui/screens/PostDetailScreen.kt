@@ -184,7 +184,7 @@ fun PostDetailScreen(
     var mapOpen by remember { mutableStateOf(false) }
     var report by remember { mutableStateOf<LocalSighting?>(null) }
     var sawNote by remember(post.id, me.id) { mutableStateOf("") }
-    val kind = feedCardKind(post.tag, listing?.kind, post.sourceUrl)
+    val kind = feedCardKind(post.tag, listing?.kind, post.sourceUrl, post.publicationKind)
     val media = remember(post.id, socialTick) { db.mediaOf(post.id) }
     var comment by remember { mutableStateOf("") }
     var commentRev by remember { mutableStateOf(0) }
@@ -231,8 +231,11 @@ fun PostDetailScreen(
             }
         }
     }
-    val canRsvp = canRsvpToGathering(post.tag, post.eventStartsAtEpochMs, currentEpochMs())
+    val canRsvp = canRsvpToGathering(post.tag, post.eventStartsAtEpochMs, currentEpochMs(),post.publicationKind)
+    var invitationsOpen by remember(postId) { mutableStateOf(false) }
+    if(invitationsOpen) com.onlygoodthings.app.ui.components.PostInvitationManager(postId) { invitationsOpen=false }
     val extras = buildList {
+        if(post.authorUserId == me.id && post.listingId == null && !post.isAnecdoteShare()) add(PostExtraAction(Res.drawable.qs_invite, "Invitar a participar") { invitationsOpen=true })
         when (kind) {
             FeedCardKind.LOST_PET -> {
                 add(PostExtraAction(Res.drawable.qs_map, copy.petsMapCta, onClick = onPetsMap))
@@ -1289,7 +1292,7 @@ private fun CommunityDetail(
     going: Boolean = false,
     onRsvp: () -> Unit = {},
 ) {
-    val gathering = isGatheringPost(post.tag)
+    val gathering = isGatheringPost(post.tag,post.publicationKind)
     val whenWhere = gatheringWhenWhere(post.place, post.eventStartsAtEpochMs, currentEpochMs())
     OgtPill(post.tag)
     AuthorLine(authorName, level, post, showPlace = !gathering)

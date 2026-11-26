@@ -4,6 +4,8 @@ import com.onlygoodthings.shared.data.FeedRepository
 import com.onlygoodthings.shared.data.ParkingRepository
 import com.onlygoodthings.shared.domain.FeedEventKind
 import com.onlygoodthings.shared.domain.FeedMode
+import com.onlygoodthings.shared.domain.GoodActionRecognition
+import com.onlygoodthings.shared.domain.PostPersonRole
 import com.onlygoodthings.shared.domain.GeoMath
 import com.onlygoodthings.shared.domain.GeoPoint
 import com.onlygoodthings.shared.domain.ParkingCandidate
@@ -116,6 +118,12 @@ class LocalFeedRepository(
         honoreeName: String?,
         attributionUrl: String?,
     ): SocialPost {
+        val recognition = GoodActionRecognition.isAction(topic)
+        if (recognition) {
+            GoodActionRecognition.validate(
+                currentUserId, protagonistUserId, honoreeName, db.userOrNull(currentUserId)?.displayName,
+            )
+        }
         val now = currentEpochMs()
         val id = "post-pub-$now"
         db.posts += LocalSocialPost(
@@ -132,9 +140,17 @@ class LocalFeedRepository(
             isStory = false,
             storyLabel = null,
             createdAtEpochMs = now,
-            honoreeName = honoreeName,
+            honoreeName = if (recognition) {
+                db.userOrNull(protagonistUserId)?.displayName ?: honoreeName
+            } else honoreeName,
             attributionUrl = com.onlygoodthings.shared.domain.ContentAttribution.normalize(attributionUrl),
         )
+        if (recognition) {
+            db.postPeople += LocalPostPerson(id, currentUserId, PostPersonRole.AUTHOR)
+            protagonistUserId?.takeIf { it.isNotBlank() }?.let {
+                db.postPeople += LocalPostPerson(id, it, PostPersonRole.PROTAGONIST)
+            }
+        }
         db.bumpFeed()
         return db.toDomain(db.post(id))
     }

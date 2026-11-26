@@ -32,6 +32,7 @@ data class LocalUser(
     val honorTag: String,
     val latitude: Double,
     val longitude: Double,
+    val nickname: String? = null,
 ) {
     /** Id local, UID de Firebase u otro alias con el que se grabó una ficha. */
     fun aliases(): Set<String> = setOf(id, firebaseUid).filter { it.isNotBlank() }.toSet()
@@ -130,6 +131,8 @@ data class LocalSocialPost(
     val viewerHasImpacted: Boolean = false,
     val viewerHasHearted: Boolean = false,
     val attributionUrl: String? = null,
+    val categoryId: String? = null,
+    val publicationKind: String? = null,
 )
 
 @Serializable

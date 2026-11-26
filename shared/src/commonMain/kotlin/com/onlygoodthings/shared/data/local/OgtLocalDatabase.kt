@@ -177,7 +177,10 @@ class OgtLocalDatabase {
                 storyLabel = null,
                 createdAtEpochMs = live.createdAtEpochMs.takeIf { it > 0L } ?: currentEpochMs(),
                 listingId = live.listingId,
+                eventStartsAtEpochMs = live.eventStartsAtEpochMs,
                 honoreeName = live.honoreeName,
+                categoryId = live.categoryId,
+                publicationKind = live.publicationKind,
                 attributionUrl = live.attributionUrl,
                 heartCount = live.heartCount,
             )
@@ -195,6 +198,11 @@ class OgtLocalDatabase {
             impactCount = maxOf(current.impactCount, live.impactCount),
             heartCount = maxOf(current.heartCount, live.heartCount),
             authorUserId = authorId ?: current.authorUserId,
+            honoreeName = live.honoreeName?.takeIf { it.isNotBlank() } ?: current.honoreeName,
+            categoryId = live.categoryId ?: current.categoryId,
+            place = if(live.publicationKind=="CONVOCATORIA")live.place ?: current.place else current.place,
+            eventStartsAtEpochMs = live.eventStartsAtEpochMs ?: current.eventStartsAtEpochMs,
+            publicationKind = live.publicationKind ?: current.publicationKind,
             authorKind = if (authorId != null) AuthorKind.USER else current.authorKind,
             authorCompanyId = if (authorId != null) null else current.authorCompanyId,
             attributionUrl = if (live.attributionChanged) live.attributionUrl else current.attributionUrl,
@@ -245,7 +253,7 @@ class OgtLocalDatabase {
      * Pinta la cara que ya está en `users`. Un comentario no pisa una foto más nueva:
      * solo completa el hueco si esa persona todavía no tiene imagen local.
      */
-    fun applyUserLive(id: String, displayName: String?, photoUrl: String?): Boolean {
+    fun applyUserLive(id: String, displayName: String?, photoUrl: String?, nickname: String? = null): Boolean {
         if (id.isBlank()) return false
         val name = displayName?.trim()?.takeIf { it.isNotBlank() }
         val photo = photoUrl?.trim()?.takeIf { it.isNotBlank() }
@@ -254,8 +262,8 @@ class OgtLocalDatabase {
             val current = users[idx]
             val nextName = name ?: current.displayName
             val nextPhoto = photo ?: current.photoUrl
-            if (nextName == current.displayName && nextPhoto == current.photoUrl) return false
-            users[idx] = current.copy(displayName = nextName, photoUrl = nextPhoto)
+            if (nextName == current.displayName && nextPhoto == current.photoUrl && (nickname == null || nickname == current.nickname)) return false
+            users[idx] = current.copy(displayName = nextName, photoUrl = nextPhoto, nickname = nickname ?: current.nickname)
         } else {
             if (name == null && photo == null) return false
             users += LocalUser(
@@ -264,6 +272,7 @@ class OgtLocalDatabase {
                 email = null,
                 phoneE164 = null,
                 displayName = name ?: "Vecino",
+                nickname = nickname,
                 photoUrl = photo,
                 role = UserRole.USER,
                 communityPoints = 0,
@@ -304,6 +313,9 @@ class OgtLocalDatabase {
         body = post.body,
         tag = post.tag,
         place = post.place,
+        publicationKind = post.publicationKind,
+        categoryId = post.categoryId,
+        eventStartsAtEpochMs = post.eventStartsAtEpochMs,
         createdAtEpochMs = post.createdAtEpochMs,
         listingId = post.listingId,
         honoreeName = post.honoreeName,
@@ -430,10 +442,10 @@ class OgtLocalDatabase {
         if (index >= 0) {
             val current = posts[index]
             posts[index] = incoming.copy(
-                place = current.place.ifBlank { incoming.place },
+                place = if(incoming.publicationKind=="CONVOCATORIA")incoming.place.ifBlank { current.place } else current.place.ifBlank { incoming.place },
                 timeLabel = current.timeLabel.ifBlank { incoming.timeLabel },
                 listingId = current.listingId ?: incoming.listingId,
-                honoreeName = current.honoreeName ?: incoming.honoreeName,
+                honoreeName = incoming.honoreeName?.takeIf { it.isNotBlank() } ?: current.honoreeName,
                 parentPostId = current.parentPostId ?: incoming.parentPostId,
                 heartCount = maxOf(current.heartCount, incoming.heartCount),
                 viewerHasImpacted = incoming.viewerHasImpacted || current.viewerHasImpacted,
@@ -509,7 +521,7 @@ class OgtLocalDatabase {
     fun toMention(user: LocalUser): MentionCandidate = MentionCandidate(
         userId = user.id,
         displayName = user.displayName,
-        handle = mentionHandle(user.displayName),
+        handle = user.nickname ?: mentionHandle(user.displayName),
     )
 
     fun toMention(honor: LocalHonorMention): MentionCandidate = MentionCandidate(
@@ -894,7 +906,7 @@ class OgtLocalDatabase {
             available.sortedByDescending { it.createdAtEpochMs }
         for (post in ordered) {
             val listing = post.listingId?.let { id -> animals.firstOrNull { it.id == id } }
-            val kind = feedCardKind(post.tag, listing?.kind, post.sourceUrl)
+            val kind = feedCardKind(post.tag, listing?.kind, post.sourceUrl, post.publicationKind)
             if (kind !in picks) picks[kind] = post
             if (picks.size == FeedCardKind.entries.size) break
         }
@@ -2057,6 +2069,10 @@ class OgtLocalDatabase {
             achievedCount = post.achievedCount,
             empresaQueSuma = post.empresaQueSuma,
             honoreeName = post.honoreeName,
+            place = post.place,
+            eventStartsAtEpochMs = post.eventStartsAtEpochMs,
+            categoryId = post.categoryId,
+            publicationKind = post.publicationKind,
             anecdotes = anecdotesOf(post.id).map(::toDomain),
         )
     }
@@ -2178,7 +2194,8 @@ internal fun SocialPost.asLocalPost(): LocalSocialPost = LocalSocialPost(
     authorKind = authorKind,
     authorUserId = if (authorKind == AuthorKind.USER) authorId else null,
     authorCompanyId = if (authorKind == AuthorKind.COMPANY) authorId else null,
-    place = "",
+    place = place.orEmpty(),
+    eventStartsAtEpochMs = eventStartsAtEpochMs,
     timeLabel = "",
     tag = topic,
     body = body,
@@ -2189,6 +2206,8 @@ internal fun SocialPost.asLocalPost(): LocalSocialPost = LocalSocialPost(
     createdAtEpochMs = createdAtEpochMs,
     sourceUrl = sourceUrl,
     attributionUrl = attributionUrl,
+    categoryId = categoryId,
+    publicationKind = publicationKind,
     honoreeName = honoreeName,
     placement = placement,
     achievedCount = achievedCount,

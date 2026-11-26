@@ -30,15 +30,18 @@ test('publish in UI, persist, comment, enforce ownership and remove own post', a
   const author = api(request, await signup(page, 'Autora QA Social'));
   const text = `QA historia solidaria ${Date.now()}`;
   await page.goto('/#/publicar/accion');
-  await page.getByRole('button', { name: 'Yo la hice' }).click();
+  await expect(page.getByRole('button', { name: 'Yo la hice' })).toHaveCount(0);
+  await page.getByLabel('¿Quién hizo esta buena acción?', { exact: true }).fill('Vecina QA Reconocida');
   await page.getByLabel('La historia', { exact: true }).fill(text);
   await page.locator('#publish-form [data-file]').setInputFiles({ name: 'photo.jpg', mimeType: 'image/jpeg', buffer: await readFile(new URL('../../backend/src/test/resources/images/rotated.jpg', import.meta.url)) });
   const published = page.waitForResponse(r => r.url().endsWith('/api/v1/social/publish'));
   await page.locator('#publish-form [data-submit]').click();
   const post = (await (await published).json()).data;
   expect(post.id).toBeTruthy();
+  expect(post.honoreeName).toBe('Vecina QA Reconocida');
   await page.reload();
   await expect(page.locator('#main')).toContainText(text);
+  await expect(page.locator('#main')).toContainText('Vecina QA Reconocida');
   const otherContext = await browser.newContext();
   await otherContext.route('**/*', route => ['localhost', '127.0.0.1'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
   try {
@@ -262,4 +265,54 @@ test('parking leftover remains available and simultaneous claims have one winner
     await winner('parking/complete', { ...location, spotId: second.id }, false);
     expect((await owner('auth/me')).communityPoints).toBe(pointsAfter);
   } finally { await Promise.all(contexts.map(c => c.close())); }
+});
+
+test('recognize another account and reject missing or own recognition through UI and API', async ({ page, browser, request }) => {
+  const author = api(request, await signup(page, 'Autora QA Reconocimiento'));
+  const me = await author('auth/me');
+  const otherContext = await browser.newContext();
+  await otherContext.route('**/*', route => ['localhost', '127.0.0.1'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
+  try {
+    const heroName = `Persona Reconocida ${Date.now()}`;
+    const other = api(request, await signup(await otherContext.newPage(), heroName));
+    const hero = await other('auth/me');
+    await page.goto('/#/publicar/accion');
+    const person = page.getByLabel('¿Quién hizo esta buena acción?', { exact: true });
+    await expect(person).toHaveAttribute('required', '');
+    await expect(page.getByRole('button', { name: 'Yo la hice' })).toHaveCount(0);
+    await page.locator('#publish-form [data-submit]').click();
+    expect(await person.evaluate(el => el.validity.valueMissing)).toBe(true);
+    await person.fill(me.displayName);
+    await page.locator('#publish-form [data-submit]').click();
+    await expect(page.locator('[role=status], .toast').filter({ hasText: 'otra persona' }).first()).toBeVisible();
+    await person.fill(heroName);
+    await page.getByLabel('Cuenta de OGT (opcional)',{exact:true}).fill(heroName);
+    await page.locator('[data-recognition-people]').getByRole('button', { name: heroName, exact: true }).click();
+    await page.getByLabel('La historia', { exact: true }).fill('Reconocemos el trabajo de otra persona en el barrio.');
+    await page.locator('#publish-form [data-file]').setInputFiles({ name: 'photo.jpg', mimeType: 'image/jpeg', buffer: await readFile(new URL('../../backend/src/test/resources/images/rotated.jpg', import.meta.url)) });
+    const published = page.waitForResponse(r => r.url().endsWith('/api/v1/social/publish'));
+    await page.locator('#publish-form [data-submit]').click();
+    const response = await published;
+    expect(response.ok()).toBe(true);
+    const post = (await response.json()).data;
+    expect(post.authorId).toBe(me.userId);
+    expect(post.protagonistUserId).toBe(hero.userId);
+    expect(post.honoreeName).toBe(heroName);
+    await page.reload();
+    await expect(page.locator('#main')).toContainText(`Lo hizo ${heroName}`);
+    const base = { body: 'Una nueva acción de QA', topic: 'Limpieza', media: post.media };
+    for (const identity of [{}, { protagonistUserId: me.userId }, { protagonistUserId: me.userId, honoreeName: heroName }, { honoreeName: '@autora.qa.reconocimiento' }]) {
+      await author('social/publish', { ...base, ...identity }, false);
+    }
+    // These flows still support first-person content, including overlapping categories.
+    for (const fields of [{ topic: 'Ternura' }, { topic: 'En vida', honoreeName: 'Abuela QA' }, { topic: 'Reforestación', publicationKind: 'CONVOCATORIA' }]) {
+      const adjacent = await author('social/publish', { ...base, ...fields });
+      expect(adjacent.id).toBeTruthy();
+      await author('social/post/delete', { postId: adjacent.id });
+    }
+    const edited = await author('social/post/edit', { postId: post.id, body: 'Relato corregido', topic: 'Reciclaje' });
+    expect(edited.protagonistUserId).toBe(hero.userId);
+    expect(edited.honoreeName).toBe(heroName);
+    await author('social/post/delete', { postId: post.id });
+  } finally { await otherContext.close(); }
 });

@@ -10,9 +10,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,7 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,10 +33,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.onlygoodthings.app.theme.LushImpactTheme
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.theme.OgtDimens
 import com.onlygoodthings.app.theme.OgtMotion
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.jetbrains.compose.resources.painterResource
 
 /**
@@ -43,7 +47,7 @@ import org.jetbrains.compose.resources.painterResource
  */
 @Composable
 internal fun AuthFeatureReel(modifier: Modifier = Modifier) {
-    var index by remember { mutableIntStateOf(0) }
+    var index by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         while (true) {
             delay(OgtMotion.reelHoldMs)
@@ -52,28 +56,30 @@ internal fun AuthFeatureReel(modifier: Modifier = Modifier) {
     }
     val page = OnboardPages[index]
     Column(
-        modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Box(
             Modifier
                 .fillMaxWidth()
-                .aspectRatio(4f / 3f)
+                .height(220.dp)
                 .clip(RoundedCornerShape(OgtDimens.cardRadius))
                 .background(OgtColors.sand),
+            contentAlignment = Alignment.Center,
         ) {
             AnimatedContent(
                 targetState = page,
                 modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
                 transitionSpec = { OgtMotion.enterUp togetherWith OgtMotion.exitDown },
                 label = "auth-reel",
             ) { scene ->
                 Image(
-                    painter = painterResource(scene.image),
+                    painter = painterResource(scene.reelImage ?: scene.image),
                     contentDescription = scene.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxHeight(),
+                    contentScale = ContentScale.Fit,
                 )
             }
         }
@@ -120,6 +126,22 @@ internal fun AuthFeatureReel(modifier: Modifier = Modifier) {
                         .background(if (on) OgtColors.secondary else OgtColors.stone),
                 )
             }
+        }
+    }
+
+}
+
+@Preview
+@Composable
+private fun AuthFeatureReelPreview() {
+    LushImpactTheme {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .background(OgtColors.canvas)
+                .padding(16.dp),
+        ) {
+            AuthFeatureReel()
         }
     }
 }

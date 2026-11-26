@@ -24,6 +24,7 @@ import io.ktor.http.contentType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.buildJsonObject
 
 class RestFeedRepository(
@@ -31,6 +32,22 @@ class RestFeedRepository(
     private val session: SessionStore,
 ) : FeedRepository {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+
+    suspend fun recognitionCategories():List<com.onlygoodthings.shared.domain.RecognitionCategory> = post("/api/v1/social/categories",buildJsonObject {})
+
+    suspend fun publishRecognition(draft:com.onlygoodthings.shared.domain.RecognitionPostDraft):SocialPost =
+        post("/api/v1/social/publish",json.encodeToJsonElement(com.onlygoodthings.shared.domain.RecognitionPostDraft.serializer(),draft) as JsonObject)
+
+    suspend fun publishGathering(draft:com.onlygoodthings.shared.domain.GatheringPostDraft):SocialPost =
+        post("/api/v1/social/publish",json.encodeToJsonElement(com.onlygoodthings.shared.domain.GatheringPostDraft.serializer(),draft) as JsonObject)
+    suspend fun editGathering(id:String,body:String,topic:String,place:String,start:Long?,attribution:String):SocialPost =
+        post("/api/v1/social/post/edit",buildJsonObject { put("postId",id);put("body",body);put("topic",topic);if(start!=null){put("place",place);put("eventStartsAtEpochMs",start)};put("attributionUrl",attribution) })
+
+    suspend fun getPost(id:String):SocialPost = post("/api/v1/social/post/get",buildJsonObject { put("postId",JsonPrimitive(id)) })
+
+    suspend fun setNickname(nickname:String):com.onlygoodthings.shared.domain.UserLive = post("/api/v1/users/nickname",buildJsonObject { put("nickname",JsonPrimitive(nickname)) })
+
+    suspend fun search(query:String,pageSize:Int=8):com.onlygoodthings.shared.domain.SearchPage = post("/api/v1/social/search",buildJsonObject { put("query",JsonPrimitive(query));put("pageSize",JsonPrimitive(pageSize)) })
 
     suspend fun ownCoupons():List<com.onlygoodthings.shared.domain.BusinessCoupon> = post("/api/v1/coupons/mine",buildJsonObject {})
     suspend fun claimCoupon(code:String) {
@@ -126,6 +143,12 @@ class RestFeedRepository(
     override suspend fun repostAnecdote(anecdoteId: String): SocialPost =
         post("/api/v1/social/anecdote/repost", buildJsonObject {
             put("anecdoteId", JsonPrimitive(anecdoteId))
+        })
+
+    suspend fun editRecognition(postId:String,body:String,topic:String,attributionUrl:String,fullName:String,categoryId:String?):SocialPost =
+        post("/api/v1/social/post/edit",buildJsonObject {
+            put("postId",postId);put("body",body);put("topic",topic);put("attributionUrl",attributionUrl);put("honoreeFullName",fullName)
+            categoryId?.let { put("categoryId",it) }
         })
 
     override suspend fun editPost(postId: String, body: String, topic: String?, attributionUrl: String?): SocialPost =

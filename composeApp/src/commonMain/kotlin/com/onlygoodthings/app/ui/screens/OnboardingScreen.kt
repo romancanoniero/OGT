@@ -30,6 +30,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.compose.ui.tooling.preview.Preview
+import com.onlygoodthings.app.theme.LushImpactTheme
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.ui.components.GhostLink
 import com.onlygoodthings.app.ui.components.OgtBackChevron
@@ -76,7 +78,7 @@ fun OnboardingScreen(onDone: () -> Unit, onLogin: () -> Unit) {
                         painter = painterResource(page.image),
                         contentDescription = page.title,
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
+                        contentScale = ContentScale.Fit,
                     )
                 }
                 Spacer(Modifier.height(20.dp))
@@ -146,5 +148,13 @@ private fun CircleNav(forward: Boolean, enabled: Boolean, onClick: () -> Unit) {
             tint = if (enabled) OgtColors.ink else OgtColors.disabledInk,
             forward = forward,
         )
+    }
+}
+
+@Preview
+@Composable
+private fun OnboardingScreenPreview() {
+    LushImpactTheme {
+        OnboardingScreen(onDone = {}, onLogin = {})
     }
 }

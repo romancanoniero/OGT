@@ -343,7 +343,11 @@ function applyLive(live) {
     commentCount: live.commentCount,
     body: live.body,
     honoreeName: live.honoreeName,
+    categoryId: live.categoryId || lastFeed[idx].categoryId,
+    publicationKind: live.publicationKind || lastFeed[idx].publicationKind,
     topic: live.tag || lastFeed[idx].topic,
+    place: live.place || lastFeed[idx].place,
+    eventStartsAtEpochMs: live.eventStartsAtEpochMs || lastFeed[idx].eventStartsAtEpochMs,
   };
   if (live.attributionChanged) patch.attributionUrl = live.attributionUrl || null;
   if (live.authorUserId) {
@@ -1039,7 +1043,7 @@ function tagOf(post) {
 }
 
 function isHomenaje(post) {
-  return HOMENAJE_TAGS.has(tagOf(post));
+  return post.publicationKind!=="ACTION" && HOMENAJE_TAGS.has(tagOf(post));
 }
 
 function isAnecdoteShare(post) {
@@ -1052,6 +1056,7 @@ function cardKind(post) {
   const listing = String(post.listingKind || post.urgency || "").toUpperCase();
   if (listing === "LOST") return "LOST_PET";
   if (listing === "ADOPTION") return "ADOPTION";
+  if(post.publicationKind==="ACTION")return "COMMUNITY";
   const t = tagOf(post);
   if (t.includes("perdid")) return "LOST_PET";
   if (t === "adopción" || t === "adopcion") return "ADOPTION";
@@ -1830,7 +1835,7 @@ function postCard(post, { openable = true, previewStories = true, compose = fals
   const honoreeLine = share && honoree
     ? `<h2 class="honoree">Anécdota del homenaje a ${escapeHtml(honoree)}</h2>`
     : honoree
-      ? `<h2 class="honoree">${escapeHtml(honoree)}</h2>`
+      ? `<h2 class="honoree">${!homage && post.protagonistUserId && post.protagonistUserId !== post.authorId ? "Lo hizo " : ""}${escapeHtml(honoree)}</h2>`
       : "";
   const openClass = openable ? " open" : "";
   const openAttr = openable ? ` data-open="${escapeHtml(post.id)}"` : "";
@@ -1839,12 +1844,13 @@ function postCard(post, { openable = true, previewStories = true, compose = fals
       ${avatarHtml(post.authorId, post.authorName || "Vecino", "", post.authorPhotoUrl)}
       <div class="who-block">
         <div class="who">${post.authorId ? `<a href="#/perfil/${escapeHtml(post.authorId)}">${escapeHtml(post.authorName || "Vecino")}</a>` : escapeHtml(post.authorName || "Vecino")}</div>
-        <div class="meta">${[post.topic, ago(post.createdAtEpochMs)].filter(Boolean).join(" · ")}</div>
+        <div class="meta">${escapeHtml([post.topic, ago(post.createdAtEpochMs)].filter(Boolean).join(" · "))}</div>
       </div>
       <button type="button" class="more" data-more="${escapeHtml(post.id)}" aria-label="Más acciones">${icon("qs-more")}</button>
     </div>
     ${pill ? `<div class="pill-row">${pill}</div>` : ""}
     ${honoreeLine}
+    ${post.publicationKind==="CONVOCATORIA" && post.eventStartsAtEpochMs ? `<p class="meta">${escapeHtml(new Date(post.eventStartsAtEpochMs).toLocaleString("es-AR"))} · ${escapeHtml(post.place || "")}</p>` : ""}
     ${lostExtrasHtml(post)}
     ${truequeExtrasHtml(post)}
     ${truequeBodyHtml(post)}
@@ -2358,7 +2364,8 @@ async function renderPost(id) {
     if (!lastFeed.length) await loadFeed();
     let post = lastFeed.find((p) => p.id === id);
     if (!post) {
-      await loadFeed();
+      const remote=await api("/api/v1/social/post/get",{postId:id});
+      mergePost(remote);
       post = lastFeed.find((p) => p.id === id);
     }
     if (!post) {
@@ -2369,6 +2376,10 @@ async function renderPost(id) {
     main.innerHTML = `<div class="chrome"><a href="#/inicio">Inicio</a><h1>${escapeHtml(title)}</h1></div>${
       postCard(post, { openable: false, previewStories: false, compose: true })
     }`;
+    if(post.authorId===me.userId && !post.isStory && !post.listingId && !isAnecdoteShare(post)) {
+      const invite=document.createElement("button");invite.type="button";invite.className="ghost-cta";invite.textContent="Invitar a participar";
+      invite.onclick=async()=>{const module=await import('./post-invitations.js?v=1');await module.openInvitationManager({api,postId:id,toast});};main.querySelector('.chrome').after(invite);
+    }
     bindSocial(main, { onDetail: true });
     await paintLoadedComments(post.id);
   } catch (e) {
@@ -2377,7 +2388,7 @@ async function renderPost(id) {
 }
 
 const PUBLISH_KINDS = [
-  { id: "accion", title: "Buena acción", icon: "qs-feed", hint: "Lo que hizo un vecino, o lo que hiciste vos." },
+  { id: "accion", title: "Dar a conocer", icon: "qs-feed", hint: "Reconocé una buena acción de otra persona." },
   { id: "convocatoria", title: "Convocatoria", icon: "qs-attend", hint: "Una juntada: huerta, merienda, limpieza." },
   { id: "trueque", title: "Trueque", icon: "qs-skills", hint: "Pedí un saber o una tarea. Se publica en el tablero.", timebank: true },
   { id: "homenaje", title: "Homenaje", icon: "qs-invite", hint: "Una enseñanza, una anécdota o las gracias." },
@@ -2909,17 +2920,21 @@ function bindTruequeNeedForm() {
   });
 }
 
-function bindPublishForm(kind) {
+function bindPublishForm(kind, catalog=[], invitationsModule=null) {
   const spec = PUBLISH_KINDS.find((k) => k.id === kind);
   const form = document.getElementById("publish-form");
   if (!form || !spec) return;
-  const topics = PUBLISH_TOPICS[kind] || [];
+  const topics = kind==="accion" ? catalog.map(c=>c.label) : PUBLISH_TOPICS[kind] || [];
   let topic = topics[0] || "Comunidad";
-  let self = false;
+  const recognition = kind === "accion";
+  let recognizedPerson = null;
   const honor = kind === "homenaje";
   const count = form.querySelector("[data-count]");
-  const whoBox = form.querySelector("[data-who]");
+  const peopleBox = form.querySelector("[data-recognition-people]");
   const nameField = form.querySelector("[name=honoree]");
+  const accountField=form.querySelector("[name=recognitionAccount]");
+  const invitationDrafts=invitationsModule?.bindInvitationDrafts(form,{honoreeName:()=>nameField.value,honoreeId:()=>recognizedPerson?.userId}) || (()=>[]);
+  let attemptKey="",requestId="",uploadedForAttempt=null;
   const story = form.querySelector("[name=body]");
   const submit = form.querySelector("[data-submit]");
 
@@ -2928,18 +2943,10 @@ function bindPublishForm(kind) {
       btn.classList.toggle("on", btn.dataset.topic === topic);
     });
   }
-  function paintWho() {
-    if (!whoBox) return;
-    whoBox.querySelectorAll("[data-self]").forEach((btn) => {
-      btn.classList.toggle("on", (btn.dataset.self === "1") === self);
-    });
-    if (nameField) nameField.closest("label").hidden = self;
-  }
   function paintMeta() {
     if (count) count.textContent = `${story.value.length} / 500`;
   }
   paintChips();
-  paintWho();
   bindPublishMedia(form);
   paintMeta();
 
@@ -2949,12 +2956,38 @@ function bindPublishForm(kind) {
       paintChips();
     });
   });
-  whoBox?.querySelectorAll("[data-self]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      self = btn.dataset.self === "1";
-      paintWho();
+  if (recognition && accountField && peopleBox) {
+    let searchVersion = 0;
+    accountField.addEventListener("input", async () => {
+      recognizedPerson = null;
+      const version = ++searchVersion;
+      const query = accountField.value.trim().replace(/^@/, "");
+      peopleBox.replaceChildren();
+      if (query.length < 2) return;
+      try {
+        const result = await api("/api/v1/social/search", { query, pageSize: 8 });
+        if (version !== searchVersion) return;
+        const people = (result.people || []).filter(person => person.userId !== me.userId);
+        for (const person of people) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "chip";
+          button.textContent = `${person.displayName}${person.nickname ? " · @"+person.nickname : ""}`;
+          button.addEventListener("click", () => {
+            ++searchVersion;
+            recognizedPerson = person;
+            if(!nameField.value.trim())nameField.value = person.displayName;
+            accountField.value=person.nickname ? "@"+person.nickname : person.displayName;
+            peopleBox.replaceChildren();
+            peopleBox.textContent = `Vas a reconocer a ${person.displayName}.`;
+          });
+          peopleBox.append(button);
+        }
+      } catch {
+        if (version === searchVersion) peopleBox.textContent = "No pudimos buscar personas. Podés reintentar o escribir el nombre de alguien que aún no está en OGT.";
+      }
     });
-  });
+  }
   story.addEventListener("input", () => {
     if (story.value.length > 500) story.value = story.value.slice(0, 500);
     paintMeta();
@@ -2963,9 +2996,20 @@ function bindPublishForm(kind) {
     ev.preventDefault();
     const body = story.value.trim();
     const honoree = String(nameField?.value || "").trim();
-    if (honor && !honoree) {
-      toast("Escribí a quién homenajeás");
+    if ((honor || recognition) && !honoree) {
+      toast(recognition ? "Elegí a la persona que hizo esta buena acción." : "Escribí a quién homenajeás");
       return;
+    }
+    if (recognition && !recognizedPerson) {
+      if (honoree.startsWith("@")) {
+        toast("Seleccioná la cuenta de esa persona o escribí su nombre si todavía no está en OGT.");
+        return;
+      }
+      const nameKey = value => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9 ._-]/g, "").replace(/[ ._-]+/g, ".").replace(/^\.+|\.+$/g, "");
+      if (nameKey(honoree) === nameKey(me.displayName)) {
+        toast("Dar a conocer es para reconocer una buena acción de otra persona.");
+        return;
+      }
     }
     if (!body) {
       toast(honor ? "Contá la enseñanza o la anécdota" : "Contá lo que pasó");
@@ -2975,16 +3019,34 @@ function bindPublishForm(kind) {
       toast("Hace falta al menos una foto o un video");
       return;
     }
+    let eventStartsAtEpochMs,place;
+    if(kind==="convocatoria"){
+      place=String(form.elements.gatheringPlace.value||"").trim();
+      eventStartsAtEpochMs=new Date(form.elements.gatheringStart.value).getTime();
+      if(place.length<3 || !Number.isFinite(eventStartsAtEpochMs) || eventStartsAtEpochMs<=Date.now()){toast("Completá un lugar y una fecha y hora futuras.");return;}
+    }
     let attributionUrl;
     try { attributionUrl = globalThis.OgtAttribution.normalize(form.elements.attributionUrl.value); }
     catch (error) { toast(error.message); return; }
+    if(recognition && !catalog.length){toast("No hay categorías disponibles para publicar.");return;}
     submit.disabled = true;
     try {
-      const media = await uploadPublishMedia(topic);
+      const invitations=invitationDrafts();
+      const key=JSON.stringify({body,topic,place,eventStartsAtEpochMs,honoree,account:recognizedPerson?.userId,attributionUrl,invitations,files:publishFiles.map(f=>[f.file?.name,f.file?.size,f.url])});
+      if(key!==attemptKey){attemptKey=key;requestId=globalThis.crypto.randomUUID();uploadedForAttempt=null;}
+      const media = uploadedForAttempt || (uploadedForAttempt=await uploadPublishMedia(topic));
       const saved = await api("/api/v1/social/publish", {
         body,
         topic,
-        honoreeName: (honor || !self) && honoree ? honoree : undefined,
+        publicationKind: ({ accion: "ACTION", convocatoria: "CONVOCATORIA", ternura: "TERNURA", homenaje: "HOMENAJE" })[kind],
+        protagonistUserId: recognition ? recognizedPerson?.userId : undefined,
+        honoreeFullName: recognition ? honoree : undefined,
+        categoryId: recognition ? catalog.find(c=>c.label===topic)?.id : undefined,
+        requestId: (recognition || kind==="convocatoria") ? requestId : undefined,
+        place,
+        eventStartsAtEpochMs,
+        invitations: recognition ? invitations : undefined,
+        honoreeName: (honor || recognition) && honoree ? honoree : undefined,
         attributionUrl,
         media,
       });
@@ -2992,6 +3054,7 @@ function bindPublishForm(kind) {
       mergePost(saved);
       toast("Publicado en el feed");
       location.hash = `#/p/${saved.id}`;
+      if(invitations.length)await invitationsModule.openInvitationManager({api,postId:saved.id,toast});
     } catch (e) {
       submit.disabled = false;
       alert(e.message);
@@ -3007,7 +3070,12 @@ async function renderPublicar(kind) {
     renderPublishPicker();
     return;
   }
-  const topics = PUBLISH_TOPICS[kind] || [];
+  let catalog=[];let invitationsModule=null;
+  if(kind==="accion") {
+    try { [catalog,invitationsModule]=await Promise.all([api("/api/v1/social/categories",{}),import('./post-invitations.js?v=1')]); }
+    catch(e){document.getElementById("main").innerHTML=`<h1>Dar a conocer</h1><p role="alert">${escapeHtml(e.message)}</p><a href="#/publicar">Volver a intentar</a>`;return;}
+  }
+  const topics = kind==="accion" ? catalog.map(c=>c.label) : PUBLISH_TOPICS[kind] || [];
   const honor = kind === "homenaje";
   const main = document.getElementById("main");
   if (spec.animal) {
@@ -3109,16 +3177,18 @@ async function renderPublicar(kind) {
   main.innerHTML = `<div class="chrome"><a href="#/publicar">Publicar</a><h1>${escapeHtml(spec.title)}</h1></div>
     <form class="publish" id="publish-form">
       ${kind === "accion" ? `
-        <p class="hint">Lo más habitual es hacer visible lo bueno que hizo otra persona.</p>
-        <div class="who-choice" data-who>
-          <button type="button" data-self="0" class="on"><strong>Alguien más</strong><small>Lo más habitual</small></button>
-          <button type="button" data-self="1"><strong>Yo la hice</strong><small>Mi propia acción</small></button>
-        </div>
-        <label class="field">Nombre
-          <input name="honoree" maxlength="80" placeholder="Nombre o @nick">
+        <p class="hint">Reconocé una buena acción de otra persona y contá cómo ayudó a los demás.</p>
+        <label class="field">¿Quién hizo esta buena acción?
+          <input name="honoree" maxlength="100" placeholder="Nombre y apellido" required autocomplete="off">
         </label>
+        <p class="hint">El nombre completo aparece en el título. El @nick se elige por separado y es opcional.</p>
+        <label class="field">Cuenta de OGT (opcional)<input name="recognitionAccount" placeholder="Buscá @nick o nombre" autocomplete="off"></label>
+        <div class="chips" data-recognition-people aria-live="polite"></div>
       ` : ""}
-      ${kind === "convocatoria" ? `<p class="hint">Una convocatoria se lee como un aviso del barrio.</p>` : ""}
+      ${kind === "convocatoria" ? `<p class="hint">Invitá a la comunidad a una actividad que van a realizar. Se publica a tu nombre como organizador.</p>
+      <label class="field">Día y hora de la actividad<input name="gatheringStart" type="datetime-local" required></label>
+      <p class="hint">Usá tu horario local.</p>
+      <label class="field">Lugar o punto de encuentro<input name="gatheringPlace" maxlength="200" minlength="3" required></label>` : ""}
       ${honor ? `
         <p class="hint">Persona o mascota. Contá una enseñanza, una anécdota o las gracias que no llegaste a decir.</p>
         <label class="field">¿A quién homenajeás?
@@ -3139,10 +3209,11 @@ async function renderPublicar(kind) {
       </label>
       <p class="count" data-count>0 / 500</p>
       <label class="field">Fuente o enlace original (opcional)<input name="attributionUrl" type="url" maxlength="2048" autocapitalize="off" placeholder="https://"></label>
+      ${kind==="accion" ? invitationsModule.invitationEditorHtml() : ""}
       <p class="hint publication-rights-notice">Al publicar declarás que el contenido es tuyo o que tenés los permisos necesarios. Citar la fuente no reemplaza la autorización. <a href="/terms#propiedad-intelectual" target="_blank" rel="noopener">Leer el acuerdo de publicación</a>.</p>
       <button type="submit" class="publish-cta" data-submit>${icon(spec.icon)} Publicar</button>
     </form>`;
-  bindPublishForm(kind);
+  bindPublishForm(kind,catalog,invitationsModule);
 }
 
 function speciesLabel(code) {
@@ -3857,8 +3928,13 @@ async function renderAvisos() {
         <button type="button" class="chip" data-kind="MATCH">Trueque</button>
         <button type="button" class="chip" data-kind="MENTION">Menciones</button>
       </div>
+      <div id="post-invitation-inbox"></div>
       <div id="notice-list"><p class="empty">Cargando…</p></div>
     </div>`;
+  api("/api/v1/social/invitations/inbox",{}).then(rows=>{
+    const box=document.getElementById("post-invitation-inbox");if(!box)return;
+    box.innerHTML=rows.map(row=>`<p>${escapeHtml(row.issuerName)} te invitó a una publicación. <a href="#/invitacion/${escapeHtml(row.token)}">Ver invitación</a></p>`).join("");
+  }).catch(()=>{});
   let kind = "";
   let rows = [];
   const box = document.getElementById("notice-list");
@@ -4131,6 +4207,9 @@ async function renderAjustes() {
       <label class="field">Nombre
         <input name="displayName" type="text" maxlength="80" required value="${escapeHtml(me.displayName || "")}">
       </label>
+      <label class="field">@nick (opcional)
+        <input name="nickname" maxlength="30" value="${escapeHtml(me.nickname || "")}" placeholder="Ej. irma.sartirana" autocomplete="off">
+      </label><p class="hint">El @nick permite encontrar tu cuenta. Tu nombre completo se conserva por separado.</p>
       <label class="field">Barrio
         <input name="barrio" type="text" maxlength="80" placeholder="Palermo, Villa Crespo…" value="${escapeHtml(settings.barrio || "")}">
       </label>
@@ -4217,6 +4296,8 @@ async function renderAjustes() {
       };
       if (photoUrl) payload.photoUrl = photoUrl;
       if (me.userId !== settingsOwner) throw new Error("La sesión cambió. Volvé a abrir tus ajustes.");
+      const nickname=String(data.get("nickname")||"").trim().replace(/^@/,"").toLowerCase();
+      if(nickname && nickname!==me.nickname){const live=await api("/api/v1/users/nickname",{nickname});me.nickname=live.nickname;}
       const card = await api("/api/v1/users/profile/update", payload);
       if (!isCurrentSettings()) return;
       applyProfileLive({
@@ -5104,7 +5185,8 @@ async function enterAfterAuth() {
       location.assign("/borrar-cuenta");
       return;
     }
-    const next = isCompany() ? "#/empresa" : "#/inicio";
+    const pendingInvitation=localStorage.getItem("ogt.pendingInvitation");
+    const next = pendingInvitation ? `#/invitacion/${pendingInvitation}` : isCompany() ? "#/empresa" : "#/inicio";
     if (location.hash === next) return show();
     location.hash = next;
   } finally {
@@ -5233,9 +5315,32 @@ async function renderEmpresaComunidad() {
   }
 }
 
+async function renderPostInvitation(token) {
+  if(!hasSession())markIntroSeen();
+  setShell(hasSession());
+  const main=document.getElementById(hasSession()?"main":"auth-root");main.innerHTML='<h1>Invitación a una publicación</h1><p>Cargando…</p>';
+  try {
+    const row=await api("/api/v1/social/invitations/peek",{token});
+    main.innerHTML=`<h1>Invitación a una publicación</h1><div class="page"><p>${escapeHtml(row.issuerName)} te invitó, ${escapeHtml(row.recipientName)}.</p><p>${row.purpose==="RECOGNITION" ? "Reconoció una buena acción tuya. Confirmá solo si sos la persona nombrada." : "Podés ver el post y participar de la conversación. La invitación no te atribuye la acción publicada."}</p>${hasSession()?'<button type="button" class="publish-cta" data-accept-invitation>Aceptar y ver publicación</button><button type="button" class="ghost-cta" data-decline-invitation>Rechazar invitación</button>':'<a class="publish-cta" href="#/registro">Crear cuenta para continuar</a><a class="ghost-cta" href="#/entrar">Ya tengo cuenta</a>'}<p data-invitation-error role="alert"></p><a href="#/inicio" data-leave-invitation>Continuar en OGT</a></div>`;
+    main.querySelector('[data-leave-invitation]').onclick=()=>localStorage.removeItem("ogt.pendingInvitation");
+    for(const action of ['accept','decline'])main.querySelector(`[data-${action}-invitation]`)?.addEventListener('click',async()=>{
+      const buttons=main.querySelectorAll('button');buttons.forEach(b=>b.disabled=true);
+      try {
+        await api('/api/v1/social/invitations/accept',{token,action:action==='decline'?'DECLINE':'ACCEPT'});
+        localStorage.removeItem('ogt.pendingInvitation');
+        location.hash=action==='decline'?'#/inicio':`#/p/${row.postId}`;
+      }catch(e){main.querySelector('[data-invitation-error]').textContent=e.message;buttons.forEach(b=>b.disabled=false);}
+    });
+  }catch(e){main.innerHTML=`<h1>Invitación</h1><p role="alert">${escapeHtml(e.message)}</p><a href="#/inicio" data-leave-invitation>Continuar en OGT</a>`;main.querySelector('a').onclick=()=>localStorage.removeItem('ogt.pendingInvitation');}
+}
+
 async function show() {
   closeMenu();
   const { page, id } = route();
+  if(page==="invitacion" && /^[A-Za-z0-9_-]{32,64}$/.test(id||"")) {
+    localStorage.setItem("ogt.pendingInvitation",id);
+    return renderPostInvitation(id);
+  }
   if (!hasSession()) {
     if (sessionStorage.getItem("ogt.justAuthed") === "1" || sessionStorage.getItem("ogt.authRedirect") === "1") {
       return;

@@ -597,12 +597,25 @@ private fun tabLabel(route: OgtRoute, copy: com.onlygoodthings.app.i18n.OgtCopy)
 
 @Composable
 fun GhostLink(text: String, onClick: () -> Unit) {
+    GhostLink(text = text, modifier = Modifier, onClick = onClick)
+}
+
+@Composable
+fun GhostLink(
+    modifier: Modifier = Modifier,
+    text: String,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+    contentAlignment: Alignment = Alignment.Center,
+    onClick: () -> Unit
+) {
     TextButton(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = Pill,
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+        contentPadding = contentPadding,
     ) {
-        Text(text, color = OgtColors.ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+        Box(modifier = Modifier.weight(1f), contentAlignment = contentAlignment) {
+            Text(text, color = OgtColors.ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+        }
     }
 }

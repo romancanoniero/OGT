@@ -81,6 +81,7 @@ import com.onlygoodthings.app.ui.screens.CommunityRulesScreen
 import com.onlygoodthings.app.ui.screens.LanguageSettingsScreen
 import com.onlygoodthings.app.ui.screens.FeedScreen
 import com.onlygoodthings.app.ui.screens.IdentityScreen
+import com.onlygoodthings.app.ui.screens.PostInvitationScreen
 import com.onlygoodthings.app.ui.screens.ClaimHonorScreen
 import com.onlygoodthings.app.ui.screens.InviteScreen
 import com.onlygoodthings.app.ui.screens.LoginScreen
@@ -171,7 +172,7 @@ fun App() {
         fun openEditPost(postId: String, from: OgtRoute = OgtRoute.Feed) {
             val post = db.post(postId)
             val listing = post.listingId?.let { id -> db.animals.firstOrNull { it.id == id } }
-            val kind = feedCardKind(post.tag, listing?.kind, post.sourceUrl)
+            val kind = feedCardKind(post.tag, listing?.kind, post.sourceUrl, post.publicationKind)
             editPostId = postId
             selectedPostId = postId
             when (kind) {
@@ -194,7 +195,7 @@ fun App() {
                     route = OgtRoute.Publish
                 }
                 else -> {
-                    publishKind = if (isGatheringPost(post.tag)) ComposePostKind.GATHERING else ComposePostKind.ACTION
+                    publishKind = if (isGatheringPost(post.tag,post.publicationKind)) ComposePostKind.GATHERING else ComposePostKind.ACTION
                     route = OgtRoute.Publish
                 }
             }
@@ -324,6 +325,7 @@ fun App() {
             !session.askLeaveWithoutYield &&
             !session.askStaleParked
         fun applyHonorRoute(fallback: OgtRoute): OgtRoute {
+            if (fallback == OgtRoute.Feed && !session.pendingInvitationToken.isNullOrBlank()) return OgtRoute.PostInvitation
             val fromContact = db.pendingHonorForUser(session.me())?.claimToken
             val token = session.pendingHonorToken ?: fromContact
             if (!token.isNullOrBlank()) {
@@ -347,6 +349,10 @@ fun App() {
             route == OgtRoute.SignUp ||
             route == OgtRoute.Otp ||
             route == OgtRoute.Recover
+        LaunchedEffect(OgtIncomingLinks.latestInvitationToken, authGate) {
+            OgtIncomingLinks.latestInvitationToken?.let { session.rememberInvitationToken(it); OgtIncomingLinks.clearInvitation() }
+            if (!authGate && auth.hasFinishedOnboarding() && !session.pendingInvitationToken.isNullOrBlank()) route = OgtRoute.PostInvitation
+        }
         LaunchedEffect(OgtIncomingLinks.latest) {
             val token = OgtIncomingLinks.latest ?: return@LaunchedEffect
             session.rememberHonorToken(token)
@@ -360,7 +366,7 @@ fun App() {
             if (!OgtSdk.isStarted()) return@LaunchedEffect
             runCatching {
                 OgtRealtime().observeUserProfiles().collect { live ->
-                    db.applyUserLive(live.id, live.displayName, live.photoUrl)
+                    db.applyUserLive(live.id, live.displayName, live.photoUrl, live.nickname)
                 }
             }
         }
@@ -398,7 +404,7 @@ fun App() {
                 OgtRoute.Otp -> ({ route = otpBack })
                 OgtRoute.Recover, OgtRoute.SignUp -> ({ route = OgtRoute.Login })
                 OgtRoute.NeighborProfile, OgtRoute.PostDetail, OgtRoute.Publish,
-                OgtRoute.ClaimHonor,
+                OgtRoute.ClaimHonor, OgtRoute.PostInvitation,
                 -> ({ route = OgtRoute.Feed })
                 OgtRoute.Notifications -> ({
                     route = noticeBack.takeUnless { it == OgtRoute.Notifications } ?: OgtRoute.Feed
@@ -548,11 +554,11 @@ fun App() {
                         onBack = if (settingsResume) closeSettingsLeaf else null,
                     )
                     OgtRoute.OnboardingFeatures -> OnboardingScreen(
-                        onDone = { route = OgtRoute.SignUp },
+                        onDone = { route = OgtRoute.Login },
                         onLogin = { route = OgtRoute.Login },
                     )
                     OgtRoute.Onboarding -> OnboardingScreen(
-                        onDone = { route = OgtRoute.SignUp },
+                        onDone = { route = OgtRoute.Login },
                         onLogin = { route = OgtRoute.Login },
                     )
                     OgtRoute.CommunityAgreement -> com.onlygoodthings.app.ui.screens.CommunityAgreementScreen(
@@ -636,7 +642,7 @@ fun App() {
                     )
                     OgtRoute.Identity -> IdentityScreen {
                         auth.markOnboardingDone()
-                        if(settingsResume)closeSettingsLeaf() else route = OgtRoute.Feed
+                        if(settingsResume)closeSettingsLeaf() else route = applyHonorRoute(OgtRoute.Feed)
                     }
                     OgtRoute.Feed, OgtRoute.PostDetail, OgtRoute.NeighborProfile -> {
                         // El feed sigue compuesto bajo la ficha: atrás vuelve a la misma tarjeta.
@@ -821,6 +827,10 @@ fun App() {
                     OgtRoute.Invite -> InviteScreen {
                         if (settingsResume) closeSettingsLeaf() else route = OgtRoute.Feed
                     }
+                    OgtRoute.PostInvitation -> PostInvitationScreen(
+                        onOpenPost = { selectedPostId = it; route = OgtRoute.PostDetail },
+                        onBack = { session.rememberInvitationToken(null); route = OgtRoute.Feed },
+                    )
                     OgtRoute.ClaimHonor -> ClaimHonorScreen(
                         onDone = {
                             session.rememberHonorToken(null)

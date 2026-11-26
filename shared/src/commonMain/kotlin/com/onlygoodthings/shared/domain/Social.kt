@@ -42,6 +42,10 @@ data class SocialPost(
     val viewerInvited: Boolean = false,
     val matchesMyOffer: Boolean = false,
     val attributionUrl: String? = null,
+    val categoryId: String? = null,
+    val publicationKind: String? = null,
+    val place: String? = null,
+    val eventStartsAtEpochMs: Long? = null,
 )
 
 @Serializable
@@ -103,6 +107,9 @@ data class SocialLiveCounters(
     val createdAtEpochMs: Long = 0L,
     val listingId: String? = null,
     val honoreeName: String? = null,
+    val categoryId: String? = null,
+    val publicationKind: String? = null,
+    val eventStartsAtEpochMs: Long? = null,
     /** VISIBLE sigue en el feed. REMOVED lo saca de las pantallas que ya lo muestran. */
     val moderationStatus: String = "VISIBLE",
     /** Anécdota que sale del homenaje. Las pantallas ya escuchan este post, no un nodo nuevo. */

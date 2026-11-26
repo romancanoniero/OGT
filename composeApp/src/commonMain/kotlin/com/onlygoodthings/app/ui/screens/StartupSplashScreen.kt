@@ -26,6 +26,9 @@ import com.onlygoodthings.app.auth.AuthRestore
 import com.onlygoodthings.app.resources.Res
 import com.onlygoodthings.app.resources.ogt_logo
 import com.onlygoodthings.app.theme.OgtColors
+import com.onlygoodthings.app.ui.components.GhostLink
+import com.onlygoodthings.app.ui.components.OgtPrimaryButton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.painterResource
@@ -39,12 +42,32 @@ fun SplashScreen(restore: suspend () -> AuthRestore, onReady: (AuthRestore) -> U
     val dot = remember { Animatable(if (reducedMotion) 1f else 0f) }
     val bloom = remember { Animatable(0f) }
     var waiting by remember { mutableStateOf(false) }
+    var restoreFailed by remember { mutableStateOf(false) }
+    var restoreAttempt by remember { mutableIntStateOf(0) }
+    val latestRestore by rememberUpdatedState(restore)
     val latestReady by rememberUpdatedState(onReady)
-    LaunchedEffect(Unit) {
-        val restored = async { restore() }
-        if (reducedMotion) {
+    LaunchedEffect(restoreAttempt) {
+        restoreFailed = false
+        val restored = async {
+            try {
+                Result.success(latestRestore())
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (failure: Exception) {
+                Result.failure(failure)
+            }
+        }
+        suspend fun finishRestore() {
+            val result = restored.await()
+            waiting = false
+            result.fold(
+                onSuccess = { latestReady(it) },
+                onFailure = { restoreFailed = true },
+            )
+        }
+        if (reducedMotion || restoreAttempt > 0) {
             waiting = true
-            latestReady(restored.await())
+            finishRestore()
             return@LaunchedEffect
         }
         val leftMotion = async {
@@ -58,7 +81,7 @@ fun SplashScreen(restore: suspend () -> AuthRestore, onReady: (AuthRestore) -> U
         bloom.animateTo(1f, tween(260, easing = FastOutSlowInEasing))
         settle.await()
         waiting = !restored.isCompleted
-        latestReady(restored.await())
+        finishRestore()
     }
     Column(
         Modifier.fillMaxSize().background(OgtColors.canvas).safeDrawingPadding().padding(24.dp),
@@ -113,6 +136,17 @@ fun SplashScreen(restore: suspend () -> AuthRestore, onReady: (AuthRestore) -> U
         if (waiting) {
             Spacer(Modifier.height(24.dp))
             androidx.compose.material3.CircularProgressIndicator(Modifier.size(20.dp), color = OgtColors.primary, strokeWidth = 2.dp)
+        }
+        if (restoreFailed) {
+            Spacer(Modifier.height(24.dp))
+            Text(
+                "Tu sesión está guardada, pero no pudimos abrirla. Volvé a intentarlo.",
+                color = OgtColors.muted,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            Spacer(Modifier.height(16.dp))
+            OgtPrimaryButton("Reintentar") { restoreAttempt++ }
+            GhostLink("Volver al ingreso") { latestReady(AuthRestore.LoginRequired) }
         }
     }
 }

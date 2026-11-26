@@ -14,6 +14,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
+import com.onlygoodthings.app.data.LocalAuth
+import com.onlygoodthings.app.platform.OgtIncomingLinks
+import com.onlygoodthings.shared.domain.PostInvitationView
+import com.onlygoodthings.shared.domain.invitationLink
+import kotlinx.coroutines.CancellationException
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +46,14 @@ fun NotificationsScreen(
     onOpenPets: () -> Unit = {},
     onOpenTrade: () -> Unit = {},
 ) {
+    val auth=LocalAuth.current
+    var invitations by remember { mutableStateOf<List<PostInvitationView>>(emptyList()) }
+    var invitationError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        try { invitations=auth.postInvitations.inbox() }
+        catch(cancel:CancellationException) { throw cancel }
+        catch(_:Exception) { invitationError="No pudimos actualizar las invitaciones. Volvé a abrir Notificaciones para reintentar." }
+    }
     val db = LocalOgtDb.current
     val me = LocalOgtSession.current.me()
     val inbox = db.inboxOf(me.id)
@@ -57,6 +71,13 @@ fun NotificationsScreen(
     Column(Modifier.fillMaxSize().background(OgtColors.canvas).verticalScroll(rememberScrollState())) {
         OgtTopBar(title = "Notificaciones", onBack = onBack)
         ScreenColumn {
+            invitations.forEach { row ->
+                OgtCard {
+                    Text("${row.issuerName} te invitó a una publicación")
+                    OgtPrimaryButton("Ver invitación") { row.token?.let { OgtIncomingLinks.offer(invitationLink(it)) } }
+                }
+            }
+            invitationError?.let { OgtCaption(it) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OgtPill("$unread nuevas", OgtColors.sunset, OgtColors.sunsetText)
                 Box(Modifier.clickable { db.markInboxRead(me.id) }) {

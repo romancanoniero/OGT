@@ -34,6 +34,7 @@ kotlin {
         iosTarget.binaries.framework {
             baseName = "ComposeApp"
             isStatic = true
+            export(project(":shared"))
         }
     }
 
@@ -45,6 +46,7 @@ kotlin {
             implementation(compose.foundation)
             implementation(compose.material3)
             implementation(compose.ui)
+            implementation("org.jetbrains.compose.components:components-ui-tooling-preview:1.8.2")
             implementation(compose.components.resources)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.datetime)
@@ -53,6 +55,7 @@ kotlin {
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.commonlib)
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
@@ -72,6 +75,7 @@ kotlin {
             implementation("com.android.installreferrer:installreferrer:2.2")
             implementation("androidx.media3:media3-transformer:1.9.3")
             implementation("androidx.media3:media3-effect:1.9.3")
+            implementation(compose.uiTooling)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
@@ -149,6 +153,16 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/AL2.0",
+                "META-INF/LGPL2.1",
+                "META-INF/LICENSE.md",
+                "META-INF/LICENSE-notice.md"
+            )
+        }
     }
 }
 

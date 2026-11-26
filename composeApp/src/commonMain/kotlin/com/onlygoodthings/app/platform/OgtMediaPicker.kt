@@ -2,6 +2,7 @@ package com.onlygoodthings.app.platform
 
 import androidx.compose.runtime.*
 import androidx.compose.material3.*
+import androidx.compose.ui.platform.LocalInspectionMode
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import com.onlygoodthings.shared.domain.MediaKind
@@ -38,6 +39,9 @@ fun rememberOgtMediaPicker(onPicked: (OgtPickedMedia) -> Unit): OgtMediaPicker =
 /** Serialize selection and editing so multi-select cannot present overlapping editors. */
 @Composable
 fun rememberOgtMediaPicker(remaining: Int, videoMaxDurationMs: Long? = null, onPicked: (OgtPickedMedia) -> Unit): OgtMediaPicker {
+    if (LocalInspectionMode.current) {
+        return remember { OgtMediaPicker(pickPhoto = {}, pickVideo = {}, pickLibrary = {}, takeCamera = {}) }
+    }
     val callback by rememberUpdatedState(onPicked)
     val limit by rememberUpdatedState(videoMaxDurationMs)
     val queue=remember { Channel<OgtPickedMedia>(Channel.UNLIMITED) }

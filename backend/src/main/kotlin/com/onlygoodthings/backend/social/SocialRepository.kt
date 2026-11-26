@@ -5,6 +5,7 @@ import com.onlygoodthings.backend.http.optString
 import com.onlygoodthings.backend.infra.Database
 import com.onlygoodthings.backend.infra.stringOrNull
 import com.onlygoodthings.shared.domain.ContentAttribution
+import com.onlygoodthings.shared.domain.GoodActionRecognition
 import com.onlygoodthings.shared.domain.AuthorKind
 import com.onlygoodthings.shared.domain.FeedEventKind
 import com.onlygoodthings.shared.domain.FeedMode
@@ -104,116 +105,75 @@ class SocialSqlRepository(private val db: Database) {
     }
 
     fun publish(
-        userId: String,
-        body: String,
-        topic: String,
-        media: List<PostMediaItem>,
-        latitude: Double?,
-        longitude: Double?,
-        protagonistUserId: String?,
-        participantUserIds: List<String>,
-        honoreeName: String? = null,
-        sourceUrl: String? = null,
-        attributionUrl: String? = null,
+        userId: String, body: String, topic: String, media: List<PostMediaItem>,
+        latitude: Double?, longitude: Double?, protagonistUserId: String?, participantUserIds: List<String>,
+        honoreeName: String? = null, sourceUrl: String? = null, attributionUrl: String? = null,
+        publicationKind: String? = null, categoryId: String? = null, requestId: String? = null,
+        invitations: List<com.onlygoodthings.shared.domain.PostInvitationDraft> = emptyList(),
+        honoreeFullName: String? = null,
+        place:String?=null,eventStartsAtEpochMs:Long?=null,
     ): SocialPost {
         require(body.isNotBlank()) { "El texto no puede estar vacío" }
         require(media.isNotEmpty()) { "Hace falta al menos una foto o un video" }
-        val credit = ContentAttribution.normalize(attributionUrl)
-        val postId = UUID.randomUUID().toString()
-        db.withConnection { connection ->
-            connection.autoCommit = false
-            try {
-                connection.prepareStatement(
-                    """
-                    INSERT INTO social_posts (
-                        id, author_kind, author_user_id, body, media_urls, location, topic, placement, honoree_name, source_url, attribution_url
-                    ) VALUES (
-                        ?::uuid, 'USER', ?::uuid, ?, ?,
-                        CASE WHEN ?::float8 IS NULL THEN NULL
-                             ELSE ST_SetSRID(ST_MakePoint(?::float8, ?::float8), 4326) END,
-                        ?, 'ORGANIC', ?, ?, ?
-                    )
-                    """.trimIndent(),
-                ).use { stmt ->
-                    stmt.setString(1, postId)
-                    stmt.setString(2, userId)
-                    stmt.setString(3, body)
-                    stmt.setArray(4, connection.createArrayOf("text", media.map { it.url }.toTypedArray()))
-                    if (latitude == null || longitude == null) {
-                        stmt.setNull(5, java.sql.Types.DOUBLE)
-                        stmt.setNull(6, java.sql.Types.DOUBLE)
-                        stmt.setNull(7, java.sql.Types.DOUBLE)
-                    } else {
-                        stmt.setDouble(5, longitude)
-                        stmt.setDouble(6, longitude)
-                        stmt.setDouble(7, latitude)
-                    }
-                    stmt.setString(8, topic)
-                    if (honoreeName.isNullOrBlank()) {
-                        stmt.setNull(9, java.sql.Types.VARCHAR)
-                    } else {
-                        stmt.setString(9, honoreeName.trim())
-                    }
-                    if (sourceUrl.isNullOrBlank()) {
-                        stmt.setNull(10, java.sql.Types.VARCHAR)
-                    } else {
-                        stmt.setString(10, sourceUrl.trim())
-                    }
-                    stmt.setString(11, credit)
-                    stmt.executeUpdate()
-                }
-                connection.prepareStatement(
-                    "INSERT INTO post_people (post_id, user_id, role) VALUES (?::uuid, ?::uuid, 'AUTHOR')",
-                ).use { stmt ->
-                    stmt.setString(1, postId)
-                    stmt.setString(2, userId)
-                    stmt.executeUpdate()
-                }
-                val hero = protagonistUserId?.takeIf { it != userId }
-                if (!hero.isNullOrBlank()) {
-                    connection.prepareStatement(
-                        "INSERT INTO post_people (post_id, user_id, role) VALUES (?::uuid, ?::uuid, 'PROTAGONIST') ON CONFLICT DO NOTHING",
-                    ).use { stmt ->
-                        stmt.setString(1, postId)
-                        stmt.setString(2, hero)
-                        stmt.executeUpdate()
-                    }
-                }
-                participantUserIds.distinct().filter { it != userId && it != hero }.forEach { participant ->
-                    connection.prepareStatement(
-                        "INSERT INTO post_people (post_id, user_id, role) VALUES (?::uuid, ?::uuid, 'PARTICIPANT') ON CONFLICT DO NOTHING",
-                    ).use { stmt ->
-                        stmt.setString(1, postId)
-                        stmt.setString(2, participant)
-                        stmt.executeUpdate()
-                    }
-                }
-                media.take(10).forEachIndexed { order, item ->
-                    connection.prepareStatement(
-                        """
-                        INSERT INTO post_media (id, post_id, kind, url, poster_url, sort_order, alt_text)
-                        VALUES (?::uuid, ?::uuid, ?::media_kind, ?, ?, ?, ?)
-                        """.trimIndent(),
-                    ).use { stmt ->
-                        stmt.setString(1, UUID.randomUUID().toString())
-                        stmt.setString(2, postId)
-                        stmt.setString(3, item.kind.name)
-                        stmt.setString(4, item.url)
-                        stmt.setString(5, item.posterUrl)
-                        stmt.setInt(6, order)
-                        stmt.setString(7, item.altText ?: topic)
-                        stmt.executeUpdate()
-                    }
-                }
-                connection.commit()
-            } catch (error: Exception) {
-                connection.rollback()
-                throw error
-            } finally {
-                connection.autoCommit = true
-            }
+        require(media.size<=10) { "Podés adjuntar hasta 10 archivos." }
+        require(requestId==null || Regex("^[A-Za-z0-9_-]{12,80}$").matches(requestId)) { "Identificador de envío inválido" }
+        if(place!=null || eventStartsAtEpochMs!=null) {
+            require(publicationKind=="CONVOCATORIA") { "El día y lugar pertenecen a una convocatoria." }
+            com.onlygoodthings.shared.domain.validateGathering(body,topic,place.orEmpty(),eventStartsAtEpochMs ?: 0,System.currentTimeMillis())
         }
-        return byId(postId, userId) ?: error("No se pudo leer el post publicado")
+        val credit=ContentAttribution.normalize(attributionUrl)
+        val hero=protagonistUserId?.trim()?.takeIf(String::isNotEmpty)
+        val fingerprint=invitationTokenHash(com.onlygoodthings.backend.http.JsonBody.objectMapper.writeValueAsString(
+            listOf(body,topic,media,latitude,longitude,hero,participantUserIds,honoreeName,sourceUrl,credit,publicationKind,categoryId,invitations,honoreeFullName,place,eventStartsAtEpochMs)))
+        val postId=db.withConnection { c ->
+            c.autoCommit=false
+            try {
+                if(requestId!=null) {
+                    c.prepareStatement("SELECT pg_advisory_xact_lock(hashtextextended(?,0))").use { q ->q.setString(1,"publish:$userId:$requestId");q.execute() }
+                    val old=c.prepareStatement("SELECT id::text,request_fingerprint FROM social_posts WHERE author_user_id=?::uuid AND client_request_id=?").use { q ->
+                        q.setString(1,userId);q.setString(2,requestId);q.executeQuery().use { rs ->if(rs.next())rs.getString(1) to rs.getString(2) else null }
+                    }
+                    if(old!=null) { require(old.second==fingerprint) { "Este envío ya tiene una publicación. Actualizá el feed antes de cambiarla." };c.commit();return@withConnection old.first }
+                }
+                val category=RecognitionCategories.resolve(c,categoryId,topic)
+                val recognition=GoodActionRecognition.isAction(topic,publicationKind) || (publicationKind==null && category!=null)
+                require(categoryId==null || (recognition && category!=null)) { "Categoría de reconocimiento inválida" }
+                if(recognition)require(category!=null && category.active) { "Esta categoría ya no está disponible. Elegí otra." }
+                val name=(honoreeFullName ?: honoreeName)?.trim()?.takeIf(String::isNotEmpty)
+                if(recognition) {
+                    val authorName=c.prepareStatement("SELECT display_name FROM users WHERE id=?::uuid").use { q ->q.setString(1,userId);q.executeQuery().use { rs ->if(rs.next())rs.getString(1) else null } }
+                    GoodActionRecognition.validate(userId,hero,name,authorName)
+                    require(name==null || (name.length in 2..100 && !name.startsWith("@"))) { "Ingresá el nombre completo, separado del @nick." }
+                }
+                val recognizedName=if(recognition && hero!=null) {
+                    val full=c.prepareStatement("SELECT display_name FROM users WHERE id=?::uuid AND status='ACTIVE'").use { q ->q.setString(1,hero);q.executeQuery().use { rs ->require(rs.next()) { "No encontramos a esa persona." };rs.getString(1) } }
+                    honoreeFullName?.trim()?.takeIf(String::isNotEmpty) ?: full
+                } else name
+                val id=UUID.randomUUID().toString()
+                c.prepareStatement("""
+                    INSERT INTO social_posts(id,author_kind,author_user_id,body,media_urls,location,topic,placement,honoree_name,source_url,attribution_url,recognition_category_id,publication_kind,client_request_id,request_fingerprint,gathering_place,event_starts_at)
+                    VALUES(?::uuid,'USER',?::uuid,?,?,CASE WHEN ?::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint(?::float8,?::float8),4326) END,?,'ORGANIC',?,?,?,?,?,?,?,?,?)
+                """.trimIndent()).use { q ->
+                    q.setString(1,id);q.setString(2,userId);q.setString(3,body);q.setArray(4,c.createArrayOf("text",media.map { it.url }.toTypedArray()))
+                    q.setObject(5,if(latitude!=null && longitude!=null)longitude else null);q.setObject(6,longitude);q.setObject(7,latitude)
+                    q.setString(8,if(recognition)category!!.label else topic);q.setString(9,recognizedName);q.setString(10,sourceUrl?.trim()?.takeIf(String::isNotEmpty));q.setString(11,credit)
+                    q.setString(12,if(recognition)category?.id else null);q.setString(13,if(recognition)"ACTION" else publicationKind);q.setString(14,requestId);q.setString(15,fingerprint);q.setString(16,place?.trim());q.setTimestamp(17,eventStartsAtEpochMs?.let { java.sql.Timestamp(it) });q.executeUpdate()
+                }
+                c.prepareStatement("INSERT INTO post_people(post_id,user_id,role) VALUES(?::uuid,?::uuid,'AUTHOR')").use { q ->q.setString(1,id);q.setString(2,userId);q.executeUpdate() }
+                if(!hero.isNullOrBlank() && !hero.equals(userId,true))c.prepareStatement("INSERT INTO post_people(post_id,user_id,role) VALUES(?::uuid,?::uuid,'PROTAGONIST') ON CONFLICT DO NOTHING").use { q ->q.setString(1,id);q.setString(2,hero);q.executeUpdate() }
+                participantUserIds.distinct().filter { it!=userId && it!=hero }.forEach { person ->
+                    c.prepareStatement("INSERT INTO post_people(post_id,user_id,role) VALUES(?::uuid,?::uuid,'PARTICIPANT') ON CONFLICT DO NOTHING").use { q ->q.setString(1,id);q.setString(2,person);q.executeUpdate() }
+                }
+                media.forEachIndexed { order,item ->
+                    c.prepareStatement("INSERT INTO post_media(id,post_id,kind,url,poster_url,sort_order,alt_text) VALUES(?::uuid,?::uuid,?::media_kind,?,?,?,?)").use { q ->
+                        q.setString(1,UUID.randomUUID().toString());q.setString(2,id);q.setString(3,item.kind.name);q.setString(4,item.url);q.setString(5,item.posterUrl);q.setInt(6,order);q.setString(7,item.altText ?: topic);q.executeUpdate()
+                    }
+                }
+                PostInvitations.createInTransaction(c,userId,id,invitations)
+                c.commit();id
+            } catch(e:Exception) { c.rollback();throw e } finally { c.autoCommit=true }
+        }
+        return byId(postId,userId) ?: error("No se pudo leer la publicación")
     }
 
     fun follow(followerId: String, followedId: String) {
@@ -310,14 +270,15 @@ class SocialSqlRepository(private val db: Database) {
             }
             val people = connection.prepareStatement(
                 """
-                SELECT id::text, display_name, photo_url, community_points, role::text
+                SELECT id::text, display_name, nickname, photo_url, community_points, role::text
                 FROM users
-                WHERE status = 'ACTIVE' AND display_name ILIKE ? AND ${interactionSql(viewerId,"id")} AND ${profileVisibilitySql(viewerId,"users")}
+                WHERE status = 'ACTIVE' AND (display_name ILIKE ? OR nickname ILIKE ?) AND ${interactionSql(viewerId,"id")} AND ${profileVisibilitySql(viewerId,"users")}
                 ORDER BY community_points DESC
                 LIMIT 12
                 """.trimIndent(),
             ).use { stmt ->
                 stmt.setString(1, like)
+                stmt.setString(2, like)
                 stmt.executeQuery().use { rs ->
                     buildList {
                         while (rs.next()) {
@@ -326,6 +287,7 @@ class SocialSqlRepository(private val db: Database) {
                                 com.onlygoodthings.shared.domain.NeighborCard(
                                     userId = rs.getString("id"),
                                     displayName = rs.getString("display_name"),
+                                    nickname = rs.stringOrNull("nickname"),
                                     photoUrl = rs.stringOrNull("photo_url"),
                                     communityPoints = pts,
                                     role = rs.getString("role"),
@@ -402,7 +364,7 @@ class SocialSqlRepository(private val db: Database) {
         db.withConnection { connection ->
             connection.prepareStatement(
                 """
-                SELECT u.id::text, u.display_name, u.photo_url, u.community_points, u.role::text, u.invite_code,
+                SELECT u.id::text, u.display_name, u.nickname, u.photo_url, u.community_points, u.role::text, u.invite_code,
                        (SELECT COUNT(*) FROM social_posts p WHERE p.author_user_id = u.id AND p.moderation_status = 'VISIBLE') AS posts,
                        (SELECT COUNT(*) FROM follows f WHERE f.followed_id = u.id) AS followers,
                        (SELECT COUNT(*) FROM follows f WHERE f.follower_id = u.id) AS following,
@@ -428,6 +390,7 @@ class SocialSqlRepository(private val db: Database) {
                         viewerFollows = rs.getBoolean("viewer_follows"),
                         inviteCode = if (mine) rs.getString("invite_code") else null,
                         role = rs.getString("role"),
+                        nickname = rs.stringOrNull("nickname"),
                         levelLabel = com.onlygoodthings.shared.domain.communityLevelLabel(pts),
                     )
                 }
@@ -784,37 +747,32 @@ class SocialSqlRepository(private val db: Database) {
         }
     }
 
-    fun editPost(postId: String, userId: String, body: String, topic: String?, attributionUrl: String? = null): SocialPost {
+    fun editPost(postId: String, userId: String, body: String, topic: String?, attributionUrl: String? = null, honoreeFullName:String?=null, categoryId:String?=null,place:String?=null,eventStartsAtEpochMs:Long?=null): SocialPost {
         val credit = ContentAttribution.normalize(attributionUrl)
         val trimmed = body.trim()
         require(trimmed.isNotBlank()) { "El texto no puede estar vacío" }
-        db.withConnection { connection ->
-            val author = connection.prepareStatement(
-                "SELECT author_user_id::text FROM social_posts WHERE id = ?::uuid AND moderation_status = 'VISIBLE'",
-            ).use { stmt ->
-                stmt.setString(1, postId)
-                stmt.executeQuery().use { rs -> if (rs.next()) rs.getString(1) else null }
-            } ?: error("Post inexistente")
-            require(author == userId) { "Solo quien publicó puede editar" }
-            connection.prepareStatement(
-                """
-                UPDATE social_posts
-                SET body = ?,
-                    topic = COALESCE(?, topic),
-                    attribution_url = CASE WHEN ? THEN ? ELSE attribution_url END,
-                    updated_at = now()
-                WHERE id = ?::uuid
-                """.trimIndent(),
-            ).use { stmt ->
-                stmt.setString(1, trimmed)
-                if (topic.isNullOrBlank()) stmt.setNull(2, java.sql.Types.VARCHAR) else stmt.setString(2, topic.trim())
-                stmt.setBoolean(3, attributionUrl != null)
-                stmt.setString(4, credit)
-                stmt.setString(5, postId)
-                stmt.executeUpdate()
-            }
+        honoreeFullName?.let { require(it.trim().length in 2..100 && !it.trim().startsWith("@")) { "Ingresá el nombre completo, separado del @nick." } }
+        db.withConnection { c ->
+            c.autoCommit=false
+            try {
+                val old=c.prepareStatement("SELECT author_user_id::text,recognition_category_id,topic FROM social_posts WHERE id=?::uuid AND moderation_status='VISIBLE' FOR UPDATE").use { q ->
+                    q.setString(1,postId);q.executeQuery().use { r -> require(r.next()) { "Post inexistente" };Triple(r.getString(1),r.getString(2),r.getString(3)) }
+                }
+                require(old.first==userId) { "Solo quien publicó puede editar" }
+                if(place!=null || eventStartsAtEpochMs!=null) {
+                    val prior=c.prepareStatement("SELECT publication_kind,event_starts_at FROM social_posts WHERE id=?::uuid").use { q ->q.setString(1,postId);q.executeQuery().use { r ->r.next();r.getString(1) to r.getTimestamp(2)?.time } }
+                    require(com.onlygoodthings.shared.domain.isGatheringPost(old.third,prior.first)) { "Esta publicación no es una convocatoria." }
+                    com.onlygoodthings.shared.domain.validateGathering(body,topic ?: old.third,place.orEmpty(),eventStartsAtEpochMs ?: 0,System.currentTimeMillis(),allowPast=prior.second==eventStartsAtEpochMs)
+                }
+                val selected=categoryId?.let { RecognitionCategories.resolve(c,it,topic.orEmpty()) ?: throw IllegalArgumentException("Categoría inexistente") }
+                if(selected!=null && selected.id!=old.second && !selected.label.equals(old.third,true))require(selected.active) { "Elegí una categoría activa." }
+                c.prepareStatement("UPDATE social_posts SET body=?,topic=COALESCE(?,topic),attribution_url=CASE WHEN ? THEN ? ELSE attribution_url END,honoree_name=COALESCE(?,honoree_name),recognition_category_id=COALESCE(?,recognition_category_id),gathering_place=COALESCE(?,gathering_place),event_starts_at=COALESCE(?,event_starts_at),publication_kind=CASE WHEN ? THEN 'CONVOCATORIA' ELSE publication_kind END,updated_at=now() WHERE id=?::uuid").use { q ->
+                    q.setString(1,trimmed);q.setString(2,if(selected?.id==old.second && topic==old.third)old.third else selected?.label ?: topic?.trim()?.takeIf { it.isNotEmpty() });q.setBoolean(3,attributionUrl!=null);q.setString(4,credit);q.setString(5,honoreeFullName?.trim());q.setString(6,selected?.id);q.setString(7,place?.trim());q.setTimestamp(8,eventStartsAtEpochMs?.let { java.sql.Timestamp(it) });q.setBoolean(9,eventStartsAtEpochMs!=null);q.setString(10,postId);q.executeUpdate()
+                }
+                c.commit()
+            } catch(e:Exception) { c.rollback();throw e } finally { c.autoCommit=true }
         }
-        return byId(postId, userId) ?: error("No se pudo leer el post")
+        return byId(postId,userId) ?: error("No se pudo leer el post")
     }
 
     fun deletePost(postId: String, userId: String) {
@@ -852,7 +810,7 @@ class SocialSqlRepository(private val db: Database) {
         }
     }
 
-    private fun byId(postId: String, viewerId: String): SocialPost? =
+    fun byId(postId: String, viewerId: String): SocialPost? =
         hydratePosts(listOf(postId), viewerId).firstOrNull()
 
     private fun loadViewer(userId: String): ViewerContext = db.withConnection { connection ->
@@ -1048,7 +1006,7 @@ class SocialSqlRepository(private val db: Database) {
                 """
                 SELECT p.id, p.author_kind, p.author_user_id, p.author_company_id, p.body, p.media_urls,
                        p.impact_count, p.comment_count, p.is_story, COALESCE(p.topic, '') AS topic,
-                       p.source_url, p.attribution_url, p.honoree_name,
+                       p.source_url, p.attribution_url, p.honoree_name, p.recognition_category_id, p.publication_kind, p.gathering_place, p.event_starts_at,
                        COALESCE(p.achieved_count, 0) AS achieved_count,
                        COALESCE(p.placement::text, 'ORGANIC') AS placement,
                        EXTRACT(EPOCH FROM p.created_at) * 1000 AS created_ms,
@@ -1451,6 +1409,10 @@ class SocialSqlRepository(private val db: Database) {
             achievedCount = runCatching { getInt("achieved_count") }.getOrDefault(0),
             empresaQueSuma = runCatching { getBoolean("empresa_que_suma") }.getOrDefault(false),
             honoreeName = runCatching { stringOrNull("honoree_name") }.getOrNull(),
+            categoryId = runCatching { stringOrNull("recognition_category_id") }.getOrNull(),
+            publicationKind = runCatching { stringOrNull("publication_kind") }.getOrNull(),
+            place = stringOrNull("gathering_place"),
+            eventStartsAtEpochMs = getTimestamp("event_starts_at")?.time,
             needId = runCatching { stringOrNull("need_id") }.getOrNull(),
             needLabel = runCatching { stringOrNull("need_label") }.getOrNull(),
             giveLabels = runCatching {

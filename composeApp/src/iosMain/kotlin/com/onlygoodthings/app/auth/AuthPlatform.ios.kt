@@ -103,9 +103,9 @@ actual class AuthPlatform actual constructor() {
 
 actual class AuthPrefs actual constructor() {
     private val defaults = NSUserDefaults.standardUserDefaults
-    actual var keepSession: Boolean
-        get() = defaults.boolForKey("ogt.keep")
-        set(value) { defaults.setBool(value, forKey = "ogt.keep") }
+    actual var sessionSignedOut: Boolean
+        get() = defaults.boolForKey("ogt.signedOut")
+        set(value) { defaults.setBool(value, forKey = "ogt.signedOut") }
     actual var biometricEnabled: Boolean
         get() = defaults.boolForKey("ogt.bio")
         set(value) { defaults.setBool(value, forKey = "ogt.bio") }
@@ -166,6 +166,9 @@ actual class AuthPrefs actual constructor() {
     actual var selectedVehicleId: String
         get() = defaults.stringForKey("ogt.car.sel").orEmpty()
         set(value) { defaults.setObject(value, forKey = "ogt.car.sel") }
+    actual var pendingInvitationToken: String
+        get() = defaults.stringForKey("ogt.invitation.token").orEmpty()
+        set(value) { defaults.setObject(value, forKey = "ogt.invitation.token") }
     actual var pendingHonorToken: String
         get() = defaults.stringForKey("ogt.honor.token").orEmpty()
         set(value) { defaults.setObject(value, forKey = "ogt.honor.token") }

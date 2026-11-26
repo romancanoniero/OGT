@@ -74,6 +74,15 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
         call.respond(ApiResponse.ok(repository.feed(principal.userId, mode, pageSize, cursor, family)))
     }
 
+    post("/api/v1/social/post/get") {
+        val me=call.principal<AuthPrincipal>() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+        val id=JsonBody.receiveMap(call).reqString("postId")
+        repository.requireOrdinaryPost(id)
+        repository.requireContentInteraction(me.userId,id,null,null)
+        val post=repository.byId(id,me.userId) ?: return@post call.respond(HttpStatusCode.NotFound,ApiResponse.fail<Unit>("La publicación no está disponible.","NOT_FOUND"))
+        call.respond(ApiResponse.ok(post))
+    }
+
     post("/api/v1/social/visibility") {
         val principal=call.principal<AuthPrincipal>() ?: return@post call.respond(
             HttpStatusCode.Unauthorized, ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"),
@@ -106,6 +115,13 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             participantUserIds = participants,
             honoreeName = dataMap.optString("honoreeName"),
             attributionUrl = ContentAttribution.normalize(dataMap.optString("attributionUrl")),
+            publicationKind = dataMap.optString("publicationKind"),
+            categoryId = dataMap.optString("categoryId"),
+            requestId = dataMap.optString("requestId"),
+            invitations = dataMap.invitationDrafts(),
+            honoreeFullName = dataMap.optString("honoreeFullName"),
+            place = dataMap.optString("place"),
+            eventStartsAtEpochMs = (dataMap["eventStartsAtEpochMs"] as? Number)?.toLong(),
         )
         hub.projectSocialPost(
             saved.id,
@@ -118,6 +134,11 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
                     authorUserId = saved.authorId,
                     body = saved.body,
                     tag = saved.topic,
+                    honoreeName = saved.honoreeName,
+                    categoryId = saved.categoryId,
+                    publicationKind = saved.publicationKind,
+                    place = saved.place,
+                    eventStartsAtEpochMs = saved.eventStartsAtEpochMs,
                     attributionUrl = saved.attributionUrl,
                     attributionChanged = true,
                     createdAtEpochMs = saved.createdAtEpochMs,
@@ -486,6 +507,10 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
                     tag = saved.topic,
                     createdAtEpochMs = saved.createdAtEpochMs,
                     honoreeName = saved.honoreeName,
+                    categoryId = saved.categoryId,
+                    publicationKind = saved.publicationKind,
+                    place = saved.place,
+                    eventStartsAtEpochMs = saved.eventStartsAtEpochMs,
                 ),
             ),
         )
@@ -507,6 +532,10 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             body = dataMap.reqString("body"),
             topic = dataMap.optString("topic"),
             attributionUrl = dataMap.optString("attributionUrl"),
+            honoreeFullName = dataMap.optString("honoreeFullName"),
+            place = dataMap.optString("place"),
+            eventStartsAtEpochMs = (dataMap["eventStartsAtEpochMs"] as? Number)?.toLong(),
+            categoryId = dataMap.optString("categoryId"),
         )
         hub.projectSocialPost(
             updated.id,
@@ -521,6 +550,10 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
                     tag = updated.topic,
                     createdAtEpochMs = updated.createdAtEpochMs,
                     honoreeName = updated.honoreeName,
+                    categoryId = updated.categoryId,
+                    publicationKind = updated.publicationKind,
+                    place = updated.place,
+                    eventStartsAtEpochMs = updated.eventStartsAtEpochMs,
                     attributionUrl = updated.attributionUrl,
                     attributionChanged = true,
                 ),

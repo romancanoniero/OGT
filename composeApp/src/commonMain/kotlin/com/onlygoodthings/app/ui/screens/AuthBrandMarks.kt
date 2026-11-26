@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.iyr.iyrcommonlib.kmp.Platform
 import com.onlygoodthings.app.resources.Res
 import com.onlygoodthings.app.resources.google_logo
 import com.onlygoodthings.app.theme.OgtColors
@@ -29,7 +30,9 @@ const val GoogleSignInLabel = "Continuar con Google"
 @Composable
 fun AuthProviderRow(enabled: Boolean = true, onPick: (String) -> Unit = {}) {
     Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        AppleSignInButton(enabled) { onPick("apple") }
+        if (Platform.isIOS) {
+            AppleSignInButton(enabled) { onPick("apple") }
+        }
         AuthProviderChip(GoogleSignInLabel, Modifier.fillMaxWidth(), enabled, onClick = { onPick("google") })
     }
 }

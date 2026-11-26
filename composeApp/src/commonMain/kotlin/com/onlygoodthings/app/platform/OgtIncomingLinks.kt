@@ -3,6 +3,7 @@ package com.onlygoodthings.app.platform
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.onlygoodthings.shared.domain.parseInvitationToken
 import com.onlygoodthings.shared.domain.parseHonorToken
 import com.onlygoodthings.shared.domain.parsePostDeepLink
 
@@ -15,7 +16,12 @@ object OgtIncomingLinks {
     var latestPostId by mutableStateOf<String?>(null)
         private set
 
+    var latestInvitationToken by mutableStateOf<String?>(null)
+        private set
+    fun clearInvitation() { latestInvitationToken = null }
+
     fun offer(uri: String) {
+        parseInvitationToken(uri)?.let { latestInvitationToken = it }
         parseHonorToken(uri)?.let { latest = it }
         parsePostDeepLink(uri)?.let { latestPostId = it }
     }

@@ -6,7 +6,8 @@
     "ignore": ["firebase.json", "**/node_modules/**"],
     "rewrites": [
       { "source": "/h/**", "destination": "/honor.html" },
-      { "source": "/p/**", "destination": "/honor.html" }
+      { "source": "/p/**", "destination": "/honor.html" },
+      { "source": "/i/**", "destination": "/invitation.html" }
     ],
     "headers": [
       {

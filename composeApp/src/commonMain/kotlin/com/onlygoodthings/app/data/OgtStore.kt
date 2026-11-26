@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.platform.LocalInspectionMode
 import com.onlygoodthings.app.auth.AuthController
 import com.onlygoodthings.app.auth.AuthPrefs
 import com.onlygoodthings.app.media.OgtMediaCache
@@ -93,6 +94,7 @@ class OgtPreviewSession(
     var askStaleParked by mutableStateOf(false)
     var lastParkedConfirmEpochMs by mutableStateOf(initialParking.parkedCar?.parkedAtEpochMs ?: 0L)
     /** Token de `onlygoodthings.app/h/{token}` pendiente de reivindicar. */
+    var pendingInvitationToken by mutableStateOf(prefs.pendingInvitationToken.takeIf { it.isNotBlank() })
     var pendingHonorToken by mutableStateOf(prefs.pendingHonorToken.takeIf { it.isNotBlank() })
 
     init {
@@ -118,6 +120,11 @@ class OgtPreviewSession(
     fun reconcileFeedVisibility(checkedIds: Set<String>, visibleIds: Set<String>) {
         db.reconcilePostVisibility(checkedIds, visibleIds)
         persistSocialFeed()
+    }
+
+    fun rememberInvitationToken(token: String?) {
+        pendingInvitationToken = token
+        prefs.pendingInvitationToken = token.orEmpty()
     }
 
     fun rememberHonorToken(token: String?) {
@@ -319,14 +326,15 @@ class OgtPreviewSession(
 
 @Composable
 fun OgtPreviewStore(content: @Composable () -> Unit) {
+    val inspectionMode = LocalInspectionMode.current
     val db = remember { OgtLocalDatabase() }
     val session = remember(db) { OgtPreviewSession(db) }
     val auth = remember(db, session) { AuthController(db, session) }
     androidx.compose.runtime.DisposableEffect(auth) { onDispose { auth.stories.close() } }
     LaunchedEffect(db, session) { session.observeProfileUpdates() }
-    remember(auth) {
+    remember(auth, inspectionMode) {
         auth.ensureDevBearer()
-        if (!OgtSdk.isStarted()) {
+        if (!inspectionMode && !OgtSdk.isStarted()) {
             runCatching {
                 OgtSdk.start(
                     gatewayEndpoint = gatewayEndpointFromApiBase(auth.session.apiBaseUrl),

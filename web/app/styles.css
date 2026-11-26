@@ -1675,3 +1675,17 @@ body.desk .center {
 .post-attribution:empty{display:none}
 
 .publication-rights-notice a{text-decoration:underline;text-underline-offset:.15em}
+
+/* Invitations are composed by the user's chosen application. */
+[data-invitation-editor] { display: grid; gap: 12px; min-width: 0; margin: 16px 0; padding: 16px; border: 1px solid var(--hairline); border-radius: 16px; }
+[data-invitation-editor] legend { font-weight: 600; padding: 0 4px; }
+[data-invitation-editor] label.field { display: grid; gap: 6px; min-width: 0; margin: 0; font-size: 14px; }
+[data-invitation-editor] input, [data-invitation-editor] select { box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 12px; color: var(--ink); background: var(--sand); font: inherit; }
+[data-invite-contact-label][hidden], [data-manager-editor][hidden] { display: none; }
+.post-invitation-sheet { color: var(--ink); background: var(--canvas, #fff); }
+.post-invitation-sheet::backdrop { background: rgba(17, 18, 19, 0.35); }
+.post-invitation-sheet h2 { margin-top: 0; font-size: 20px; }
+.post-invitation-sheet [data-invitation-rows] > div { padding: 14px; border: 1px solid var(--hairline); border-radius: 16px; }
+.post-invitation-sheet .publish-cta { display: flex; width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.post-invitation-sheet button, .post-invitation-sheet a { min-height: 44px; margin: 4px 0; }
+.post-invitation-sheet [data-close], .post-invitation-sheet [data-toggle-invite] { width: 100%; }

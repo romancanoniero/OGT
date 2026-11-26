@@ -35,6 +35,7 @@ enum class OgtRoute(val title: String) {
     Ranking("Ranking de la comunidad"),
     Notifications("Notificaciones"),
     Invite("Invitar amigos"),
+    PostInvitation("Invitación a una publicación"),
     ClaimHonor("Reivindicar mención"),
     Settings("Configuración"),
     Vehicle("Auto"),

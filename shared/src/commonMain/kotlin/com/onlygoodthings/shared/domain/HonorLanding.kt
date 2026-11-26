@@ -59,10 +59,11 @@ fun appleAppSiteAssociationJson(): String = """
       {
         "appID": "$OgtIosTeamAppId",
         "appIDs": ["$OgtIosTeamAppId"],
-        "paths": ["/h/*", "/p/*"],
+        "paths": ["/h/*", "/p/*", "/i/*"],
         "components": [
           { "/": "/h/*" },
-          { "/": "/p/*" }
+          { "/": "/p/*" },
+          { "/": "/i/*" }
         ]
       }
     ]
