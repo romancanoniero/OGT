@@ -40,7 +40,8 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation(project(":shared"))
+            // The iOS framework exports this module to Swift.
+            api(project(":shared"))
             implementation(compose.runtime)
             implementation(compose.animation)
             implementation(compose.foundation)

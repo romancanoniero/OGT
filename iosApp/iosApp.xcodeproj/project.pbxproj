@@ -175,7 +175,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "cd \"$SRCROOT/..\"\n./gradlew :composeApp:embedAndSignAppleFrameworkForXcode\n";
+			shellScript = "cd \"$SRCROOT/..\"\nif [ \"$CONFIGURATION\" = \"Release\" ]; then\n    # Native Release optimization exceeds the regular 4 GB Gradle heap.\n    ./gradlew :composeApp:embedAndSignAppleFrameworkForXcode \"-Dorg.gradle.jvmargs=-Xmx${OGT_IOS_GRADLE_HEAP:-8G} -Dfile.encoding=UTF-8 -XX:+UseParallelGC\" --max-workers=2\nelse\n    ./gradlew :composeApp:embedAndSignAppleFrameworkForXcode\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
