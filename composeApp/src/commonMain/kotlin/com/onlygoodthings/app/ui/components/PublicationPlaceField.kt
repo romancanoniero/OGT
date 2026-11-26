@@ -1,12 +1,12 @@
 package com.onlygoodthings.app.ui.components
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalInspectionMode
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import com.onlygoodthings.app.data.LocalAuth
 import com.onlygoodthings.app.data.LocalOgtSession
@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** A publication shares the chosen place name, without attaching device coordinates to the post. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PublicationPlaceField(
     value:String,
@@ -29,7 +30,7 @@ fun PublicationPlaceField(
     locateInitially:Boolean=false,
 ) {
     val preview=LocalInspectionMode.current
-    val uriHandler=LocalUriHandler.current
+    val focusManager=LocalFocusManager.current
     val auth=LocalAuth.current;val session=LocalOgtSession.current
     val gps=if(preview)remember { LocationUiState() } else LocalOgtLocation.current
     var search by remember { mutableStateOf("") }
@@ -40,6 +41,8 @@ fun PublicationPlaceField(
     var locatePending by remember { mutableStateOf(locateInitially && value.isBlank()) }
     var locating by remember { mutableStateOf(false) }
     var prompted by remember(locationRequest) { mutableStateOf<LocationRequirement?>(null) }
+    var fieldFocused by remember { mutableStateOf(false) }
+    var menuRequested by remember { mutableStateOf(false) }
 
     LaunchedEffect(search,enabled) {
         hits=emptyList()
@@ -51,10 +54,10 @@ fun PublicationPlaceField(
             val result=auth.feed.publicationPlaces(search.trim())
             if(revision==expected) {
                 hits=result
-                status=if(result.isEmpty())"No encontramos sugerencias. Podés dejar el lugar escrito." else "Elegí una sugerencia o dejá el lugar escrito."
+                status=if(result.isEmpty())"No encontramos lugares con ese texto." else null
             }
         } catch(cancel:CancellationException) { throw cancel }
-        catch(_:Exception) { if(revision==expected)status="No pudimos buscar lugares. Podés escribirlo libremente." }
+        catch(_:Exception) { if(revision==expected)status="No pudimos buscar lugares. Reintentá." }
     }
 
     LaunchedEffect(locatePending,locationRequest,enabled,session.gpsEnabled,gps.permission,gps.servicesEnabled) {
@@ -93,19 +96,27 @@ fun PublicationPlaceField(
     }
 
     Column(verticalArrangement=Arrangement.spacedBy(6.dp)) {
-        OgtOutlinedTextField(value,{ text ->
-            revision++;locatePending=false;locating=false;hits=emptyList();status=null
-            val next=text.take(200);search=next;onValueChange(next)
-        },label={Text(label)},placeholder={Text("Buscá una plaza, dirección o ciudad")},singleLine=true,enabled=enabled,modifier=Modifier.fillMaxWidth())
+        val expanded=enabled && fieldFocused && menuRequested && hits.isNotEmpty()
+        ExposedDropdownMenuBox(expanded=expanded,onExpandedChange={menuRequested=it}) {
+            OgtOutlinedTextField(value,{ text ->
+                revision++;locatePending=false;locating=false;hits=emptyList();status=null;menuRequested=true
+                val next=text.take(200);search=next;onValueChange(next)
+            },label={Text(label)},placeholder={Text("Buscá una plaza, dirección o ciudad")},singleLine=true,enabled=enabled,
+                modifier=Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryEditable,enabled).onFocusChanged {
+                    fieldFocused=it.isFocused
+                    if(it.isFocused)menuRequested=true
+                })
+            ExposedDropdownMenu(expanded=expanded,onDismissRequest={menuRequested=false},modifier=Modifier.heightIn(max=240.dp)) {
+                hits.forEach { hit -> DropdownMenuItem(text={Text(hit.label)},onClick={
+                    revision++;locatePending=false;search="";hits=emptyList();status=null;menuRequested=false
+                    onValueChange(hit.label);focusManager.clearFocus()
+                }) }
+            }
+        }
         TextButton(onClick={
             if(gps.permission==LocationPermissionState.DENIED_FOREVER && session.gpsEnabled)gps.openSettings()
             revision++;search="";hits=emptyList();locationRequest++;locatePending=true
         },enabled=enabled && !locating) { Text(if(locating)"Buscando tu ubicación…" else "Usar mi ubicación actual") }
-        hits.forEach { hit -> TextButton(onClick={
-            revision++;locatePending=false;search="";hits=emptyList();status=null;onValueChange(hit.label)
-        },enabled=enabled,modifier=Modifier.fillMaxWidth()) { Text(hit.label) } }
         status?.let { Text(it,color=OgtColors.muted) }
-        Text("Podés escribir cualquier lugar. Solo se publica el nombre que confirmes.",color=OgtColors.muted)
-        TextButton(onClick={uriHandler.openUri("https://www.openstreetmap.org/copyright")}) { Text("Lugares: © OpenStreetMap · Photon") }
     }
 }

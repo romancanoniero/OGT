@@ -13,11 +13,33 @@ ON CONFLICT DO NOTHING;
 
 ALTER TABLE social_posts ADD COLUMN IF NOT EXISTS hashtags JSONB NOT NULL DEFAULT '[]'::jsonb;
 -- Backfill once without changing any existing topic or kind. Inactive categories remain readable.
-UPDATE social_posts p SET hashtags = jsonb_build_array(jsonb_build_object(
- 'key',COALESCE(c.tag_key,translate(lower(regexp_replace(p.topic,'[^[:alnum:]_]','','g')),'áéíóúüñ','aeiouun')),
- 'label',p.topic,'categoryId',c.id))
-FROM (SELECT s.id,COALESCE(s.recognition_category_id,rc.id) AS category_id FROM social_posts s LEFT JOIN recognition_categories rc ON lower(rc.label)=lower(s.topic)) old
-LEFT JOIN recognition_categories c ON c.id=old.category_id
-WHERE p.id=old.id AND p.hashtags='[]'::jsonb AND length(btrim(COALESCE(p.topic,'')))>=2;
+-- This metadata backfill must not turn historical posts into newly edited posts.
+-- Only the timestamp trigger is suspended under this statement's exclusive table
+-- lock. PostgreSQL rolls back its state on failure; every other trigger stays active.
+DO $backfill$
+DECLARE timestamp_trigger_mode "char";
+BEGIN
+    IF EXISTS (SELECT 1 FROM social_posts WHERE hashtags='[]'::jsonb AND length(btrim(COALESCE(topic,'')))>=2) THEN
+        SELECT tgenabled INTO timestamp_trigger_mode FROM pg_trigger
+        WHERE tgrelid='social_posts'::regclass AND tgname='trg_posts_updated' AND NOT tgisinternal;
+        IF timestamp_trigger_mode IN ('O','A','R') THEN
+            ALTER TABLE social_posts DISABLE TRIGGER trg_posts_updated;
+        END IF;
+        UPDATE social_posts p SET hashtags = jsonb_build_array(jsonb_build_object(
+         'key',COALESCE(c.tag_key,translate(lower(regexp_replace(p.topic,'[^[:alnum:]_]','','g')),'áéíóúüñ','aeiouun')),
+         'label',p.topic,'categoryId',c.id))
+        FROM (SELECT s.id,COALESCE(s.recognition_category_id,rc.id) AS category_id FROM social_posts s LEFT JOIN recognition_categories rc ON lower(rc.label)=lower(s.topic)) old
+        LEFT JOIN recognition_categories c ON c.id=old.category_id
+        WHERE p.id=old.id AND p.hashtags='[]'::jsonb AND length(btrim(COALESCE(p.topic,'')))>=2;
+        IF timestamp_trigger_mode='O' THEN
+            ALTER TABLE social_posts ENABLE TRIGGER trg_posts_updated;
+        ELSIF timestamp_trigger_mode='A' THEN
+            ALTER TABLE social_posts ENABLE ALWAYS TRIGGER trg_posts_updated;
+        ELSIF timestamp_trigger_mode='R' THEN
+            ALTER TABLE social_posts ENABLE REPLICA TRIGGER trg_posts_updated;
+        END IF;
+    END IF;
+END
+$backfill$;
 CREATE INDEX IF NOT EXISTS social_posts_hashtags_gin ON social_posts USING gin(hashtags jsonb_path_ops);
 CREATE INDEX IF NOT EXISTS feed_events_viewer_recent ON feed_events(viewer_id,created_at DESC);

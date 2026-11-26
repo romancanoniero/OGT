@@ -4362,6 +4362,16 @@ async function renderAjustes() {
       <p class="save-ok" id="profile-ok" hidden>Perfil actualizado</p>
     </form>
     <section class="profile-edit" id="blocked-users"></section>
+    <section class="profile-edit" id="software-credits">
+      <details class="pref-block"><summary>Créditos y licencias</summary>
+        <h2>Búsqueda de lugares</h2>
+        <p>Datos geográficos: © OpenStreetMap contributors. Disponibles bajo Open Database License (ODbL) 1.0.</p>
+        <p><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap · Datos y licencia</a></p>
+        <p>Photon permite buscar direcciones y localidades a partir de datos de OpenStreetMap. Su software se distribuye bajo Apache License 2.0.</p>
+        <p><a href="https://github.com/komoot/photon/blob/master/LICENSE" target="_blank" rel="noopener">Photon · Licencia del software</a></p>
+        <p><a href="/terms#creditos-editoriales" target="_blank" rel="noopener">Créditos del material editorial</a></p>
+      </details>
+    </section>
     <form class="profile-edit" id="delete-account">
       <div class="pref-block">
         <h2>Borrar cuenta</h2>

@@ -99,6 +99,7 @@ fun SettingsScreen(
     val db = LocalOgtDb.current
     val scope = rememberCoroutineScope()
     var confirmOpen by remember { mutableStateOf(false) }
+    var creditsOpen by remember { mutableStateOf(false) }
     var confirmText by remember { mutableStateOf("") }
     val copy = LocalOgtCopy.current
     val me = session.me()
@@ -339,6 +340,10 @@ fun SettingsScreen(
                     PrefNav(label) { onOpen(key) }
                 }
             }
+            PrefCategory("Información")
+            PrefGroup {
+                PrefNav("Créditos y licencias") { creditsOpen=true }
+            }
             Text(
                 "Cerrar sesión",
                 color = OgtColors.secondary,
@@ -396,6 +401,19 @@ fun SettingsScreen(
             }
             OgtCaption("Only Good Things · ${com.onlygoodthings.app.auth.appVersionLabel()}")
             Spacer(Modifier.height(80.dp))
+        }
+    }
+    if(creditsOpen)OgtBottomSheet(onDismiss={creditsOpen=false}) { closer ->
+        val links=androidx.compose.ui.platform.LocalUriHandler.current
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Text("Créditos y licencias",fontSize=22.sp,fontWeight=FontWeight.Bold,color=OgtColors.ink)
+            Text("Búsqueda de lugares",fontWeight=FontWeight.SemiBold)
+            Text("Datos geográficos: © OpenStreetMap contributors. Disponibles bajo Open Database License (ODbL) 1.0.")
+            androidx.compose.material3.TextButton(onClick={links.openUri("https://www.openstreetmap.org/copyright")}) { Text("OpenStreetMap · Datos y licencia") }
+            Text("Photon permite buscar direcciones y localidades a partir de datos de OpenStreetMap. Su software se distribuye bajo Apache License 2.0.")
+            androidx.compose.material3.TextButton(onClick={links.openUri("https://github.com/komoot/photon/blob/master/LICENSE")}) { Text("Photon · Licencia del software") }
+            androidx.compose.material3.TextButton(onClick={links.openUri("https://onlygoodthings.lat/terms#creditos-editoriales")}) { Text("Créditos del material editorial") }
+            OgtPrimaryButton("Cerrar",onClick=closer.close)
         }
     }
 }

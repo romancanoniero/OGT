@@ -20,6 +20,26 @@ class PublicationHashtagsIntegrationTest {
         } }
     }
     private val media=listOf(PostMediaItem("qa-media",MediaKind.IMAGE,"https://example.test/hashtags.jpg"))
+
+    @Test fun historicalHashtagBackfillPreservesAllOtherFieldsIncludingEditTimeAndLeavesTheTriggerActive() {
+        database().use { db ->
+            val author=user(db,"Historia QA");val id=UUID.randomUUID().toString()
+            db.withConnection { c ->
+                c.prepareStatement("INSERT INTO social_posts(id,author_kind,author_user_id,body,media_urls,topic,publication_kind,created_at,updated_at) VALUES(?::uuid,'USER',?::uuid,'Historia anterior',ARRAY['https://example.test/backfill.jpg'],'Ternura','TERNURA','2020-01-01T00:00:00Z','2020-01-01T00:00:00Z')").use { q ->q.setString(1,id);q.setString(2,author);q.executeUpdate() }
+                fun fingerprint()=c.prepareStatement("SELECT (to_jsonb(p)-'hashtags')::text FROM social_posts p WHERE id=?::uuid").use { q ->q.setString(1,id);q.executeQuery().use { r ->r.next();r.getString(1) } }
+                val before=fingerprint()
+                val migration=java.nio.file.Files.readString(java.nio.file.Path.of("../database/migrations/41_publication_hashtags.sql"))
+                repeat(2) {
+                    c.createStatement().use { it.execute(migration) }
+                    assertEquals(before,fingerprint())
+                    c.createStatement().use { q ->q.executeQuery("SELECT tgenabled FROM pg_trigger WHERE tgrelid='social_posts'::regclass AND tgname='trg_posts_updated'").use { r ->r.next();assertEquals("O",r.getString(1)) } }
+                }
+                c.prepareStatement("SELECT jsonb_array_length(hashtags) FROM social_posts WHERE id=?::uuid").use { q ->q.setString(1,id);q.executeQuery().use { r ->r.next();assertEquals(1,r.getInt(1)) } }
+                c.prepareStatement("UPDATE social_posts SET body='Una edición real' WHERE id=?::uuid").use { q ->q.setString(1,id);q.executeUpdate() }
+                c.prepareStatement("SELECT updated_at > '2020-01-02T00:00:00Z' FROM social_posts WHERE id=?::uuid").use { q ->q.setString(1,id);q.executeQuery().use { r ->r.next();assertTrue(r.getBoolean(1)) } }
+            }
+        }
+    }
     private fun publish(posts:SocialSqlRepository,author:String,tags:List<String>,name:String?=null,hero:String?=null,request:String?=null)=
         posts.publish(author,"Una historia para compartir","Comunidad",media,null,null,hero,emptyList(),publicationKind="POST",requestId=request,honoreeFullName=name,hashtags=tags)
 

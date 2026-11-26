@@ -741,6 +741,20 @@ span.avatar svg { width: 18px; height: 18px; }
 }
 .place-hit:last-child { border-bottom: 0; }
 .place-hit:hover { background: var(--canvas); }
+.publication-place-input { position: relative; }
+.publication-place-options {
+  position: absolute;
+  top: 100%; left: 0; right: 0;
+  z-index: 30;
+  display: flex; flex-direction: column;
+  max-height: 240px; overflow-y: auto;
+  background: var(--canvas);
+  border: 1px solid var(--hairline); border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.16);
+}
+.publication-place-options[hidden] { display: none; }
+.publication-place-options .place-hit { min-height: 44px; flex-shrink: 0; overflow-wrap: anywhere; }
+.publication-place-options .place-hit[aria-selected="true"] { background: var(--sand); }
 .lost-map,
 .lost-map-edit {
   width: 100%;
