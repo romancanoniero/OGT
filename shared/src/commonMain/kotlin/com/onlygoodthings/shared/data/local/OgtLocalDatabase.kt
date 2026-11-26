@@ -39,6 +39,7 @@ import com.onlygoodthings.shared.feed.FeedCandidate
 import com.onlygoodthings.shared.feed.FeedEventSignal
 import com.onlygoodthings.shared.feed.FeedRanker
 import com.onlygoodthings.shared.feed.ViewerContext
+import com.onlygoodthings.shared.feed.feedTopicFamilies
 import com.onlygoodthings.shared.feed.feedTopicFamily
 import com.onlygoodthings.shared.realtime.currentEpochMs
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -180,6 +181,7 @@ class OgtLocalDatabase {
                 eventStartsAtEpochMs = live.eventStartsAtEpochMs,
                 honoreeName = live.honoreeName,
                 categoryId = live.categoryId,
+                hashtags = live.hashtags.orEmpty(),
                 publicationKind = live.publicationKind,
                 attributionUrl = live.attributionUrl,
                 heartCount = live.heartCount,
@@ -200,7 +202,8 @@ class OgtLocalDatabase {
             authorUserId = authorId ?: current.authorUserId,
             honoreeName = live.honoreeName?.takeIf { it.isNotBlank() } ?: current.honoreeName,
             categoryId = live.categoryId ?: current.categoryId,
-            place = if(live.publicationKind=="CONVOCATORIA")live.place ?: current.place else current.place,
+            hashtags = live.hashtags ?: current.hashtags,
+            place = if(live.publicationKind in listOf("CONVOCATORIA","POST","ACTION","TERNURA"))live.place ?: current.place else current.place,
             eventStartsAtEpochMs = live.eventStartsAtEpochMs ?: current.eventStartsAtEpochMs,
             publicationKind = live.publicationKind ?: current.publicationKind,
             authorKind = if (authorId != null) AuthorKind.USER else current.authorKind,
@@ -315,6 +318,7 @@ class OgtLocalDatabase {
         place = post.place,
         publicationKind = post.publicationKind,
         categoryId = post.categoryId,
+        hashtags = post.hashtags,
         eventStartsAtEpochMs = post.eventStartsAtEpochMs,
         createdAtEpochMs = post.createdAtEpochMs,
         listingId = post.listingId,
@@ -442,7 +446,7 @@ class OgtLocalDatabase {
         if (index >= 0) {
             val current = posts[index]
             posts[index] = incoming.copy(
-                place = if(incoming.publicationKind=="CONVOCATORIA")incoming.place.ifBlank { current.place } else current.place.ifBlank { incoming.place },
+                place = if(incoming.publicationKind=="CONVOCATORIA")incoming.place.ifBlank { current.place } else remote.place ?: current.place,
                 timeLabel = current.timeLabel.ifBlank { incoming.timeLabel },
                 listingId = current.listingId ?: incoming.listingId,
                 honoreeName = incoming.honoreeName?.takeIf { it.isNotBlank() } ?: current.honoreeName,
@@ -811,6 +815,7 @@ class OgtLocalDatabase {
                 authorUserId = post.authorUserId,
                 protagonistUserId = protagonistOf(post),
                 topic = post.tag,
+                hashtags = post.hashtags,
                 createdAtEpochMs = post.createdAtEpochMs,
                 impactCount = post.impactCount,
                 commentCount = post.commentCount,
@@ -831,6 +836,9 @@ class OgtLocalDatabase {
                     authorUserId = origin?.authorUserId,
                     topic = origin?.tag.orEmpty(),
                     kind = event.kind,
+                    hashtags = origin?.hashtags.orEmpty(),
+                    occurredAtEpochMs = event.createdAtEpochMs,
+                    dwellMs = event.dwellMs ?: 0,
                 )
             },
             latitude = viewerUser?.latitude,
@@ -863,7 +871,7 @@ class OgtLocalDatabase {
                     shouldShowInFeed(viewerId, post, mode, family, nowEpochMs)
             }
             .sortedByDescending { it.createdAtEpochMs }
-        return (pinned + ranked).distinctBy { it.id }
+        return (if(mode==FeedMode.FOLLOWING)ranked else (pinned + ranked).distinctBy { it.id })
     }
 
     fun shouldShowInFeed(
@@ -878,7 +886,7 @@ class OgtLocalDatabase {
         if (feedEvents.any { it.viewerId == viewerId && it.postId == post.id && it.kind == FeedEventKind.HIDE }) {
             return false
         }
-        if (family != null && feedTopicFamily(post.tag, post.sourceUrl) != family) return false
+        if (family != null && family !in feedTopicFamilies(post.tag, post.sourceUrl,post.hashtags)) return false
         if (isOwnPost(post, viewerAliases(viewerId))) return true
         if (mode == FeedMode.FOLLOWING) {
             val mine = setOfNotNull(post.authorUserId, protagonistOf(post))
@@ -1008,7 +1016,7 @@ class OgtLocalDatabase {
         fun matches(post: LocalSocialPost): Boolean {
             if (!allowed(post)) return false
             if (family == null) return true
-            return feedTopicFamily(post.tag, post.sourceUrl) == family
+            return family in feedTopicFamilies(post.tag, post.sourceUrl,post.hashtags)
         }
         val body = if (remoteOrder != null) {
             val byId = posts.associateBy { it.id }
@@ -1024,7 +1032,7 @@ class OgtLocalDatabase {
                     shouldShowInFeed(viewerId, post, mode, family)
             }
             .sortedByDescending { it.createdAtEpochMs }
-        return (pinned + body).distinctBy { it.id }
+        return if(mode==FeedMode.FOLLOWING)body.sortedWith(compareByDescending<LocalSocialPost> { it.createdAtEpochMs }.thenBy { it.id }) else (pinned + body).distinctBy { it.id }
     }
 
     /** Remove only IDs explicitly checked with the server, preserving other pages and pending drafts. */
@@ -1041,10 +1049,18 @@ class OgtLocalDatabase {
 
     var socialFeedViewerId:String?=null
         private set
+    private val feedOrders=mutableMapOf<Pair<FeedMode,FeedTopicFamily?>,List<String>>()
+    fun cachedFeedOrder(viewer:String,mode:FeedMode,family:FeedTopicFamily?):List<String>? =
+        if(socialFeedViewerId==viewer)feedOrders[mode to family] else null
+    fun rememberFeedOrder(viewer:String,mode:FeedMode,family:FeedTopicFamily?,ids:List<String>) {
+        if(socialFeedViewerId!=viewer)return
+        feedOrders[mode to family]=ids.distinct().take(80)
+    }
 
     /** Viewer reactions in a cache belong to one authenticated account, including after restart. */
     fun bindSocialFeedViewer(viewerId:String) {
         if(socialFeedViewerId==viewerId)return
+        feedOrders.clear()
         posts.indices.forEach { index ->
             val post=posts[index]
             if(post.viewerHasImpacted || post.viewerHasHearted)
@@ -1055,13 +1071,15 @@ class OgtLocalDatabase {
     }
 
     fun exportSocialFeed(viewerId: String): String {
-        val cached = feedPosts()
-            .sortedByDescending { it.createdAtEpochMs }
+        val available=feedPosts().associateBy { it.id }
+        val preferred=if(socialFeedViewerId==viewerId)feedOrders.values.flatten().distinct().mapNotNull { available[it] } else emptyList()
+        val cached = (preferred+feedPosts().sortedByDescending { it.createdAtEpochMs }).distinctBy { it.id }
             .take(80)
         val postIds = cached.map { it.id }.toSet()
         return honorJson.encodeToString(
             SocialFeedSnapshot(
                 viewerId = viewerId,
+                orders = if(socialFeedViewerId==viewerId)feedOrders.map { (key,ids) -> LocalFeedOrder(key.first,key.second,ids.filter { it in postIds }) } else emptyList(),
                 posts = cached,
                 media = postMedia.filter { it.postId in postIds },
                 comments = comments.filter { it.postId in postIds },
@@ -1076,6 +1094,8 @@ class OgtLocalDatabase {
         if (raw.isBlank()) return
         val snap = runCatching { honorJson.decodeFromString<SocialFeedSnapshot>(raw) }.getOrNull() ?: return
         socialFeedViewerId=snap.viewerId
+        feedOrders.clear()
+        if(snap.viewerId!=null)snap.orders.forEach { order -> feedOrders[order.mode to order.family]=order.ids.distinct().take(80) }
         snap.posts.forEach { row ->
             if (row.id in OgtIds.phoneFixturePostIds && posts.none { it.id == row.id }) return@forEach
             val idx = posts.indexOfFirst { it.id == row.id }
@@ -2089,6 +2109,7 @@ class OgtLocalDatabase {
             place = post.place,
             eventStartsAtEpochMs = post.eventStartsAtEpochMs,
             categoryId = post.categoryId,
+        hashtags = post.hashtags,
             publicationKind = post.publicationKind,
             anecdotes = anecdotesOf(post.id).map(::toDomain),
         )
@@ -2224,6 +2245,7 @@ internal fun SocialPost.asLocalPost(): LocalSocialPost = LocalSocialPost(
     sourceUrl = sourceUrl,
     attributionUrl = attributionUrl,
     categoryId = categoryId,
+    hashtags = hashtags,
     publicationKind = publicationKind,
     honoreeName = honoreeName,
     placement = placement,

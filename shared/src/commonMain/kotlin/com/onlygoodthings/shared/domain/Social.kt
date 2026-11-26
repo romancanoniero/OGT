@@ -46,6 +46,7 @@ data class SocialPost(
     val publicationKind: String? = null,
     val place: String? = null,
     val eventStartsAtEpochMs: Long? = null,
+    val hashtags: List<PostHashtag> = emptyList(),
 )
 
 @Serializable
@@ -129,6 +130,7 @@ data class SocialLiveCounters(
     val imageUrl: String? = null,
     val attributionUrl: String? = null,
     val attributionChanged: Boolean = false,
+    val hashtags: List<PostHashtag>? = null,
 ) {
     val canIngest: Boolean
         get() = !authorUserId.isNullOrBlank() && !body.isNullOrBlank()

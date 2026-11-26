@@ -10,7 +10,7 @@ object GoodActionRecognition {
     fun isAction(topic: String, publicationKind: String? = null): Boolean = when (publicationKind) {
         null -> foldMention(topic.trim()) in topics // Compatibility with existing mobile clients.
         "ACTION" -> true
-        "CONVOCATORIA", "TERNURA", "HOMENAJE" -> false
+        "CONVOCATORIA", "TERNURA", "HOMENAJE", "POST" -> false
         else -> throw IllegalArgumentException("Tipo de publicación inválido")
     }
 

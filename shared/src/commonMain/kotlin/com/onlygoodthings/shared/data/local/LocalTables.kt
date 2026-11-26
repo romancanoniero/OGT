@@ -133,6 +133,7 @@ data class LocalSocialPost(
     val attributionUrl: String? = null,
     val categoryId: String? = null,
     val publicationKind: String? = null,
+    val hashtags: List<com.onlygoodthings.shared.domain.PostHashtag> = emptyList(),
 )
 
 @Serializable
@@ -299,7 +300,11 @@ data class SocialFeedSnapshot(
     val follows: List<LocalFollow> = emptyList(),
     val hideEvents: List<LocalFeedEvent> = emptyList(),
     val viewerId: String? = null,
+    val orders: List<LocalFeedOrder> = emptyList(),
 )
+
+@Serializable
+data class LocalFeedOrder(val mode:com.onlygoodthings.shared.domain.FeedMode,val family:com.onlygoodthings.shared.domain.FeedTopicFamily?=null,val ids:List<String>)
 
 @Serializable
 data class LocalSighting(

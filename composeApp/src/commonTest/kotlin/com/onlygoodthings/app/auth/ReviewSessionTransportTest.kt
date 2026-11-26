@@ -84,6 +84,21 @@ class ReviewSessionTransportTest {
         }
     }
 
+    @Test fun confirmedPublicationNoticesKeepTheOriginalIdentityAndTransport() = runBlocking {
+        val session=SessionStore().apply { apiBaseUrl=OGT_DEFAULT_API_BASE;firebaseJwt="different-account" }
+        var calls=0
+        HttpClient(MockEngine { request ->
+            calls++
+            assertEquals("$review/api/v1/notifications/mention",request.url.toString())
+            assertEquals("Bearer publishing-account",request.headers[HttpHeaders.Authorization])
+            respond("""{"success":true,"data":1}""",HttpStatusCode.OK,jsonHeaders)
+        }) { install(ContentNegotiation) { json() } }.use { client ->
+            assertEquals(1,AuthSessionApi(session,client).notifyPublishedMention("recipient","post","publishing-account",review))
+            assertEquals(1,calls)
+            assertEquals("different-account",session.firebaseJwt)
+        }
+    }
+
     @Test fun signingOutCanUnregisterItsPushTokenOnThePreviousReviewTransport() = runBlocking {
         val session = SessionStore().apply { apiBaseUrl = review }
         val previousBase = session.apiBaseUrl

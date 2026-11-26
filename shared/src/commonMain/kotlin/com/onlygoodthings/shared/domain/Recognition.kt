@@ -3,7 +3,7 @@ package com.onlygoodthings.shared.domain
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class RecognitionCategory(val id: String, val label: String, val icon: String = "", val active: Boolean = true, val sortOrder: Int = 0, val version: Int = 1)
+data class RecognitionCategory(val id: String, val label: String, val icon: String = "", val active: Boolean = true, val sortOrder: Int = 0, val version: Int = 1, val tagKey: String = "", val requiresRecognition: Boolean = true)
 
 @Serializable
 data class RecognitionPostDraft(

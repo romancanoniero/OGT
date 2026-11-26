@@ -31,8 +31,10 @@ data class FeedCandidate(
     val urgencyRank: Int = 0,
     val placement: PostPlacement = PostPlacement.ORGANIC,
     val needTagId: String? = null,
+    val hashtags: List<com.onlygoodthings.shared.domain.PostHashtag> = emptyList(),
 ) {
-    fun family(): FeedTopicFamily = feedTopicFamily(topic, sourceUrl)
+    fun families(): Set<FeedTopicFamily> = feedTopicFamilies(topic,sourceUrl,hashtags)
+    fun family(): FeedTopicFamily = families().firstOrNull { it != FeedTopicFamily.OTHER } ?: FeedTopicFamily.OTHER
 }
 
 data class FeedEventSignal(
@@ -40,6 +42,9 @@ data class FeedEventSignal(
     val authorUserId: String?,
     val topic: String,
     val kind: FeedEventKind,
+    val hashtags: List<com.onlygoodthings.shared.domain.PostHashtag> = emptyList(),
+    val occurredAtEpochMs: Long = 0L,
+    val dwellMs: Int = 0,
 )
 
 data class ViewerContext(
@@ -61,8 +66,8 @@ data class RankedFeedItem(
 )
 
 /**
- * Inventario del feed: filtros (ocultos, ads, familia, grafo) y orden cronológico.
- * Lo más nuevo va primero. Siempre.
+ * HOME learns topic/author affinity; FOLLOWING remains strictly chronological.
+ * Moderation, graph eligibility and hidden posts are applied before personalization.
  */
 object FeedRanker {
     const val MAX_SAME_AUTHOR_STREAK = 3
@@ -121,37 +126,49 @@ object FeedRanker {
         val hiddenPosts = viewer.events.filter { it.kind == FeedEventKind.HIDE }.map { it.postId }.toSet()
         var visible = candidates.filter { it.postId !in hiddenPosts && it.placement != PostPlacement.AD }
         if (query.family != null) {
-            visible = visible.filter { it.family() == query.family }
+            visible = visible.filter { query.family in it.families() }
         }
         if (query.mode == FeedMode.FOLLOWING) {
             visible = visible.filter { inGraph(it, viewer) }
         }
-        return visible
-            .sortedWith(
-                compareByDescending<FeedCandidate> { skillMatch(it, viewer) && inGraph(it, viewer) }
-                    .thenByDescending { it.createdAtEpochMs }
-                    .thenBy { it.postId },
-            )
-            .drop(offset.coerceAtLeast(0))
-            .take(limit.coerceAtLeast(0))
-            .map { post ->
-                val fromGraph = inGraph(post, viewer)
-                val canHelp = skillMatch(post, viewer) && fromGraph
-                RankedFeedItem(
-                    postId = post.postId,
-                    score = post.createdAtEpochMs.toDouble(),
-                    discovery = query.mode == FeedMode.HOME && !fromGraph,
-                    reason = if (canHelp) {
-                        FeedShowReason.SKILL_MATCH
-                    } else if (query.mode == FeedMode.FOLLOWING) {
-                        if (query.family != null) FeedShowReason.FILTER else FeedShowReason.GRAPH
-                    } else {
-                        reasonFor(query, profile, post, fromGraph)
-                    },
-                    family = post.family(),
-                    createdAtEpochMs = post.createdAtEpochMs,
-                )
+        val interests = HashtagInterests(viewer.events,nowEpochMs)
+        val personalized = query.mode == FeedMode.HOME && interests.hasEvidence
+        val items = visible.map { post ->
+            val fromGraph = inGraph(post,viewer)
+            val canHelp = query.mode==FeedMode.HOME && skillMatch(post,viewer) && fromGraph
+            val affinity = interests.topic(post)
+            val value = if(personalized) {
+                5.0*affinity + 0.6*interests.author(post) + 2.0*recency(post.createdAtEpochMs,nowEpochMs) +
+                    (if(canHelp)8.0 else 0.0) + (if(fromGraph)0.15 else 0.0)
+            } else post.createdAtEpochMs.toDouble()
+            RankedFeedItem(post.postId,value,query.mode==FeedMode.HOME && !fromGraph,
+                reason=when {
+                    post.placement==PostPlacement.PROMOTED -> FeedShowReason.PROMOTED
+                    canHelp -> FeedShowReason.SKILL_MATCH
+                    query.family!=null -> FeedShowReason.FILTER
+                    query.mode==FeedMode.FOLLOWING || fromGraph -> FeedShowReason.GRAPH
+                    personalized && affinity>0 -> FeedShowReason.AFFINITY
+                    personalized -> FeedShowReason.EXPLORE
+                    else -> reasonFor(query,profile,post,fromGraph)
+                },family=post.family(),createdAtEpochMs=post.createdAtEpochMs) to post
+        }.sortedWith(compareByDescending<Pair<RankedFeedItem,FeedCandidate>> {
+            query.mode==FeedMode.HOME && skillMatch(it.second,viewer) && inGraph(it.second,viewer)
+        }.thenByDescending { it.first.score }.thenByDescending { it.second.createdAtEpochMs }.thenBy { it.first.postId })
+        val ordered = if(personalized) {
+            val waiting=items.toMutableList()
+            val result=mutableListOf<Pair<RankedFeedItem,FeedCandidate>>()
+            while(waiting.isNotEmpty()) {
+                val previous=result.takeLast(MAX_SAME_AUTHOR_STREAK).map { it.second.authorKey }
+                val repeated=previous.takeIf { it.size==MAX_SAME_AUTHOR_STREAK && it.distinct().size==1 }?.first()
+                val explore=(result.size+1)%5==0
+                val pick=waiting.indexOfFirst { (_,post) ->
+                    (repeated==null || post.authorKey!=repeated) && (!explore || interests.topic(post)<=0)
+                }.takeIf { it>=0 } ?: waiting.indexOfFirst { repeated==null || it.second.authorKey!=repeated }.takeIf { it>=0 } ?: 0
+                result+=waiting.removeAt(pick)
             }
+            result
+        } else items
+        return ordered.drop(offset.coerceAtLeast(0)).take(limit.coerceIn(0,200)).map { it.first }
     }
 
     internal fun score(

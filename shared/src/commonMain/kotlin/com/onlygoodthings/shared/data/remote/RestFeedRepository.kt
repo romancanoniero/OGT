@@ -38,6 +38,17 @@ class RestFeedRepository(
     suspend fun publishRecognition(draft:com.onlygoodthings.shared.domain.RecognitionPostDraft):SocialPost =
         post("/api/v1/social/publish",json.encodeToJsonElement(com.onlygoodthings.shared.domain.RecognitionPostDraft.serializer(),draft) as JsonObject)
 
+    suspend fun publishPublication(draft:com.onlygoodthings.shared.domain.PublicationDraft):SocialPost =
+        post("/api/v1/social/publish",json.encodeToJsonElement(com.onlygoodthings.shared.domain.PublicationDraft.serializer(),draft) as JsonObject)
+
+    suspend fun editPublication(id:String,body:String,hashtags:List<String>,fullName:String?,attribution:String,place:String?=null):SocialPost =
+        post("/api/v1/social/post/edit",buildJsonObject {
+            put("postId",id);put("body",body);put("attributionUrl",attribution)
+            place?.let { put("place",it) }
+            put("hashtags",buildJsonArray { hashtags.forEach { add(it) } })
+            fullName?.takeIf { it.isNotBlank() }?.let { put("honoreeFullName",it) }
+        })
+
     suspend fun publishGathering(draft:com.onlygoodthings.shared.domain.GatheringPostDraft):SocialPost =
         post("/api/v1/social/publish",json.encodeToJsonElement(com.onlygoodthings.shared.domain.GatheringPostDraft.serializer(),draft) as JsonObject)
     suspend fun editGathering(id:String,body:String,topic:String,place:String,start:Long?,attribution:String):SocialPost =

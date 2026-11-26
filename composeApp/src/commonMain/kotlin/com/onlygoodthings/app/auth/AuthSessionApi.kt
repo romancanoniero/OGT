@@ -85,6 +85,11 @@ class AuthSessionApi(
         accountPost<String>("/api/v1/notifications/unregister", buildJsonObject { put("token", JsonPrimitive(token)) },bearer,base)
     }
 
+    suspend fun notifyPublishedMention(recipient:String,postId:String,bearer:String,base:String):Int =
+        accountPost("/api/v1/notifications/mention",buildJsonObject {
+            put("recipientUserId",JsonPrimitive(recipient));put("postId",JsonPrimitive(postId))
+        },bearer,base)
+
     suspend fun openSession(token: String, firebaseUid: String): UserProfile = try {
         suspend fun request(base: String) = client.post("$base/api/v1/auth/session") {
             contentType(ContentType.Application.Json)

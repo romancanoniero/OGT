@@ -254,7 +254,7 @@ function newestFirst(a, b) {
 }
 
 function sortFeed() {
-  lastFeed.sort(newestFirst);
+  if(feedMode==="FOLLOWING")lastFeed.sort(newestFirst);
 }
 
 function mergePost(next) {
@@ -344,6 +344,7 @@ function applyLive(live) {
     body: live.body,
     honoreeName: live.honoreeName,
     categoryId: live.categoryId || lastFeed[idx].categoryId,
+    hashtags: live.hashtags ?? lastFeed[idx].hashtags,
     publicationKind: live.publicationKind || lastFeed[idx].publicationKind,
     topic: live.tag || lastFeed[idx].topic,
     place: live.place || lastFeed[idx].place,
@@ -1043,7 +1044,7 @@ function tagOf(post) {
 }
 
 function isHomenaje(post) {
-  return post.publicationKind!=="ACTION" && HOMENAJE_TAGS.has(tagOf(post));
+  return !["ACTION","POST"].includes(post.publicationKind) && HOMENAJE_TAGS.has(tagOf(post));
 }
 
 function isAnecdoteShare(post) {
@@ -1057,6 +1058,7 @@ function cardKind(post) {
   if (listing === "LOST") return "LOST_PET";
   if (listing === "ADOPTION") return "ADOPTION";
   if(post.publicationKind==="ACTION")return "COMMUNITY";
+  if(post.publicationKind==="POST")return TERNURA_TAGS.has(tagOf(post)) ? "TERNURA" : "COMMUNITY";
   const t = tagOf(post);
   if (t.includes("perdid")) return "LOST_PET";
   if (t === "adopción" || t === "adopcion") return "ADOPTION";
@@ -1255,6 +1257,7 @@ function renderEdit(post) {
   openDialog(`
     <h2>Editar publicación</h2>
     <p>El texto queda en esta ficha. La foto no se cambia desde acá.</p>
+    ${["POST","ACTION","TERNURA"].includes(post.publicationKind) ? `<label class="field">Hashtags<input id="edit-hashtags" value="${escapeHtml((post.hashtags||[]).map(t=>"#"+(t.categoryId?t.key:t.label)).join(" "))}"></label><label class="field">Nombre y apellido (si reconocés una buena acción)<input id="edit-honoree" maxlength="100" value="${escapeHtml(post.honoreeName||"")}"></label>` : ""}
     <textarea id="edit-body">${escapeHtml(post.body || "")}</textarea>
     <label class="field">Fuente o enlace original (opcional)<input id="edit-attribution" type="url" maxlength="2048" autocapitalize="off" value="${escapeHtml(post.attributionUrl || "")}"></label>
     <p class="hint">Citar la fuente no reemplaza el permiso de uso.</p>
@@ -1488,7 +1491,10 @@ function bindDialog(post) {
       if (!body) return;
       try {
         const attributionUrl = globalThis.OgtAttribution.normalize(document.getElementById("edit-attribution")?.value);
-        const updated = await api("/api/v1/social/post/edit", { postId: post.id, body, attributionUrl: attributionUrl || "" });
+        const tagsInput=document.getElementById("edit-hashtags");
+        const hashtags=tagsInput ? (await import("./hashtags.js")).hashtagList(tagsInput.value,{preserveLabels:true}) : undefined;
+        const honoreeFullName=document.getElementById("edit-honoree")?.value.trim() || undefined;
+        const updated = await api("/api/v1/social/post/edit", { postId: post.id, body, hashtags, honoreeFullName, attributionUrl: attributionUrl || "" });
         closeDialog();
         toast("Publicación editada");
         paintPost(mergePost(updated));
@@ -1856,6 +1862,7 @@ function postCard(post, { openable = true, previewStories = true, compose = fals
     ${truequeBodyHtml(post)}
     ${shown}
     <div class="post-attribution">${globalThis.OgtAttribution.link(post.attributionUrl)?.outerHTML || ""}</div>
+    ${post.hashtags?.length ? `<p class="meta post-hashtags">${post.hashtags.map(tag=>escapeHtml("#"+String(tag.label||tag.key).replace(/\s/g,""))).join(" ")}</p>` : ""}
     ${lostMapHtml(post)}
     ${truequeActionsHtml(post)}
     <div class="actions">
@@ -2256,6 +2263,8 @@ const FEED_TYPES = [
   ["NEWS", "Noticias"],
 ];
 let feedType = "";
+let feedMode = "HOME";
+let feedRequestVersion = 0;
 
 function familyOfFeedType(type) {
   if (!type) return "";
@@ -2277,10 +2286,12 @@ function visibleFeed(type) {
 
 async function loadFeed(type) {
   const next = type === undefined ? "" : type;
-  const payload = { pageSize: 40, mode: "HOME" };
+  const version=++feedRequestVersion;
+  const payload = { pageSize: 40, mode: feedMode };
   const family = familyOfFeedType(next);
   if (family) payload.family = family;
   const posts = await api("/api/v1/social/feed", payload);
+  if(version!==feedRequestVersion)return lastFeed;
   lastFeed = (Array.isArray(posts) ? posts : posts?.items || []).filter((p) => !hiddenIds.has(p.id));
   sortFeed();
   await loadListings();
@@ -2295,13 +2306,13 @@ async function loadListings() {
   lastListings.forEach((row) => {
     if (!row.postId) return;
     const existing = lastFeed.find((p) => p.id === row.postId);
-    mergePost(listingToPost(row, existing));
+    if(feedMode!=="FOLLOWING" || existing)mergePost(listingToPost(row, existing));
   });
   return lastListings;
 }
 
 function feedPillsHtml() {
-  return `<div class="chips feed-pills" id="feed-type" role="tablist" aria-label="Tipo de publicación">
+  return `<div class="chips feed-pills" aria-label="Selección del feed">${[["HOME","Para vos"],["FOLLOWING","Siguiendo"]].map(([mode,label])=>`<button type="button" class="chip${mode===feedMode?" on":""}" data-feed-mode="${mode}" aria-pressed="${mode===feedMode}">${label}</button>`).join("")}</div><div class="chips feed-pills" id="feed-type" role="tablist" aria-label="Tipo de publicación">
     ${FEED_TYPES.map(([id, label]) => `<button type="button" class="chip${id === feedType ? " on" : ""}" data-type="${id}" role="tab" aria-selected="${id === feedType ? "true" : "false"}">${escapeHtml(label)}</button>`).join("")}
   </div>`;
 }
@@ -2317,6 +2328,13 @@ function paintFeedList() {
 }
 
 function bindFeedPills() {
+  document.querySelectorAll('[data-feed-mode]').forEach(button=>button.addEventListener('click',async()=>{
+    if(feedMode===button.dataset.feedMode)return;
+    feedMode=button.dataset.feedMode;
+    document.querySelectorAll('[data-feed-mode]').forEach(node=>{const selected=node===button;node.classList.toggle('on',selected);node.setAttribute('aria-pressed',String(selected));});
+    const box=document.getElementById('feed-list');if(box)box.innerHTML='<p class="empty">Cargando…</p>';
+    try {await loadFeed(feedType);paintFeedList();}catch(error){if(box)box.textContent=error.message;}
+  }));
   document.getElementById("feed-type")?.querySelectorAll("[data-type]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const next = btn.dataset.type || "";
@@ -2388,11 +2406,10 @@ async function renderPost(id) {
 }
 
 const PUBLISH_KINDS = [
-  { id: "accion", title: "Dar a conocer", icon: "qs-feed", hint: "Reconocé una buena acción de otra persona." },
+  { id: "accion", title: "Publicar", icon: "qs-feed", hint: "Compartí algo bueno con hashtags." },
   { id: "convocatoria", title: "Convocatoria", icon: "qs-attend", hint: "Una juntada: huerta, merienda, limpieza." },
   { id: "trueque", title: "Trueque", icon: "qs-skills", hint: "Pedí un saber o una tarea. Se publica en el tablero.", timebank: true },
   { id: "homenaje", title: "Homenaje", icon: "qs-invite", hint: "Una enseñanza, una anécdota o las gracias." },
-  { id: "ternura", title: "Ternura", icon: "qs-pets", hint: "Un gesto o un animal que enterneció el día." },
   { id: "perdida", title: "Mascota perdida", icon: "qs-paw", hint: "Alerta con señas, última vista y el punto en el mapa.", animal: "LOST" },
   { id: "adopcion", title: "Adopción", icon: "qs-pets", hint: "Una ficha para que una familia postule.", animal: "ADOPTION" },
 ];
@@ -3063,6 +3080,8 @@ function bindPublishForm(kind, catalog=[], invitationsModule=null) {
 }
 
 async function renderPublicar(kind) {
+  const initialTag=kind==="ternura" ? "ternura" : null;
+  if(kind==="ternura")kind="accion";
   await loadSession();
   const spec = PUBLISH_KINDS.find((k) => k.id === kind);
   if (!spec) {
@@ -3073,9 +3092,10 @@ async function renderPublicar(kind) {
   let catalog=[];let invitationsModule=null;
   if(kind==="accion") {
     try { [catalog,invitationsModule]=await Promise.all([api("/api/v1/social/categories",{}),import('./post-invitations.js?v=1')]); }
-    catch(e){document.getElementById("main").innerHTML=`<h1>Dar a conocer</h1><p role="alert">${escapeHtml(e.message)}</p><a href="#/publicar">Volver a intentar</a>`;return;}
+    catch(e){document.getElementById("main").innerHTML=`<h1>Publicar</h1><p role="alert">${escapeHtml(e.message)}</p><a href="#/publicar">Volver a intentar</a>`;return;}
   }
-  const topics = kind==="accion" ? catalog.map(c=>c.label) : PUBLISH_TOPICS[kind] || [];
+  if(kind==="accion"){await renderUnifiedPublication(catalog,invitationsModule,initialTag);return;}
+  const topics = PUBLISH_TOPICS[kind] || [];
   const honor = kind === "homenaje";
   const main = document.getElementById("main");
   if (spec.animal) {
@@ -3214,6 +3234,99 @@ async function renderPublicar(kind) {
       <button type="submit" class="publish-cta" data-submit>${icon(spec.icon)} Publicar</button>
     </form>`;
   bindPublishForm(kind,catalog,invitationsModule);
+}
+
+async function renderUnifiedPublication(catalog,invitationsModule,initialTag=null) {
+  const {hashtagKey}=await import('./hashtags.js');
+  const main=document.getElementById('main');
+  const selected=new Map();
+  const officialKey=category=>category.tagKey||hashtagKey(category.label);
+  if(initialTag){const category=catalog.find(row=>officialKey(row)===initialTag);if(category)selected.set(initialTag,{key:initialTag,label:category.label,category});}
+  main.innerHTML=`<div class="chrome"><a href="#/publicar">Volver</a><h1>Publicar</h1></div>
+    <form class="publish" id="publish-form">
+      <p class="hint">Compartí algo bueno. Los hashtags cuentan de qué se trata y ayudan a encontrar contenido que te interesa.</p>
+      <h2>Hashtags</h2><p class="hint">Elegí los oficiales o agregá los tuyos. Hasta 8 por publicación.</p>
+      <div class="chips" data-official-tags>${catalog.map(category=>`<button type="button" class="chip" aria-label="${escapeHtml(category.label)}" aria-pressed="false" data-tag="${escapeHtml(officialKey(category))}">#${escapeHtml(category.label.replace(/\s/g,''))}</button>`).join('')}</div>
+      <div class="chips" data-selected-tags aria-label="Hashtags seleccionados"></div>
+      <label class="field">Hashtag libre<input name="freeHashtag" maxlength="60" placeholder="#HuertaEnCasa"></label>
+      <button type="button" class="ghost" data-add-tag>Agregar hashtag</button>
+      <section data-recognition-section hidden>
+        <p class="hint">Reconocé una buena acción de otra persona.</p>
+        <label class="field">¿Quién hizo esta buena acción?<input name="honoree" maxlength="100" placeholder="Nombre y apellido" autocomplete="off"></label>
+        <p class="hint">El nombre completo aparece en el título. El @nick se elige por separado y es opcional.</p>
+        <label class="field">Cuenta de OGT (opcional)<input name="recognitionAccount" placeholder="Buscá @nick o nombre" autocomplete="off"></label>
+        <div class="chips" data-recognition-people aria-live="polite"></div>
+      </section>
+      <div class="media-pick"><button type="button" class="media-add" data-add-media>${icon('qs-plus')} Foto o video</button>
+        <input type="file" data-file accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" multiple><div class="media-thumbs" data-thumbs></div></div>
+      <label class="field">Lugar (opcional)<input name="publicationPlace" maxlength="200" placeholder="Plaza o barrio"></label>
+      <label class="field">La historia<textarea name="body" maxlength="500" required></textarea></label>
+      <p class="count" data-count>0 / 500</p>
+      <label class="field">Fuente o enlace original (opcional)<input name="attributionUrl" type="url" maxlength="2048" autocapitalize="off"></label>
+      ${invitationsModule.invitationEditorHtml()}
+      <p class="hint publication-rights-notice">Al publicar declarás que el contenido es tuyo o que tenés los permisos necesarios. Citar la fuente no reemplaza la autorización. <a href="/terms#propiedad-intelectual" target="_blank" rel="noopener">Leer el acuerdo de publicación</a>.</p>
+      <p role="alert" data-publication-error></p><button type="submit" class="publish-cta" data-submit>Publicar</button>
+    </form>`;
+  const form=document.getElementById('publish-form'),name=form.elements.honoree,account=form.elements.recognitionAccount;
+  form.noValidate=true;
+  const error=form.querySelector('[data-publication-error]'),submit=form.querySelector('[data-submit]');
+  let person=null,searchVersion=0,busy=false,attemptKey='',requestId='',uploaded=null;
+  const invitationDrafts=invitationsModule.bindInvitationDrafts(form,{honoreeName:()=>name.value,honoreeId:()=>person?.userId});
+  const recognition=()=>[...selected.values()].some(tag=>tag.category?.requiresRecognition!==false && tag.category);
+  function paint(){
+    form.querySelectorAll('[data-tag]').forEach(button=>{const on=selected.has(button.dataset.tag);button.classList.toggle('on',on);button.setAttribute('aria-pressed',String(on));});
+    const box=form.querySelector('[data-selected-tags]');box.replaceChildren();
+    for(const tag of selected.values()) {const button=document.createElement('button');button.type='button';button.className='chip on';button.textContent='#'+tag.label.replace(/\s/g,'')+' ×';button.setAttribute('aria-label','Quitar #'+tag.key);button.onclick=()=>{selected.delete(tag.key);paint();};box.append(button);}
+    form.querySelector('[data-recognition-section]').hidden=!recognition();name.required=recognition();
+  }
+  function add(raw){
+    const key=hashtagKey(raw);if(selected.has(key))return;
+    if(selected.size>=8)throw new Error('Podés elegir hasta 8 hashtags.');
+    const category=catalog.find(row=>officialKey(row)===key || hashtagKey(row.label)===key);
+    const canonical=category ? officialKey(category) : key;
+    selected.set(canonical,{key:canonical,label:category?.label||raw.trim().replace(/^#/,'').replace(/\s/g,''),category});paint();
+  }
+  function addFree(){const field=form.elements.freeHashtag;if(field.value.trim()){add(field.value);field.value='';}}
+  form.querySelector('[data-add-tag]').onclick=()=>{try{addFree();error.textContent='';}catch(e){error.textContent=e.message;}};
+  form.elements.freeHashtag.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();form.querySelector('[data-add-tag]').click();}});
+  form.querySelectorAll('[data-tag]').forEach(button=>button.onclick=()=>{try{const key=button.dataset.tag;if(selected.has(key)){selected.delete(key);paint();}else add(key);error.textContent='';}catch(e){error.textContent=e.message;}});
+  account.addEventListener('input',async()=>{
+    person=null;const version=++searchVersion;const box=form.querySelector('[data-recognition-people]');box.replaceChildren();
+    const query=account.value.trim().replace(/^@/,'');if(query.length<2)return;
+    try {const result=await api('/api/v1/social/search',{query,pageSize:8});if(version!==searchVersion || !form.isConnected)return;
+      for(const hit of (result.people||[]).filter(row=>row.userId!==me.userId)){
+        const button=document.createElement('button');button.type='button';button.className='chip';button.textContent=hit.displayName+(hit.nickname?' · @'+hit.nickname:'');
+        button.onclick=()=>{++searchVersion;person=hit;account.value=hit.nickname?'@'+hit.nickname:hit.displayName;if(!name.value.trim())name.value=hit.displayName;box.textContent='Vas a reconocer a '+hit.displayName;};box.append(button);
+      }
+    }catch{if(version===searchVersion)box.textContent='No pudimos buscar cuentas. Podés continuar con el nombre completo.';}
+  });
+  form.elements.body.oninput=()=>{form.querySelector('[data-count]').textContent=form.elements.body.value.length+' / 500';};
+  bindPublishMedia(form);paint();
+  form.addEventListener('submit',async event=>{
+    event.preventDefault();if(busy)return;error.textContent='';
+    try {
+      addFree();if(!selected.size)throw new Error('Elegí al menos un hashtag.');
+      const requiresRecognition=recognition(),honoree=name.value.trim();
+      if(requiresRecognition && (honoree.length<2 || honoree.startsWith('@')))throw new Error('Ingresá el nombre completo, separado del @nick.');
+      const nameKey=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9 ._-]/g,'').replace(/[ ._-]+/g,'.').replace(/^\.+|\.+$/g,'');
+      if(requiresRecognition && !person && nameKey(honoree)===nameKey(me.displayName))throw new Error('Reconocé la buena acción de otra persona.');
+      const body=form.elements.body.value.trim();if(!body)throw new Error('Contá lo que querés compartir.');
+      if(!publishFiles.length)throw new Error('Hace falta al menos una foto o un video.');
+      const attributionUrl=globalThis.OgtAttribution.normalize(form.elements.attributionUrl.value),invitations=invitationDrafts();
+      if(!requiresRecognition && invitations.some(row=>row.purpose==='RECOGNITION'))throw new Error('Elegí un hashtag de buena acción o quitá la invitación de reconocimiento.');
+      const hashtags=[...selected.values()].map(tag=>tag.category?tag.key:tag.label);
+      const place=form.elements.publicationPlace.value.trim() || undefined;
+      const key=JSON.stringify({body,hashtags,place,honoree,person:person?.userId,attributionUrl,invitations,files:publishFiles.map(file=>[file.file?.name,file.file?.size,file.url])});
+      if(key!==attemptKey){attemptKey=key;requestId=crypto.randomUUID();uploaded=null;}
+      busy=true;form.inert=true;submit.textContent='Subiendo publicación…';
+      const media=uploaded || (uploaded=await uploadPublishMedia([...selected.values()][0].label));
+      const saved=await api('/api/v1/social/publish',{body,hashtags,place,media,requestId,publicationKind:'POST',
+        honoreeFullName:requiresRecognition?honoree:undefined,protagonistUserId:requiresRecognition?person?.userId:undefined,invitations,attributionUrl});
+      clearPublishFiles();mergePost(saved);toast('Publicado en el feed');location.hash='#/p/'+saved.id;
+      if(invitations.length)await invitationsModule.openInvitationManager({api,postId:saved.id,toast});
+    }catch(e){error.textContent=e.message;}
+    finally{busy=false;form.inert=false;submit.textContent='Publicar';}
+  });
 }
 
 function speciesLabel(code) {

@@ -42,6 +42,7 @@ fun feedCardKind(
     if (kind == "LOST") return FeedCardKind.LOST_PET
     if (kind == "ADOPTION") return FeedCardKind.ADOPTION
     if(publicationKind=="ACTION")return FeedCardKind.COMMUNITY
+    if(publicationKind=="POST")return if(isTernuraPost(tag))FeedCardKind.TERNURA else FeedCardKind.COMMUNITY
     val t = tag.trim().lowercase()
     if (t.contains("perdid")) return FeedCardKind.LOST_PET
     if (t in TERNURA_TAGS) return FeedCardKind.TERNURA

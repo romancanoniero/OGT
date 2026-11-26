@@ -87,10 +87,11 @@ class FeedTimeline(
         posts=if(initialized) river(query,null) else emptyList(),ready=initialized,
     )
     private fun river(query:FeedQuery,order:List<String>?) =
-        db.composeVisibleRiver(owner,query.mode,query.family,order).filter {
+        db.composeVisibleRiver(owner,query.mode,query.family,order ?: db.cachedFeedOrder(owner,query.mode,query.family)).filter {
             it.id !in removed && (query.mode!=FeedMode.FOLLOWING || db.shouldShowInFeed(owner,it,query.mode,query.family))
         }
     private fun publish(query:FeedQuery,value:FeedPageState) {
+        if(value.ready)db.rememberFeedOrder(owner,query.mode,query.family,value.posts.map { it.id })
         if(pages.value[query]!=value) _pages.value=pages.value+(query to value)
     }
     private fun entry(query:FeedQuery):Entry = entries.getOrPut(query) {

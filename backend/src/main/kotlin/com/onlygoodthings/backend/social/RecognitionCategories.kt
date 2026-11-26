@@ -30,15 +30,17 @@ class RecognitionCategories(private val db: Database) {
         val version = data.optInt("version",0)
         val order = data.optInt("sortOrder",0)
         val active = data.optBoolean("active", true)
+        val requiresRecognition = data.optBoolean("requiresRecognition", true)
+        val tagKey = data.optString("tagKey")?.takeIf(String::isNotBlank)?.let(Hashtags::key) ?: Hashtags.catalogKey(label,id)
         try {
             return db.withConnection { c ->
                 c.autoCommit = false
                 try {
-                    val sql = if (version == 0) "INSERT INTO recognition_categories(id,label,icon,active,sort_order) VALUES(?,?,?,?,?) RETURNING *"
-                    else "UPDATE recognition_categories SET label=?,icon=?,active=?,sort_order=?,version=version+1,updated_at=now() WHERE id=? AND version=? RETURNING *"
+                    val sql = if (version == 0) "INSERT INTO recognition_categories(id,label,icon,active,sort_order,tag_key,requires_recognition) VALUES(?,?,?,?,?,?,?) RETURNING *"
+                    else "UPDATE recognition_categories SET label=?,icon=?,active=?,sort_order=?,requires_recognition=COALESCE(?::boolean,requires_recognition),version=version+1,updated_at=now() WHERE id=? AND version=? RETURNING *"
                     val saved = c.prepareStatement(sql).use { q ->
-                        if (version == 0) { q.setString(1,id);q.setString(2,label);q.setString(3,icon);q.setBoolean(4,active);q.setInt(5,order) }
-                        else { q.setString(1,label);q.setString(2,icon);q.setBoolean(3,active);q.setInt(4,order);q.setString(5,id);q.setInt(6,version) }
+                        if (version == 0) { q.setString(1,id);q.setString(2,label);q.setString(3,icon);q.setBoolean(4,active);q.setInt(5,order);q.setString(6,tagKey);q.setBoolean(7,requiresRecognition) }
+                        else { q.setString(1,label);q.setString(2,icon);q.setBoolean(3,active);q.setInt(4,order);if(data.containsKey("requiresRecognition"))q.setBoolean(5,requiresRecognition) else q.setNull(5,java.sql.Types.BOOLEAN);q.setString(6,id);q.setInt(7,version) }
                         q.executeQuery().use { rs -> require(rs.next()) { "La categoría cambió. Actualizá el listado antes de guardar." };rs.category() }
                     }
                     c.prepareStatement("INSERT INTO crm_audit_events(actor_user_id,action,target_type,target_id,reason,outcome) VALUES(?::uuid,'RECOGNITION_CATEGORY_SAVE','recognition_category',?,?,'SUCCESS')").use { q ->
@@ -62,7 +64,7 @@ class RecognitionCategories(private val db: Database) {
     }
 }
 
-private fun ResultSet.category() = RecognitionCategory(getString("id"),getString("label"),getString("icon"),getBoolean("active"),getInt("sort_order"),getInt("version"))
+private fun ResultSet.category() = RecognitionCategory(getString("id"),getString("label"),getString("icon"),getBoolean("active"),getInt("sort_order"),getInt("version"),getString("tag_key") ?: Hashtags.catalogKey(getString("label"),getString("id")),getBoolean("requires_recognition"))
 
 fun Route.recognitionCategoryRoutes(db:Database) {
     post("/api/v1/social/categories") { call.respond(ApiResponse.ok(RecognitionCategories(db).list())) }

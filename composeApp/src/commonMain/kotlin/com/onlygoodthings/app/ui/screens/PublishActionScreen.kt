@@ -145,6 +145,7 @@ fun PublishActionScreen(
     onDone: () -> Unit,
     onBack: () -> Unit = onDone,
 ) {
+    if(kind==ComposePostKind.ACTION || kind==ComposePostKind.TERNURA) { PublishPostScreen(editPostId,onDone,onBack,initialHashtag=if(kind==ComposePostKind.TERNURA)"ternura" else null);return }
     if(kind==ComposePostKind.GATHERING) { PublishGatheringScreen(editPostId,onDone,onBack);return }
     val db = LocalOgtDb.current
     val session = LocalOgtSession.current

@@ -16,6 +16,8 @@ import com.onlygoodthings.shared.domain.PostPlacement
 import com.onlygoodthings.shared.domain.SocialAnecdote
 import com.onlygoodthings.shared.domain.SocialComment
 import com.onlygoodthings.shared.domain.SocialLiveCounters
+import com.onlygoodthings.shared.domain.PostHashtag
+import com.onlygoodthings.shared.domain.Hashtags
 import com.onlygoodthings.shared.domain.SocialPost
 import com.onlygoodthings.shared.domain.MoneyLedgerKind
 import com.onlygoodthings.shared.domain.isAnecdoteShare
@@ -60,7 +62,11 @@ class SocialSqlRepository(private val db: Database) {
         val offset = cursor?.toIntOrNull() ?: 0
         val viewer = loadViewer(userId)
         val excluded=blocks.excluded(userId)
-        val candidates = (loadCandidates() + loadMatchedFriendNeeds(viewer)).distinctBy { it.postId }.filter { it.authorUserId !in excluded }
+        val preferred=viewer.events.filter { it.kind in setOf(FeedEventKind.CLAP,FeedEventKind.HEART,FeedEventKind.COMMENT,FeedEventKind.SHARE) }
+            .flatMap { it.hashtags }.distinctBy { it.interestKey }.take(12)
+        val inventory=if(mode==FeedMode.FOLLOWING)loadCandidates(graphIds=viewer.followedIds+viewer.userId)
+            else loadCandidates()+(if(preferred.isEmpty())emptyList() else loadCandidates(preferred))
+        val candidates = (inventory + loadMatchedFriendNeeds(viewer)).distinctBy { it.postId }.filter { it.authorUserId !in excluded }
         val ranked = FeedRanker.rank(candidates, viewer, mode, System.currentTimeMillis(), offset, pageSize, family)
         if (ranked.isEmpty()) return emptyList()
         val hydrated = hydratePosts(ranked.map { it.postId }, userId).associateBy { it.id }
@@ -112,19 +118,30 @@ class SocialSqlRepository(private val db: Database) {
         invitations: List<com.onlygoodthings.shared.domain.PostInvitationDraft> = emptyList(),
         honoreeFullName: String? = null,
         place:String?=null,eventStartsAtEpochMs:Long?=null,
+        hashtags:List<String>?=null,
     ): SocialPost {
         require(body.isNotBlank()) { "El texto no puede estar vacío" }
+        require(hashtags==null || publicationKind=="POST") { "Los hashtags múltiples se publican desde Publicar." }
         require(media.isNotEmpty()) { "Hace falta al menos una foto o un video" }
         require(media.size<=10) { "Podés adjuntar hasta 10 archivos." }
         require(requestId==null || Regex("^[A-Za-z0-9_-]{12,80}$").matches(requestId)) { "Identificador de envío inválido" }
         if(place!=null || eventStartsAtEpochMs!=null) {
-            require(publicationKind=="CONVOCATORIA") { "El día y lugar pertenecen a una convocatoria." }
-            com.onlygoodthings.shared.domain.validateGathering(body,topic,place.orEmpty(),eventStartsAtEpochMs ?: 0,System.currentTimeMillis())
+            if(publicationKind=="POST") {
+                require(eventStartsAtEpochMs==null && place.orEmpty().trim().length in 2..200) { "Revisá el lugar opcional. La fecha pertenece a una convocatoria." }
+            } else {
+                require(publicationKind=="CONVOCATORIA") { "El día y lugar pertenecen a una convocatoria." }
+                com.onlygoodthings.shared.domain.validateGathering(body,topic,place.orEmpty(),eventStartsAtEpochMs ?: 0,System.currentTimeMillis())
+            }
         }
         val credit=ContentAttribution.normalize(attributionUrl)
         val hero=protagonistUserId?.trim()?.takeIf(String::isNotEmpty)
+        // REST supplies a fresh transient media ID when a client omits it. New
+        // publications compare the actual media, preserving legacy fingerprints.
+        val fingerprintMedia=if(publicationKind=="POST")media.map {
+            listOf(it.kind.name,it.url,it.posterUrl,it.sortOrder,it.durationMs,it.altText,it.assetKey,it.frameX,it.frameY,it.frameZoom)
+        } else media
         val fingerprint=invitationTokenHash(com.onlygoodthings.backend.http.JsonBody.objectMapper.writeValueAsString(
-            listOf(body,topic,media,latitude,longitude,hero,participantUserIds,honoreeName,sourceUrl,credit,publicationKind,categoryId,invitations,honoreeFullName,place,eventStartsAtEpochMs)))
+            listOf(body,topic,fingerprintMedia,latitude,longitude,hero,participantUserIds,honoreeName,sourceUrl,credit,publicationKind,categoryId,invitations,honoreeFullName,place,eventStartsAtEpochMs).let { if(hashtags==null)it else it+listOf(hashtags) }))
         val postId=db.withConnection { c ->
             c.autoCommit=false
             try {
@@ -135,8 +152,11 @@ class SocialSqlRepository(private val db: Database) {
                     }
                     if(old!=null) { require(old.second==fingerprint) { "Este envío ya tiene una publicación. Actualizá el feed antes de cambiarla." };c.commit();return@withConnection old.first }
                 }
-                val category=RecognitionCategories.resolve(c,categoryId,topic)
-                val recognition=GoodActionRecognition.isAction(topic,publicationKind) || (publicationKind==null && category!=null)
+                require(publicationKind!="POST" || hashtags!=null) { "Elegí los hashtags de la publicación." }
+                val resolved=hashtags?.let { PostHashtags.resolve(c,it) }
+                val category=RecognitionCategories.resolve(c,if(publicationKind=="POST")resolved?.recognitionCategoryId else categoryId,topic)
+                val recognition=if(publicationKind=="POST")resolved?.recognitionCategoryId!=null else GoodActionRecognition.isAction(topic,publicationKind) || (publicationKind==null && category?.requiresRecognition==true)
+                val primaryTopic=if(recognition)category!!.label else resolved?.tags?.firstOrNull()?.label ?: topic
                 require(categoryId==null || (recognition && category!=null)) { "Categoría de reconocimiento inválida" }
                 if(recognition)require(category!=null && category.active) { "Esta categoría ya no está disponible. Elegí otra." }
                 val name=(honoreeFullName ?: honoreeName)?.trim()?.takeIf(String::isNotEmpty)
@@ -156,9 +176,11 @@ class SocialSqlRepository(private val db: Database) {
                 """.trimIndent()).use { q ->
                     q.setString(1,id);q.setString(2,userId);q.setString(3,body);q.setArray(4,c.createArrayOf("text",media.map { it.url }.toTypedArray()))
                     q.setObject(5,if(latitude!=null && longitude!=null)longitude else null);q.setObject(6,longitude);q.setObject(7,latitude)
-                    q.setString(8,if(recognition)category!!.label else topic);q.setString(9,recognizedName);q.setString(10,sourceUrl?.trim()?.takeIf(String::isNotEmpty));q.setString(11,credit)
-                    q.setString(12,if(recognition)category?.id else null);q.setString(13,if(recognition)"ACTION" else publicationKind);q.setString(14,requestId);q.setString(15,fingerprint);q.setString(16,place?.trim());q.setTimestamp(17,eventStartsAtEpochMs?.let { java.sql.Timestamp(it) });q.executeUpdate()
+                    q.setString(8,primaryTopic);q.setString(9,recognizedName);q.setString(10,sourceUrl?.trim()?.takeIf(String::isNotEmpty));q.setString(11,credit)
+                    q.setString(12,if(recognition)category?.id else null);q.setString(13,if(publicationKind=="POST")"POST" else if(recognition)"ACTION" else publicationKind);q.setString(14,requestId);q.setString(15,fingerprint);q.setString(16,place?.trim());q.setTimestamp(17,eventStartsAtEpochMs?.let { java.sql.Timestamp(it) });q.executeUpdate()
                 }
+                val savedTags=resolved?.tags ?: if(recognition && category!=null)listOf(PostHashtag(category.tagKey,primaryTopic,category.id)) else Hashtags.legacy(primaryTopic)
+                c.prepareStatement("UPDATE social_posts SET hashtags=?::jsonb WHERE id=?::uuid").use { q -> q.setString(1,PostHashtags.json(savedTags));q.setString(2,id);q.executeUpdate() }
                 c.prepareStatement("INSERT INTO post_people(post_id,user_id,role) VALUES(?::uuid,?::uuid,'AUTHOR')").use { q ->q.setString(1,id);q.setString(2,userId);q.executeUpdate() }
                 if(!hero.isNullOrBlank() && !hero.equals(userId,true))c.prepareStatement("INSERT INTO post_people(post_id,user_id,role) VALUES(?::uuid,?::uuid,'PROTAGONIST') ON CONFLICT DO NOTHING").use { q ->q.setString(1,id);q.setString(2,hero);q.executeUpdate() }
                 participantUserIds.distinct().filter { it!=userId && it!=hero }.forEach { person ->
@@ -747,7 +769,7 @@ class SocialSqlRepository(private val db: Database) {
         }
     }
 
-    fun editPost(postId: String, userId: String, body: String, topic: String?, attributionUrl: String? = null, honoreeFullName:String?=null, categoryId:String?=null,place:String?=null,eventStartsAtEpochMs:Long?=null): SocialPost {
+    fun editPost(postId: String, userId: String, body: String, topic: String?, attributionUrl: String? = null, honoreeFullName:String?=null, categoryId:String?=null,place:String?=null,eventStartsAtEpochMs:Long?=null,hashtags:List<String>?=null): SocialPost {
         val credit = ContentAttribution.normalize(attributionUrl)
         val trimmed = body.trim()
         require(trimmed.isNotBlank()) { "El texto no puede estar vacío" }
@@ -761,14 +783,30 @@ class SocialSqlRepository(private val db: Database) {
                 require(old.first==userId) { "Solo quien publicó puede editar" }
                 if(place!=null || eventStartsAtEpochMs!=null) {
                     val prior=c.prepareStatement("SELECT publication_kind,event_starts_at FROM social_posts WHERE id=?::uuid").use { q ->q.setString(1,postId);q.executeQuery().use { r ->r.next();r.getString(1) to r.getTimestamp(2)?.time } }
-                    require(com.onlygoodthings.shared.domain.isGatheringPost(old.third,prior.first)) { "Esta publicación no es una convocatoria." }
-                    com.onlygoodthings.shared.domain.validateGathering(body,topic ?: old.third,place.orEmpty(),eventStartsAtEpochMs ?: 0,System.currentTimeMillis(),allowPast=prior.second==eventStartsAtEpochMs)
+                    if(prior.first in listOf("POST","ACTION","TERNURA") || (prior.first==null && !com.onlygoodthings.shared.domain.isGatheringPost(old.third,null))) {
+                        require(eventStartsAtEpochMs==null && place.orEmpty().trim().length<=200) { "Revisá el lugar opcional." }
+                    } else {
+                        require(com.onlygoodthings.shared.domain.isGatheringPost(old.third,prior.first)) { "Esta publicación no es una convocatoria." }
+                        com.onlygoodthings.shared.domain.validateGathering(body,topic ?: old.third,place.orEmpty(),eventStartsAtEpochMs ?: 0,System.currentTimeMillis(),allowPast=prior.second==eventStartsAtEpochMs)
+                    }
                 }
-                val selected=categoryId?.let { RecognitionCategories.resolve(c,it,topic.orEmpty()) ?: throw IllegalArgumentException("Categoría inexistente") }
-                if(selected!=null && selected.id!=old.second && !selected.label.equals(old.third,true))require(selected.active) { "Elegí una categoría activa." }
+                val updatedTags=hashtags?.let { raw ->
+                    val previous=c.prepareStatement("SELECT hashtags,publication_kind,honoree_name FROM social_posts WHERE id=?::uuid").use { q ->q.setString(1,postId);q.executeQuery().use { r ->r.next();Triple(PostHashtags.read(r.getString(1)),r.getString(2),r.getString(3)) } }
+                    require(previous.second in listOf(null,"ACTION","TERNURA","POST")) { "Los hashtags de este formulario pertenecen a una publicación." }
+                    val resolved=PostHashtags.resolve(c,raw,previous.first)
+                    if(resolved.recognitionCategoryId!=null && !GoodActionRecognition.isAction(old.third,previous.second)) {
+                        val hero=c.prepareStatement("SELECT user_id::text FROM post_people WHERE post_id=?::uuid AND role='PROTAGONIST' LIMIT 1").use { q ->q.setString(1,postId);q.executeQuery().use { r ->if(r.next())r.getString(1) else null } }
+                        val author=c.prepareStatement("SELECT display_name FROM users WHERE id=?::uuid").use { q ->q.setString(1,userId);q.executeQuery().use { r ->r.next();r.getString(1) } }
+                        GoodActionRecognition.validate(userId,hero,honoreeFullName ?: previous.third,author)
+                    }
+                    resolved
+                }
+                val selected=(updatedTags?.recognitionCategoryId ?: categoryId)?.let { RecognitionCategories.resolve(c,it,topic.orEmpty()) ?: throw IllegalArgumentException("Categoría inexistente") }
+                if(updatedTags==null && selected!=null && selected.id!=old.second && !selected.label.equals(old.third,true))require(selected.active) { "Elegí una categoría activa." }
                 c.prepareStatement("UPDATE social_posts SET body=?,topic=COALESCE(?,topic),attribution_url=CASE WHEN ? THEN ? ELSE attribution_url END,honoree_name=COALESCE(?,honoree_name),recognition_category_id=COALESCE(?,recognition_category_id),gathering_place=COALESCE(?,gathering_place),event_starts_at=COALESCE(?,event_starts_at),publication_kind=CASE WHEN ? THEN 'CONVOCATORIA' ELSE publication_kind END,updated_at=now() WHERE id=?::uuid").use { q ->
-                    q.setString(1,trimmed);q.setString(2,if(selected?.id==old.second && topic==old.third)old.third else selected?.label ?: topic?.trim()?.takeIf { it.isNotEmpty() });q.setBoolean(3,attributionUrl!=null);q.setString(4,credit);q.setString(5,honoreeFullName?.trim());q.setString(6,selected?.id);q.setString(7,place?.trim());q.setTimestamp(8,eventStartsAtEpochMs?.let { java.sql.Timestamp(it) });q.setBoolean(9,eventStartsAtEpochMs!=null);q.setString(10,postId);q.executeUpdate()
+                    q.setString(1,trimmed);q.setString(2,if(updatedTags!=null)selected?.label ?: updatedTags.tags.first().label else if(selected?.id==old.second && topic==old.third)old.third else selected?.label ?: topic?.trim()?.takeIf { it.isNotEmpty() });q.setBoolean(3,attributionUrl!=null);q.setString(4,credit);q.setString(5,honoreeFullName?.trim());q.setString(6,selected?.id);q.setString(7,place?.trim());q.setTimestamp(8,eventStartsAtEpochMs?.let { java.sql.Timestamp(it) });q.setBoolean(9,eventStartsAtEpochMs!=null);q.setString(10,postId);q.executeUpdate()
                 }
+                if(updatedTags!=null)c.prepareStatement("UPDATE social_posts SET hashtags=?::jsonb,recognition_category_id=CASE WHEN publication_kind='POST' THEN ? ELSE recognition_category_id END WHERE id=?::uuid").use { q -> q.setString(1,PostHashtags.json(updatedTags.tags));q.setString(2,updatedTags.recognitionCategoryId);q.setString(3,postId);q.executeUpdate() }
                 c.commit()
             } catch(e:Exception) { c.rollback();throw e } finally { c.autoCommit=true }
         }
@@ -837,10 +875,12 @@ class SocialSqlRepository(private val db: Database) {
         }
         val events = connection.prepareStatement(
             """
-            SELECT e.post_id, e.kind, p.author_user_id, COALESCE(p.topic, '') AS topic
+            SELECT e.post_id, e.kind, e.dwell_ms, EXTRACT(EPOCH FROM e.created_at)*1000 AS event_ms, p.hashtags, p.author_user_id, COALESCE(p.topic, '') AS topic
             FROM feed_events e
             JOIN social_posts p ON p.id = e.post_id
             WHERE e.viewer_id = ?::uuid AND e.created_at > now() - INTERVAL '90 days'
+              AND p.moderation_status='VISIBLE' AND NOT p.is_story
+            ORDER BY e.created_at DESC LIMIT 2000
             """.trimIndent(),
         ).use { stmt ->
             stmt.setString(1, userId)
@@ -853,6 +893,8 @@ class SocialSqlRepository(private val db: Database) {
                                 authorUserId = rs.getString("author_user_id"),
                                 topic = rs.getString("topic"),
                                 kind = FeedEventKind.valueOf(rs.getString("kind")),
+                                hashtags = PostHashtags.read(rs.getString("hashtags")),
+                                occurredAtEpochMs = rs.getLong("event_ms"),dwellMs=rs.getInt("dwell_ms"),
                             ),
                         )
                     }
@@ -870,10 +912,12 @@ class SocialSqlRepository(private val db: Database) {
         ViewerContext(userId, followed, events, lat, lng, offeredTagIds = offered)
     }
 
-    private fun loadCandidates(): List<FeedCandidate> = db.withConnection { connection ->
+    private fun loadCandidates(preferred:List<PostHashtag> = emptyList(),graphIds:Set<String>?=null): List<FeedCandidate> = db.withConnection { connection ->
+        val topicFilter=if(preferred.isEmpty())"" else " AND ("+preferred.joinToString(" OR ") { "p.hashtags @> ?::jsonb" }+")"
+        val graphFilter=if(graphIds==null)"" else " AND (p.author_user_id=ANY(?::uuid[]) OR EXISTS(SELECT 1 FROM post_people fp WHERE fp.post_id=p.id AND fp.role='PROTAGONIST' AND fp.user_id=ANY(?::uuid[])))"
         connection.prepareStatement(
             """
-            SELECT p.id, p.author_user_id, p.author_company_id, COALESCE(p.topic, '') AS topic,
+            SELECT p.id, p.author_user_id, p.author_company_id, p.hashtags, COALESCE(p.topic, '') AS topic,
                    p.impact_count, p.comment_count, p.source_url,
                    EXTRACT(EPOCH FROM p.created_at) * 1000 AS created_ms,
                    ST_Y(p.location) AS lat, ST_X(p.location) AS lng,
@@ -893,10 +937,19 @@ class SocialSqlRepository(private val db: Database) {
             LEFT JOIN animal_listings a ON a.id = p.listing_id
             LEFT JOIN timebank_needs tn ON tn.post_id = p.id AND tn.open
             WHERE p.moderation_status = 'VISIBLE' AND p.is_story = FALSE
+            $topicFilter $graphFilter
             ORDER BY p.created_at DESC
             LIMIT 200
             """.trimIndent(),
         ).use { stmt ->
+            preferred.forEachIndexed { index,tag ->
+                val identity=tag.categoryId?.let { mapOf("categoryId" to it) } ?: mapOf("key" to tag.key)
+                stmt.setString(index+1,com.onlygoodthings.backend.http.JsonBody.objectMapper.writeValueAsString(listOf(identity)))
+            }
+            if(graphIds!=null) {
+                val graph=connection.createArrayOf("uuid",graphIds.toTypedArray())
+                stmt.setArray(preferred.size+1,graph);stmt.setArray(preferred.size+2,graph)
+            }
             stmt.executeQuery().use { rs ->
                 buildList {
                     while (rs.next()) {
@@ -909,6 +962,7 @@ class SocialSqlRepository(private val db: Database) {
                                 authorUserId = authorUser,
                                 protagonistUserId = rs.getString("protagonist_id") ?: authorUser,
                                 topic = rs.getString("topic"),
+                                hashtags = PostHashtags.read(rs.getString("hashtags")),
                                 createdAtEpochMs = rs.getLong("created_ms"),
                                 impactCount = rs.getInt("impact_count"),
                                 commentCount = rs.getInt("comment_count"),
@@ -937,7 +991,7 @@ class SocialSqlRepository(private val db: Database) {
         return db.withConnection { connection ->
             connection.prepareStatement(
                 """
-                SELECT p.id, p.author_user_id, p.author_company_id, COALESCE(p.topic, '') AS topic,
+                SELECT p.id, p.author_user_id, p.author_company_id, p.hashtags, COALESCE(p.topic, '') AS topic,
                        p.impact_count, p.comment_count, p.source_url,
                        EXTRACT(EPOCH FROM p.created_at) * 1000 AS created_ms,
                        ST_Y(p.location) AS lat, ST_X(p.location) AS lng,
@@ -976,6 +1030,7 @@ class SocialSqlRepository(private val db: Database) {
                                     authorUserId = authorUser,
                                     protagonistUserId = rs.getString("protagonist_id") ?: authorUser,
                                     topic = rs.getString("topic"),
+                                    hashtags = PostHashtags.read(rs.getString("hashtags")),
                                     createdAtEpochMs = rs.getLong("created_ms"),
                                     impactCount = rs.getInt("impact_count"),
                                     commentCount = rs.getInt("comment_count"),
@@ -1006,7 +1061,7 @@ class SocialSqlRepository(private val db: Database) {
                 """
                 SELECT p.id, p.author_kind, p.author_user_id, p.author_company_id, p.body, p.media_urls,
                        p.impact_count, p.comment_count, p.is_story, COALESCE(p.topic, '') AS topic,
-                       p.source_url, p.attribution_url, p.honoree_name, p.recognition_category_id, p.publication_kind, p.gathering_place, p.event_starts_at,
+                       p.source_url, p.attribution_url, p.honoree_name, p.recognition_category_id,p.hashtags, p.publication_kind, p.gathering_place, p.event_starts_at,
                        COALESCE(p.achieved_count, 0) AS achieved_count,
                        COALESCE(p.placement::text, 'ORGANIC') AS placement,
                        EXTRACT(EPOCH FROM p.created_at) * 1000 AS created_ms,
@@ -1410,6 +1465,7 @@ class SocialSqlRepository(private val db: Database) {
             empresaQueSuma = runCatching { getBoolean("empresa_que_suma") }.getOrDefault(false),
             honoreeName = runCatching { stringOrNull("honoree_name") }.getOrNull(),
             categoryId = runCatching { stringOrNull("recognition_category_id") }.getOrNull(),
+            hashtags = PostHashtags.read(stringOrNull("hashtags")),
             publicationKind = runCatching { stringOrNull("publication_kind") }.getOrNull(),
             place = stringOrNull("gathering_place"),
             eventStartsAtEpochMs = getTimestamp("event_starts_at")?.time,

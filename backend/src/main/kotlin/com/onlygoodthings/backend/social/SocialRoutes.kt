@@ -116,6 +116,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             honoreeName = dataMap.optString("honoreeName"),
             attributionUrl = ContentAttribution.normalize(dataMap.optString("attributionUrl")),
             publicationKind = dataMap.optString("publicationKind"),
+            hashtags = dataMap.hashtags(),
             categoryId = dataMap.optString("categoryId"),
             requestId = dataMap.optString("requestId"),
             invitations = dataMap.invitationDrafts(),
@@ -136,6 +137,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
                     tag = saved.topic,
                     honoreeName = saved.honoreeName,
                     categoryId = saved.categoryId,
+                    hashtags = saved.hashtags,
                     publicationKind = saved.publicationKind,
                     place = saved.place,
                     eventStartsAtEpochMs = saved.eventStartsAtEpochMs,
@@ -508,6 +510,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
                     createdAtEpochMs = saved.createdAtEpochMs,
                     honoreeName = saved.honoreeName,
                     categoryId = saved.categoryId,
+                    hashtags = saved.hashtags,
                     publicationKind = saved.publicationKind,
                     place = saved.place,
                     eventStartsAtEpochMs = saved.eventStartsAtEpochMs,
@@ -535,6 +538,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             honoreeFullName = dataMap.optString("honoreeFullName"),
             place = dataMap.optString("place"),
             eventStartsAtEpochMs = (dataMap["eventStartsAtEpochMs"] as? Number)?.toLong(),
+            hashtags = dataMap.hashtags(),
             categoryId = dataMap.optString("categoryId"),
         )
         hub.projectSocialPost(
@@ -551,6 +555,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
                     createdAtEpochMs = updated.createdAtEpochMs,
                     honoreeName = updated.honoreeName,
                     categoryId = updated.categoryId,
+                    hashtags = updated.hashtags,
                     publicationKind = updated.publicationKind,
                     place = updated.place,
                     eventStartsAtEpochMs = updated.eventStartsAtEpochMs,
@@ -759,4 +764,11 @@ private fun Map<String, Any?>.optMedia(): List<PostMediaItem> {
             altText = row["altText"] as? String,
         )
     }
+}
+
+private fun Map<String,Any?>.hashtags():List<String>? {
+    if(!containsKey("hashtags"))return null
+    val raw=this["hashtags"] as? List<*> ?: throw IllegalArgumentException("Hashtags inválidos")
+    require(raw.size<=com.onlygoodthings.shared.domain.Hashtags.MAX_TAGS && raw.all { it is String }) { "Hashtags inválidos" }
+    return raw.filterIsInstance<String>()
 }

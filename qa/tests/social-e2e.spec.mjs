@@ -30,6 +30,7 @@ test('publish in UI, persist, comment, enforce ownership and remove own post', a
   const author = api(request, await signup(page, 'Autora QA Social'));
   const text = `QA historia solidaria ${Date.now()}`;
   await page.goto('/#/publicar/accion');
+  await page.getByRole('button',{name:'Buena Acción',exact:true}).click();
   await expect(page.getByRole('button', { name: 'Yo la hice' })).toHaveCount(0);
   await page.getByLabel('¿Quién hizo esta buena acción?', { exact: true }).fill('Vecina QA Reconocida');
   await page.getByLabel('La historia', { exact: true }).fill(text);
@@ -277,6 +278,7 @@ test('recognize another account and reject missing or own recognition through UI
     const other = api(request, await signup(await otherContext.newPage(), heroName));
     const hero = await other('auth/me');
     await page.goto('/#/publicar/accion');
+  await page.getByRole('button',{name:'Buena Acción',exact:true}).click();
     const person = page.getByLabel('¿Quién hizo esta buena acción?', { exact: true });
     await expect(person).toHaveAttribute('required', '');
     await expect(page.getByRole('button', { name: 'Yo la hice' })).toHaveCount(0);
@@ -284,7 +286,7 @@ test('recognize another account and reject missing or own recognition through UI
     expect(await person.evaluate(el => el.validity.valueMissing)).toBe(true);
     await person.fill(me.displayName);
     await page.locator('#publish-form [data-submit]').click();
-    await expect(page.locator('[role=status], .toast').filter({ hasText: 'otra persona' }).first()).toBeVisible();
+    await expect(page.locator('[data-publication-error]').filter({ hasText: 'otra persona' })).toBeVisible();
     await person.fill(heroName);
     await page.getByLabel('Cuenta de OGT (opcional)',{exact:true}).fill(heroName);
     await page.locator('[data-recognition-people]').getByRole('button', { name: heroName, exact: true }).click();

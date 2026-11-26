@@ -448,7 +448,7 @@ private fun postLook(
         fullName = authorName,
         avatar = commentAvatar(post.authorUserId ?: ""),
         photo = Res.drawable.feed_story_donacion,
-        hashtags = listOf("#${post.tag.replace(" ", "")}"),
+        hashtags = post.hashtags.map { it.display }.ifEmpty { listOf("#${post.tag.replace(" ", "")}") },
         verified = post.authorKind == AuthorKind.COMPANY,
     )
 }

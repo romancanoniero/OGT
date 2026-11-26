@@ -171,6 +171,8 @@ class DeploymentContractTests(unittest.TestCase):
         self.assertIn('35_company_teams.sql', source)
         self.assertIn('39_recognition_invitations.sql', source)
         self.assertIn('40_gathering_details.sql', source)
+        self.assertIn('41_publication_hashtags.sql', source)
+        self.assertLess(source.index('40_gathering_details.sql'), source.index('41_publication_hashtags.sql'))
         self.assertLess(source.index('38_animal_contacts.sql'), source.index('39_recognition_invitations.sql'))
         self.assertLess(source.index('39_recognition_invitations.sql'), source.index('40_gathering_details.sql'))
         self.assertLess(source.index('34_company_registration.sql'), source.index('35_company_teams.sql'))

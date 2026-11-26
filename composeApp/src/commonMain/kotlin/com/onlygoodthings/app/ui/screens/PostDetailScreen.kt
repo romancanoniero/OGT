@@ -1312,7 +1312,7 @@ private fun CommunityDetail(
         OgtCaption("Ya anotamos que vas.")
     }
     actions()
-    Text("#${post.tag.replace(" ", "")}", color = OgtColors.primary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    Text(post.hashtags.map { it.display }.ifEmpty { listOf("#${post.tag.replace(" ", "")}") }.joinToString(" "), color = OgtColors.primary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
 }
 
 @Composable

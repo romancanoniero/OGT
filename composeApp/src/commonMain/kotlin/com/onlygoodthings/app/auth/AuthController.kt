@@ -43,6 +43,23 @@ class AuthController(
     private val settingsMutex = kotlinx.coroutines.sync.Mutex()
     private val accountWorkScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob()+kotlinx.coroutines.Dispatchers.Default)
 
+    /** Survives leaving the editor, while never borrowing a different account's token. */
+    fun notifyPublicationMentions(owner:String,postId:String,recipients:List<String>) {
+        if(owner.isBlank() || preview.currentUserId!=owner)return
+        val bearer=session.firebaseJwt ?: return
+        val base=session.apiBaseUrl
+        accountWorkScope.launch {
+            kotlinx.coroutines.withTimeoutOrNull(10_000) {
+                for(recipient in recipients.distinct().filter { it!=owner }) {
+                    if(preview.currentUserId!=owner)break
+                    try { api.notifyPublishedMention(recipient,postId,bearer,base) }
+                    catch(cancel:kotlinx.coroutines.CancellationException) { throw cancel }
+                    catch(_:Exception) { /* Publication is already confirmed; notices are best effort. */ }
+                }
+            }
+        }
+    }
+
     suspend fun refreshSettings() {
         val owner=preview.currentUserId
         val settings=api.settings()

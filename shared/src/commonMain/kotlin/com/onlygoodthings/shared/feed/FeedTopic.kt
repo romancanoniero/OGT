@@ -69,6 +69,9 @@ fun feedTopicFamily(tag: String, sourceUrl: String? = null): FeedTopicFamily {
     }
 }
 
+fun feedTopicFamilies(topic:String,sourceUrl:String?,hashtags:List<com.onlygoodthings.shared.domain.PostHashtag>):Set<FeedTopicFamily> =
+    (listOf(feedTopicFamily(topic,sourceUrl))+hashtags.map { feedTopicFamily(it.label) }).toSet()
+
 fun FeedShowReason.labelEs(): String = when (this) {
     FeedShowReason.GRAPH -> "De tu gente"
     FeedShowReason.AFFINITY -> "Por lo que te gusta"
@@ -79,6 +82,7 @@ fun FeedShowReason.labelEs(): String = when (this) {
 }
 
 private val PET_TAGS = setOf(
+    "perros", "gatos",
     "adopción", "rescate animal", "tránsito animal", "mascotas", "fauna", "mascota perdida",
     "cría", "cria", "llegó a casa", "llego a casa", "historia tierna", "ternura",
 )

@@ -18,7 +18,7 @@ enum class OgtRoute(val title: String) {
     Identity("Verificación"),
     Feed("Feed"),
     PostDetail("Detalle de publicación"),
-    Publish("Dar a conocer"),
+    Publish("Publicar"),
     Parking("Estacionamiento"),
     ParkingConfirm("Cesión confirmada"),
     ParkHere("Estacioné aquí"),

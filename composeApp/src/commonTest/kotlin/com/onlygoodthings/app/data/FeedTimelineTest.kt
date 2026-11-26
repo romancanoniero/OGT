@@ -40,6 +40,22 @@ class FeedTimelineTest {
         fun close() { timeline.close() }
     }
 
+    @Test fun personalizedOrderStaysStableWhileReactingAndOnlyChangesWhenRequested()=runBlocking {
+        val f=Fixture()
+        try {
+            f.rows=listOf(post(2),post(1));f.start();f.load()
+            val order=f.page().posts.map { it.id }
+            f.db.recordFeedEvent("viewer",id(1),FeedEventKind.CLAP)
+            f.timeline.localChanged()
+            assertEquals(order,f.page().posts.map { it.id })
+            f.rows=listOf(post(1),post(2))
+            f.timeline.refresh(home,force=true)!!.join()
+            assertEquals(order,f.page().posts.map { it.id })
+            f.timeline.refresh(home,force=true,reveal=true)!!.join()
+            assertEquals(listOf(id(1),id(2)),f.page().posts.map { it.id })
+        } finally { f.close() }
+    }
+
     @Test fun returningToTheFeedReusesItsSnapshotWithoutAnEmptyIntermediateState()=runBlocking {
         val f=Fixture()
         try {

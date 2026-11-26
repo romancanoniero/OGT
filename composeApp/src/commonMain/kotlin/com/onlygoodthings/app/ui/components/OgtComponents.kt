@@ -407,8 +407,9 @@ private val DockGap = 6.dp
 private val DockChromeButtons = OgtBottomTabs.size + 1
 private val DockCollapsedWidth =
     DockPad * 2 + OgtDimens.iconButton * DockChromeButtons + DockGap * (DockChromeButtons - 1)
+private val PublicComposeKinds = ComposePostKind.entries.filter { it != ComposePostKind.TERNURA }
 private val DockComposeBlock =
-    DockComposeRow * ComposePostKind.entries.size + DockGap * (ComposePostKind.entries.size - 1)
+    DockComposeRow * PublicComposeKinds.size + DockGap * (PublicComposeKinds.size - 1)
 
 @Composable
 fun OgtBottomBar(
@@ -473,7 +474,7 @@ fun OgtBottomBar(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(DockGap),
                 ) {
-                    ComposePostKind.entries.forEach { kind ->
+                    PublicComposeKinds.forEach { kind ->
                         val spec = composeDockSpec(kind)
                         ComposeDockRow(
                             art = spec.art,
@@ -522,7 +523,7 @@ fun OgtBottomBar(
 private data class ComposeDockSpec(val art: DrawableResource, val title: String)
 
 private fun composeDockSpec(kind: ComposePostKind) = when (kind) {
-    ComposePostKind.ACTION -> ComposeDockSpec(Res.drawable.qs_feed, "Buena acción")
+    ComposePostKind.ACTION -> ComposeDockSpec(Res.drawable.qs_feed, "Publicar")
     ComposePostKind.GATHERING -> ComposeDockSpec(Res.drawable.qs_attend, "Convocatoria")
     ComposePostKind.LOST -> ComposeDockSpec(Res.drawable.qs_paw, "Mascota perdida")
     ComposePostKind.ADOPT -> ComposeDockSpec(Res.drawable.qs_adopt, "Adopción")
