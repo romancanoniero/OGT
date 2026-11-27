@@ -237,7 +237,7 @@ fun Route.animalRoutes(db: Database, hub: RealtimeHub) {
     }
 }
 
-private fun animalWriteFrom(dataMap: Map<String, Any?>, home: Pair<Double, Double>?): AnimalWrite {
+internal fun animalWriteFrom(dataMap: Map<String, Any?>, home: Pair<Double, Double>?): AnimalWrite {
     val kind = (dataMap.optString("kind") ?: "LOST").uppercase()
     val petName = titleCasePersonName(dataMap.optString("petName").orEmpty())
     val age = dataMap.optString("ageLabel").orEmpty()
@@ -252,6 +252,13 @@ private fun animalWriteFrom(dataMap: Map<String, Any?>, home: Pair<Double, Doubl
         require(marks.isNotBlank()) { "Campo requerido: marks" }
         require(lastSeenPlace.isNotBlank()) { "Campo requerido: lastSeenPlace" }
         require(lat != null && lng != null) { "Falta el punto de última vista" }
+    }
+    val media = dataMap.optMediaItems()
+    require(media.size <= 10) { "Podés incluir hasta 10 archivos." }
+    media.forEach { item ->
+        require(isPublishedAnimalMediaUrl(item.url) && item.posterUrl?.let(::isPublishedAnimalMediaUrl) != false) {
+            "La foto o el video todavía no se subió. Volvé a intentarlo desde la publicación."
+        }
     }
     return AnimalWrite(
         kind = if (lost) "LOST" else "ADOPTION",
@@ -273,8 +280,15 @@ private fun animalWriteFrom(dataMap: Map<String, Any?>, home: Pair<Double, Doubl
         latitude = lat ?: -34.6037,
         longitude = lng ?: -58.3816,
         alertRadiusM = if (lost) OgtCrmDefaults.LOST_ALERT_RADIUS_M else 0,
-        media = dataMap.optMediaItems(),
+        media = media,
     )
+}
+
+private fun isPublishedAnimalMediaUrl(raw: String): Boolean {
+    if (raw.any { it.isWhitespace() || it.code < 32 || it == '\\' }) return false
+    if (raw.startsWith("/media/u/")) return com.onlygoodthings.backend.media.MediaStore.isSafeName(raw.removePrefix("/media/u/"))
+    val uri = runCatching { java.net.URI(raw) }.getOrNull() ?: return false
+    return uri.scheme in listOf("https", "http") && !uri.host.isNullOrBlank() && uri.userInfo == null
 }
 
 @Suppress("UNCHECKED_CAST")

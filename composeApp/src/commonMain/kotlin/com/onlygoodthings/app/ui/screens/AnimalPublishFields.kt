@@ -108,8 +108,9 @@ internal fun OgtLocalDatabase.attachAnimalMedia(
 ) {
     draftMedia.take(PostMediaRules.MAX_ITEMS).forEachIndexed { order, item ->
         val video = item.kind == MediaKind.VIDEO
-        val url = if (item.fromDevice) "file://${item.path}" else "asset://${item.path}"
-        val poster = item.posterPath?.let { "file://$it" }
+        val remote = !item.fromDevice && (item.path.startsWith("https://") || item.path.startsWith("http://"))
+        val url = if (remote) item.path else if (item.fromDevice) "file://${item.path}" else "asset://${item.path}"
+        val poster = item.posterPath?.let { if (remote) it else "file://$it" }
         postMedia += LocalPostMedia(
             id = "$postId-m$order",
             postId = postId,
@@ -117,7 +118,7 @@ internal fun OgtLocalDatabase.attachAnimalMedia(
             url = url,
             posterUrl = poster,
             sortOrder = order,
-            assetKey = if (item.fromDevice || video) "" else item.path,
+            assetKey = if (item.fromDevice || video || remote) "" else item.path,
             altText = tag,
         )
         if (item.fromDevice) {

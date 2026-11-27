@@ -9,6 +9,7 @@ import com.onlygoodthings.shared.data.local.LocalUser
 import com.onlygoodthings.shared.data.local.OgtLocalDatabase
 import com.onlygoodthings.shared.data.remote.RestAnimalsRepository
 import com.onlygoodthings.shared.domain.GeoPoint
+import com.onlygoodthings.shared.domain.PostMediaItem
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -29,7 +30,9 @@ suspend fun persistUnpublishedAnimal(
     api: RestAnimalsRepository,
     me: LocalUser,
     post: LocalSocialPost,
-): LocalSocialPost = persistAnimalOnServer(db, api, me, post, emptyList(), me.asPoint())
+    isCurrentOwner: () -> Boolean,
+    upload: suspend (List<OgtPickedMedia>, String) -> List<PostMediaItem>,
+): LocalSocialPost = persistAnimalOnServer(db, api, me, post, emptyList(), me.asPoint(), isCurrentOwner, upload)
 
 /** Graba o actualiza la ficha en Postgres y alinea los IDs locales con los del servidor. */
 suspend fun persistAnimalOnServer(
@@ -39,17 +42,25 @@ suspend fun persistAnimalOnServer(
     post: LocalSocialPost,
     draft: List<OgtPickedMedia>,
     here: GeoPoint?,
+    isCurrentOwner: () -> Boolean,
+    upload: suspend (List<OgtPickedMedia>, String) -> List<PostMediaItem>,
 ): LocalSocialPost {
+    check(isCurrentOwner()) { "La sesión cambió. Volvé a intentarlo." }
     val listing = post.listingId?.let { id -> db.animals.firstOrNull { it.id == id } } ?: return post
     val localMedia = db.mediaOf(post.id).ifEmpty { draft.toStored(post.id, listing.kind) }
     localMedia.forEach { row ->
         OgtMediaCache.ingest(row.url)
         row.posterUrl?.let { OgtMediaCache.ingest(it) }
     }
+    val uploadedMedia = uploadAnimalMedia(localMedia) { items, alt ->
+        check(isCurrentOwner()) { "La sesión cambió. Volvé a intentarlo." }
+        upload(items, alt)
+    }
+    check(isCurrentOwner()) { "La sesión cambió. Volvé a intentarlo." }
     val body = animalWriteJson(
         listing,
         post,
-        localMedia,
+        uploadedMedia,
         here ?: me.asPoint() ?: FallbackPoint,
     )
     val remote = if (listing.id.isUuid()) {
@@ -57,6 +68,7 @@ suspend fun persistAnimalOnServer(
     } else {
         api.publish(body)
     }
+    check(isCurrentOwner()) { "La sesión cambió. Volvé a intentarlo." }
     db.bindServerAnimal(post.id, remote, me.id)
     val live = db.posts.firstOrNull { it.id == remote.postId } ?: post
     val seenRemote = mutableSetOf<String>()
@@ -69,6 +81,24 @@ suspend fun persistAnimalOnServer(
         }
     }
     return live
+}
+
+/** Upload device files before publishing; retain existing remote photos when editing. */
+internal suspend fun uploadAnimalMedia(
+    media: List<LocalPostMedia>,
+    upload: suspend (List<OgtPickedMedia>, String) -> List<PostMediaItem>,
+): List<LocalPostMedia> = media.map { row ->
+    if (row.url.startsWith("https://") || row.url.startsWith("http://")) return@map row
+    require(row.url.startsWith("file://") || row.url.startsWith("content://") || row.url.startsWith("/")) {
+        "Elegí la foto de la mascota desde la galería."
+    }
+    val item = OgtPickedMedia(
+        id = row.id, kind = row.kind, path = row.url.removePrefix("file://"), fromDevice = true,
+        posterPath = row.posterUrl?.removePrefix("file://"), preparedForUpload = true,
+    )
+    val saved = upload(listOf(item), row.altText.orEmpty()).single()
+    require(saved.url.startsWith("https://") || saved.url.startsWith("http://")) { "No se pudo subir la foto." }
+    row.copy(url = saved.url, posterUrl = saved.posterUrl, assetKey = "")
 }
 
 private fun LocalUser.asPoint(): GeoPoint? =
@@ -119,14 +149,15 @@ private fun List<LocalPostMedia>.toJson(): JsonArray = buildJsonArray {
 
 private fun List<OgtPickedMedia>.toStored(postId: String, tag: String): List<LocalPostMedia> =
     mapIndexed { order, item ->
+        val remote = !item.fromDevice && (item.path.startsWith("https://") || item.path.startsWith("http://"))
         LocalPostMedia(
             id = "$postId-m$order",
             postId = postId,
             kind = item.kind,
-            url = if (item.fromDevice) "file://${item.path}" else "asset://${item.path}",
-            posterUrl = item.posterPath?.let { "file://$it" },
+            url = if (remote) item.path else if (item.fromDevice) "file://${item.path}" else "asset://${item.path}",
+            posterUrl = item.posterPath?.let { if (remote) it else "file://$it" },
             sortOrder = order,
-            assetKey = if (item.fromDevice) "" else item.path,
+            assetKey = if (item.fromDevice || remote) "" else item.path,
             altText = if (tag == "LOST") "Mascota perdida" else "Adopción",
         )
     }

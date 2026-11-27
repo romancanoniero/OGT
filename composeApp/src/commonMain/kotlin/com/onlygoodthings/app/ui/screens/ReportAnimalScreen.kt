@@ -80,6 +80,8 @@ fun ReportAnimalScreen(
     )
     var triedPublish by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
+    var pendingPostId by remember { mutableStateOf(editPostId) }
+    var publishError by remember { mutableStateOf<String?>(null) }
     val missing = buildList {
         if (draftMedia.isEmpty()) add("una foto")
         if (name.isBlank()) add("el nombre")
@@ -161,11 +163,12 @@ fun ReportAnimalScreen(
                     return@OgtPrimaryButton
                 }
                 saving = true
+                publishError = null
                 val place = lastSeenPoint ?: return@OgtPrimaryButton
-                val post = if (editing && existing != null) {
+                val post = if (pendingPostId != null) {
                     db.updateAnimalListing(
                         author = me,
-                        postId = existing.id,
+                        postId = pendingPostId!!,
                         petName = titleCasePersonName(name),
                         species = species,
                         size = size,
@@ -195,7 +198,8 @@ fun ReportAnimalScreen(
                     saving = false
                     return@OgtPrimaryButton
                 }
-                if (editing) {
+                pendingPostId = post.id
+                if (db.mediaOf(post.id).isNotEmpty()) {
                     db.replaceAnimalMedia(post.id, "Mascota perdida", draftMedia)
                 } else {
                     db.attachAnimalMedia(post.id, "Mascota perdida", draftMedia)
@@ -203,21 +207,28 @@ fun ReportAnimalScreen(
                 session.persistPublishedAnimals()
                 auth.ensureDevBearer()
                 scope.launch {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                        val live = runCatching {
-                            persistAnimalOnServer(db, auth.animals, me, post, draftMedia, place)
-                        }.getOrDefault(post)
-                        if (editing) {
-                            runCatching { auth.feed.editPost(live.id, story, "Mascota perdida") }
-                                .onSuccess { db.upsertRemoteSocial(it) }
+                    try {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                            val live = persistAnimalOnServer(db, auth.animals, me, post, draftMedia, place, { session.currentUserId == me.id }, auth::uploadPostMedia)
+                            if (editing) {
+                                runCatching { auth.feed.editPost(live.id, story, "Mascota perdida") }
+                                    .onSuccess { db.upsertRemoteSocial(it) }
+                            }
+                            session.persistPublishedAnimals()
+                            session.persistSocialFeed()
+                            if (!editing) announcePublishedPost(db, live)
                         }
-                        session.persistPublishedAnimals()
-                        session.persistSocialFeed()
-                        if (!editing) announcePublishedPost(db, live)
+                        onDone()
+                    } catch (cancel: kotlinx.coroutines.CancellationException) {
+                        throw cancel
+                    } catch (failure: Exception) {
+                        publishError = failure.message ?: "No se pudo publicar. Volvé a intentarlo."
+                    } finally {
+                        saving = false
                     }
-                    onDone()
                 }
             }
+            publishError?.let { Text(it, color = OgtColors.error, fontSize = 13.sp) }
             Spacer(Modifier.height(24.dp))
         }
     }

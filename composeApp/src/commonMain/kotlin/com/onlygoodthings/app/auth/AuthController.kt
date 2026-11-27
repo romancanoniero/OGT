@@ -428,7 +428,7 @@ class AuthController(
         }
         db.unpublishedAnimalPosts().forEach { post ->
             runCatching {
-                persistUnpublishedAnimal(db, animals, me, post)
+                persistUnpublishedAnimal(db, animals, me, post, { preview.currentUserId == me.id }, ::uploadPostMedia)
             }
         }
     }

@@ -79,6 +79,8 @@ fun PublishAdoptionScreen(
     )
     var triedPublish by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
+    var pendingPostId by remember { mutableStateOf(editPostId) }
+    var publishError by remember { mutableStateOf<String?>(null) }
     val missing = buildList {
         if (draftMedia.isEmpty()) add("una foto")
         if (name.isBlank()) add("el nombre")
@@ -177,10 +179,11 @@ fun PublishAdoptionScreen(
                     return@OgtPrimaryButton
                 }
                 saving = true
-                val post = if (editing && existing != null) {
+                publishError = null
+                val post = if (pendingPostId != null) {
                     db.updateAnimalListing(
                         author = me,
-                        postId = existing.id,
+                        postId = pendingPostId!!,
                         petName = titleCasePersonName(name),
                         species = species,
                         size = size,
@@ -213,7 +216,8 @@ fun PublishAdoptionScreen(
                     saving = false
                     return@OgtPrimaryButton
                 }
-                if (editing) {
+                pendingPostId = post.id
+                if (db.mediaOf(post.id).isNotEmpty()) {
                     db.replaceAnimalMedia(post.id, "Adopción", draftMedia)
                 } else {
                     db.attachAnimalMedia(post.id, "Adopción", draftMedia)
@@ -221,16 +225,23 @@ fun PublishAdoptionScreen(
                 session.persistPublishedAnimals()
                 auth.ensureDevBearer()
                 scope.launch {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                        val live = runCatching {
-                            persistAnimalOnServer(db, auth.animals, me, post, draftMedia, session.here())
-                        }.getOrDefault(post)
-                        session.persistPublishedAnimals()
-                        if (!editing) announcePublishedPost(db, live)
+                    try {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                            val live = persistAnimalOnServer(db, auth.animals, me, post, draftMedia, session.here(), { session.currentUserId == me.id }, auth::uploadPostMedia)
+                            session.persistPublishedAnimals()
+                            if (!editing) announcePublishedPost(db, live)
+                        }
+                        onPublished()
+                    } catch (cancel: kotlinx.coroutines.CancellationException) {
+                        throw cancel
+                    } catch (failure: Exception) {
+                        publishError = failure.message ?: "No se pudo publicar. Volvé a intentarlo."
+                    } finally {
+                        saving = false
                     }
-                    onPublished()
                 }
             }
+            publishError?.let { Text(it, color = OgtColors.error, fontSize = 13.sp) }
             Spacer(Modifier.height(24.dp))
         }
     }

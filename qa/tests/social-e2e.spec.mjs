@@ -181,10 +181,20 @@ test('adoption publishes from UI, preserves its photo and restricts edits to the
   const stored = await owner('animals/get', { listingId: listing.listingId });
   expect(stored.media[0].url).toBe(listing.media[0].url);
   expect((await request.get(new URL(stored.media[0].url).pathname)).ok()).toBe(true);
+  await expect.poll(() => page.locator('.post .media-slot img.media').first().evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
+  // Native device paths must never be accepted as publishable media by the API.
+  for (const url of ['file:///var/mobile/pet.jpg', 'content://photos/pet', 'asset://pet.jpg']) {
+    await owner('animals/publish', { ...stored, media: [{ kind: 'IMAGE', url }] }, false);
+    await owner('animals/update', { ...stored, media: [{ kind: 'IMAGE', url }] }, false);
+  }
+  expect((await owner('animals/get', { listingId: listing.listingId })).media[0].url).toBe(stored.media[0].url);
   const context = await browser.newContext();
   await context.route('**/*', route => ['localhost', '127.0.0.1'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
   try {
-    const other = api(request, await signup(await context.newPage(), 'Vecino QA Mascotas'));
+    const otherPage = await context.newPage();
+    const other = api(request, await signup(otherPage, 'Vecino QA Mascotas'));
+    await otherPage.goto('http://localhost:19082/#/p/' + listing.postId);
+    await expect.poll(() => otherPage.locator('.post .media-slot img.media').first().evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
     const edit = { ...stored, kind: 'ADOPTION', description: 'QA ficha actualizada' };
     await other('animals/update', edit, false);
     expect((await owner('animals/get', { listingId: listing.listingId })).description).toBe(stored.description);
