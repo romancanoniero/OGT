@@ -25,7 +25,10 @@ expect class AuthPlatform() {
 expect class AuthPrefs() {
     /** Local logout takes precedence even if native credential cleanup fails. */
     var sessionSignedOut: Boolean
+    /** Legacy login shortcut preference. It does not enable app lock. */
     var biometricEnabled: Boolean
+    /** Explicit device app lock; independent from the legacy biometric login shortcut. */
+    var appLockEnabled: Boolean
     var onboardingDone: Boolean
     var parkedLatitude: Double
     var parkedLongitude: Double

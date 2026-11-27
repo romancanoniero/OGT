@@ -171,7 +171,6 @@ fun FeedScreen(
     var page by remember { mutableStateOf(1) }
     var refreshing by remember(query) { mutableStateOf(false) }
     var pullPx by remember(query) { mutableStateOf(0f) }
-    val initialSyncComplete=feedState.ready
     val feedPosts=feedState.posts
     var suppressIncomingToast by remember(query) { mutableStateOf(false) }
     val incomingToast=feedState.pendingIds.isNotEmpty() && !suppressIncomingToast
@@ -252,10 +251,11 @@ fun FeedScreen(
             item(key = "chrome-family") {
                 FeedFamilyRow(family = feedFamily, onFamily = { presentation.family = it }, copy = copy)
             }
-            if (!initialSyncComplete || refreshing || pullPx > 16f) {
+            if (refreshing || pullPx > 16f) {
                 item(key = "chrome-refresh") {
                     Box(Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
-                        OgtLoader(size = 28.dp)
+                        if (refreshing) OgtLoader(size = 28.dp)
+                        else OgtCaption(if (pullPx > 72f) "Soltá para actualizar" else "Deslizá para actualizar")
                     }
                 }
             }

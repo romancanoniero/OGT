@@ -7,7 +7,7 @@ import kotlinx.coroutines.CancellationException
 /** Firebase owns persisted credentials; the old optional "keep" preference is no longer consulted. */
 internal suspend fun restoreSavedAuthSession(
     explicitlySignedOut: Boolean,
-    biometricEnabled: Boolean,
+    appLockEnabled: Boolean,
     currentUser: suspend () -> AuthUser?,
     openSession: suspend (AuthUser) -> Unit,
     onboardingDone: () -> Boolean,
@@ -15,7 +15,7 @@ internal suspend fun restoreSavedAuthSession(
 ): AuthRestore {
     if (explicitlySignedOut) return AuthRestore.LoggedOut
     val user = currentUser() ?: return AuthRestore.LoggedOut
-    if (biometricEnabled) return AuthRestore.NeedsBiometric
+    if (appLockEnabled) return AuthRestore.NeedsBiometric
     try {
         openSession(user)
     } catch (cancel: CancellationException) {
@@ -26,6 +26,24 @@ internal suspend fun restoreSavedAuthSession(
     }
     // Temporary failures propagate to the startup retry UI, without discarding credentials.
     return if (onboardingDone()) AuthRestore.Home else AuthRestore.FirstRun
+}
+
+/** Only an explicit setting can enable app lock; cancellation never saves a partial choice. */
+internal suspend fun updateSavedSessionLock(
+    enabled: Boolean,
+    currentOwner: suspend () -> String?,
+    canAuthenticate: suspend () -> Boolean,
+    authenticate: suspend () -> Boolean,
+    save: (Boolean) -> Unit,
+) {
+    val owner = currentOwner()?.takeIf { it.isNotBlank() }
+        ?: throw AuthException("Iniciá sesión para cambiar el bloqueo de OGT")
+    if (enabled) {
+        if (!canAuthenticate()) throw AuthException("Configurá la biometría del dispositivo para activar el bloqueo")
+        if (!authenticate()) throw AuthException("No se activó el bloqueo porque no se confirmó tu identidad")
+    }
+    if (currentOwner() != owner) throw AuthException("La sesión cambió")
+    save(enabled)
 }
 
 internal fun profileNeedsCompletion(name: String, barrio: String, firebaseUid: String, photoUrl: String?): Boolean =

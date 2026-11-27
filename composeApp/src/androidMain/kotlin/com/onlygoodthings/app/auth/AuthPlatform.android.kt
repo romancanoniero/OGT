@@ -393,6 +393,9 @@ actual class AuthPrefs actual constructor() {
     actual var biometricEnabled: Boolean
         get() = prefs.getBoolean("bio", false)
         set(value) { prefs.edit().putBoolean("bio", value).apply() }
+    actual var appLockEnabled: Boolean
+        get() = prefs.getBoolean("app_lock", false)
+        set(value) { prefs.edit().putBoolean("app_lock", value).apply() }
     actual var onboardingDone: Boolean
         get() = prefs.getBoolean("onboard", false)
         set(value) { prefs.edit().putBoolean("onboard", value).apply() }

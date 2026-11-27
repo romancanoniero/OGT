@@ -118,7 +118,7 @@ class FeedRankerTest {
     }
 
     @Test
-    fun pedidoDeUnSeguidoQuePuedoCubrirSaleAntes() {
+    fun pedidoDeUnSeguidoConservaSuRecomendacionSinAdelantarseAUnaPublicacionMasReciente() {
         val fresco = post("foto", "ana", hoursAgo = 1)
         val pedido = post("trueque", "sofia", hoursAgo = 20, topic = "Trueque", needTagId = "albanil")
         val ranked = FeedRanker.rank(
@@ -127,8 +127,8 @@ class FeedRankerTest {
             mode = FeedMode.HOME,
             nowEpochMs = now,
         )
-        assertEquals(listOf("trueque", "foto"), ranked.map { it.postId })
-        assertEquals(FeedShowReason.SKILL_MATCH, ranked.first().reason)
+        assertEquals(listOf("foto", "trueque"), ranked.map { it.postId })
+        assertEquals(FeedShowReason.SKILL_MATCH, ranked.first { it.postId=="trueque" }.reason)
     }
 
     @Test

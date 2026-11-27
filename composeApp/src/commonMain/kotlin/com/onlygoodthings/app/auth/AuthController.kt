@@ -27,6 +27,8 @@ class AuthController(
 ) {
     private val platform = AuthPlatform()
     private val prefs = AuthPrefs()
+    var appLockEnabled by mutableStateOf(prefs.appLockEnabled)
+        private set
     init { prefs.noticeOwnerId = "" }
     val account = AuthSessionApi(session, onSessionExpired = { rejectedToken ->
         check(session.firebaseJwt == rejectedToken) { "La sesión cambió" }
@@ -180,7 +182,7 @@ class AuthController(
         return try {
             restoreSavedAuthSession(
                 explicitlySignedOut = prefs.sessionSignedOut,
-                biometricEnabled = prefs.biometricEnabled,
+                appLockEnabled = prefs.appLockEnabled,
                 currentUser = platform::currentUser,
                 openSession = { finishSession(it) },
                 onboardingDone = { prefs.onboardingDone },
@@ -275,6 +277,16 @@ class AuthController(
     }
 
     suspend fun canUseBiometric(): Boolean = runCatching { platform.canUseBiometric() }.getOrElse { false }
+
+    suspend fun setAppLockEnabled(enabled: Boolean): Boolean = wrap {
+        updateSavedSessionLock(
+            enabled = enabled,
+            currentOwner = { if (_signedIn.value && !prefs.sessionSignedOut) platform.currentUser()?.firebaseUid else null },
+            canAuthenticate = platform::canUseBiometric,
+            authenticate = platform::unlockBiometric,
+            save = { prefs.appLockEnabled = it; appLockEnabled = it },
+        )
+    }
 
     suspend fun unlockWithBiometric(): Boolean = wrap {
         if (!platform.canUseBiometric()) {

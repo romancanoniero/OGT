@@ -66,7 +66,7 @@ data class RankedFeedItem(
 )
 
 /**
- * HOME learns topic/author affinity; FOLLOWING remains strictly chronological.
+ * HOME retains topic/author affinity; both feeds present original posting times newest first.
  * Moderation, graph eligibility and hidden posts are applied before personalization.
  */
 object FeedRanker {
@@ -168,7 +168,10 @@ object FeedRanker {
             }
             result
         } else items
-        return ordered.drop(offset.coerceAtLeast(0)).take(limit.coerceIn(0,200)).map { it.first }
+        // Affinity selects/expands recommendations, but original posting time determines
+        // their presentation. Keep the previous order only for identical timestamps.
+        return ordered.sortedByDescending { it.second.createdAtEpochMs }
+            .drop(offset.coerceAtLeast(0)).take(limit.coerceIn(0,200)).map { it.first }
     }
 
     internal fun score(

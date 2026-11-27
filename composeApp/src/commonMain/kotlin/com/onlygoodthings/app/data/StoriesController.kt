@@ -61,6 +61,7 @@ class StoriesController(private val session: SessionStore, private val prefs: Au
     var stories by mutableStateOf<List<Story>>(emptyList());private set
     var draft by mutableStateOf<StoryDraft?>(null);private set
     var loading by mutableStateOf(false);private set
+    var manualRefresh by mutableStateOf(false);private set
     var publishing by mutableStateOf(false);private set
     var error by mutableStateOf<String?>(null);private set
     var publishError by mutableStateOf<String?>(null);private set
@@ -112,8 +113,9 @@ class StoriesController(private val session: SessionStore, private val prefs: Au
         val user=owner
         scope.launch { mediaCache.authorize(user,remaining,now) }
     }
-    fun refresh() {
+    fun refresh(manual:Boolean=false) {
         if(owner.isBlank()) return
+        if(manual)manualRefresh=true
         // Keep one request in flight and replay invalidations received while it is running.
         refreshRequested=true
         verificationJob?.cancel()
@@ -151,6 +153,7 @@ class StoriesController(private val session: SessionStore, private val prefs: Au
             } finally {
                 if(owner==user && generation==version) {
                     loading=false
+                    manualRefresh=false
                     // The SDK has no connection-health API. Renew the privacy lease before 30 s,
                     // resetting this deadline on every successful socket-triggered verification.
                     scheduleVerification(if(failures==0) 20_000 else storyRetryDelay(failures-1))
@@ -246,7 +249,7 @@ class StoriesController(private val session: SessionStore, private val prefs: Au
         cacheBinding?.cancel();accountJob?.cancel();refreshJob?.cancel();uploadJob?.cancel()
         expiryJob?.cancel();verificationJob?.cancel();refreshRequested=false;failures=0;hasLoaded=false;clock.clear()
         owner="";stories=emptyList();visibleRows=emptyList();draft=null;publishedId=null
-        error=null;publishError=null;publishing=false;loading=false
+        error=null;publishError=null;publishing=false;loading=false;manualRefresh=false
     }
     fun close() { clear(clearMedia=false);draftStore.close();mediaCache.close();scope.cancel();http.close() }
 }

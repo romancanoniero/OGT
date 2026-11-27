@@ -70,14 +70,15 @@ test('Para vos learns different interests per account; Siguiendo keeps date orde
     await api('social/impact',{postId:a.id});await opposite.api('social/impact',{postId:c.id});
   }
   const a=await publish(astro,astronomy),c=await publish(cook,cooking);
-  execFileSync('docker',['exec','ogt-qa-postgres-1','psql','-X','-qAt','-v','ON_ERROR_STOP=1','-U','ogt','-d',qaDatabase,'-c',`UPDATE social_posts SET created_at=now()-INTERVAL '72 hours' WHERE author_user_id IN ('${astro.id}','${cook.id}');UPDATE social_posts SET created_at=now()-INTERVAL '20 hours' WHERE id='${a.id}';UPDATE social_posts SET created_at=now()-INTERVAL '1 hour' WHERE id='${c.id}';`]);
-  expect((await api('social/feed',{mode:'HOME',pageSize:40}))[0].id).toBe(a.id);
+  execFileSync('docker',['exec','ogt-qa-postgres-1','psql','-X','-qAt','-v','ON_ERROR_STOP=1','-U','ogt','-d',qaDatabase,'-c',`UPDATE social_posts SET created_at=now()-INTERVAL '72 hours' WHERE author_user_id IN ('${astro.id}','${cook.id}');UPDATE social_posts SET created_at=now()-INTERVAL '20 hours' WHERE id='${a.id}';UPDATE social_posts SET created_at=now() WHERE id='${c.id}';`]);
+  const home=await api('social/feed',{mode:'HOME',pageSize:40});
+  expect(home[0].id).toBe(c.id);expect(home.map(post=>post.createdAtEpochMs)).toEqual(home.map(post=>post.createdAtEpochMs).sort((x,y)=>y-x));
   expect((await opposite.api('social/feed',{mode:'HOME',pageSize:40}))[0].id).toBe(c.id);
   await api('social/follow',{userId:astro.id});await api('social/follow',{userId:cook.id});
-  await page.goto('/#/inicio');await page.reload();await expect(page.locator('#feed-list [data-post]').first()).toHaveAttribute('data-post',a.id);
+  await page.goto('/#/inicio');await page.reload();await expect(page.locator('#feed-list [data-post]').first()).toHaveAttribute('data-post',c.id);
   await page.getByRole('button',{name:'Siguiendo',exact:true}).click();await expect(page.locator('#feed-list [data-post]').first()).toHaveAttribute('data-post',c.id);
   const following=await api('social/feed',{mode:'FOLLOWING',pageSize:40});expect(following.map(post=>post.createdAtEpochMs)).toEqual(following.map(post=>post.createdAtEpochMs).sort((x,y)=>y-x));
-  await page.getByRole('button',{name:'Para vos',exact:true}).click();await expect(page.locator('#feed-list [data-post]').first()).toHaveAttribute('data-post',a.id);
+  await page.getByRole('button',{name:'Para vos',exact:true}).click();await expect(page.locator('#feed-list [data-post]').first()).toHaveAttribute('data-post',c.id);
   const before=await page.locator('#feed-list [data-post]').evaluateAll(nodes=>nodes.map(node=>node.dataset.post));
   await page.locator('#feed-list [data-post]').first().getByRole('button',{name:'Aplauso',exact:true}).click();
   expect(await page.locator('#feed-list [data-post]').evaluateAll(nodes=>nodes.map(node=>node.dataset.post))).toEqual(before);

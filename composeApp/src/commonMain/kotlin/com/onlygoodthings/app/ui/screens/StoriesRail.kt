@@ -118,10 +118,10 @@ fun StoriesRail() {
                 }
             }
         }
-        if(rows.isEmpty() && controller.loading) Box(Modifier.fillMaxWidth().height(28.dp),contentAlignment=Alignment.Center) { OgtLoader(size=20.dp) }
+        if(rows.isEmpty() && controller.manualRefresh) Box(Modifier.fillMaxWidth().height(28.dp),contentAlignment=Alignment.Center) { OgtLoader(size=20.dp) }
         if(picker.isProcessing.value) com.onlygoodthings.app.ui.components.OgtMediaImportProgress(Modifier.padding(horizontal=16.dp))
         picker.errorMessage.value?.let { message -> Text(message,color=OgtColors.error,fontSize=12.sp) }
-        controller.error?.let { message -> TextButton(onClick={ controller.refresh() }) { Text("$message · Reintentar",color=OgtColors.muted,fontSize=12.sp) } }
+        controller.error?.let { message -> TextButton(onClick={ controller.refresh(manual=true) }) { Text("$message · Reintentar",color=OgtColors.muted,fontSize=12.sp) } }
         if(controller.draft!=null && !editor) TextButton(onClick={ editor=true }) { Text(if(controller.publishing) "Publicando historia…" else "Continuar borrador") }
     }
     if(source) AlertDialog(onDismissRequest={source=false},title={Text("Agregar historia")},text={

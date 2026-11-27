@@ -12,7 +12,7 @@ class SavedAuthSessionTest {
             var restoredUser: AuthUser? = null
             val restored = restoreSavedAuthSession(
                 explicitlySignedOut = false,
-                biometricEnabled = false,
+                appLockEnabled = false,
                 currentUser = { user },
                 openSession = { restoredUser = it },
                 onboardingDone = { onboarded },
@@ -26,7 +26,7 @@ class SavedAuthSessionTest {
     @Test fun explicitLogoutPreventsRestorationEvenIfNativeCredentialCleanupFailed() = runBlocking {
         val restored = restoreSavedAuthSession(
             explicitlySignedOut = true,
-            biometricEnabled = true,
+            appLockEnabled = true,
             currentUser = { fail("Do not reuse Firebase's leftover identity after logout") },
             openSession = { fail("An explicitly closed session must stay closed") },
             onboardingDone = { true },
@@ -38,7 +38,7 @@ class SavedAuthSessionTest {
     @Test fun aFreshInstallationWithoutCredentialsRemainsLoggedOut() = runBlocking {
         assertEquals(AuthRestore.LoggedOut, restoreSavedAuthSession(
             explicitlySignedOut = false,
-            biometricEnabled = false,
+            appLockEnabled = false,
             currentUser = { null },
             openSession = { fail("No identity was authenticated") },
             onboardingDone = { true },
@@ -46,10 +46,10 @@ class SavedAuthSessionTest {
         ))
     }
 
-    @Test fun optingIntoBiometricsStillProtectsTheSavedSession() = runBlocking {
+    @Test fun explicitlyOptingIntoAppLockStillProtectsTheSavedSession() = runBlocking {
         assertEquals(AuthRestore.NeedsBiometric, restoreSavedAuthSession(
             explicitlySignedOut = false,
-            biometricEnabled = true,
+            appLockEnabled = true,
             currentUser = { user },
             openSession = { fail("Wait for biometric confirmation") },
             onboardingDone = { true },
@@ -63,7 +63,7 @@ class SavedAuthSessionTest {
         var signedOut = false
         suspend fun restore() = restoreSavedAuthSession(
             explicitlySignedOut = signedOut,
-            biometricEnabled = false,
+            appLockEnabled = false,
             currentUser = { user },
             openSession = {
                 assertEquals(user, it)
@@ -83,7 +83,7 @@ class SavedAuthSessionTest {
         var attempts = 0
         suspend fun restore() = restoreSavedAuthSession(
             explicitlySignedOut = signedOut,
-            biometricEnabled = false,
+            appLockEnabled = false,
             currentUser = { user },
             openSession = { attempts++; throw AuthSessionExpired() },
             onboardingDone = { true },
@@ -100,7 +100,7 @@ class SavedAuthSessionTest {
         assertFailsWith<CancellationException> {
             restoreSavedAuthSession(
                 explicitlySignedOut = false,
-                biometricEnabled = false,
+                appLockEnabled = false,
                 currentUser = { user },
                 openSession = { throw CancellationException("Startup left") },
                 onboardingDone = { true },

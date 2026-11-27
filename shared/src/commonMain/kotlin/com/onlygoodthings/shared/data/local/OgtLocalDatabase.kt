@@ -1001,7 +1001,7 @@ class OgtLocalDatabase {
 
     /**
      * Río inmediato: lo que ya llegó de Postgres y lo propio reciente.
-     * Si hay orden REST, se respeta y se pinnea lo publicado acá.
+     * La selección REST y lo propio reciente se presentan por su fecha original.
      */
     fun composeVisibleRiver(
         viewerId: String,
@@ -1032,7 +1032,8 @@ class OgtLocalDatabase {
                     shouldShowInFeed(viewerId, post, mode, family)
             }
             .sortedByDescending { it.createdAtEpochMs }
-        return if(mode==FeedMode.FOLLOWING)body.sortedWith(compareByDescending<LocalSocialPost> { it.createdAtEpochMs }.thenBy { it.id }) else (pinned + body).distinctBy { it.id }
+        return if(mode==FeedMode.FOLLOWING)body.sortedWith(compareByDescending<LocalSocialPost> { it.createdAtEpochMs }.thenBy { it.id })
+            else (pinned + body).distinctBy { it.id }.sortedByDescending { it.createdAtEpochMs }
     }
 
     /** Remove only IDs explicitly checked with the server, preserving other pages and pending drafts. */

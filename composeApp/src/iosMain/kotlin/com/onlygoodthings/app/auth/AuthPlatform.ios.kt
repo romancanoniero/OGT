@@ -109,6 +109,9 @@ actual class AuthPrefs actual constructor() {
     actual var biometricEnabled: Boolean
         get() = defaults.boolForKey("ogt.bio")
         set(value) { defaults.setBool(value, forKey = "ogt.bio") }
+    actual var appLockEnabled: Boolean
+        get() = defaults.boolForKey("ogt.appLock")
+        set(value) { defaults.setBool(value, forKey = "ogt.appLock") }
     actual var onboardingDone: Boolean
         get() = defaults.boolForKey("ogt.onboard")
         set(value) { defaults.setBool(value, forKey = "ogt.onboard") }

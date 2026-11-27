@@ -21,7 +21,6 @@ fun AttributionField(value: String, onChange: (String) -> Unit, enabled: Boolean
             Modifier.fillMaxWidth(), enabled = enabled, label = { Text("Fuente o enlace original (opcional)") },
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, keyboardType = KeyboardType.Uri),
             singleLine = true)
-        OgtCaption("Indicá el enlace original cuando corresponda. Dar crédito no reemplaza el permiso de uso.")
     }
 }
 
@@ -29,7 +28,6 @@ fun AttributionField(value: String, onChange: (String) -> Unit, enabled: Boolean
 fun PublicationRightsNotice() {
     val uri = LocalUriHandler.current
     Column {
-        OgtCaption(ContentAttribution.NOTICE)
         TextButton(onClick = { uri.openUri("https://onlygoodthings.lat/terms#propiedad-intelectual") }) { Text("Leer el acuerdo de publicación") }
     }
 }

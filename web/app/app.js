@@ -254,7 +254,7 @@ function newestFirst(a, b) {
 }
 
 function sortFeed() {
-  if(feedMode==="FOLLOWING")lastFeed.sort(newestFirst);
+  lastFeed.sort(newestFirst);
 }
 
 function mergePost(next) {
@@ -1260,7 +1260,6 @@ function renderEdit(post) {
     ${["POST","ACTION","TERNURA"].includes(post.publicationKind) ? `<label class="field">Hashtags<input id="edit-hashtags" value="${escapeHtml((post.hashtags||[]).map(t=>"#"+(t.categoryId?t.key:t.label)).join(" "))}"></label><label class="field">Nombre y apellido (si reconocés una buena acción)<input id="edit-honoree" maxlength="100" value="${escapeHtml(post.honoreeName||"")}"></label>` : ""}
     <textarea id="edit-body">${escapeHtml(post.body || "")}</textarea>
     <label class="field">Fuente o enlace original (opcional)<input id="edit-attribution" type="url" maxlength="2048" autocapitalize="off" value="${escapeHtml(post.attributionUrl || "")}"></label>
-    <p class="hint">Citar la fuente no reemplaza el permiso de uso.</p>
     <div class="row">
       <button class="ghost" data-close-dialog>Cancelar</button>
       <button class="primary" data-edit-save="${escapeHtml(post.id)}">Guardar</button>
@@ -2333,7 +2332,7 @@ function bindFeedPills() {
     if(feedMode===button.dataset.feedMode)return;
     feedMode=button.dataset.feedMode;
     document.querySelectorAll('[data-feed-mode]').forEach(node=>{const selected=node===button;node.classList.toggle('on',selected);node.setAttribute('aria-pressed',String(selected));});
-    const box=document.getElementById('feed-list');if(box)box.innerHTML='<p class="empty">Cargando…</p>';
+    const box=document.getElementById('feed-list');if(box)box.replaceChildren();
     try {await loadFeed(feedType);paintFeedList();}catch(error){if(box)box.textContent=error.message;}
   }));
   document.getElementById("feed-type")?.querySelectorAll("[data-type]").forEach((btn) => {
@@ -2347,7 +2346,7 @@ function bindFeedPills() {
         el.setAttribute("aria-selected", on ? "true" : "false");
       });
       const box = document.getElementById("feed-list");
-      if (box) box.innerHTML = `<p class="empty">Cargando…</p>`;
+      if (box) box.replaceChildren();
       try {
         await loadFeed(feedType);
         paintFeedList();
@@ -2361,7 +2360,7 @@ function bindFeedPills() {
 async function renderInicio() {
   const main = document.getElementById("main");
   disposeStories();
-  main.innerHTML = `<h1>Inicio</h1><section id="ephemeral-stories" class="ephemeral-stories"></section>${feedPillsHtml()}<div id="feed-list"><p class="empty">Cargando…</p></div>`;
+  main.innerHTML = `<h1>Inicio</h1><section id="ephemeral-stories" class="ephemeral-stories"></section>${feedPillsHtml()}<div id="feed-list"></div>`;
   bindFeedPills();
   try {
     await loadSession();
@@ -3235,7 +3234,7 @@ async function renderPublicar(kind) {
       <p class="count" data-count>0 / 500</p>
       <label class="field">Fuente o enlace original (opcional)<input name="attributionUrl" type="url" maxlength="2048" autocapitalize="off" placeholder="https://"></label>
       ${kind==="accion" ? invitationsModule.invitationEditorHtml() : ""}
-      <p class="hint publication-rights-notice">Al publicar declarás que el contenido es tuyo o que tenés los permisos necesarios. Citar la fuente no reemplaza la autorización. <a href="/terms#propiedad-intelectual" target="_blank" rel="noopener">Leer el acuerdo de publicación</a>.</p>
+      <p class="hint publication-rights-notice"><a href="/terms#propiedad-intelectual" target="_blank" rel="noopener">Leer el acuerdo de publicación</a></p>
       <button type="submit" class="publish-cta" data-submit>${icon(spec.icon)} Publicar</button>
     </form>`;
   bindPublishForm(kind,catalog,invitationsModule,placeModule);
@@ -3270,7 +3269,7 @@ async function renderUnifiedPublication(catalog,invitationsModule,initialTag=nul
       <p class="count" data-count>0 / 500</p>
       <label class="field">Fuente o enlace original (opcional)<input name="attributionUrl" type="url" maxlength="2048" autocapitalize="off"></label>
       ${invitationsModule.invitationEditorHtml()}
-      <p class="hint publication-rights-notice">Al publicar declarás que el contenido es tuyo o que tenés los permisos necesarios. Citar la fuente no reemplaza la autorización. <a href="/terms#propiedad-intelectual" target="_blank" rel="noopener">Leer el acuerdo de publicación</a>.</p>
+      <p class="hint publication-rights-notice"><a href="/terms#propiedad-intelectual" target="_blank" rel="noopener">Leer el acuerdo de publicación</a></p>
       <p role="alert" data-publication-error></p><button type="submit" class="publish-cta" data-submit>Publicar</button>
     </form>`;
   const form=document.getElementById('publish-form'),name=form.elements.honoree,account=form.elements.recognitionAccount;

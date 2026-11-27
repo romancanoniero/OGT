@@ -14,7 +14,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.onlygoodthings.app.auth.AuthRestore
 import com.onlygoodthings.app.data.LocalAuth
 import com.onlygoodthings.app.data.LocalOgtDb
 import com.onlygoodthings.app.data.LocalOgtSession
@@ -235,6 +234,7 @@ fun App() {
             route == OgtRoute.Onboarding ||
             route == OgtRoute.OnboardingFeatures ||
             route == OgtRoute.Login ||
+            route == OgtRoute.UnlockSession ||
             route == OgtRoute.SignUp ||
             route == OgtRoute.Otp ||
             route == OgtRoute.Recover
@@ -421,11 +421,10 @@ fun App() {
                     OgtRoute.Splash -> SplashScreen(
                         restore = { auth.restore() },
                         onReady = { restored ->
-                            when (restored) {
-                                AuthRestore.LoggedOut -> route = OgtRoute.Landing
-                                AuthRestore.NeedsBiometric, AuthRestore.LoginRequired -> route = OgtRoute.Login
-                                AuthRestore.FirstRun, AuthRestore.Home -> goHomeOrOnboard()
-                            }
+                            val next = com.onlygoodthings.app.nav.restoredSessionStartRoute(
+                                restored, auth.needsCommunityConsent, auth.needsProfileCompletion, auth.hasFinishedOnboarding(),
+                            )
+                            route = if (next == OgtRoute.Feed || next == OgtRoute.Permissions) applyHonorRoute(next) else next
                             scope.launch {
                                 auth.hydratePublishedAnimals(db)
                                 session.persistPublishedAnimals()
@@ -474,6 +473,10 @@ fun App() {
                             otpBack = OgtRoute.Login
                             route = OgtRoute.Otp
                         },
+                    )
+                    OgtRoute.UnlockSession -> com.onlygoodthings.app.ui.screens.UnlockSessionScreen(
+                        onUnlocked = { goHomeOrOnboard() },
+                        onUseOtherMethod = { auth.error = null; route = OgtRoute.Login },
                     )
                     OgtRoute.Otp -> OtpScreen(
                         onConfirm = { goHomeOrOnboard() },

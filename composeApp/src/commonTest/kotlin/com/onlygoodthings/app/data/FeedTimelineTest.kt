@@ -72,6 +72,17 @@ class FeedTimelineTest {
             assertTrue(f.page().ready)
         } finally { f.close() }
     }
+    @Test fun aRecentPostPrecedesAnOlderOwnPostEvenWithAnOldRankedOrCachedOrder()=runBlocking {
+        val f=Fixture()
+        try {
+            val now=com.onlygoodthings.shared.realtime.currentEpochMs()
+            f.rows=listOf(post(2,author="viewer").copy(createdAtEpochMs=now-3_600_000),post(1).copy(createdAtEpochMs=now-1000))
+            f.start();f.load()
+            assertEquals(listOf(id(1),id(2)),f.page().posts.map { it.id })
+            f.timeline.localChanged()
+            assertEquals(listOf(id(1),id(2)),f.page().posts.map { it.id })
+        } finally { f.close() }
+    }
     @Test fun shortNavigationDoesNotRepeatRequestsAndErrorsKeepTheLastContent()=runBlocking {
         val f=Fixture()
         try {

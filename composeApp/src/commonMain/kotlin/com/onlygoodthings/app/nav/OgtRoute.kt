@@ -9,6 +9,7 @@ enum class OgtRoute(val title: String) {
     Onboarding("Onboarding"),
     SignUp("Crear cuenta"),
     Login("Iniciar sesión"),
+    UnlockSession("Desbloquear OGT"),
     Otp("Verificación OTP"),
     Recover("Recuperar contraseña"),
     CommunityAgreement("Bienvenido a Only Good Things"),
@@ -57,6 +58,20 @@ internal fun authenticatedStartRoute(needsConsent: Boolean, needsProfile: Boolea
     needsProfile -> OgtRoute.CompleteProfile
     !onboardingDone -> OgtRoute.Permissions
     else -> OgtRoute.Feed
+}
+
+/** A saved session protected by biometrics needs unlocking, not another provider sign-in. */
+internal fun restoredSessionStartRoute(
+    restored: com.onlygoodthings.app.auth.AuthRestore,
+    needsConsent: Boolean,
+    needsProfile: Boolean,
+    onboardingDone: Boolean,
+): OgtRoute = when (restored) {
+    com.onlygoodthings.app.auth.AuthRestore.LoggedOut -> OgtRoute.Landing
+    com.onlygoodthings.app.auth.AuthRestore.LoginRequired -> OgtRoute.Login
+    com.onlygoodthings.app.auth.AuthRestore.NeedsBiometric -> OgtRoute.UnlockSession
+    com.onlygoodthings.app.auth.AuthRestore.FirstRun,
+    com.onlygoodthings.app.auth.AuthRestore.Home -> authenticatedStartRoute(needsConsent, needsProfile, onboardingDone)
 }
 
 /** Tipos de aviso que se publican desde el + del dock. */

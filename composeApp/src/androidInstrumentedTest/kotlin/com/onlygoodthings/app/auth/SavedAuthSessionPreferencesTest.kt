@@ -37,7 +37,7 @@ class SavedAuthSessionPreferencesTest {
             var opened: AuthUser? = null
             val restored = restoreSavedAuthSession(
                 explicitlySignedOut = AuthPrefs().sessionSignedOut,
-                biometricEnabled = false,
+                appLockEnabled = false,
                 currentUser = { user },
                 openSession = { opened = it },
                 onboardingDone = { true },
@@ -49,6 +49,38 @@ class SavedAuthSessionPreferencesTest {
             prefs.sessionSignedOut = wasSignedOut
             storage.edit().apply {
                 if (hadKeep) putBoolean("keep", oldKeep) else remove("keep")
+            }.commit()
+        }
+    }
+
+    @Test fun legacyBiometricLoginDoesNotOptIntoAppLockButAnExplicitChoiceIsRetained() = runBlocking {
+        val app = OgtApplication.instance
+        check(app.packageName == "com.onlygoodthings.app.qa")
+        val storage = app.getSharedPreferences("ogt_auth", 0)
+        val old = storage.all.filterKeys { it == "bio" || it == "app_lock" || it == "signed_out" }
+        try {
+            storage.edit().putBoolean("bio", true).remove("app_lock").putBoolean("signed_out", false).commit()
+            assertTrue(AuthPrefs().biometricEnabled)
+            assertFalse(AuthPrefs().appLockEnabled)
+            val user = AuthUser("saved-firebase-user", null, null, "Vecina", null)
+            var opened = false
+            assertEquals(AuthRestore.Home, restoreSavedAuthSession(
+                explicitlySignedOut = AuthPrefs().sessionSignedOut,
+                appLockEnabled = AuthPrefs().appLockEnabled,
+                currentUser = { user },
+                openSession = { assertEquals(user, it); opened = true },
+                onboardingDone = { true },
+                onSessionExpired = { fail("The saved identity remains valid") },
+            ))
+            assertTrue(opened)
+            AuthPrefs().appLockEnabled = true
+            assertTrue(AuthPrefs().appLockEnabled)
+            assertTrue(AuthPrefs().biometricEnabled)
+        } finally {
+            storage.edit().apply {
+                for (key in listOf("bio", "app_lock", "signed_out")) {
+                    if (key in old) putBoolean(key, old.getValue(key) as Boolean) else remove(key)
+                }
             }.commit()
         }
     }

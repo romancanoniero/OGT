@@ -116,8 +116,12 @@ class PublicationHashtagsIntegrationTest {
                 c.createStatement().use { q ->q.executeUpdate("UPDATE social_posts SET created_at=now()-INTERVAL '20 hours' WHERE id='${target.id}'") }
                 c.prepareStatement("INSERT INTO social_posts(id,author_kind,author_user_id,body,media_urls,topic,publication_kind,hashtags) SELECT gen_random_uuid(),'USER',?::uuid,'Receta reciente',ARRAY['https://example.test/cooking.jpg'],'Cocina','POST','[{\"key\":\"cocina\",\"label\":\"Cocina\"}]'::jsonb FROM generate_series(1,215)").use { q ->q.setString(1,noise);q.executeUpdate() }
             }
-            assertEquals(target.id,posts.feed(viewer,FeedMode.HOME,20,null).first().id)
-            assertNotEquals(target.id,posts.feed(stranger,FeedMode.HOME,20,null).first().id)
+            val recent=posts.feed(viewer,FeedMode.HOME,200,null)
+            val recommended=posts.feed(viewer,FeedMode.HOME,20,"200")
+            assertEquals(noise,recent.first().authorId)
+            assertEquals((recent+recommended).map { it.createdAtEpochMs }.sortedDescending(),(recent+recommended).map { it.createdAtEpochMs })
+            assertTrue(recommended.any { it.id==target.id })
+            assertTrue(posts.feed(stranger,FeedMode.HOME,20,"200").none { it.id==target.id })
             posts.follow(viewer,author);posts.follow(viewer,noise)
             val following=posts.feed(viewer,FeedMode.FOLLOWING,40,null)
             assertEquals(following.map { it.createdAtEpochMs }.sortedDescending(),following.map { it.createdAtEpochMs })

@@ -18,14 +18,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import com.onlygoodthings.shared.domain.placePostFrame
 import com.onlygoodthings.app.map.decodeTileBitmap
 import com.onlygoodthings.app.media.OgtMediaCache
 import com.onlygoodthings.app.media.isRemoteMediaUrl
 import com.onlygoodthings.app.platform.localFilePath
 import com.onlygoodthings.app.theme.OgtColors
-import com.onlygoodthings.app.ui.components.OgtLoader
 import com.onlygoodthings.app.data.LocalOgtSession
 import com.onlygoodthings.app.ui.components.neighborAvatarArt
 import com.onlygoodthings.shared.data.local.LocalPostMedia
@@ -47,7 +45,7 @@ fun Modifier.ogtBleedHorizontal(bleed: Dp): Modifier = layout { measurable, cons
     }
 }
 
-/** Foto de seed, archivo local o URL remota. Cache + loader en el holder. */
+/** Foto de seed, archivo local o URL remota. La carga automática conserva un fondo estable. */
 @Composable
 fun OgtPostImage(
     url: String,
@@ -130,7 +128,6 @@ fun OgtPostImage(
                     contentScale = contentScale,
                 )
             }
-            if (loading) OgtLoader(size = 28.dp)
         }
     }
 }

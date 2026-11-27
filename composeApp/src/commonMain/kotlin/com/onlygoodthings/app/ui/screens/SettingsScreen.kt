@@ -269,6 +269,17 @@ fun SettingsScreen(
 
             }
 
+            PrefCategory("Seguridad en este dispositivo")
+            PrefGroup {
+                PrefSwitch(
+                    title = "Bloquear OGT al abrir",
+                    body = "Opcional. Pedí rostro o huella al volver a abrir la app en este dispositivo. Si está apagado, tu sesión abre directamente.",
+                    checked = auth.appLockEnabled,
+                    enabled = !auth.busy,
+                ) { on -> scope.launch { auth.setAppLockEnabled(on) } }
+                AuthError(auth.error)
+            }
+
             PrefCategory("Privacidad")
             com.onlygoodthings.app.ui.components.BlockedUsersControl()
             PrefGroup {

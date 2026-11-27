@@ -13,8 +13,11 @@ class FeedPersonalizationTest {
         listOf(post("stars",astronomy,20),post("food",cooking)),ViewerContext("me",setOf("stars","food"),events),mode,now)
 
     @Test fun customHashtagsDifferentiateInterestsEvenWithinTheSameOtherFamily() {
-        assertEquals("stars",rank(likes(astronomy)).first().postId)
-        assertEquals("food",rank(likes(cooking)).first().postId)
+        val stars=rank(likes(astronomy));val food=rank(likes(cooking))
+        assertEquals(listOf("food","stars"),stars.map { it.postId })
+        assertEquals(listOf("food","stars"),food.map { it.postId })
+        assertTrue(stars.first { it.postId=="stars" }.score > stars.first { it.postId=="food" }.score)
+        assertTrue(food.first { it.postId=="food" }.score > food.first { it.postId=="stars" }.score)
     }
     @Test fun followingIgnoresInterestsAndIsChronological() {
         assertEquals(listOf("food","stars"),rank(likes(astronomy),FeedMode.FOLLOWING).map { it.postId })
@@ -23,12 +26,14 @@ class FeedPersonalizationTest {
         val old=PostHashtag("ciencia","Ciencia","crm-science")
         val renamed=PostHashtag("astronomia","Astronomía","crm-science")
         val ranked=FeedRanker.rank(listOf(post("stars",renamed,20),post("food",cooking)),ViewerContext("me",emptySet(),likes(old)),FeedMode.HOME,now)
-        assertEquals("stars",ranked.first().postId)
+        assertEquals("food",ranked.first().postId)
+        assertTrue(ranked.first { it.postId=="stars" }.score > ranked.first { it.postId=="food" }.score)
     }
     @Test fun aFreeHashtagCanBecomeOfficialWithoutLosingItsAudience() {
         val official=astronomy.copy(categoryId="crm-science")
         val ranked=FeedRanker.rank(listOf(post("stars",official,20),post("food",cooking)),ViewerContext("me",emptySet(),likes(astronomy)),FeedMode.HOME,now)
-        assertEquals("stars",ranked.first().postId)
+        assertEquals("food",ranked.first().postId)
+        assertTrue(ranked.first { it.postId=="stars" }.score > ranked.first { it.postId=="food" }.score)
     }
     @Test fun repeatedEventsForOnePostDoNotInflatePreference() {
         assertEquals(rank(likes(astronomy)),rank(likes(astronomy).flatMap { event -> List(50) { event } }))
@@ -57,5 +62,14 @@ class FeedPersonalizationTest {
         val old=rank(likes(astronomy).map { it.copy(occurredAtEpochMs=now-90*86_400_000L) }).first { it.postId=="stars" }.score
         assertTrue(recent>old)
         assertEquals("food",rank(emptyList()).first().postId)
+    }
+
+    @Test fun chronologicalPaginationDoesNotSkipOrRepeatPostsWithStrongOlderInterests() {
+        val candidates=(1..45).map { post("post-$it",if(it%2==0) astronomy else cooking,it) }
+        val viewer=ViewerContext("me",emptySet(),likes(astronomy))
+        val first=FeedRanker.rank(candidates,viewer,FeedMode.HOME,now,0,20)
+        val second=FeedRanker.rank(candidates,viewer,FeedMode.HOME,now,20,20)
+        assertEquals((1..40).map { "post-$it" },(first+second).map { it.postId })
+        assertEquals(40,(first+second).map { it.postId }.distinct().size)
     }
 }
