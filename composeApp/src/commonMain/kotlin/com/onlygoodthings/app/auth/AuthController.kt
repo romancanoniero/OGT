@@ -87,7 +87,7 @@ class AuthController(
     val notices = RestNoticeRepository(createPlatformHttpClient(), session)
     val animals = RestAnimalsRepository(createPlatformHttpClient(), session)
     val feed = RestFeedRepository(createPlatformHttpClient(), session)
-    val feedTimeline = com.onlygoodthings.app.data.FeedTimeline(
+    val feedTimeline: com.onlygoodthings.app.data.FeedTimeline = com.onlygoodthings.app.data.FeedTimeline(
         db=db,
         prepare={
             if(allowDevTokens)ensureDevBearer() else {
@@ -97,7 +97,7 @@ class AuthController(
                 session.firebaseJwt=token
             }
         },
-        load={ query -> feed.loadFeed("0",40,query.mode,query.family) },
+        load={ query -> feedTimeline.confirmViewerLocation(feed.feedLocation());feed.loadNearbyFeed("0",40,query.mode,query.family,query.adoptionRadiusKm) },
         visible=feed::visiblePostIds,
         loadPost=feed::getPost,
         reconcile=preview::reconcileFeedVisibility,
@@ -114,6 +114,9 @@ class AuthController(
         val idx = db.users.indexOfFirst { it.id == me.id }
         if (idx >= 0) db.users[idx] = updated
         preview.overlayUser = updated
+        feedTimeline.confirmViewerLocation(com.onlygoodthings.shared.domain.GeoPoint(latitude,longitude))
+        feedTimeline.localChanged()
+        feedTimeline.refresh(feedTimeline.presentation.query,force=true)
     }
 
     var pendingPhone by mutableStateOf<PendingPhoneAuth?>(null)

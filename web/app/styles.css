@@ -439,12 +439,12 @@ span.avatar svg { width: 18px; height: 18px; }
   object-fit: contain;
   background: var(--ink);
 }
-.post-carousel { touch-action: pan-y pinch-zoom; }
+.post-carousel { position:relative; touch-action: pan-y pinch-zoom; }
 .post-carousel:focus-visible { outline: 2px solid var(--secondary); outline-offset: 4px; }
-.post-media-dots { display: flex; justify-content: center; flex-wrap: wrap; gap: 2px; padding-top: 6px; }
-.post-media-dot { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; }
-.post-media-dot span { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); opacity: .4; }
-.post-media-dot[aria-current="true"] span { background: var(--secondary); opacity: 1; transform: scale(1.25); }
+.post-media-dots { position:absolute; z-index:3; bottom:8px; left:50%; transform:translateX(-50%); max-width:calc(100% - 96px); display:flex; justify-content:center; gap:0; border-radius:20px; background:#11121388; padding:0 4px; }
+.post-media-dot { display: grid; place-items: center; width: 20px; min-width: 12px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; }
+.post-media-dot span { width: 7px; height: 7px; border-radius: 50%; background: white; opacity: .5; }
+.post-media-dot[aria-current="true"] span { background: white; opacity: 1; transform: scale(1.25); }
 .post-media-dot:focus-visible { outline: 2px solid var(--secondary); outline-offset: 1px; }
 .post-media-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .actions { display: flex; gap: 8px; margin-top: 12px; }
@@ -1752,3 +1752,12 @@ body.desk .center {
 .adoption-info {padding:0 20px 12px}
 .adoption-info .meta {margin:4px 0;white-space:pre-line}
 .publish .field select {font:inherit;color:inherit;background:transparent;border:0;padding:12px 0;width:100%}
+
+.post-video-play,.post-video-sound { position:absolute;z-index:2;display:grid;place-items:center;border:0;border-radius:50%;background:#11121399;color:white;cursor:pointer; }
+.post-video-play { left:50%;top:50%;transform:translate(-50%,-50%);width:52px;height:52px;font-size:24px; }
+.is-playing .post-video-play { left:10px;top:10px;transform:none;width:36px;height:36px;font-size:16px; }
+.post-video-sound { right:10px;bottom:10px;width:40px;height:40px; }
+.post-video-play:focus-visible,.post-video-sound:focus-visible { outline:2px solid white;outline-offset:2px; }
+.post-media-types { display:flex;gap:8px;margin:4px 0 8px; }
+.post-media-type { display:inline-flex;color:var(--muted);opacity:.35; }
+.post-media-type.has { color:var(--secondary);opacity:1; }

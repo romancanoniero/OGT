@@ -51,6 +51,10 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
         catch (failure: IllegalArgumentException) { return@post call.respond(HttpStatusCode.BadRequest,ApiResponse.fail<Unit>(failure.message ?: "Ajustes inválidos","BAD_REQUEST")) }
         call.respond(ApiResponse.ok(settings))
     }
+    post("/api/v1/social/feed-scope") {
+        val principal=call.principal<AuthPrincipal>() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+        call.respond(ApiResponse.ok(repository.feedScope(principal.userId)))
+    }
     post("/api/v1/social/feed") {
         val principal = call.principal<AuthPrincipal>() ?: return@post call.respond(
             HttpStatusCode.Unauthorized,
@@ -71,7 +75,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
                 else -> runCatching { com.onlygoodthings.shared.domain.FeedTopicFamily.valueOf(key) }.getOrNull()
             }
         }
-        call.respond(ApiResponse.ok(repository.feed(principal.userId, mode, pageSize, cursor, family)))
+        call.respond(ApiResponse.ok(repository.feed(principal.userId, mode, pageSize, cursor, family, dataMap.optInt("adoptionRadiusKm",50))))
     }
 
     post("/api/v1/social/post/get") {
@@ -539,6 +543,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
             place = dataMap.optString("place"),
             eventStartsAtEpochMs = (dataMap["eventStartsAtEpochMs"] as? Number)?.toLong(),
             hashtags = dataMap.hashtags(),
+            latitude=dataMap.optDouble("latitude"),longitude=dataMap.optDouble("longitude"),pointChanged=dataMap.containsKey("latitude") || dataMap.containsKey("longitude"),
             categoryId = dataMap.optString("categoryId"),
         )
         hub.projectSocialPost(

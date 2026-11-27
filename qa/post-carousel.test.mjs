@@ -18,8 +18,12 @@ test('mixed carousels preserve every file and its order, poster and frame with o
   assert.equal((html.match(/data-media-go=/g) || []).length, 3);
   assert.equal((html.match(/class="post-media-slide"/g) || []).length, 3);
   assert.equal((html.match(/aria-current="true"/g) || []).length, 1);
-  assert.ok(html.includes('<video class="media" src="https://example.test/middle.mp4" poster="https://example.test/poster.jpg" controls playsinline'));
+  assert.ok(html.includes('<video class="media" src="https://example.test/middle.mp4" poster="https://example.test/poster.jpg" playsinline'));
   assert.ok(!html.includes('<img class="media" src="https://example.test/middle.mp4"'));
+  assert.ok(!html.includes(' controls'));
+  assert.ok(html.includes('data-video-play'));
+  assert.ok(html.includes('data-video-sound'));
+  assert.ok(!html.includes(' loop'));
   assert.ok(html.includes('data-frame-x="0.2"'));
   assert.ok(html.includes('Ir a video 2 de 3'));
   assert.equal(post.media[0].url, 'https://example.test/last.jpg');

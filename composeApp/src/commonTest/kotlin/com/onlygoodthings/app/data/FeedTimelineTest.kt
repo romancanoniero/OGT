@@ -40,6 +40,26 @@ class FeedTimelineTest {
         fun close() { timeline.close() }
     }
 
+    @Test fun radiusAlsoFiltersCachedAndLiveAdoptionsWithoutDeletingThemOrChangingFollowing()=runBlocking {
+        val f=Fixture()
+        try {
+            fun adoption(n:Int,lat:Double?,lng:Double?)=post(n).copy(topic="Adopción",animalListing=AnimalListingDto(
+                id(n+100),id(n),"neighbor","firebase-neighbor","ADOPTION","CAT","SMALL","LOW","Gato","Busca hogar","Zona",0,false,latitude=lat,longitude=lng))
+            f.rows=listOf(adoption(1,-34.60,-58.45),adoption(2,-34.92,-57.95),adoption(3,null,null),post(4))
+            f.start();f.timeline.confirmViewerLocation(GeoPoint(-34.62,-58.44));f.load()
+            assertEquals(setOf(id(1),id(4)),f.page().posts.map { it.id }.toSet())
+            val wide=FeedQuery(adoptionRadiusKm=100);f.load(wide)
+            assertEquals(setOf(id(1),id(2),id(4)),f.page(wide).posts.map { it.id }.toSet())
+            val all=FeedQuery(adoptionRadiusKm=0);f.load(all)
+            assertEquals(4,f.page(all).posts.size)
+            f.timeline.localChanged()
+            assertEquals(setOf(id(1),id(4)),f.page().posts.map { it.id }.toSet())
+            assertTrue(f.db.posts.any { it.id==id(2) })
+            f.timeline.confirmViewerLocation(null)
+            assertEquals(listOf(id(4)),f.page().posts.map { it.id })
+        } finally { f.close() }
+    }
+
     @Test fun personalizedOrderStaysStableWhileReactingAndOnlyChangesWhenRequested()=runBlocking {
         val f=Fixture()
         try {

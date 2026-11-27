@@ -47,30 +47,8 @@ fun PostMediaViewer(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Box(Modifier.fillMaxSize().background(OgtColors.ink)) {
-            HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { media[it].id }) { page ->
-                val item = media[page]
-                val playable = item.kind == MediaKind.VIDEO && (
-                    item.url.startsWith("http") || item.url.startsWith("file") || item.url.startsWith("/")
-                )
-                if (playable) {
-                    var playUrl by remember(item.url) {
-                        mutableStateOf(OgtMediaCache.cachedFileUrl(item.url) ?: item.url)
-                    }
-                    LaunchedEffect(item.url) {
-                        playUrl = OgtMediaCache.cachedPlayableUrl(item.url)
-                    }
-                    OgtPostedVideo(playUrl, Modifier.fillMaxSize())
-                } else {
-                    OgtPostImage(
-                        item = item,
-                        fallback = Res.drawable.feed_story_donacion,
-                        contentDescription = item.altText ?: tag,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit,
-                    )
-                }
-            }
-            MediaPagerIndicator(pageIndex = pager.currentPage, pageCount = media.size)
+            com.onlygoodthings.app.ui.components.PostedMediaCarousel(media,Res.drawable.feed_story_donacion,tag,
+                modifier=Modifier.fillMaxSize(),initialIndex=startIndex,autoPlay=true)
             CircleIconButton(
                 art = Res.drawable.qs_close,
                 label = "Cerrar",

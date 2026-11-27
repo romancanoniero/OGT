@@ -32,8 +32,8 @@ data class AnimalWrite(
     val marks: String,
     val lastSeenPlace: String,
     val place: String,
-    val latitude: Double,
-    val longitude: Double,
+    val latitude: Double?,
+    val longitude: Double?,
     val alertRadiusM: Int,
     val media: List<PostMediaItem>,
     val adoptionDetails: AdoptionDetails? = null,
@@ -126,8 +126,8 @@ class AnimalSqlRepository(private val db: Database) {
                 ).use { stmt ->
                     stmt.setString(1, write.adoptionDetails?.presentation?.takeIf { it.isNotBlank() } ?: write.description)
                     stmt.setString(2, topicOf(write.kind))
-                    stmt.setDouble(3, write.longitude)
-                    stmt.setDouble(4, write.latitude)
+                    stmt.setObject(3, write.longitude)
+                    stmt.setObject(4, write.latitude)
                     stmt.setArray(5, connection.createArrayOf("text", write.media.map { it.url }.toTypedArray()))
                     stmt.setString(6, postId)
                     stmt.executeUpdate()
@@ -262,8 +262,8 @@ class AnimalSqlRepository(private val db: Database) {
             stmt.setString(2, reporterId)
             stmt.setString(3, write.adoptionDetails?.presentation?.takeIf { it.isNotBlank() } ?: write.description)
             stmt.setArray(4, connection.createArrayOf("text", write.media.map { it.url }.toTypedArray()))
-            stmt.setDouble(5, write.longitude)
-            stmt.setDouble(6, write.latitude)
+            stmt.setObject(5, write.longitude)
+            stmt.setObject(6, write.latitude)
             stmt.setString(7, topicOf(write.kind))
             stmt.setString(8, listingId)
             stmt.executeUpdate()
@@ -325,8 +325,8 @@ class AnimalSqlRepository(private val db: Database) {
         stmt.setString(i++, write.title)
         stmt.setString(i++, write.description)
         stmt.setArray(i++, stmt.connection.createArrayOf("text", write.media.map { it.url }.toTypedArray()))
-        stmt.setDouble(i++, write.longitude)
-        stmt.setDouble(i++, write.latitude)
+        stmt.setObject(i++, write.longitude)
+        stmt.setObject(i++, write.latitude)
         stmt.setInt(i++, write.alertRadiusM)
         stmt.setString(i++, write.petName)
         stmt.setString(i++, write.ageLabel)

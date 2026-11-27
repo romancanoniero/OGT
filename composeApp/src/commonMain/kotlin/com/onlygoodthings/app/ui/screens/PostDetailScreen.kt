@@ -1357,45 +1357,8 @@ private fun DetailMedia(
         )
         return
     }
-    val pager = rememberPagerState { media.size }
-    Box(
-        Modifier
-            .ogtBleedHorizontal(OgtDimens.margin)
-            .aspectRatio(POST_FRAME_RATIO),
-    ) {
-        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { media[it].let { item -> "${item.id}:${item.url}" } }) { page ->
-            val item = media[page]
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .clickable { onOpen(page) },
-            ) {
-                OgtPostImage(
-                    item = item,
-                    fallback = Res.drawable.feed_story_donacion,
-                    contentDescription = item.altText ?: tag,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
-                if (item.kind == MediaKind.VIDEO) {
-                    Box(
-                        Modifier
-                            .align(Alignment.Center)
-                            .size(52.dp)
-                            .clip(CircleShape)
-                            .background(OgtColors.ink.copy(alpha = 0.55f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        OgtStitchIcon(Res.drawable.qs_play, "Reproducir video", tint = OgtColors.onPrimary)
-                    }
-                }
-            }
-        }
-        MediaPagerIndicator(
-            pageIndex = pager.currentPage,
-            pageCount = media.size,
-        )
-    }
+    com.onlygoodthings.app.ui.components.PostedMediaCarousel(media,Res.drawable.feed_story_donacion,tag,
+        modifier=Modifier.ogtBleedHorizontal(OgtDimens.margin).aspectRatio(POST_FRAME_RATIO),onOpen=onOpen,inlineVideo=false)
 }
 
 private fun lostSpeciesSize(listing: LocalAnimalListing?): String? {

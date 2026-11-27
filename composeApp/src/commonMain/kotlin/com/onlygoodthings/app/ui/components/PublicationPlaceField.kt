@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** A publication shares the chosen place name, without attaching device coordinates to the post. */
+/** Optional point callback keeps the confirmed place coordinates alongside its label. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PublicationPlaceField(
@@ -28,6 +28,7 @@ fun PublicationPlaceField(
     label:String="Lugar",
     enabled:Boolean=true,
     locateInitially:Boolean=false,
+    onPointChange:(com.onlygoodthings.shared.domain.GeoPoint?)->Unit={},
 ) {
     val preview=LocalInspectionMode.current
     val focusManager=LocalFocusManager.current
@@ -91,7 +92,7 @@ fun PublicationPlaceField(
                 catch(_:Exception) { null }
             if(revision!=expected)return@LaunchedEffect
             if(hit==null)status="No pudimos identificar el lugar. Reintentá o escribilo libremente."
-            else { search="";hits=emptyList();onValueChange(hit.label);status="Lugar de tu ubicación actual. Podés cambiarlo antes de publicar." }
+            else { search="";hits=emptyList();onValueChange(hit.label);onPointChange(com.onlygoodthings.shared.domain.GeoPoint(hit.latitude,hit.longitude));status="Lugar de tu ubicación actual. Podés cambiarlo antes de publicar." }
         } finally { locating=false;if(revision==expected)locatePending=false }
     }
 
@@ -100,7 +101,7 @@ fun PublicationPlaceField(
         ExposedDropdownMenuBox(expanded=expanded,onExpandedChange={menuRequested=it}) {
             OgtOutlinedTextField(value,{ text ->
                 revision++;locatePending=false;locating=false;hits=emptyList();status=null;menuRequested=true
-                val next=text.take(200);search=next;onValueChange(next)
+                val next=text.take(200);search=next;onValueChange(next);onPointChange(null)
             },label={Text(label)},placeholder={Text("Buscá una plaza, dirección o ciudad")},singleLine=true,enabled=enabled,
                 modifier=Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryEditable,enabled).onFocusChanged {
                     fieldFocused=it.isFocused
@@ -109,7 +110,7 @@ fun PublicationPlaceField(
             ExposedDropdownMenu(expanded=expanded,onDismissRequest={menuRequested=false},modifier=Modifier.heightIn(max=240.dp)) {
                 hits.forEach { hit -> DropdownMenuItem(text={Text(hit.label)},onClick={
                     revision++;locatePending=false;search="";hits=emptyList();status=null;menuRequested=false
-                    onValueChange(hit.label);focusManager.clearFocus()
+                    onValueChange(hit.label);onPointChange(com.onlygoodthings.shared.domain.GeoPoint(hit.latitude,hit.longitude));focusManager.clearFocus()
                 }) }
             }
         }

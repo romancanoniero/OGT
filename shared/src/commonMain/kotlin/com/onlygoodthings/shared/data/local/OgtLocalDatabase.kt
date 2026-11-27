@@ -1793,6 +1793,7 @@ class OgtLocalDatabase {
         title: String? = null,
         adoptionDetails: com.onlygoodthings.shared.domain.AdoptionDetails? = null,
         attributionUrl: String? = null,
+        clearLocation: Boolean = false,
     ): LocalSocialPost? {
         val name = titleCasePersonName(petName.trim())
         val story = description.trim()
@@ -1827,8 +1828,8 @@ class OgtLocalDatabase {
             petName = name,
             marks = if (lost) marks.trim() else listing.marks,
             lastSeenPlace = if (lost) seen else listing.lastSeenPlace,
-            latitude = latitude ?: listing.latitude,
-            longitude = longitude ?: listing.longitude,
+            latitude = if (!lost && clearLocation) null else latitude ?: listing.latitude,
+            longitude = if (!lost && clearLocation) null else longitude ?: listing.longitude,
             lastSeenAtEpochMs = if (lost) currentEpochMs() else listing.lastSeenAtEpochMs,
             ageLabel = if (lost) listing.ageLabel else ageLabel.trim(),
             sex = if (lost) listing.sex else sex.trim(),

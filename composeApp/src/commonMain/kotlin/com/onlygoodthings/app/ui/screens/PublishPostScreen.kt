@@ -50,6 +50,8 @@ fun PublishPostScreen(editPostId:String?=null,onDone:()->Unit,onBack:()->Unit=on
     var attribution by remember(editPostId) { mutableStateOf(existing?.attributionUrl.orEmpty()) }
     var includePlace by remember(editPostId) { mutableStateOf(!existing?.place.isNullOrBlank()) }
     var place by remember(editPostId) { mutableStateOf(existing?.place.orEmpty()) }
+    var placePoint by remember(editPostId) { mutableStateOf<com.onlygoodthings.shared.domain.GeoPoint?>(null) }
+    var pointChanged by remember(editPostId) { mutableStateOf(false) }
     val media=remember { mutableStateListOf<OgtPickedMedia>() }
     val invitations=remember { mutableStateListOf<PostInvitationDraft>() }
     val participants=remember { mutableStateListOf<MentionCandidate>() }
@@ -97,19 +99,19 @@ fun PublishPostScreen(editPostId:String?=null,onDone:()->Unit,onBack:()->Unit=on
             val selectedPlace=if(includePlace)place.trim() else ""
             require(!includePlace || selectedPlace.length in 2..200) { "Completá el lugar o desactivá la ubicación opcional." }
             val participantIds=participants.mapNotNull { it.userId }.distinct().filter { it!=hero }
-            val key=listOf(text,selectedTags,selectedMedia,selectedInvitations,credit,name,hero,participantIds,selectedPlace)
+            val key=listOf(text,selectedTags,selectedMedia,selectedInvitations,credit,name,hero,participantIds,selectedPlace,placePoint.takeIf { includePlace },pointChanged || !includePlace)
             if(attempt!=key) { attempt=key;requestId="post_${currentEpochMs()}_${Random.nextLong().toULong().toString(16)}";uploaded=null }
             val selectedRequest=requestId
             busy=true;error=null
             scope.launch {
                 try {
-                    val saved=if(existing!=null)auth.feed.editPublication(existing.id,text,selectedTags,name,credit.orEmpty(),selectedPlace)
+                    val saved=if(existing!=null)auth.feed.editPublication(existing.id,text,selectedTags,name,credit.orEmpty(),selectedPlace,placePoint.takeIf { includePlace },pointChanged || !includePlace)
                     else {
                         val remoteMedia=uploaded ?: auth.uploadPostMedia(selectedMedia,tags.first().label).also { uploaded=it }
                         check(session.currentUserId==me.id) { "La sesión cambió. Volvé a intentarlo." }
                         auth.feed.publishPublication(PublicationDraft(text,selectedTags,remoteMedia,selectedRequest,
                             honoreeFullName=name,protagonistUserId=if(recognition)hero else null,
-                            participantUserIds=participantIds,invitations=selectedInvitations,attributionUrl=credit,place=selectedPlace.takeIf(String::isNotBlank)))
+                            participantUserIds=participantIds,invitations=selectedInvitations,attributionUrl=credit,place=selectedPlace.takeIf(String::isNotBlank),latitude=placePoint?.latitude?.takeIf { includePlace },longitude=placePoint?.longitude?.takeIf { includePlace }))
                     }
                     check(session.currentUserId==me.id) { "La sesión cambió. Volvé a intentarlo." }
                     db.upsertRemoteSocial(saved);db.bumpFeed()
@@ -170,7 +172,7 @@ fun PublishPostScreen(editPostId:String?=null,onDone:()->Unit,onBack:()->Unit=on
                 Checkbox(includePlace,{includePlace=it},enabled=!busy)
                 Text("Incluir lugar (opcional)")
             }
-            if(includePlace)PublicationPlaceField(place,{place=it},enabled=!busy,locateInitially=!editing && place.isBlank())
+            if(includePlace)PublicationPlaceField(place,{place=it},enabled=!busy,locateInitially=!editing && place.isBlank(),onPointChange={placePoint=it;pointChanged=true})
             OgtOutlinedTextField(body,{body=it.take(500)},label={Text("La historia")},minLines=4,enabled=!busy,modifier=Modifier.fillMaxWidth())
             AttributionField(attribution,{attribution=it},enabled=!busy)
             PublicationRightsNotice()

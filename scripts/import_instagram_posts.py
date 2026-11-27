@@ -4,6 +4,7 @@ import argparse
 import base64
 import hashlib
 import json
+import math
 from pathlib import Path
 import re
 import shlex
@@ -22,6 +23,23 @@ def quote(value):
 
 def identity(value):
     return str(uuid.uuid5(uuid.NAMESPACE_URL, value))
+
+
+def reviewed_location(entry):
+    location = entry.get('location')
+    if location is None:
+        return None, 'NULL'
+    label = location.get('label', '').strip()
+    lat, lng = location.get('latitude'), location.get('longitude')
+    if not label or len(label) > 200 or (lat is None) != (lng is None):
+        raise ValueError('A reviewed place needs a label and a coordinate pair')
+    if lat is None:
+        return label, 'NULL'
+    if any(type(v) not in (float,int) or not math.isfinite(v) for v in (lat,lng)) or not -90 <= lat <= 90 or not -180 <= lng <= 180:
+        raise ValueError('Invalid reviewed place coordinates')
+    if not location.get('evidence') or not location.get('sourceUrl','').startswith('https://www.instagram.com/'):
+        raise ValueError('Coordinates require reviewed location evidence')
+    return label, f'ST_SetSRID(ST_MakePoint({lng},{lat}),4326)'
 
 
 def prepare(path):
@@ -68,6 +86,7 @@ def prepare(path):
             raise ValueError('Classify the post and preserve all 1..10 media items')
         if not entry['body'].strip() or 'importad' not in entry['body'].lower():
             raise ValueError('Post must disclose the import')
+        reviewed_location(entry)
         post = dict(entry, id=identity(entry['sourceUrl']))
         post['listingId'] = identity(entry['sourceUrl'] + '#adoption') if entry['kind'] == 'ADOPTION' else None
         prepared = []
@@ -94,10 +113,11 @@ def make_sql(data, apply=False):
         all_ids += [p['id'], *([p['listingId']] if p['listingId'] else []), *[m['id'] for m in p['media']]]
     ids = ','.join(quote(x) for x in all_ids)
     metadata = {'importedProfile': {'platform': 'instagram', 'handle': data['handle'], 'sourceUrl': data['sourceUrl'], 'bio': data['bio'], 'managed': False},
-                'settings': {'barrio': 'Caballito, CABA', 'language': 'es', 'publicProfileVisible': True}}
+                'settings': {'barrio': data.get('profilePlace',''), 'language': 'es', 'publicProfileVisible': True}}
     sql = ["BEGIN ISOLATION LEVEL REPEATABLE READ; SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='45s';",
            "SELECT pg_advisory_xact_lock(hashtextextended('ogt-instagram-import',0));",
            (ROOT/'database/migrations/42_imported_profiles.sql').read_text(),
+           (ROOT/'database/migrations/44_adoption_location.sql').read_text(),
            "CREATE TEMP TABLE import_protected(table_name text PRIMARY KEY, before_hash text) ON COMMIT DROP;",
            f"""CREATE FUNCTION pg_temp.import_snapshot() RETURNS TABLE(table_name text, row_hash text) LANGUAGE plpgsql AS $snapshot$
 DECLARE r record; clause text; h text;
@@ -113,15 +133,16 @@ INSERT INTO import_protected SELECT * FROM pg_temp.import_snapshot();""",
            f"INSERT INTO users(id,firebase_uid,display_name,photo_url,nickname,invite_code,publishing_blocked,metadata) VALUES({uid}::uuid,{quote('ogt-import:instagram:'+data['handle'])},{quote(data['displayName'])},{quote(data['photoUrl'])},{quote(data['handle'])},{quote('IG-'+data['userId'])},true,{quote(json.dumps(metadata))}::jsonb) ON CONFLICT(id) DO NOTHING;",
            f"DO $check$ BEGIN IF NOT EXISTS(SELECT 1 FROM users WHERE id={uid}::uuid AND firebase_uid={quote('ogt-import:instagram:'+data['handle'])} AND publishing_blocked AND role='USER' AND status='ACTIVE' AND display_name={quote(data['displayName'])} AND metadata->'importedProfile'->>'sourceUrl'={quote(data['sourceUrl'])}) THEN RAISE EXCEPTION 'Imported profile collision or changed owner'; END IF; END $check$;"]
     for p in data['posts']:
+        place, point = reviewed_location(p)
         pid = quote(p['id']) + '::uuid'
         media_urls = 'ARRAY[' + ','.join(quote(m['url']) for m in p['media']) + ']::text[]'
         if p['listingId']:
             a = p['animal']
             values = [quote(a.get(k,'')) for k in ('title','petName','ageLabel','sex','temperament','homeNeeds')]
             title,name,age,sex,temperament,home = values
-            sql.append(f"INSERT INTO animal_listings(id,reporter_user_id,kind,species,size,urgency,title,description,photo_urls,location,alert_radius_m,pet_name,age_label,sex,temperament,sterilized,home_needs,place_label,created_at) VALUES({quote(p['listingId'])}::uuid,{uid}::uuid,'ADOPTION','CAT','SMALL','LOW',{title},{quote(p['body'])},{media_urls},ST_SetSRID(ST_MakePoint(-58.4495,-34.6204),4326),0,{name},{age},{sex},{temperament},{'TRUE' if a.get('sterilized') else 'FALSE'},{home},'Caballito, CABA (zona aproximada)',{quote(p['createdAt'])}::timestamptz) ON CONFLICT(id) DO NOTHING;")
+            sql.append(f"INSERT INTO animal_listings(id,reporter_user_id,kind,species,size,urgency,title,description,photo_urls,location,alert_radius_m,pet_name,age_label,sex,temperament,sterilized,home_needs,place_label,created_at) VALUES({quote(p['listingId'])}::uuid,{uid}::uuid,'ADOPTION','CAT','SMALL','LOW',{title},{quote(p['body'])},{media_urls},{point},0,{name},{age},{sex},{temperament},{'TRUE' if a.get('sterilized') else 'FALSE'},{home},{quote(place or "Ubicación pendiente de confirmar")},{quote(p['createdAt'])}::timestamptz) ON CONFLICT(id) DO NOTHING;")
         tags = json.dumps([{'key':'gatos','label':'Gatos'}, {'key':'adopcion' if p['kind']=='ADOPTION' else 'transitoanimal' if p['category']=='Tránsito animal' else 'comunidad','label':p['category']}])
-        sql += [f"INSERT INTO social_posts(id,author_kind,author_user_id,body,media_urls,topic,listing_id,attribution_url,publication_kind,hashtags,created_at) VALUES({pid},'USER',{uid}::uuid,{quote(p['body'])},{media_urls},{quote(p['category'])},{quote(p['listingId'])}::uuid,{quote(p['sourceUrl'])},{'NULL' if p['listingId'] else quote('POST')},{quote(tags)}::jsonb,{quote(p['createdAt'])}::timestamptz) ON CONFLICT(id) DO NOTHING;",
+        sql += [f"INSERT INTO social_posts(id,author_kind,author_user_id,body,media_urls,location,gathering_place,topic,listing_id,attribution_url,publication_kind,hashtags,created_at) VALUES({pid},'USER',{uid}::uuid,{quote(p['body'])},{media_urls},{point},{quote(place)},{quote(p['category'])},{quote(p['listingId'])}::uuid,{quote(p['sourceUrl'])},{'NULL' if p['listingId'] else quote('POST')},{quote(tags)}::jsonb,{quote(p['createdAt'])}::timestamptz) ON CONFLICT(id) DO NOTHING;",
                 f"DO $check$ BEGIN IF NOT EXISTS(SELECT 1 FROM social_posts WHERE id={pid} AND author_user_id={uid}::uuid AND body={quote(p['body'])} AND attribution_url={quote(p['sourceUrl'])} AND media_urls={media_urls} AND listing_id IS NOT DISTINCT FROM {quote(p['listingId'])}::uuid AND source_url IS NULL) THEN RAISE EXCEPTION 'Imported post collision or edited content'; END IF; END $check$;",
                 f"INSERT INTO post_people(post_id,user_id,role) VALUES({pid},{uid}::uuid,'AUTHOR') ON CONFLICT DO NOTHING;"]
         for m in p['media']:

@@ -29,6 +29,8 @@ fun PublishGatheringScreen(editPostId:String?=null,onDone:()->Unit,onBack:()->Un
     var topicsOpen by remember{mutableStateOf(false)}
     var body by remember(editPostId){mutableStateOf(existing?.body.orEmpty())}
     var place by remember(editPostId){mutableStateOf(existing?.place.orEmpty())}
+    var placePoint by remember(editPostId) { mutableStateOf<com.onlygoodthings.shared.domain.GeoPoint?>(null) }
+    var pointChanged by remember(editPostId) { mutableStateOf(false) }
     var day by remember(editPostId){mutableStateOf(date?.let { "${it.dayOfMonth.toString().padStart(2,'0')}/${it.monthNumber.toString().padStart(2,'0')}/${it.year}" }.orEmpty())}
     var clock by remember(editPostId){mutableStateOf(date?.let { "${it.hour.toString().padStart(2,'0')}:${it.minute.toString().padStart(2,'0')}" }.orEmpty())}
     var attribution by remember(editPostId){mutableStateOf(existing?.attributionUrl.orEmpty())}
@@ -51,10 +53,10 @@ fun PublishGatheringScreen(editPostId:String?=null,onDone:()->Unit,onBack:()->Un
         busy=true;error=null
         scope.launch {
             try {
-                val saved=if(existing!=null)auth.feed.editGathering(existing.id,text,selectedTopic,location,start,credit.orEmpty()) else {
+                val saved=if(existing!=null)auth.feed.editGathering(existing.id,text,selectedTopic,location,start,credit.orEmpty(),placePoint,pointChanged) else {
                     val items=uploaded ?: auth.uploadPostMedia(chosen,selectedTopic).also{uploaded=it}
                     check(session.currentUserId==me.id){"La sesión cambió. Volvé a ingresar."}
-                    auth.feed.publishGathering(GatheringPostDraft(text,selectedTopic,location,start!!,items,requestId,credit))
+                    auth.feed.publishGathering(GatheringPostDraft(text,selectedTopic,location,start!!,items,requestId,credit,latitude=placePoint?.latitude,longitude=placePoint?.longitude))
                 }
                 check(session.currentUserId==me.id){"La sesión cambió. Volvé a ingresar."}
                 db.upsertRemoteSocial(saved);session.persistSocialFeed()
@@ -84,7 +86,7 @@ fun PublishGatheringScreen(editPostId:String?=null,onDone:()->Unit,onBack:()->Un
                 OgtOutlinedTextField(value=clock,onValueChange={clock=it.take(5)},label={Text("Hora (HH:mm)")},singleLine=true,modifier=Modifier.weight(1f),enabled=!busy)
             }
             OgtCaption("Usá el horario local de tu dispositivo. Asistiré estará disponible hasta que empiece la actividad.")
-            PublicationPlaceField(value=place,onValueChange={place=it},label="Lugar o punto de encuentro",enabled=!busy)
+            PublicationPlaceField(value=place,onValueChange={place=it},label="Lugar o punto de encuentro",enabled=!busy,onPointChange={placePoint=it;pointChanged=true})
             if(!editing)OgtDraftMediaStrip(items=media,missing=false,heroDescription="La actividad",onBusyChange={preparing=it},reorderEnabled=!busy) else OgtCaption("Se conservan las fotos y videos de esta publicación.")
             AttributionField(attribution,{attribution=it},enabled=!busy)
             PublicationRightsNotice()

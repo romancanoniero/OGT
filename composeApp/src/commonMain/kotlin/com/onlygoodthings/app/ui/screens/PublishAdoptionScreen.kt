@@ -40,6 +40,7 @@ fun PublishAdoptionScreen(onBack: () -> Unit, onPublished: () -> Unit = onBack, 
     var age by remember(editPostId) { mutableStateOf(listing?.ageLabel.orEmpty()) }
     var history by remember(editPostId) { mutableStateOf(listing?.adoptionDetails?.historyAndCare.orEmpty()) }
     var place by remember(editPostId) { mutableStateOf(listing?.place?.ifBlank { me.barrio } ?: me.barrio) }
+    var placePoint by remember(editPostId) { mutableStateOf(com.onlygoodthings.shared.domain.AdoptionProximity.point(listing?.latitude,listing?.longitude)) }
     var home by remember(editPostId) { mutableStateOf(listing?.homeNeeds.orEmpty()) }
     var mode by remember(editPostId) { mutableStateOf(listing?.adoptionDetails?.adoptionMode ?: "UNSPECIFIED") }
     var count by remember(editPostId) { mutableStateOf(listing?.adoptionDetails?.availableCount?.toString().orEmpty()) }
@@ -129,7 +130,8 @@ fun PublishAdoptionScreen(onBack: () -> Unit, onPublished: () -> Unit = onBack, 
                 label = { Text("Edad (opcional)") }, placeholder = { Text("3 meses, entre 1 y 2 años…") }, enabled = !saving)
             OgtOutlinedTextField(history, { if (it.length <= AdoptionRules.MAX_HISTORY) history = it }, Modifier.fillMaxWidth(),
                 label = { Text("Historia y cuidados (opcional)") }, enabled = !saving, minLines = 2)
-            PublicationPlaceField(place, { place = it }, label = "Barrio o localidad", enabled = !saving)
+            PublicationPlaceField(place, { place = it }, label = "Barrio o localidad", enabled = !saving, onPointChange = { placePoint = it })
+            if (place.isNotBlank() && placePoint == null) OgtCaption("Elegí un lugar de la lista para aparecer en adopciones cercanas. Si lo escribís libremente, quedará sin ubicación confirmada.")
             OgtOutlinedTextField(home, { if (it.length <= 160) home = it }, Modifier.fillMaxWidth(),
                 label = { Text("Qué hogar necesita") }, enabled = !saving, minLines = 2,
                 placeholder = { Text("Patio, convivencia con otros animales, tiempo en casa…") })
@@ -161,10 +163,10 @@ fun PublishAdoptionScreen(onBack: () -> Unit, onPublished: () -> Unit = onBack, 
                     val name = listing?.petName?.ifBlank { null } ?: title.take(40)
                     val post = if (pendingPostId != null) db.updateAnimalListing(me, pendingPostId!!, name, species, size, presentation, place,
                         ageLabel = age, sex = sex, temperament = listing?.temperament.orEmpty(), vaccinated = vaccinated, sterilized = sterilized,
-                        homeNeeds = home, title = title, adoptionDetails = details, attributionUrl = credit)
+                        homeNeeds = home, title = title, adoptionDetails = details, attributionUrl = credit, latitude = placePoint?.latitude, longitude = placePoint?.longitude, clearLocation = placePoint == null)
                     else db.publishAnimalListing(me, "ADOPTION", name, species, size, presentation, place,
                         ageLabel = age, sex = sex, vaccinated = vaccinated, sterilized = sterilized,
-                        homeNeeds = home, title = title, adoptionDetails = details, attributionUrl = credit)
+                        homeNeeds = home, title = title, adoptionDetails = details, attributionUrl = credit, latitude = placePoint?.latitude, longitude = placePoint?.longitude)
                     requireNotNull(post) { "Revisá los datos de la adopción." }
                     pendingPostId = post.id; saving = true; error = null
                     if (db.mediaOf(post.id).isNotEmpty()) db.replaceAnimalMedia(post.id, "Adopción", media) else db.attachAnimalMedia(post.id, "Adopción", media)

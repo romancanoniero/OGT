@@ -1,4 +1,4 @@
-import {publicationPlaceHtml,bindPublicationPlace} from './publication-place.js';
+import {publicationPlaceHtml,bindPublicationPlace} from './publication-place.js?v=20261127-location';
 
 export const adoptionGroups=[['SPECIES','Especie'],['SIZE','Tamaño'],['SEX','Sexo'],['VACCINATION','Vacunación'],['STERILIZATION','Castración'],['OTHER','Otras etiquetas']];
 const exclusive=new Set(['VACCINATION','STERILIZATION']);
@@ -29,6 +29,7 @@ export function mountAdoptionForm(root,{api,editing=null,mediaHtml,bindMedia,onS
  <label class="field">Edad (opcional)<input name="ageLabel" maxlength="30" placeholder="3 meses, entre 1 y 2 años…" value="${escape(editing?.ageLabel)}"></label>
  <label class="field">Historia y cuidados (opcional)<textarea name="historyAndCare" aria-label="Historia y cuidados (opcional)" maxlength="2000" rows="3">${escape(old?.historyAndCare)}</textarea></label>
  ${publicationPlaceHtml({optional:false,name:'place',label:'Barrio o localidad'})}
+ <p class="hint">Elegí una sugerencia para aparecer en adopciones cercanas. Un lugar escrito libremente queda sin ubicación confirmada.</p>
  <label class="field">Qué hogar necesita<textarea name="homeNeeds" aria-label="Qué hogar necesita" maxlength="160">${escape(editing?.homeNeeds)}</textarea></label>
  <label class="field">Cómo se pueden adoptar<select name="adoptionMode" aria-label="Cómo se pueden adoptar"><option value="UNSPECIFIED">No indicado</option><option value="SEPARATE">Por separado</option><option value="TOGETHER">Juntos</option></select></label>
  <label class="field">Cantidad que sigue buscando hogar (opcional)<input name="availableCount" type="number" min="1" max="100" step="1" value="${escape(old?.availableCount??'')}"></label>
@@ -37,7 +38,7 @@ export function mountAdoptionForm(root,{api,editing=null,mediaHtml,bindMedia,onS
  </form>`;
  const form=root.querySelector('form'),fields=form.elements,status=form.querySelector('[data-missing]'),submit=form.querySelector('[data-submit]');
  fields.place.value=editing?.place||'';fields.adoptionMode.value=old?.adoptionMode||'UNSPECIFIED';
- const place=bindPublicationPlace(form.querySelector('[data-publication-place]'),{api});
+ const place=bindPublicationPlace(form.querySelector('[data-publication-place]'),{api,initialPoint:editing?.latitude!=null && editing?.longitude!=null?{latitude:editing.latitude,longitude:editing.longitude}:null});
  const media=bindMedia(form,editing?.media||[],editing?.listingId?`animal:${editing.listingId}`:'adopcion');
  let catalog=[],loaded=false,initialized=!!old,busy=false,selected=new Map((old?.tags||[]).map(tag=>[tag.id,tag])),free=[...(old?.freeHashtags||[])];
  const error=message=>{status.hidden=!message;status.textContent=message||'';};
@@ -92,7 +93,8 @@ export function mountAdoptionForm(root,{api,editing=null,mediaHtml,bindMedia,onS
    if(count!==null && (!Number.isInteger(count)||count<1||count>100))throw new Error('La cantidad disponible debe estar entre 1 y 100.');
    const credit=globalThis.OgtAttribution.normalize(fields.attributionUrl.value);
    const adoptionDetails={version:1,presentation:description,tags:[...selected.keys()].map(id=>({id})),freeHashtags:[...free],historyAndCare:fields.historyAndCare.value.trim(),adoptionMode:fields.adoptionMode.value,availableCount:count};
-   const body={listingId:editing?.listingId,kind:'ADOPTION',title,description,place:neighborhood,species:species.legacyValue||'OTHER',petName:editing?.petName||title.slice(0,40),ageLabel:fields.ageLabel.value.trim(),homeNeeds:fields.homeNeeds.value.trim(),temperament:editing?.temperament||'',adoptionDetails,attributionUrl:credit||''};
+   const point=place.point();
+   const body={latitude:point?.latitude??null,longitude:point?.longitude??null,listingId:editing?.listingId,kind:'ADOPTION',title,description,place:neighborhood,species:species.legacyValue||'OTHER',petName:editing?.petName||title.slice(0,40),ageLabel:fields.ageLabel.value.trim(),homeNeeds:fields.homeNeeds.value.trim(),temperament:editing?.temperament||'',adoptionDetails,attributionUrl:credit||''};
    if(!isCurrentOwner())throw new Error('La sesión cambió. Volvé a intentarlo.');
    busy=true;form.inert=true;submit.disabled=true;submit.textContent='Guardando…';place.pause();
    body.media=await media.upload('Adopción');if(!isCurrentOwner())throw new Error('La sesión cambió. Volvé a intentarlo.');

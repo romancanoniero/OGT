@@ -130,8 +130,10 @@ private fun animalWriteJson(
     listing.adoptionDetails?.let { put("adoptionDetails", com.onlygoodthings.shared.protocol.WsCodec.json.encodeToJsonElement(com.onlygoodthings.shared.domain.AdoptionDetails.serializer(), it)) }
     put("attributionUrl", JsonPrimitive(post.attributionUrl.orEmpty()))
     put("radius", JsonPrimitive(listing.alertRadiusM))
-    (listing.latitude ?: here?.latitude)?.let { put("latitude", JsonPrimitive(it)) }
-    (listing.longitude ?: here?.longitude)?.let { put("longitude", JsonPrimitive(it)) }
+    val point = com.onlygoodthings.shared.domain.AdoptionProximity.point(listing.latitude, listing.longitude)
+        ?: here?.takeIf { listing.kind == "LOST" }
+    put("latitude", point?.latitude?.let(::JsonPrimitive) ?: kotlinx.serialization.json.JsonNull)
+    put("longitude", point?.longitude?.let(::JsonPrimitive) ?: kotlinx.serialization.json.JsonNull)
     put("media", media.toJson())
 }
 

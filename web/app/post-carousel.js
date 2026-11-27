@@ -14,12 +14,30 @@
       const source = escape(mediaUrl(item.url)), label = `${item.kind === 'VIDEO' ? 'Video' : 'Foto'} ${index + 1} de ${items.length}`;
       const frame = frameOf({...post, media: [item]});
       const media = item.kind === 'VIDEO'
-        ? `<video class="media" src="${source}"${item.posterUrl ? ` poster="${escape(mediaUrl(item.posterUrl))}"` : ''} controls playsinline preload="${index ? 'none' : 'metadata'}" aria-label="${label}"></video>`
+        ? `<video class="media" src="${source}"${item.posterUrl ? ` poster="${escape(mediaUrl(item.posterUrl))}"` : ''} playsinline preload="${index ? 'none' : 'metadata'}" aria-label="${label}"></video>`
         : `<img class="media" src="${source}" alt="${escape(item.altText || '')}"${index ? ' loading="lazy"' : ''} data-frame-x="${frame.x}" data-frame-y="${frame.y}" data-frame-zoom="${frame.zoom}" onload="window.ogtPlaceFrame&&window.ogtPlaceFrame(this)">`;
-      return `<div class="post-media-slide" data-media-page="${index}" role="group" aria-label="${label}"${index ? ' hidden' : ''}><div class="media-slot">${media}</div></div>`;
+      const buttons = item.kind === 'VIDEO' ? `<button type="button" class="post-video-play" data-video-play aria-label="Reproducir video"><span aria-hidden="true">▶</span></button><button type="button" class="post-video-sound" data-video-sound aria-label="Silenciar video" aria-pressed="false"><span aria-hidden="true">${soundIcon(false)}</span></button>` : '';
+      return `<div class="post-media-slide" data-media-page="${index}" role="group" aria-label="${label}"${index ? ' hidden' : ''}><div class="media-slot">${media}${buttons}</div></div>`;
     }).join('');
     const dots = items.length > 1 ? `<div class="post-media-dots" role="group" aria-label="Elegir foto o video">${items.map((item, index) => `<button type="button" class="post-media-dot" data-media-go="${index}" aria-label="Ir a ${item.kind === 'VIDEO' ? 'video' : 'foto'} ${index + 1} de ${items.length}" aria-current="${index === 0}"><span aria-hidden="true"></span></button>`).join('')}</div>` : '';
     return `<div class="post-carousel" data-post-media data-media-key="${escape(JSON.stringify(items))}" data-media-active="0" role="region" aria-roledescription="carrusel" aria-label="Fotos y videos de la publicación"${items.length > 1 ? ' tabindex="0"' : ''}>${slides}${dots}<span class="post-media-status" role="status" aria-live="polite"></span></div>`;
+  }
+  function soundIcon(muted) {
+    return `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 9h4l5-4v14l-5-4H3z"/>${muted?'<path d="m16 8 6 6-2 2-6-6zm4 0 2 2-6 6-2-2z"/>':'<path d="M15 8v2c2 1 2 3 0 4v2c5-2 5-6 0-8m3-4v2c6 3 6 9 0 12v2c9-4 9-12 0-16"/>'}</svg>`;
+  }
+  let muted=false,activeVideo=null;
+  function paintVideo(video) {
+    const slide=video.closest('[data-media-page]'),button=slide?.querySelector('[data-video-play]'),sound=slide?.querySelector('[data-video-sound]');
+    slide?.classList.toggle('is-playing',!video.paused && !video.ended);
+    if(button){button.setAttribute('aria-label',video.paused || video.ended?'Reproducir video':'Pausar video');button.firstElementChild.textContent=video.paused || video.ended?'▶':'Ⅱ';}
+    if(sound){sound.setAttribute('aria-label',video.muted?'Activar sonido':'Silenciar video');sound.setAttribute('aria-pressed',String(video.muted));sound.firstElementChild.innerHTML=soundIcon(video.muted);}
+  }
+  async function toggleVideo(video) {
+    if(!video.paused && !video.ended){video.pause();return;}
+    if(activeVideo && activeVideo!==video)activeVideo.pause();
+    activeVideo=video;video.muted=muted;
+    if(video.ended)video.currentTime=0;
+    try{await video.play();}catch{paintVideo(video);}
   }
   function show(carousel, index) {
     const slides = [...carousel.querySelectorAll('[data-media-page]')];
@@ -45,6 +63,15 @@
     carousels.forEach(carousel => {
       if (carousel.dataset.mediaBound) return;
       carousel.dataset.mediaBound = 'true';
+      carousel.querySelectorAll('video').forEach(video=>{
+        video.controls=false;video.loop=false;video.muted=muted;
+        ['play','pause','ended','volumechange'].forEach(name=>video.addEventListener(name,()=>paintVideo(video)));
+        video.closest('[data-media-page]').querySelector('[data-video-play]')?.addEventListener('click',event=>{event.stopPropagation();toggleVideo(video);});
+        video.closest('[data-media-page]').querySelector('[data-video-sound]')?.addEventListener('click',event=>{
+          event.stopPropagation();muted=!video.muted;
+          document.querySelectorAll('[data-post-media] video').forEach(other=>{other.muted=muted;paintVideo(other);});
+        });
+      });
       carousel.querySelectorAll('[data-media-go]').forEach(button => button.addEventListener('click', event => {
         event.stopPropagation();show(carousel, Number(button.dataset.mediaGo));
       }));
@@ -57,7 +84,7 @@
       });
       let start = null, suppressClickUntil = 0;
       carousel.addEventListener('pointerdown', event => {
-        start = event.pointerType !== 'mouse' && !event.target.closest('button, video, a') ? {x: event.clientX, y: event.clientY} : null;
+        start = event.pointerType !== 'mouse' && !event.target.closest('button, a') ? {x: event.clientX, y: event.clientY} : null;
       }, {passive: true});
       carousel.addEventListener('pointercancel', () => { start = null; });
       carousel.addEventListener('pointerup', event => {
@@ -67,9 +94,26 @@
         show(carousel, Number(carousel.dataset.mediaActive) + (dx < 0 ? 1 : -1));suppressClickUntil = Date.now() + 500;
       }, {passive: true});
       carousel.addEventListener('click', event => {
-        if (Date.now() < suppressClickUntil) { event.preventDefault();event.stopPropagation(); }
+        if (Date.now() < suppressClickUntil) { event.preventDefault();event.stopPropagation();return; }
+        if(event.target.closest('button,a'))return;
+        const slide=event.target.closest('[data-media-page]');if(!slide)return;
+        const bounds=slide.getBoundingClientRect(),fraction=(event.clientX-bounds.left)/bounds.width;
+        const video=slide.querySelector('video'),multiple=carousel.querySelectorAll('[data-media-page]').length>1;
+        if(video || multiple)event.stopPropagation();
+        if(video && (!multiple || fraction>=.3 && fraction<=.7)){event.preventDefault();toggleVideo(video);}
+        else if(multiple){event.preventDefault();show(carousel,Number(carousel.dataset.mediaActive)+(fraction<.5?-1:1));}
       }, true);
     });
+  }
+  if(typeof IntersectionObserver!=='undefined') {
+    const visibility=new IntersectionObserver(entries=>entries.forEach(entry=>{if(!entry.isIntersecting)entry.target.querySelectorAll('video').forEach(video=>video.pause());}));
+    const previousBind=bind;bind=function(root){previousBind(root);root.querySelectorAll('[data-post-media]').forEach(node=>visibility.observe(node));if(root.matches?.('[data-post-media]'))visibility.observe(root);};
+  }
+  if(typeof document!=='undefined')document.addEventListener('visibilitychange',()=>{if(document.hidden && activeVideo)activeVideo.pause();});
+  function typesHtml(post) {
+    const items=rows(post);if(!items.length)return '';
+    const icon=(kind,label,path)=>`<span class="post-media-type${items.some(item=>item.kind===kind)?' has':''}" role="img" aria-label="${items.some(item=>item.kind===kind)?'Contiene':'Sin'} ${label}"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="currentColor"><path fill-rule="evenodd" d="${path}"/></svg></span>`;
+    return `<div class="post-media-types" role="group" aria-label="Tipos de archivos">${icon('IMAGE','fotos','M3 3h18v18H3zm2 2v14h14V5zm1 11 4-5 3 4 2-2 3 5H6zm10-10a2 2 0 1 0 0 4 2 2 0 0 0 0-4')}${icon('VIDEO','videos','M3 5h13v14H3zm15 4 4-3v12l-4-3z')}</div>`;
   }
   function update(card, post, options) {
     const current = card.querySelector(':scope > [data-post-media]');
@@ -88,5 +132,5 @@
       show(next, retained >= 0 ? retained : oldIndex);
     }
   }
-  scope.OgtPostCarousel = {rows, html, bind, update};
+  scope.OgtPostCarousel = {rows, html, bind, update, typesHtml};
 })(globalThis);

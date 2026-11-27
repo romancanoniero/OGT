@@ -3,6 +3,6 @@ package com.onlygoodthings.app.platform
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
-/** Reproduce el video posteado a pantalla completa. Poster si la URL no es remota. */
+/** Control-free player used by inline and full-screen post media. */
 @Composable
-expect fun OgtPostedVideo(url: String, modifier: Modifier = Modifier)
+expect fun OgtPostedVideo(url: String, modifier: Modifier = Modifier, playing: Boolean = true, muted: Boolean = false, onEnded: () -> Unit = {})

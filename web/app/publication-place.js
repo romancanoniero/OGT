@@ -1,4 +1,4 @@
-// Place lookup is separate from device tracking. Posts persist only the confirmed label.
+// A confirmed place can supply its own coordinates; typing invalidates the old point.
 export function publicationPlaceHtml({optional=true,name='publicationPlace',label='Lugar (opcional)'}={}) {
   return `<section data-publication-place>
     ${optional?'<label class="check"><input type="checkbox" name="includePublicationPlace"> Incluir lugar (opcional)</label>':''}
@@ -12,12 +12,12 @@ export function publicationPlaceHtml({optional=true,name='publicationPlace',labe
     </div></section>`;
 }
 
-export function bindPublicationPlace(root,{api,geolocation=globalThis.navigator?.geolocation}={}) {
+export function bindPublicationPlace(root,{api,geolocation=globalThis.navigator?.geolocation,initialPoint=null}={}) {
   if(!root)return {value:()=>undefined};
   const input=root.querySelector('input:not([type=checkbox])'),toggle=root.querySelector('input[type=checkbox]');
   const editor=root.querySelector('[data-place-editor]'),button=root.querySelector('[data-current-place]');
   const hits=root.querySelector('[data-place-hits]'),status=root.querySelector('[data-place-status]');
-  let revision=0,timer,initialized=false,activeOption=-1;
+  let revision=0,timer,initialized=false,activeOption=-1,point=initialPoint;
   const active=()=>root.isConnected && (!toggle || toggle.checked);
   const current=version=>active() && revision===version;
   const message=text=>{status.textContent=text;};
@@ -30,7 +30,7 @@ export function bindPublicationPlace(root,{api,geolocation=globalThis.navigator?
     input.setAttribute('aria-activedescendant',options[activeOption].id);options[activeOption].scrollIntoView({block:'nearest'});
   }
   function apply(hit){
-    ++revision;clearTimeout(timer);clearHits();input.value=hit.label;
+    ++revision;clearTimeout(timer);clearHits();input.value=hit.label;point={latitude:hit.latitude,longitude:hit.longitude};
     button.disabled=false;message('Podés cambiar el lugar antes de publicar.');
   }
   async function locate(){
@@ -63,7 +63,7 @@ export function bindPublicationPlace(root,{api,geolocation=globalThis.navigator?
     }else if(event.key==='Enter' && !hits.hidden && activeOption>=0){event.preventDefault();hits.children[activeOption].click();}
   });
   input.addEventListener('input',()=>{
-    initialized=true;const version=++revision;clearTimeout(timer);clearHits();button.disabled=false;message('');
+    initialized=true;point=null;const version=++revision;clearTimeout(timer);clearHits();button.disabled=false;message('');
     const query=input.value.trim();if(query.length<3)return;
     timer=setTimeout(async()=>{
       if(!current(version))return;
@@ -83,6 +83,7 @@ export function bindPublicationPlace(root,{api,geolocation=globalThis.navigator?
   });
   return {
     value:()=>toggle && !toggle.checked?undefined:input.value.trim()||undefined,
+    point:()=>toggle && !toggle.checked?null:point,
     pause:()=>{++revision;clearTimeout(timer);clearHits();button.disabled=false;},
   };
 }

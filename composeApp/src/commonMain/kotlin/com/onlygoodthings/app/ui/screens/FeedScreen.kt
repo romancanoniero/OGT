@@ -163,7 +163,7 @@ fun FeedScreen(
     val presentation=timeline.presentation
     val feedMode=presentation.mode
     val feedFamily=presentation.family
-    val query=FeedQuery(feedMode,feedFamily)
+    val query=presentation.query
     val pages by timeline.pages.collectAsState()
     val feedState=pages[query] ?: timeline.cached(query)
     val copy = LocalOgtCopy.current
@@ -248,6 +248,23 @@ fun FeedScreen(
             }
             item(key = "chrome-mode") {
                 FeedModeRow(mode = feedMode, onMode = { presentation.mode = it }, copy = copy)
+            }
+            if (feedMode == FeedMode.HOME) item(key = "chrome-adoption-radius") {
+                var expanded by remember { mutableStateOf(false) }
+                Column(Modifier.fillMaxWidth().padding(horizontal=16.dp)) {
+                    Box {
+                        androidx.compose.material3.TextButton(onClick={expanded=true}) {
+                            Text(if(presentation.adoptionRadiusKm==0) "Adopciones: sin límite de distancia" else "Adopciones: hasta ${presentation.adoptionRadiusKm} km")
+                        }
+                        androidx.compose.material3.DropdownMenu(expanded=expanded,onDismissRequest={expanded=false}) {
+                            com.onlygoodthings.shared.domain.AdoptionProximity.radiusOptions.forEach { km ->
+                                androidx.compose.material3.DropdownMenuItem(text={Text(if(km==0)"Sin límite (incluye ubicación pendiente)" else "Hasta $km km")},onClick={presentation.adoptionRadiusKm=km;expanded=false})
+                            }
+                        }
+                    }
+                    if (timeline.locationChecked && timeline.viewerLocation==null && presentation.adoptionRadiusKm>0)
+                        OgtCaption("Activá tu ubicación para ver adopciones cercanas, o elegí Sin límite.")
+                }
             }
             item(key = "chrome-family") {
                 FeedFamilyRow(family = feedFamily, onFamily = { presentation.family = it }, copy = copy)
@@ -634,6 +651,7 @@ private fun LostPetFeedCard(
             }
             OgtCaption("Última vista · $lastSeen · ${radius} m")
             listing?.marks?.takeIf { it.isNotBlank() }?.let { OgtCaption(it) }
+            com.onlygoodthings.app.ui.components.PostMediaTypes(media)
             ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen)
             com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
             PostActionRow(
@@ -726,6 +744,7 @@ private fun AdoptionFeedCard(
                 onShare = onShare,
             )
             Text(listing?.displayPetName()?.ifBlank { null } ?: post.tag, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = OgtColors.ink)
+            com.onlygoodthings.app.ui.components.PostMediaTypes(media)
             listing?.takeIf { it.adoptionDetails == null }?.let { row ->
                 val bits = listOfNotNull(
                     row.ageLabel.takeIf { it.isNotBlank() },
@@ -791,6 +810,7 @@ private fun TernuraFeedCard(
                 OgtPill(post.tag, OgtColors.sand, OgtColors.secondary)
             }
             ImpactTruthPills(post)
+            com.onlygoodthings.app.ui.components.PostMediaTypes(media)
             ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen)
             com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
             PostActionRow(
@@ -868,6 +888,7 @@ private fun HomenajeFeedCard(
             if (db.creditPending(post)) {
                 OgtCaption("La familia puede reivindicar este crédito.")
             }
+            com.onlygoodthings.app.ui.components.PostMediaTypes(media)
             ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen)
             com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
             PostActionRow(
@@ -913,51 +934,8 @@ private fun ListingPhotoStrip(
     fallback: DrawableResource,
     onOpen: () -> Unit,
 ) {
-    val pageCount = media.size.coerceAtLeast(1)
-    val pager = rememberPagerState { pageCount }
-    // Marco 16:9 de la grilla. La foto lo cubre y se recorta.
-    Box(
-        Modifier
-            .ogtBleedHorizontal(12.dp)
-            .aspectRatio(POST_FRAME_RATIO),
-    ) {
-        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { pageIndex ->
-            val item = media.getOrNull(pageIndex)
-            if (item == null) pageIndex else "${item.id}:${item.url}"
-        }) { page ->
-            val item = media.getOrNull(page)
-            Box(Modifier.fillMaxSize().clickable(onClick = onOpen)) {
-                if (item != null) {
-                    OgtPostImage(
-                        item = item,
-                        fallback = fallback,
-                        contentDescription = item.altText,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                    )
-                } else {
-                    Image(
-                        painterResource(fallback),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                    )
-                }
-                if (item?.kind == MediaKind.VIDEO) {
-                    Box(
-                        Modifier.align(Alignment.Center).size(56.dp).clip(CircleShape).background(Color(0xB3000000)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        OgtStitchIcon(Res.drawable.qs_play, "Reproducir video", tint = OgtColors.onPrimary)
-                    }
-                }
-            }
-        }
-        MediaPagerIndicator(
-            pageIndex = pager.currentPage,
-            pageCount = media.size,
-        )
-    }
+    com.onlygoodthings.app.ui.components.PostedMediaCarousel(media,fallback,null,
+        modifier=Modifier.ogtBleedHorizontal(12.dp).aspectRatio(POST_FRAME_RATIO),onOpen={onOpen()})
 }
 
 @Composable
@@ -994,6 +972,7 @@ private fun StoryFeedCard(
             post.honoreeName,
             modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 10.dp),
         )
+        com.onlygoodthings.app.ui.components.PostMediaTypes(media,Modifier.padding(horizontal=12.dp))
         PostMediaPager(
             media = media,
             fallback = profile.photo,
@@ -1199,59 +1178,9 @@ private fun PostMediaPager(
     petStory: Boolean = false,
     onOpen: () -> Unit,
 ) {
-    val items = media.ifEmpty { emptyList() }
-    val pageCount = items.size.coerceAtLeast(1)
-    val pagerState = rememberPagerState { pageCount }
-    // Miniatura del feed: la grilla es 16:9 y la foto se recorta a ese marco.
-    Box(Modifier.fillMaxWidth().aspectRatio(POST_FRAME_RATIO)) {
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize(), key = { pageIndex ->
-            val item = items.getOrNull(pageIndex)
-            if (item == null) pageIndex else "${item.id}:${item.url}"
-        }) { page ->
-            val item = items.getOrNull(page)
-            Box(Modifier.fillMaxSize().clickable(onClick = onOpen)) {
-                if (item != null) {
-                    OgtPostImage(
-                        item = item,
-                        fallback = fallback,
-                        contentDescription = item.altText ?: tag,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                    )
-                } else {
-                    Image(
-                        painterResource(fallback),
-                        contentDescription = tag,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                    )
-                }
-                if (item?.kind == MediaKind.VIDEO) {
-                    Box(
-                        Modifier.align(Alignment.Center).size(56.dp).clip(CircleShape).background(Color(0xB3000000)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        OgtStitchIcon(Res.drawable.qs_play, "Reproducir video", tint = OgtColors.onPrimary)
-                    }
-                }
-            }
-        }
-        OverlayChip(
-            Modifier.align(Alignment.TopStart).padding(12.dp),
-            tag,
-            if (petStory) OgtColors.secondary else OgtColors.ink,
-        )
-        if (discovery) {
-            OverlayChip(
-                Modifier.align(if (items.size > 1) Alignment.BottomStart else Alignment.TopEnd).padding(12.dp),
-                "Para vos",
-                OgtColors.secondary,
-            )
-        }
-        MediaPagerIndicator(
-            pageIndex = pagerState.currentPage,
-            pageCount = items.size,
-        )
+    com.onlygoodthings.app.ui.components.PostedMediaCarousel(media,fallback,tag,
+        modifier=Modifier.fillMaxWidth().aspectRatio(POST_FRAME_RATIO),onOpen={onOpen()}) {
+        OverlayChip(Modifier.align(Alignment.TopStart).padding(12.dp),tag,if(petStory)OgtColors.secondary else OgtColors.ink)
     }
 }
 

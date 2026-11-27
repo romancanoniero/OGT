@@ -263,8 +263,13 @@ internal fun animalWriteFrom(dataMap: Map<String, Any?>, home: Pair<Double, Doub
         adoption.copy(presentation = if (temperament.isNotBlank() && !description.contains(temperament, ignoreCase = true)) "$description\n\nCarácter: $temperament" else description)
     } else adoption
     val lastSeenPlace = dataMap.optString("lastSeenPlace").orEmpty()
-    val lat = dataMap.optDouble("latitude") ?: if (lost) null else home?.first ?: -34.6037
-    val lng = dataMap.optDouble("longitude") ?: if (lost) null else home?.second ?: -58.3816
+    // A chosen neighborhood is independent of the author's home/device location.
+    val keepPoint = !dataMap.containsKey("latitude") && !dataMap.containsKey("longitude") &&
+        previous != null && (dataMap.optString("place") ?: previous.place) == previous.place
+    val lat = dataMap.optDouble("latitude") ?: previous?.latitude?.takeIf { keepPoint }
+    val lng = dataMap.optDouble("longitude") ?: previous?.longitude?.takeIf { keepPoint }
+    require((lat == null) == (lng == null)) { "Indicá ambas coordenadas del lugar" }
+    require(lat == null || (lat.isFinite() && lat in -90.0..90.0 && lng!!.isFinite() && lng in -180.0..180.0)) { "Ubicación inválida" }
     if (lost) {
         require(marks.isNotBlank()) { "Campo requerido: marks" }
         require(lastSeenPlace.isNotBlank()) { "Campo requerido: lastSeenPlace" }
@@ -301,8 +306,8 @@ internal fun animalWriteFrom(dataMap: Map<String, Any?>, home: Pair<Double, Doub
         marks = marks,
         lastSeenPlace = lastSeenPlace,
         place = dataMap.optString("place") ?: lastSeenPlace,
-        latitude = lat ?: -34.6037,
-        longitude = lng ?: -58.3816,
+        latitude = lat,
+        longitude = lng,
         alertRadiusM = if (lost) OgtCrmDefaults.LOST_ALERT_RADIUS_M else 0,
         media = media,
         adoptionDetails = effectiveAdoption,

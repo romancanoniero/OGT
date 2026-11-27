@@ -54,4 +54,5 @@ data class PublicationDraft(
     val attributionUrl: String? = null,
     val publicationKind: String = "POST",
     val place: String? = null,
+    val latitude:Double?=null, val longitude:Double?=null,
 )

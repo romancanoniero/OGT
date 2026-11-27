@@ -58,14 +58,16 @@ class SocialSqlRepository(private val db: Database) {
         pageSize: Int,
         cursor: String?,
         family: com.onlygoodthings.shared.domain.FeedTopicFamily? = null,
+        adoptionRadiusKm: Int = 50,
     ): List<SocialPost> {
+        require(adoptionRadiusKm in 0..20_000) { "Radio de adopciones inválido" }
         val offset = cursor?.toIntOrNull() ?: 0
         val viewer = loadViewer(userId)
         val excluded=blocks.excluded(userId)
         val preferred=viewer.events.filter { it.kind in setOf(FeedEventKind.CLAP,FeedEventKind.HEART,FeedEventKind.COMMENT,FeedEventKind.SHARE) }
             .flatMap { it.hashtags }.distinctBy { it.interestKey }.take(12)
         val inventory=if(mode==FeedMode.FOLLOWING)loadCandidates(graphIds=viewer.followedIds+viewer.userId)
-            else loadCandidates()+(if(preferred.isEmpty())emptyList() else loadCandidates(preferred))
+            else loadCandidates(viewer=viewer,adoptionRadiusKm=adoptionRadiusKm)+(if(preferred.isEmpty())emptyList() else loadCandidates(preferred,viewer=viewer,adoptionRadiusKm=adoptionRadiusKm))
         val candidates = (inventory + loadMatchedFriendNeeds(viewer)).distinctBy { it.postId }.filter { it.authorUserId !in excluded }
         val ranked = FeedRanker.rank(candidates, viewer, mode, System.currentTimeMillis(), offset, pageSize, family)
         if (ranked.isEmpty()) return emptyList()
@@ -120,6 +122,7 @@ class SocialSqlRepository(private val db: Database) {
         place:String?=null,eventStartsAtEpochMs:Long?=null,
         hashtags:List<String>?=null,
     ): SocialPost {
+        require((latitude==null)==(longitude==null) && (latitude==null || com.onlygoodthings.shared.domain.AdoptionProximity.point(latitude,longitude)!=null)) { "Ubicación inválida" }
         require(body.isNotBlank()) { "El texto no puede estar vacío" }
         require(hashtags==null || publicationKind=="POST") { "Los hashtags múltiples se publican desde Publicar." }
         require(media.isNotEmpty()) { "Hace falta al menos una foto o un video" }
@@ -769,7 +772,7 @@ class SocialSqlRepository(private val db: Database) {
         }
     }
 
-    fun editPost(postId: String, userId: String, body: String, topic: String?, attributionUrl: String? = null, honoreeFullName:String?=null, categoryId:String?=null,place:String?=null,eventStartsAtEpochMs:Long?=null,hashtags:List<String>?=null): SocialPost {
+    fun editPost(postId: String, userId: String, body: String, topic: String?, attributionUrl: String? = null, honoreeFullName:String?=null, categoryId:String?=null,place:String?=null,eventStartsAtEpochMs:Long?=null,hashtags:List<String>?=null,latitude:Double?=null,longitude:Double?=null,pointChanged:Boolean=false): SocialPost {
         val credit = ContentAttribution.normalize(attributionUrl)
         val trimmed = body.trim()
         require(trimmed.isNotBlank()) { "El texto no puede estar vacío" }
@@ -803,6 +806,13 @@ class SocialSqlRepository(private val db: Database) {
                 }
                 val selected=(updatedTags?.recognitionCategoryId ?: categoryId)?.let { RecognitionCategories.resolve(c,it,topic.orEmpty()) ?: throw IllegalArgumentException("Categoría inexistente") }
                 if(updatedTags==null && selected!=null && selected.id!=old.second && !selected.label.equals(old.third,true))require(selected.active) { "Elegí una categoría activa." }
+                if(pointChanged || place!=null) {
+                    require((latitude==null)==(longitude==null) && (latitude==null || com.onlygoodthings.shared.domain.AdoptionProximity.point(latitude,longitude)!=null)) { "Ubicación inválida" }
+                    val priorPlace=c.prepareStatement("SELECT gathering_place FROM social_posts WHERE id=?::uuid").use { q ->q.setString(1,postId);q.executeQuery().use { r ->r.next();r.getString(1) } }
+                    if(pointChanged || (place!=null && priorPlace!=place.trim()))c.prepareStatement("UPDATE social_posts SET location=ST_SetSRID(ST_MakePoint(?::float8,?::float8),4326) WHERE id=?::uuid").use { q ->
+                        q.setObject(1,if(pointChanged)longitude else null);q.setObject(2,if(pointChanged)latitude else null);q.setString(3,postId);q.executeUpdate()
+                    }
+                }
                 c.prepareStatement("UPDATE social_posts SET body=?,topic=COALESCE(?,topic),attribution_url=CASE WHEN ? THEN ? ELSE attribution_url END,honoree_name=COALESCE(?,honoree_name),recognition_category_id=COALESCE(?,recognition_category_id),gathering_place=COALESCE(?,gathering_place),event_starts_at=COALESCE(?,event_starts_at),publication_kind=CASE WHEN ? THEN 'CONVOCATORIA' ELSE publication_kind END,updated_at=now() WHERE id=?::uuid").use { q ->
                     q.setString(1,trimmed);q.setString(2,if(updatedTags!=null)selected?.label ?: updatedTags.tags.first().label else if(selected?.id==old.second && topic==old.third)old.third else selected?.label ?: topic?.trim()?.takeIf { it.isNotEmpty() });q.setBoolean(3,attributionUrl!=null);q.setString(4,credit);q.setString(5,honoreeFullName?.trim());q.setString(6,selected?.id);q.setString(7,place?.trim());q.setTimestamp(8,eventStartsAtEpochMs?.let { java.sql.Timestamp(it) });q.setBoolean(9,eventStartsAtEpochMs!=null);q.setString(10,postId);q.executeUpdate()
                 }
@@ -912,9 +922,20 @@ class SocialSqlRepository(private val db: Database) {
         ViewerContext(userId, followed, events, lat, lng, offeredTagIds = offered)
     }
 
-    private fun loadCandidates(preferred:List<PostHashtag> = emptyList(),graphIds:Set<String>?=null): List<FeedCandidate> = db.withConnection { connection ->
+    fun feedScope(userId:String): Map<String,Double?> = db.withConnection { c ->
+        c.prepareStatement("SELECT ST_Y(home_location) AS lat,ST_X(home_location) AS lng FROM users WHERE id=?::uuid").use { q ->
+            q.setString(1,userId);q.executeQuery().use { r ->
+                if(r.next()) mapOf("latitude" to r.optDouble("lat"),"longitude" to r.optDouble("lng"))
+                else mapOf("latitude" to null,"longitude" to null)
+            }
+        }
+    }
+
+    private fun loadCandidates(preferred:List<PostHashtag> = emptyList(),graphIds:Set<String>?=null,viewer:ViewerContext?=null,adoptionRadiusKm:Int=0): List<FeedCandidate> = db.withConnection { connection ->
         val topicFilter=if(preferred.isEmpty())"" else " AND ("+preferred.joinToString(" OR ") { "p.hashtags @> ?::jsonb" }+")"
         val graphFilter=if(graphIds==null)"" else " AND (p.author_user_id=ANY(?::uuid[]) OR EXISTS(SELECT 1 FROM post_people fp WHERE fp.post_id=p.id AND fp.role='PROTAGONIST' AND fp.user_id=ANY(?::uuid[])))"
+        val nearby=viewer!=null && adoptionRadiusKm>0
+        val proximityFilter=if(!nearby)"" else " AND (a.kind IS DISTINCT FROM 'ADOPTION' OR p.author_user_id=?::uuid OR ST_DWithin(a.location::geography,ST_SetSRID(ST_MakePoint(?::float8,?::float8),4326)::geography,?::float8))"
         connection.prepareStatement(
             """
             SELECT p.id, p.author_user_id, p.author_company_id, p.hashtags, COALESCE(p.topic, '') AS topic,
@@ -937,7 +958,7 @@ class SocialSqlRepository(private val db: Database) {
             LEFT JOIN animal_listings a ON a.id = p.listing_id
             LEFT JOIN timebank_needs tn ON tn.post_id = p.id AND tn.open
             WHERE p.moderation_status = 'VISIBLE' AND p.is_story = FALSE
-            $topicFilter $graphFilter
+            $topicFilter $graphFilter $proximityFilter
             ORDER BY p.created_at DESC
             LIMIT 200
             """.trimIndent(),
@@ -949,6 +970,11 @@ class SocialSqlRepository(private val db: Database) {
             if(graphIds!=null) {
                 val graph=connection.createArrayOf("uuid",graphIds.toTypedArray())
                 stmt.setArray(preferred.size+1,graph);stmt.setArray(preferred.size+2,graph)
+            }
+            if(nearby) {
+                var n=preferred.size+(if(graphIds==null)0 else 2)+1
+                stmt.setString(n++,viewer!!.userId);stmt.setObject(n++,viewer.longitude);stmt.setObject(n++,viewer.latitude)
+                stmt.setInt(n,adoptionRadiusKm*1000)
             }
             stmt.executeQuery().use { rs ->
                 buildList {

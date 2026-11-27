@@ -1924,6 +1924,7 @@ function postCard(post, { openable = true, previewStories = true, compose = fals
     </div>
     ${pill ? `<div class="pill-row">${pill}</div>` : ""}
     ${honoreeLine}
+    ${globalThis.OgtPostCarousel.typesHtml(post)}
     ${post.publicationKind==="CONVOCATORIA" && post.eventStartsAtEpochMs ? `<p class="meta">${escapeHtml(new Date(post.eventStartsAtEpochMs).toLocaleString("es-AR"))} · ${escapeHtml(post.place || "")}</p>` : ""}
     ${post.publicationKind==="POST" && post.place ? `<p class="meta publication-place">${escapeHtml(post.place)}</p>` : ""}
     ${lostExtrasHtml(post)}
@@ -2340,6 +2341,9 @@ const FEED_TYPES = [
 let feedType = "";
 let feedMode = "HOME";
 let feedRequestVersion = 0;
+let adoptionRadiusKm = 50;
+let feedLocation = null;
+function nearbyInHome(post) { return globalThis.OgtAdoptionNearby(post,post.animalListing || listingOf(post) || (cardKind(post)==="ADOPTION"?{kind:"ADOPTION"}:null),{mode:feedMode,radiusKm:adoptionRadiusKm,viewer:feedLocation,ownerId:me.userId}); }
 
 function familyOfFeedType(type) {
   if (!type) return "";
@@ -2356,16 +2360,17 @@ function matchesFeedType(post, type) {
 }
 
 function visibleFeed(type) {
-  return lastFeed.filter((p) => !hiddenIds.has(p.id) && matchesFeedType(p, type));
+  return lastFeed.filter((p) => !hiddenIds.has(p.id) && matchesFeedType(p, type) && nearbyInHome(p));
 }
 
 async function loadFeed(type) {
   const next = type === undefined ? "" : type;
   const version=++feedRequestVersion;
-  const payload = { pageSize: 40, mode: feedMode };
+  const payload = { pageSize: 40, mode: feedMode, adoptionRadiusKm };
   const family = familyOfFeedType(next);
   if (family) payload.family = family;
-  const posts = await api("/api/v1/social/feed", payload);
+  const [posts,scope] = await Promise.all([api("/api/v1/social/feed", payload),api("/api/v1/social/feed-scope",{}).catch(()=>null)]);
+  if(version===feedRequestVersion)feedLocation=scope;
   if(version!==feedRequestVersion)return lastFeed;
   lastFeed = (Array.isArray(posts) ? posts : posts?.items || []).filter((p) => !hiddenIds.has(p.id));
   sortFeed();
@@ -2381,11 +2386,14 @@ async function loadListings() {
   lastListings.forEach((row) => {
     if (!row.postId) return;
     const existing = lastFeed.find((p) => p.id === row.postId);
-    if(feedMode!=="FOLLOWING" || existing)mergePost(listingToPost(row, existing));
+    if((feedMode!=="FOLLOWING" || existing) && nearbyInHome(listingToPost(row, existing)))mergePost(listingToPost(row, existing));
   });
   return lastListings;
 }
 
+function adoptionRadiusHtml() {
+ return `<div data-adoption-radius ${feedMode==='HOME'?'':'hidden'}><label class="field">Distancia de adopciones<select aria-label="Distancia de adopciones">${[[50,'Hasta 50 km'],[100,'Hasta 100 km'],[250,'Hasta 250 km'],[0,'Sin límite (incluye ubicación pendiente)']].map(([km,label])=>`<option value="${km}" ${km===adoptionRadiusKm?'selected':''}>${label}</option>`).join('')}</select></label><p class="hint" data-adoption-location></p><button type="button" class="ghost" data-feed-location>Usar mi ubicación para adopciones</button></div>`;
+}
 function feedPillsHtml() {
   return `<div class="chips feed-pills" aria-label="Selección del feed">${[["HOME","Para vos"],["FOLLOWING","Siguiendo"]].map(([mode,label])=>`<button type="button" class="chip${mode===feedMode?" on":""}" data-feed-mode="${mode}" aria-pressed="${mode===feedMode}">${label}</button>`).join("")}</div><div class="chips feed-pills" id="feed-type" role="tablist" aria-label="Tipo de publicación">
     ${FEED_TYPES.map(([id, label]) => `<button type="button" class="chip${id === feedType ? " on" : ""}" data-type="${id}" role="tab" aria-selected="${id === feedType ? "true" : "false"}">${escapeHtml(label)}</button>`).join("")}
@@ -2395,6 +2403,8 @@ function feedPillsHtml() {
 function paintFeedList() {
   const box = document.getElementById("feed-list");
   if (!box) return;
+  const scope=document.querySelector('[data-adoption-radius]');if(scope)scope.hidden=feedMode!=='HOME';
+  const hint=document.querySelector('[data-adoption-location]');if(hint)hint.textContent=adoptionRadiusKm===0?'Incluye adopciones de todas las zonas y con ubicación pendiente.':feedLocation?.latitude==null?'Indicá tu ubicación o elegí Sin límite para ver adopciones.':'Las adopciones sin ubicación confirmada aparecen al elegir Sin límite.';
   const list = visibleFeed(feedType);
   box.innerHTML = list.length
     ? list.map((p) => postCard(p, { previewStories: false })).join("")
@@ -2403,6 +2413,19 @@ function paintFeedList() {
 }
 
 function bindFeedPills() {
+  document.querySelector('[data-adoption-radius] select')?.addEventListener('change',async event=>{
+    adoptionRadiusKm=Number(event.target.value);paintFeedList();
+    try {await loadFeed(feedType);paintFeedList();}catch(error){toast(error.message);}
+  });
+  document.querySelector('[data-feed-location]')?.addEventListener('click',async event=>{
+    const button=event.currentTarget;button.disabled=true;
+    try {
+      if(!navigator.geolocation)throw new Error('Este navegador no ofrece ubicación. Podés elegir Sin límite.');
+      const fix=await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{timeout:10000,maximumAge:120000}));
+      await api('/api/v1/me/location',{latitude:fix.coords.latitude,longitude:fix.coords.longitude,accuracyMeters:fix.coords.accuracy});
+      await loadFeed(feedType);paintFeedList();
+    }catch{toast('No pudimos obtener tu ubicación. Revisá el permiso o elegí Sin límite.');}finally{button.disabled=false;}
+  });
   document.querySelectorAll('[data-feed-mode]').forEach(button=>button.addEventListener('click',async()=>{
     if(feedMode===button.dataset.feedMode)return;
     feedMode=button.dataset.feedMode;
@@ -2435,7 +2458,7 @@ function bindFeedPills() {
 async function renderInicio() {
   const main = document.getElementById("main");
   disposeStories();
-  main.innerHTML = `<h1>Inicio</h1><section id="ephemeral-stories" class="ephemeral-stories"></section>${feedPillsHtml()}<div id="feed-list"></div>`;
+  main.innerHTML = `<h1>Inicio</h1><section id="ephemeral-stories" class="ephemeral-stories"></section>${feedPillsHtml()}${adoptionRadiusHtml()}<div id="feed-list"></div>`;
   bindFeedPills();
   try {
     await loadSession();
@@ -3176,6 +3199,7 @@ function bindPublishForm(kind, catalog=[], invitationsModule=null,placeModule=nu
         categoryId: recognition ? catalog.find(c=>c.label===topic)?.id : undefined,
         requestId: (recognition || kind==="convocatoria") ? requestId : undefined,
         place,
+        ...(gatheringPlace?.point()||{}),
         eventStartsAtEpochMs,
         invitations: recognition ? invitations : undefined,
         honoreeName: (honor || recognition) && honoree ? honoree : undefined,
@@ -3210,7 +3234,7 @@ async function renderPublicar(kind) {
     catch(e){document.getElementById("main").innerHTML=`<h1>Publicar</h1><p role="alert">${escapeHtml(e.message)}</p><a href="#/publicar">Volver a intentar</a>`;return;}
   }
   if(kind==="accion"){await renderUnifiedPublication(catalog,invitationsModule,initialTag);return;}
-  const placeModule=await import('./publication-place.js');
+  const placeModule=await import('./publication-place.js?v=20261127-location');
   const {publicationPlaceHtml}=placeModule;
   const topics = PUBLISH_TOPICS[kind] || [];
   const honor = kind === "homenaje";
@@ -3364,7 +3388,7 @@ async function renderPublicar(kind) {
 
 async function renderUnifiedPublication(catalog,invitationsModule,initialTag=null) {
   const {hashtagKey}=await import('./hashtags.js');
-  const {publicationPlaceHtml,bindPublicationPlace}=await import('./publication-place.js');
+  const {publicationPlaceHtml,bindPublicationPlace}=await import('./publication-place.js?v=20261127-location');
   const main=document.getElementById('main');
   const selected=new Map();
   const officialKey=category=>category.tagKey||hashtagKey(category.label);
@@ -3450,7 +3474,7 @@ async function renderUnifiedPublication(catalog,invitationsModule,initialTag=nul
       if(key!==attemptKey){attemptKey=key;requestId=crypto.randomUUID();uploaded=null;}
       publicationPlace.pause();busy=true;form.inert=true;submit.textContent='Subiendo publicación…';
       const media=uploaded || (uploaded=await uploadPublishMedia([...selected.values()][0].label));
-      const saved=await api('/api/v1/social/publish',{body,hashtags,place,media,requestId,publicationKind:'POST',
+      const saved=await api('/api/v1/social/publish',{body,hashtags,place,...(publicationPlace.point()||{}),media,requestId,publicationKind:'POST',
         honoreeFullName:requiresRecognition?honoree:undefined,protagonistUserId:requiresRecognition?person?.userId:undefined,invitations,attributionUrl});
       clearPublishFiles(mediaContext);mergePost(saved);toast('Publicado en el feed');location.hash='#/p/'+saved.id;
       if(invitations.length)await invitationsModule.openInvitationManager({api,postId:saved.id,toast});
@@ -4700,6 +4724,7 @@ async function clearClientSession() {
   if (window.OgtAuth) await OgtAuth.signOut();
   me = { userId: "", role: "USER" };
   lastFeed = [];
+  adoptionRadiusKm=50;feedLocation=null;feedRequestVersion++;
   lastRanking = [];
   following.clear();
   realtime = null;

@@ -50,7 +50,7 @@ test('group publication keeps full title, multiple traits, optional fields, medi
  const audit=await new AxeBuilder({page}).analyze();expect(audit.violations).toEqual([]);await page.screenshot({path:info.outputPath('adoption-composer.png'),fullPage:true});
  const saved=await save(page);expect(saved.title).toBe('Tres HERMANITOS buscan hogar 🐾');expect(saved.ageLabel).toBe('');expect(saved.adoptionDetails.historyAndCare).toBe('');
  expect(saved.adoptionDetails.tags.filter(t=>t.group==='SEX')).toHaveLength(2);expect(saved.adoptionDetails.tags.filter(t=>t.group==='SIZE')).toHaveLength(2);expect(saved.vaccinated).toBe(false);expect(saved.sterilized).toBe(true);expect(saved.adoptionDetails.availableCount).toBe(3);
- expect(saved.place).toBe('Caballito, Ciudad Autónoma de Buenos Aires, Argentina');expect(saved.attributionUrl??null).toBeNull();expect(saved.hashtags.find(t=>t.key==='gatos').categoryId).toBe('gatos');
+ expect(saved.place).toBe('Caballito, Ciudad Autónoma de Buenos Aires, Argentina');expect(saved.latitude).toBe(-34.62);expect(saved.longitude).toBe(-58.44);expect(saved.attributionUrl??null).toBeNull();expect(saved.hashtags.find(t=>t.key==='gatos').categoryId).toBe('gatos');
  const first=await request.get(new URL(saved.media[0].url).pathname);expect([...((await sharp(await first.body()).removeAlpha().raw().toBuffer()).subarray(0,3))]).toEqual([0,0,255]);
  await page.reload();await expect(card(page,saved.postId).locator('h2')).toHaveText(saved.title);await expect(card(page,saved.postId)).toContainText('Quedan 3 buscando hogar');await expect(card(page,saved.postId)).toContainText('#FamiliaResponsable');
  await expect(card(page,saved.postId).locator('.post-attribution,.content-attribution')).toHaveCount(0);

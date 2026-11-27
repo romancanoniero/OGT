@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-data class FeedQuery(val mode:FeedMode=FeedMode.HOME,val family:FeedTopicFamily?=null)
+data class FeedQuery(val mode:FeedMode=FeedMode.HOME,val family:FeedTopicFamily?=null,val adoptionRadiusKm:Int=50)
 data class FeedPageState(
     val posts:List<LocalSocialPost> = emptyList(),
     val ready:Boolean=false,
@@ -27,7 +27,8 @@ data class FeedPageState(
 class FeedPresentation {
     var mode by mutableStateOf(FeedMode.HOME)
     var family by mutableStateOf<FeedTopicFamily?>(null)
-    val query get()=FeedQuery(mode,family)
+    var adoptionRadiusKm by mutableStateOf(50)
+    val query get()=FeedQuery(mode,family,adoptionRadiusKm)
     private val positions=mutableMapOf<FeedQuery,LazyListState>()
     private val acknowledgedOwn=mutableMapOf<FeedQuery,Int>()
     fun position(query:FeedQuery)=positions.getOrPut(query) { LazyListState() }
@@ -67,6 +68,9 @@ class FeedTimeline(
     private val _pages=MutableStateFlow<Map<FeedQuery,FeedPageState>>(emptyMap())
     val pages:StateFlow<Map<FeedQuery,FeedPageState>> = _pages.asStateFlow()
     var presentation=FeedPresentation();private set
+    var viewerLocation by mutableStateOf<GeoPoint?>(null); private set
+    var locationChecked by mutableStateOf(false); private set
+    fun confirmViewerLocation(point:GeoPoint?) { viewerLocation=point;locationChecked=true;rebuild() }
     private var owner=""
     private var generation=0
     private var initialized=false
@@ -88,8 +92,17 @@ class FeedTimeline(
     )
     private fun river(query:FeedQuery,order:List<String>?) =
         db.composeVisibleRiver(owner,query.mode,query.family,order ?: db.cachedFeedOrder(owner,query.mode,query.family)).filter {
-            it.id !in removed && (query.mode!=FeedMode.FOLLOWING || db.shouldShowInFeed(owner,it,query.mode,query.family))
+            it.id !in removed && nearbyAllowed(query,it) && (query.mode!=FeedMode.FOLLOWING || db.shouldShowInFeed(owner,it,query.mode,query.family))
         }
+    private fun nearbyAllowed(query:FeedQuery,post:LocalSocialPost):Boolean {
+        if(query.mode!=FeedMode.HOME)return true
+        val animal=post.listingId?.let { id -> db.animals.firstOrNull { it.id==id } }
+        if(animal?.kind!="ADOPTION" && !post.tag.equals("Adopción",true))return true
+        val me=db.userOrNull(owner)
+        val here=if(locationChecked)viewerLocation else me?.let { AdoptionProximity.point(it.latitude,it.longitude)?.takeUnless { it.latitude==0.0 && it.longitude==0.0 } }
+        return AdoptionProximity.allows(db.isOwnPost(post,db.viewerAliases(owner)),here,
+            AdoptionProximity.point(animal?.latitude,animal?.longitude),query.adoptionRadiusKm)
+    }
     private fun publish(query:FeedQuery,value:FeedPageState) {
         if(value.ready)db.rememberFeedOrder(owner,query.mode,query.family,value.posts.map { it.id })
         if(pages.value[query]!=value) _pages.value=pages.value+(query to value)
@@ -110,14 +123,14 @@ class FeedTimeline(
             publish(query,previous.copy(posts=rows,
                 pendingIds=previous.pendingIds.filter { id ->
                     val post=db.posts.firstOrNull { it.id==id }
-                    post!=null && id !in removed && rows.none { it.id==id } && id in pendingAllowed
+                    post!=null && nearbyAllowed(query,post) && id !in removed && rows.none { it.id==id } && id in pendingAllowed
                 },
                 ownPublication=previous.ownPublication+if(ownAdded)1 else 0))
         }
     }
     fun start(userId:String) {
         if(owner==userId && accountJob?.isActive==true)return
-        clear();owner=userId;followed=db.followedIds(userId)
+        clear();viewerLocation=null;locationChecked=false;owner=userId;followed=db.followedIds(userId)
         if(userId.isNotBlank())db.bindSocialFeedViewer(userId)
         if(userId.isBlank())return
         val version=generation

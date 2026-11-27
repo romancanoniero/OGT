@@ -24,6 +24,7 @@ import io.ktor.http.contentType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.buildJsonObject
 
@@ -47,18 +48,19 @@ class RestFeedRepository(
     suspend fun publishPublication(draft:com.onlygoodthings.shared.domain.PublicationDraft):SocialPost =
         post("/api/v1/social/publish",json.encodeToJsonElement(com.onlygoodthings.shared.domain.PublicationDraft.serializer(),draft) as JsonObject)
 
-    suspend fun editPublication(id:String,body:String,hashtags:List<String>,fullName:String?,attribution:String,place:String?=null):SocialPost =
+    suspend fun editPublication(id:String,body:String,hashtags:List<String>,fullName:String?,attribution:String,place:String?=null,point:com.onlygoodthings.shared.domain.GeoPoint?=null,pointChanged:Boolean=false):SocialPost =
         post("/api/v1/social/post/edit",buildJsonObject {
             put("postId",id);put("body",body);put("attributionUrl",attribution)
             place?.let { put("place",it) }
+            if(pointChanged){put("latitude",point?.latitude?.let(::JsonPrimitive) ?: kotlinx.serialization.json.JsonNull);put("longitude",point?.longitude?.let(::JsonPrimitive) ?: kotlinx.serialization.json.JsonNull)}
             put("hashtags",buildJsonArray { hashtags.forEach { add(it) } })
             fullName?.takeIf { it.isNotBlank() }?.let { put("honoreeFullName",it) }
         })
 
     suspend fun publishGathering(draft:com.onlygoodthings.shared.domain.GatheringPostDraft):SocialPost =
         post("/api/v1/social/publish",json.encodeToJsonElement(com.onlygoodthings.shared.domain.GatheringPostDraft.serializer(),draft) as JsonObject)
-    suspend fun editGathering(id:String,body:String,topic:String,place:String,start:Long?,attribution:String):SocialPost =
-        post("/api/v1/social/post/edit",buildJsonObject { put("postId",id);put("body",body);put("topic",topic);if(start!=null){put("place",place);put("eventStartsAtEpochMs",start)};put("attributionUrl",attribution) })
+    suspend fun editGathering(id:String,body:String,topic:String,place:String,start:Long?,attribution:String,point:com.onlygoodthings.shared.domain.GeoPoint?=null,pointChanged:Boolean=false):SocialPost =
+        post("/api/v1/social/post/edit",buildJsonObject { put("postId",id);put("body",body);put("topic",topic);if(start!=null){put("place",place);put("eventStartsAtEpochMs",start)};put("attributionUrl",attribution);if(pointChanged){put("latitude",point?.latitude?.let(::JsonPrimitive) ?: kotlinx.serialization.json.JsonNull);put("longitude",point?.longitude?.let(::JsonPrimitive) ?: kotlinx.serialization.json.JsonNull)} })
 
     suspend fun getPost(id:String):SocialPost = post("/api/v1/social/post/get",buildJsonObject { put("postId",JsonPrimitive(id)) })
 
@@ -81,8 +83,16 @@ class RestFeedRepository(
         pageSize: Int,
         mode: FeedMode,
         family: FeedTopicFamily?,
-    ): List<SocialPost> =
+    ): List<SocialPost> = loadNearbyFeed(cursor,pageSize,mode,family,50)
+
+    suspend fun feedLocation():com.onlygoodthings.shared.domain.GeoPoint? {
+        val data:JsonObject=post("/api/v1/social/feed-scope",buildJsonObject {})
+        return com.onlygoodthings.shared.domain.AdoptionProximity.point((data["latitude"] as? JsonPrimitive)?.doubleOrNull,(data["longitude"] as? JsonPrimitive)?.doubleOrNull)
+    }
+
+    suspend fun loadNearbyFeed(cursor:String?,pageSize:Int,mode:FeedMode,family:FeedTopicFamily?,adoptionRadiusKm:Int):List<SocialPost> =
         post("/api/v1/social/feed", buildJsonObject {
+            put("adoptionRadiusKm",JsonPrimitive(adoptionRadiusKm))
             put("pageSize", JsonPrimitive(pageSize))
             put("mode", JsonPrimitive(mode.name))
             cursor?.let { put("cursor", JsonPrimitive(it)) }

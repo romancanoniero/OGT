@@ -45,7 +45,7 @@ test('place is opt-in, GPS resolves first, autocomplete changes it and the confi
   await expect(page.getByLabel('Lugar (opcional)',{exact:true})).toHaveValue(manualPlace.label);
   expect(searches).toBe(1);
   const {post,payload}=await publish(page);expect(post.place).toBe(manualPlace.label);
-  expect(payload).not.toHaveProperty('latitude');expect(payload).not.toHaveProperty('longitude');
+  expect(payload.latitude).toBe(manualPlace.latitude);expect(payload.longitude).toBe(manualPlace.longitude);
   await page.reload();await expect(page.locator('#main')).toContainText(manualPlace.label);
 });
 

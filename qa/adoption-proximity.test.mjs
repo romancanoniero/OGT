@@ -1,0 +1,22 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFileSync} from 'node:fs';
+const context=vm.createContext({});vm.runInContext(readFileSync(new URL('../web/app/adoption-proximity.js',import.meta.url),'utf8'),context);
+const adoptionNearby=context.OgtAdoptionNearby;
+const scope={viewer:{latitude:-34.6200773,longitude:-58.4424893},ownerId:'viewer'};
+const post={authorId:'other'};
+test('nearby adoptions require a confirmed point; radius can expand and own/profile/following views survive',()=>{
+ const nearby={kind:'ADOPTION',latitude:-34.60,longitude:-58.45};
+ const far={kind:'ADOPTION',latitude:-34.92,longitude:-57.95};
+ assert.equal(adoptionNearby(post,nearby,scope),true);
+ assert.equal(adoptionNearby(post,far,scope),false);
+ assert.equal(adoptionNearby(post,far,{...scope,radiusKm:100}),true);
+ assert.equal(adoptionNearby(post,{kind:'ADOPTION'},scope),false);
+ assert.equal(adoptionNearby(post,nearby,{viewer:null}),false);
+ assert.equal(adoptionNearby(post,{kind:'ADOPTION'},{radiusKm:0}),true);
+ assert.equal(adoptionNearby({authorId:'viewer'},far,scope),true);
+ assert.equal(adoptionNearby(post,far,{...scope,mode:'FOLLOWING'}),true);
+ assert.equal(adoptionNearby(post,{kind:'LOST'},scope),true);
+ assert.equal(adoptionNearby(post,null,scope),true);
+});

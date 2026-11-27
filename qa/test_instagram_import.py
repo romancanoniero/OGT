@@ -51,6 +51,21 @@ class InstagramImportTests(unittest.TestCase):
             for variant in variants:
                 with self.subTest(variant=variants.index(variant)), self.assertRaises(ValueError):self.prepare(root,variant)
 
+    def test_location_requires_evidence_and_never_defaults_to_the_profile_neighborhood(self):
+        with tempfile.TemporaryDirectory() as root:
+            data=self.fixture(root)
+            sql=importer.make_sql(self.prepare(root,data))
+            self.assertNotIn('ST_MakePoint(-58.4495,-34.6204)',sql)
+            self.assertIn('Ubicación pendiente de confirmar',sql)
+            location=dict(label='Córdoba (zona aproximada)',latitude=-31.42,longitude=-64.18,sourceUrl=data['posts'][0]['sourceUrl'],evidence='Ubicación declarada en la publicación')
+            data['posts'][0]['location']=location
+            sql=importer.make_sql(self.prepare(root,data))
+            self.assertIn('ST_MakePoint(-64.18,-31.42)',sql)
+            self.assertIn('location,gathering_place',sql)
+            for invalid in [dict(location,latitude=float('nan')),dict(location,longitude=None),dict(location,evidence='')]:
+                data['posts'][0]['location']=invalid
+                with self.assertRaises(ValueError):self.prepare(root,data)
+
     def test_changed_or_outside_media_is_rejected_before_a_server_write(self):
         with tempfile.TemporaryDirectory() as root:
             original=self.fixture(root)

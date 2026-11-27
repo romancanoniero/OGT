@@ -10,6 +10,7 @@ data class GatheringPostDraft(
     val body:String,val topic:String,val place:String,val eventStartsAtEpochMs:Long,
     val media:List<PostMediaItem>,val requestId:String,val attributionUrl:String?=null,
     val publicationKind:String="CONVOCATORIA",
+    val latitude:Double?=null, val longitude:Double?=null,
 )
 
 fun gatheringStart(day:String,clock:String,timeZone:TimeZone=TimeZone.currentSystemDefault()):Long {
