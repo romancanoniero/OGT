@@ -1791,6 +1791,14 @@ function mediaFrameOf(post) {
 function placeLiveFrame(img) {
   const box = img.closest(".media-slot");
   if (!box) return;
+  if (box.closest('[data-post-media]')) {
+    img.style.width = "100%";
+    img.style.height = "100%";
+    img.style.left = "0";
+    img.style.top = "0";
+    img.style.objectFit = "contain";
+    return;
+  }
   const fw = box.clientWidth;
   const fh = box.clientHeight;
   const iw = img.naturalWidth;

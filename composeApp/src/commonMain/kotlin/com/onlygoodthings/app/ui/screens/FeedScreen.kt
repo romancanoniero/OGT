@@ -86,6 +86,7 @@ import com.onlygoodthings.app.resources.feed_logo
 import com.onlygoodthings.app.resources.feed_story_donacion
 import com.onlygoodthings.app.resources.feed_story_me
 import com.onlygoodthings.app.resources.qs_feed
+import com.onlygoodthings.app.resources.qs_play
 import com.onlygoodthings.app.resources.qs_notifications
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.i18n.LocalOgtCopy
@@ -946,7 +947,7 @@ private fun ListingPhotoStrip(
                         Modifier.align(Alignment.Center).size(56.dp).clip(CircleShape).background(Color(0xB3000000)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text("▶", color = Color.White, fontSize = 22.sp)
+                        OgtStitchIcon(Res.drawable.qs_play, "Reproducir video", tint = OgtColors.onPrimary)
                     }
                 }
             }
@@ -1229,7 +1230,7 @@ private fun PostMediaPager(
                         Modifier.align(Alignment.Center).size(56.dp).clip(CircleShape).background(Color(0xB3000000)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text("▶", color = Color.White, fontSize = 22.sp)
+                        OgtStitchIcon(Res.drawable.qs_play, "Reproducir video", tint = OgtColors.onPrimary)
                     }
                 }
             }

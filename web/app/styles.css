@@ -434,6 +434,11 @@ span.avatar svg { width: 18px; height: 18px; }
   object-position: center center;
 }
 .post-media-slide[hidden] { display: none; }
+.post [data-post-media] .media-slot { background: var(--ink); }
+.post [data-post-media] .media-slot .media {
+  object-fit: contain;
+  background: var(--ink);
+}
 .post-carousel { touch-action: pan-y pinch-zoom; }
 .post-carousel:focus-visible { outline: 2px solid var(--secondary); outline-offset: 4px; }
 .post-media-dots { display: flex; justify-content: center; flex-wrap: wrap; gap: 2px; padding-top: 6px; }

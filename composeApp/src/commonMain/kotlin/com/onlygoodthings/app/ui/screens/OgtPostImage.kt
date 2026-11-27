@@ -60,7 +60,10 @@ fun OgtPostImage(
     frameX: Float? = null,
     frameY: Float? = null,
     frameZoom: Float? = null,
+    wholeMedia: Boolean = false,
 ) {
+    val stillScale = if (wholeMedia) ContentScale.Fit else contentScale
+    val stillModifier = if (wholeMedia) modifier.background(OgtColors.ink) else modifier
     val fetchUrl = url.takeIf { canFetch(it) } ?: posterUrl.orEmpty().takeIf { canFetch(it) }
     if (fetchUrl == null) {
         val painter = painterResource(if (assetKey.isBlank()) fallback else seedDrawable(assetKey))
@@ -75,9 +78,9 @@ fun OgtPostImage(
         Image(
             painter,
             contentDescription = contentDescription,
-            modifier = modifier,
+            modifier = stillModifier,
             alignment = Alignment.Center,
-            contentScale = contentScale,
+            contentScale = stillScale,
         )
         return
     }
@@ -101,15 +104,17 @@ fun OgtPostImage(
         LaunchedEffect(aspect) {
             if (aspect != null && aspect.isFinite() && aspect > 0f) onAspect?.invoke(aspect)
         }
-        Box(modifier.clipToBounds().background(OgtColors.sand), contentAlignment = Alignment.Center) {
+        Box(modifier.clipToBounds().background(if (wholeMedia) OgtColors.ink else OgtColors.sand), contentAlignment = Alignment.Center) {
             if (ready != null) {
-                // Grilla 16:9. Cubre y recorta. Sin encuadre, el centro. Con encuadre, ese punto.
+                // Reading keeps the whole file inside the existing frame. Editors
+                // retain their stored framing and the established crop behavior.
                 Image(
                     bitmap = ready,
                     contentDescription = contentDescription,
-                    modifier = Modifier.feedFrame(ready.width, ready.height, frameX, frameY, frameZoom),
+                    modifier = if (wholeMedia) Modifier.fillMaxSize()
+                        else Modifier.feedFrame(ready.width, ready.height, frameX, frameY, frameZoom),
                     alignment = Alignment.Center,
-                    contentScale = ContentScale.FillBounds,
+                    contentScale = if (wholeMedia) ContentScale.Fit else ContentScale.FillBounds,
                 )
             } else if (!loading) {
                 val painter = painterResource(if (assetKey.isBlank()) fallback else seedDrawable(assetKey))
@@ -126,7 +131,7 @@ fun OgtPostImage(
                     contentDescription = contentDescription,
                     modifier = Modifier.fillMaxSize(),
                     alignment = Alignment.Center,
-                    contentScale = contentScale,
+                    contentScale = stillScale,
                 )
             }
         }
@@ -141,6 +146,7 @@ fun OgtPostImage(
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
     onAspect: ((Float) -> Unit)? = null,
+    wholeMedia: Boolean = true,
 ) {
     OgtPostImage(
         url = postPreviewUrl(item.kind, item.url, item.posterUrl),
@@ -154,6 +160,7 @@ fun OgtPostImage(
         frameX = item.frameX?.toFloat(),
         frameY = item.frameY?.toFloat(),
         frameZoom = item.frameZoom?.toFloat(),
+        wholeMedia = wholeMedia,
     )
 }
 

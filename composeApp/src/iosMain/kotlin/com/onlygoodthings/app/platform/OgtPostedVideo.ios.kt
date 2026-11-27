@@ -8,6 +8,7 @@ import androidx.compose.ui.viewinterop.UIKitView
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.AVFoundation.AVPlayer
 import platform.AVFoundation.AVPlayerLayer
+import platform.AVFoundation.AVLayerVideoGravityResizeAspect
 import platform.AVFoundation.pause
 import platform.AVFoundation.play
 import platform.Foundation.NSURL
@@ -33,6 +34,7 @@ actual fun OgtPostedVideo(url: String, modifier: Modifier) {
         factory = {
             val view = UIView()
             val layer = AVPlayerLayer.playerLayerWithPlayer(player)
+            layer.videoGravity = AVLayerVideoGravityResizeAspect
             view.layer.addSublayer(layer)
             view
         },

@@ -89,7 +89,7 @@ import com.onlygoodthings.app.ui.components.PostShareSheet
 import com.onlygoodthings.app.resources.Res
 import com.onlygoodthings.app.resources.qs_clap
 import com.onlygoodthings.app.resources.qs_close
-import com.onlygoodthings.app.resources.qs_expand
+import com.onlygoodthings.app.resources.qs_play
 import com.onlygoodthings.app.resources.qs_anecdote
 import com.onlygoodthings.app.resources.qs_invite
 import com.onlygoodthings.app.resources.qs_map
@@ -1384,7 +1384,7 @@ private fun DetailMedia(
                             .background(OgtColors.ink.copy(alpha = 0.55f)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        OgtStitchIcon(Res.drawable.qs_expand, "Reproducir", tint = OgtColors.onPrimary)
+                        OgtStitchIcon(Res.drawable.qs_play, "Reproducir video", tint = OgtColors.onPrimary)
                     }
                 }
             }
