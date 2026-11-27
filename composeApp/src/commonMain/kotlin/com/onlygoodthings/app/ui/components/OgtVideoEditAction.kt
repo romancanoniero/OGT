@@ -22,7 +22,7 @@ import com.onlygoodthings.shared.domain.StoryFrame
 import kotlinx.coroutines.*
 
 @Composable
-fun OgtVideoEditAction(item:OgtPickedMedia,maxDurationMs:Long?=null,enabled:Boolean=true,frame:StoryFrame?=null,onBusyChange:(Boolean)->Unit={},onEdited:(OgtPickedMedia)->Unit) {
+fun OgtVideoEditAction(item:OgtPickedMedia,maxDurationMs:Long?=com.onlygoodthings.shared.domain.PostMediaRules.MAX_VIDEO_MS,enabled:Boolean=true,frame:StoryFrame?=null,onBusyChange:(Boolean)->Unit={},onEdited:(OgtPickedMedia)->Unit) {
     val editor=rememberOgtVideoEditor()
     val scope=rememberCoroutineScope()
     val callback by rememberUpdatedState(onEdited)

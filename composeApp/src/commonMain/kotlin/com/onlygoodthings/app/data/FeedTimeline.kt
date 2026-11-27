@@ -103,7 +103,7 @@ class FeedTimeline(
     )
     private fun river(query:FeedQuery,order:List<String>?) =
         db.composeVisibleRiver(owner,query.mode,query.family,order ?: db.cachedFeedOrder(owner,query.mode,query.family)).filter {
-            it.id !in removed && nearbyAllowed(query,it) && (query.mode!=FeedMode.FOLLOWING || db.shouldShowInFeed(owner,it,query.mode,query.family))
+            it.id !in removed && PostLifetimeRules.active(it.feedExpiresAtEpochMs,now()) && nearbyAllowed(query,it) && (query.mode!=FeedMode.FOLLOWING || db.shouldShowInFeed(owner,it,query.mode,query.family))
         }
     private fun nearbyAllowed(query:FeedQuery,post:LocalSocialPost):Boolean {
         if(query.mode!=FeedMode.HOME)return true
@@ -287,7 +287,7 @@ class FeedTimeline(
             reconcile(setOf(live.id),emptySet());rebuild();return
         }
         val before=db.posts.firstOrNull { it.id==live.id }
-        val needsContent=live.diffusionChanged || before==null || (live.body!=null && live.body!=before.body) ||
+        val needsContent=live.diffusionChanged || live.lifetimeChanged || before==null || (live.body!=null && live.body!=before.body) ||
             (live.tag!=null && live.tag!=before.tag) || live.listingId!=null
         if(before!=null) { db.applySocialLive(live);rebuild() }
         // Unknown posts are admitted only after authenticated REST hydration (including media).

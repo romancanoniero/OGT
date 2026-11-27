@@ -329,7 +329,7 @@ function applyProfileLive(live) {
 
 function applyLive(live) {
   if (!live || !live.id || hiddenIds.has(live.id)) return;
-  if(live.diffusionChanged) {
+  if(live.diffusionChanged || live.lifetimeChanged) {
     const owner=me.userId;
     void loadFeed(feedType).then(()=>{if(me.userId===owner){paintFeedList();const post=lastFeed.find(p=>p.id===live.id);if(post)paintPost(post);}}).catch(()=>{});
   }
@@ -2433,7 +2433,7 @@ function matchesFeedType(post, type) {
 }
 
 function visibleFeed(type) {
-  return lastFeed.filter((p) => !hiddenIds.has(p.id) && matchesFeedType(p, type) && nearbyInHome(p));
+  return lastFeed.filter((p) => !hiddenIds.has(p.id) && (p.feedExpiresAtEpochMs == null || Number(p.feedExpiresAtEpochMs)>Date.now()) && matchesFeedType(p, type) && nearbyInHome(p));
 }
 
 async function loadFeed(type) {
@@ -2581,6 +2581,21 @@ async function renderPost(id) {
       invite.onclick=async()=>{const module=await import('./post-invitations.js?v=1');await module.openInvitationManager({api,postId:id,toast});};main.querySelector('.chrome').after(invite);
     }
     bindSocial(main, { onDetail: true });
+    if(!post.isStory) {
+      const lifetime=await api('/api/v1/social/post/lifetime',{postId:id}).catch(()=>null);
+      if(current() && lifetime?.expiresAtEpochMs!=null) {
+        const box=document.createElement('div');box.className='post-lifetime';
+        const label=document.createElement('p');label.textContent=lifetime.archived?'Archivada del feed. El contenido y los mensajes se conservan.':'Vigencia de 90 días. Podés renovarla sin perder contenido.';
+        const renew=document.createElement('button');renew.type='button';renew.className='ghost-cta';renew.textContent='Renovar por 90 días';
+        renew.onclick=async()=>{
+          const owner=me.userId;renew.disabled=true;
+          try {const saved=await api('/api/v1/social/post/renew',{postId:id});if(owner!==me.userId)return;post.feedExpiresAtEpochMs=saved.expiresAtEpochMs;label.textContent='Renovada por 90 días.';toast('Publicación renovada');}
+          catch(error){if(owner===me.userId)toast(error.message || 'No pudimos renovar la publicación.');}
+          finally{renew.disabled=false;}
+        };
+        box.append(label,renew);main.querySelector('.chrome')?.after(box);
+      }
+    }
     await paintLoadedComments(post.id);
   } catch (e) {
     if (!current()) return;
@@ -2682,7 +2697,8 @@ function bindPublishMedia(form, existing = [], context = route().id || 'new') {
   if (!hasDraft && existing.length) publishFiles = existing.map(media => ({ media: { ...media }, url: media.url }));
   const thumbs = form.querySelector("[data-thumbs]");
   let orderingReady = false;
-  const enabled = () => !form.inert && !form.querySelector('[data-submit]')?.disabled;
+  let preparingVideo = false;
+  const enabled = () => !preparingVideo && !form.inert && !form.querySelector('[data-submit]')?.disabled;
   const status = document.createElement('p');status.className='media-order-status';status.setAttribute('role','status');
   thumbs?.after(status);
   thumbs?.setAttribute('role','list');thumbs?.setAttribute('aria-label','Orden de las imágenes');
@@ -2712,15 +2728,24 @@ function bindPublishMedia(form, existing = [], context = route().id || 'new') {
   form.querySelector("[data-add-media]")?.addEventListener("click", () => {
     if(enabled())form.querySelector("[data-file]")?.click();
   });
-  form.querySelector("[data-file]")?.addEventListener("change", (ev) => {
+  form.querySelector("[data-file]")?.addEventListener("change", async (ev) => {
     const picked = [...(ev.target.files || [])];ev.target.value = "";
     if(!enabled())return;
-    picked.forEach((file) => {
-      if (publishFiles.length >= PUBLISH_MAX_FILES) return;
-      if (file.size > PUBLISH_MAX_BYTES) {toast("Cada archivo puede pesar hasta 8 MB");return;}
-      publishFiles.push({ file, url: URL.createObjectURL(file) });
-    });
-    paintMedia();
+    const submit=form.querySelector('[data-submit]');
+    preparingVideo=true;if(submit)submit.disabled=true;
+    try {
+      for(let file of picked) {
+        if(version!==publishMediaVersion || !form.isConnected || publishFiles.length>=PUBLISH_MAX_FILES)break;
+        if(file.type.startsWith('video/')) {
+          try { const editor=await import('./post-video-editor.js?v=1');file=await editor.preparePostVideo(file,{prepare:async(original,startMs,endMs)=>api('/api/v1/media/video/prepare',{bytesBase64:await fileToBase64(original),startMs,endMs})}); }
+          catch(error) {toast(error.message || 'No pudimos preparar el video.');continue;}
+          if(!file)continue;
+          if(file.url && file.kind){if(version===publishMediaVersion && form.isConnected)publishFiles.push({media:file,url:file.url});continue;}
+        }
+        if(file.size>PUBLISH_MAX_BYTES){toast('Cada archivo puede pesar hasta 8 MB');continue;}
+        if(version===publishMediaVersion && form.isConnected)publishFiles.push({file,url:URL.createObjectURL(file)});
+      }
+    } finally {preparingVideo=false;if(submit)submit.disabled=false;if(version===publishMediaVersion)paintMedia();}
   });
   paintMedia();
   const selected = () => publishMediaContext === key ? publishFiles : publishMediaDrafts.get(key) || [];

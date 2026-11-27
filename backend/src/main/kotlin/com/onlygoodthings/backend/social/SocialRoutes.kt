@@ -29,6 +29,16 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
 
 fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
+    for (action in listOf("lifetime", "renew")) post("/api/v1/social/post/$action") {
+        val me=call.principal<AuthPrincipal>() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+        val id=JsonBody.receiveMap(call).reqString("postId")
+        val result=repository.postLifetime(me.userId,id,action=="renew")
+            ?: return@post call.respond(HttpStatusCode.NotFound,ApiResponse.fail<Unit>("No se puede renovar esta publicación.","NOT_FOUND"))
+        if(action=="renew")repository.byId(id,me.userId)?.let { saved ->
+            hub.projectSocialPost(id,WsCodec.json.encodeToString(SocialLiveCounters.serializer(),SocialLiveCounters(id,saved.commentCount,saved.impactCount,lifetimeChanged=true)))
+        }
+        call.respond(ApiResponse.ok(result))
+    }
     post("/api/v1/me/consent") {
         val me = call.principal<AuthPrincipal>() ?: return@post call.respond(HttpStatusCode.Unauthorized, ApiResponse.fail<Unit>("Token requerido", "UNAUTHENTICATED"))
         call.respond(ApiResponse.ok(repository.ownConsent(me.userId)))

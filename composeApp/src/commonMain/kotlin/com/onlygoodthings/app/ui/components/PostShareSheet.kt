@@ -1,5 +1,6 @@
 package com.onlygoodthings.app.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,6 +11,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -26,6 +29,9 @@ import androidx.compose.ui.unit.sp
 import com.onlygoodthings.app.data.LocalAuth
 import com.onlygoodthings.app.data.LocalOgtSession
 import com.onlygoodthings.app.platform.sharePlainText
+import com.onlygoodthings.app.platform.PostShareApp
+import com.onlygoodthings.app.platform.installedPostShareApps
+import com.onlygoodthings.app.platform.sharePostWithApp
 import com.onlygoodthings.app.resources.*
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.ui.screens.OgtNeighborAvatar
@@ -33,6 +39,7 @@ import com.onlygoodthings.shared.domain.NeighborCard
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.painterResource
 
 /** Destinatarios de OGT arriba; acciones externas al pie. No envía nada hasta pulsar Enviar. */
 @Composable
@@ -56,8 +63,10 @@ fun PostShareSheet(
     var busy by remember(owner) { mutableStateOf(false) }
     var error by remember(owner) { mutableStateOf<String?>(null) }
     var sent by remember(owner) { mutableStateOf(false) }
-    var copied by remember { mutableStateOf(false) }
-    var copiedText by remember { mutableStateOf(false) }
+    var shareStatus by remember { mutableStateOf<String?>(null) }
+    var apps by remember { mutableStateOf(emptyList<PostShareApp>()) }
+    var moreOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { apps=runCatching { installedPostShareApps() }.getOrDefault(emptyList()) }
     LaunchedEffect(owner,query) {
         people=emptyList();searching=false;error=null
         if(query.trim().length>=2) {
@@ -73,7 +82,7 @@ fun PostShareSheet(
         (known.filter { query.isBlank() || it.displayName.contains(query.trim(),true) }+people)
             .filter { it.userId!=owner }.distinctBy { it.userId }.take(16)
     }
-    OgtBottomSheet(onDismiss=onDismiss,maxHeight=560.dp,dismissEnabled=!busy) { sheet ->
+    OgtBottomSheet(onDismiss=onDismiss,maxHeight=520.dp,dismissEnabled=!busy) { sheet ->
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
             Text(title,fontSize=20.sp,fontWeight=FontWeight.Bold,color=OgtColors.ink,modifier=Modifier.weight(1f))
@@ -91,10 +100,13 @@ fun PostShareSheet(
         LazyRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             items(rows,key={it.userId}) { person ->
                 val active=selected?.userId==person.userId
-                Column(Modifier.width(82.dp).clip(RoundedCornerShape(14.dp)).semantics { this.selected=active;contentDescription="Seleccionar a ${person.displayName}" }
+                Column(Modifier.width(74.dp).clip(RoundedCornerShape(14.dp)).semantics { this.selected=active;contentDescription="Seleccionar a ${person.displayName}" }
                     .clickable(enabled=!busy) { selected=if(active)null else person;sent=false;error=null }.padding(vertical=8.dp),horizontalAlignment=Alignment.CenterHorizontally) {
-                    Box(Modifier.size(60.dp).border(if(active)2.dp else 1.dp,if(active)OgtColors.secondary else OgtColors.hairline,CircleShape).padding(4.dp)) {
-                        OgtNeighborAvatar(person.userId,person.photoUrl,null,Modifier.fillMaxSize().clip(CircleShape))
+                    Box(Modifier.size(52.dp).border(if(active)2.dp else 1.dp,if(active)OgtColors.secondary else OgtColors.hairline,CircleShape).padding(4.dp)) {
+                        val photo=person.photoUrl ?: com.onlygoodthings.app.data.LocalOgtDb.current.userOrNull(person.userId)?.photoUrl
+                        if(photo.isNullOrBlank()) Box(Modifier.fillMaxSize().background(OgtColors.sand,CircleShape),contentAlignment=Alignment.Center) {
+                            Text(person.displayName.trim().removePrefix("@").split(Regex("[\\s_.-]+")).take(2).mapNotNull { it.firstOrNull()?.takeIf(Char::isLetterOrDigit) }.joinToString(""),color=OgtColors.secondary,fontWeight=FontWeight.Bold)
+                        } else OgtNeighborAvatar(person.userId,photo,null,Modifier.fillMaxSize().clip(CircleShape))
                         if(active) Text("✓",color=OgtColors.secondary,fontWeight=FontWeight.Bold,modifier=Modifier.align(Alignment.BottomEnd).background(OgtColors.surface,CircleShape))
                     }
                     Spacer(Modifier.height(6.dp))
@@ -119,26 +131,43 @@ fun PostShareSheet(
         Spacer(Modifier.height(16.dp))
         Box(Modifier.fillMaxWidth().height(1.dp).background(OgtColors.hairline))
         Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-            ShareExternalChoice(if(copied)"Enlace copiado" else "Copiar enlace",Res.drawable.qs_link,Modifier.weight(1f),!busy) {
-                clipboard.setText(AnnotatedString(postLink));copied=true;onExternal()
+        LazyRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            item("copy-link") {
+                ShareCircleAction(null,"Copiar enlace",!busy,onClick={clipboard.setText(AnnotatedString(postLink));shareStatus="Enlace copiado";onExternal()}) {
+                    OgtStitchIcon(Res.drawable.qs_link,"",size=24.dp,tint=OgtColors.secondary)
+                }
             }
-            ShareExternalChoice(if(copiedText)"Texto copiado" else "Copiar texto",Res.drawable.qs_form,Modifier.weight(1f),!busy) {
-                clipboard.setText(AnnotatedString(shareText));copiedText=true;onExternal()
+            items(apps,key={it.id}) { app ->
+                ShareCircleAction(app.label,"Compartir por ${app.label}",!busy,onClick={
+                    onExternal();sheet.closeNow();if(!sharePostWithApp(app,shareText,postLink))sharePlainText(shareText)
+                }) {
+                    if(app.icon!=null)Image(app.icon,null,Modifier.size(48.dp))
+                    else Image(painterResource(when(app.brand){"whatsapp"->Res.drawable.share_app_whatsapp;"telegram"->Res.drawable.share_app_telegram;"messages"->Res.drawable.share_app_messages;"mail"->Res.drawable.share_app_mail;else->Res.drawable.qs_share}),null,Modifier.size(48.dp))
+                }
             }
-            ShareExternalChoice("Compartir con apps",Res.drawable.qs_share,Modifier.weight(1f),!busy) {
-                onExternal();sheet.closeNow();sharePlainText(shareText)
+            item("more") {
+                Box {
+                    ShareCircleAction("Más","Más opciones para compartir",!busy,onClick={moreOpen=true}) { Text("•••",color=OgtColors.secondary,fontSize=22.sp) }
+                    DropdownMenu(expanded=moreOpen,onDismissRequest={moreOpen=false}) {
+                        DropdownMenuItem(text={Text("Copiar texto")},onClick={moreOpen=false;clipboard.setText(AnnotatedString(shareText));shareStatus="Texto copiado";onExternal()})
+                        DropdownMenuItem(text={Text("Más apps")},onClick={moreOpen=false;onExternal();sheet.closeNow();sharePlainText(shareText)})
+                    }
+                }
             }
         }
+        shareStatus?.let { OgtCaption(it) }
         Spacer(Modifier.height(8.dp))
         }
     }
 }
 
 @Composable
-private fun ShareExternalChoice(label:String,art:org.jetbrains.compose.resources.DrawableResource,modifier:Modifier,enabled:Boolean,onClick:()->Unit) {
-    Column(modifier.clip(RoundedCornerShape(16.dp)).background(OgtColors.sand).clickable(enabled=enabled,onClick=onClick).padding(12.dp),horizontalAlignment=Alignment.CenterHorizontally) {
-        OgtStitchIcon(art,label,size=24.dp,tint=OgtColors.secondary)
-        Spacer(Modifier.height(6.dp));Text(label,fontSize=12.sp,color=OgtColors.ink,maxLines=2)
+private fun ShareCircleAction(label:String?,description:String,enabled:Boolean,onClick:()->Unit,art:@Composable ()->Unit) {
+    Column(Modifier.width(68.dp).clip(RoundedCornerShape(12.dp)).semantics(mergeDescendants=true) { contentDescription=description }
+        .clickable(enabled=enabled,onClick=onClick).padding(vertical=4.dp),horizontalAlignment=Alignment.CenterHorizontally) {
+        Box(Modifier.size(48.dp).clip(CircleShape).background(OgtColors.sand),contentAlignment=Alignment.Center) { art() }
+        Spacer(Modifier.height(4.dp))
+        if(label!=null)Text(label,fontSize=11.sp,color=OgtColors.ink,maxLines=1,overflow=TextOverflow.Ellipsis)
+        else Spacer(Modifier.height(14.dp))
     }
 }

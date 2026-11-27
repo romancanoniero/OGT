@@ -33,6 +33,7 @@ import com.onlygoodthings.backend.community.UserBlocks
 import com.onlygoodthings.backend.community.interactionSql
 
 class SocialSqlRepository(private val db: Database, private val mediaForReading: (PostMediaItem) -> PostMediaItem = { it }) {
+    fun postLifetime(userId: String, postId: String, renew: Boolean = false) = PostLifetimes(db).own(userId,postId,renew)
 
     fun ownConsent(userId: String) = db.withConnection { readCommunityConsent(it, userId) }
     fun acceptConsent(userId: String, data: Map<String, Any?>) = db.withConnection { saveCommunityConsent(it, userId, data) }
@@ -957,6 +958,7 @@ class SocialSqlRepository(private val db: Database, private val mediaForReading:
             LEFT JOIN animal_listings a ON a.id = p.listing_id
             LEFT JOIN timebank_needs tn ON tn.post_id = p.id AND tn.open
             WHERE p.moderation_status = 'VISIBLE' AND p.is_story = FALSE
+              AND (p.feed_expires_at IS NULL OR p.feed_expires_at > now())
             $topicFilter $graphFilter $proximityFilter $idFilter
             ORDER BY p.created_at DESC
             LIMIT 200
@@ -1032,6 +1034,7 @@ class SocialSqlRepository(private val db: Database, private val mediaForReading:
                 WHERE n.open
                   AND p.moderation_status = 'VISIBLE'
                   AND p.is_story = FALSE
+                  AND (p.feed_expires_at IS NULL OR p.feed_expires_at > now())
                   AND n.user_id IN ($people)
                   AND n.tag_id IN ($tags)
                   AND n.user_id <> ?::uuid
@@ -1086,7 +1089,7 @@ class SocialSqlRepository(private val db: Database, private val mediaForReading:
                 """
                 SELECT p.id, p.author_kind, p.author_user_id, p.author_company_id, p.body, p.media_urls,
                        p.impact_count, p.comment_count, p.is_story, COALESCE(p.topic, '') AS topic,
-                       p.source_url, p.attribution_url, p.honoree_name, p.recognition_category_id,p.hashtags, p.publication_kind, p.gathering_place, p.event_starts_at,
+                       p.source_url, p.attribution_url, p.honoree_name, p.recognition_category_id,p.hashtags, p.publication_kind, p.gathering_place, p.event_starts_at,p.feed_expires_at,
                        COALESCE(p.achieved_count, 0) AS achieved_count,
                        COALESCE(p.placement::text, 'ORGANIC') AS placement,
                        EXTRACT(EPOCH FROM p.created_at) * 1000 AS created_ms,
@@ -1479,6 +1482,7 @@ class SocialSqlRepository(private val db: Database, private val mediaForReading:
         }
         val media = (getArray("media_urls")?.array as? Array<*>)?.mapNotNull { it as? String } ?: emptyList()
         return SocialPost(
+            feedExpiresAtEpochMs = runCatching { getTimestamp("feed_expires_at")?.time }.getOrNull(),
             id = getString("id"),
             authorKind = kind,
             authorId = authorId,

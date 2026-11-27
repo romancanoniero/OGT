@@ -52,6 +52,8 @@ class AuthSessionApi(
     }
 
     suspend fun settings(): com.onlygoodthings.shared.domain.AccountSettings = accountPost("/api/v1/me/settings")
+    suspend fun postLifetime(postId:String,renew:Boolean=false):com.onlygoodthings.shared.domain.PostLifetime =
+        accountPost("/api/v1/social/post/"+if(renew)"renew" else "lifetime",buildJsonObject { put("postId",JsonPrimitive(postId)) })
     suspend fun communityConsent(): com.onlygoodthings.shared.domain.CommunityConsent = accountPost("/api/v1/me/consent")
     suspend fun acceptCommunityConsent(): com.onlygoodthings.shared.domain.CommunityConsent =
         accountPost("/api/v1/me/consent/accept", buildJsonObject {

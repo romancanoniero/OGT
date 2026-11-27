@@ -402,6 +402,12 @@ private fun noticeInbox(db: Database, userId: String): List<CommunityNotice> = d
                 EXTRACT(EPOCH FROM o.verified_at) * 1000
             FROM action_outcomes o
             WHERE o.beneficiary_user_id = ?::uuid OR o.actor_user_id = ?::uuid
+            UNION ALL
+            SELECT 'renewal:' || n.id::text, 'POST_EXPIRY', 'Tu publicación vence mañana',
+                'Podés renovarla por 90 días. El contenido y los mensajes se conservan.',
+                n.post_id::text, NULL, NULL, EXTRACT(EPOCH FROM n.created_at)*1000
+            FROM post_lifetime_notices n JOIN social_posts p ON p.id=n.post_id
+            WHERE n.recipient_user_id=?::uuid AND p.moderation_status='VISIBLE' AND p.feed_expires_at=n.expires_at
         )
         SELECT i.*, EXISTS (
             SELECT 1 FROM notice_reads r
@@ -412,7 +418,7 @@ private fun noticeInbox(db: Database, userId: String): List<CommunityNotice> = d
         LIMIT 40
         """.trimIndent(),
     ).use { stmt ->
-        repeat(10) { stmt.setString(it + 1, userId) }
+        repeat(11) { stmt.setString(it + 1, userId) }
         stmt.executeQuery().use { rs ->
             buildList {
                 while (rs.next()) {

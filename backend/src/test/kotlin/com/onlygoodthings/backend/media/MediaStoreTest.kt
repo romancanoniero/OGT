@@ -72,14 +72,14 @@ class MediaStoreTest {
     @Test fun `invalid image never creates a public file`() {
         val store = store()
         assertThrows(IllegalArgumentException::class.java) { store.save("not a photo".toByteArray(), "fake.jpg", "image/jpeg") }
-        Files.list(store.uploadsDir()).use { assertEquals(0, it.count()) }
+        Files.list(store.uploadsDir()).use { assertEquals(0, it.filter { p -> !p.fileName.toString().startsWith(".") }.count()) }
     }
     @Test fun `image content must agree with declared type`() {
         assertThrows(IllegalArgumentException::class.java) { store().save(picture(20, 20), "fake.jpg", "image/jpeg") }
     }
     @Test fun `video and old public names keep existing behavior`() {
         val input = byteArrayOf(1, 2, 3, 4)
-        val store = store()
+        val store = MediaStore(root, "http://localhost") { bytes, ext -> ImageOptimizer.Result(bytes, ext) }
         val saved = store.save(input, "clip.mp4", "video/mp4")
         assertEquals(MediaKind.VIDEO, saved.kind)
         assertArrayEquals(input, Files.readAllBytes(store.resolvePublic(saved.filename)!!))

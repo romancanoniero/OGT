@@ -89,6 +89,22 @@ class AuthController(
         } finally { client.close() }
     }
 
+    suspend fun postLifetime(postId:String,renew:Boolean=false):com.onlygoodthings.shared.domain.PostLifetime {
+        val owner=preview.currentUserId
+        val lifetimeBearer=sessionToken(false)
+        check(owner.isNotBlank() && preview.currentUserId==owner) { "La sesión cambió" }
+        val lifetimeClient=createPlatformHttpClient()
+        val lifetimeSession=SessionStore().apply { firebaseJwt=lifetimeBearer;apiBaseUrl=session.apiBaseUrl }
+        val result=try { AuthSessionApi(lifetimeSession,lifetimeClient).postLifetime(postId,renew) } finally { lifetimeClient.close() }
+        check(preview.currentUserId==owner) { "La sesión cambió" }
+        if(renew) {
+            val index=db.posts.indexOfFirst { it.id==postId }
+            if(index>=0) { db.posts[index]=db.posts[index].copy(feedExpiresAtEpochMs=result.expiresAtEpochMs);db.bumpSocial();preview.persistSocialFeed() }
+            feedTimeline.refresh(feedTimeline.presentation.query,force=true)
+        }
+        return result
+    }
+
     private val settingsMutex = kotlinx.coroutines.sync.Mutex()
     private val accountWorkScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob()+kotlinx.coroutines.Dispatchers.Default)
 

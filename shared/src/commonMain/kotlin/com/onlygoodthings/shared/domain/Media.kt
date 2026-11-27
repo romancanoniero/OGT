@@ -13,6 +13,7 @@ enum class MediaKind {
 object PostMediaRules {
     const val MIN_ITEMS = 1
     const val MAX_ITEMS = 20
+    const val MAX_VIDEO_MS = 120_000L
 
     fun isValid(count: Int): Boolean = count in MIN_ITEMS..MAX_ITEMS
 }

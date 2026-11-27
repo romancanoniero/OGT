@@ -23,6 +23,10 @@ import java.nio.file.Files
 import java.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+private val videoPreparationMutex = Mutex()
 
 fun Route.publicMediaRoutes(store: MediaStore,available:(String)->Boolean={true}) {
     get("/media/u/{name}") {
@@ -68,6 +72,27 @@ fun Route.publicMediaRoutes(store: MediaStore,available:(String)->Boolean={true}
 }
 
 fun Route.mediaRoutes(store: MediaStore,onMeasuredUpload:((String,MediaStore.MeasuredUpload)->Unit)?=null,onUploaded:(String,String)->Unit={_,_->}) {
+    post("/api/v1/media/video/prepare") {
+        val principal=call.principal<AuthPrincipal>() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+        videoPreparationMutex.withLock {
+            require((call.request.header(HttpHeaders.ContentLength)?.toLongOrNull() ?: 0) <= 18*1024*1024) { "El original es demasiado grande para el editor web" }
+            val data=JsonBody.receiveMap(call)
+            val encoded=requireNotNull(data.optString("bytesBase64")) { "Falta el video" }
+            require(encoded.length<=((VideoOptimizer.MAX_TRIM_SOURCE_BYTES+2)/3)*4) { "El original debe pesar hasta 12 MB para recortarlo en la web" }
+            val bytes=runCatching { Base64.getDecoder().decode(encoded) }.getOrElse { throw IllegalArgumentException("Video inválido") }
+            val start=(data["startMs"] as? Number)?.toLong() ?: throw IllegalArgumentException("Falta el inicio del tramo")
+            val end=(data["endMs"] as? Number)?.toLong() ?: throw IllegalArgumentException("Falta el fin del tramo")
+            val saved=withContext(Dispatchers.IO) {
+                val trimmed=VideoOptimizer.trim(bytes,start,end)
+                val upload=store.savePreparedVideo(trimmed,bytes.size.toLong())
+                try {
+                    if(onMeasuredUpload!=null)onMeasuredUpload(principal.userId,upload) else onUploaded(principal.userId,upload.media.filename)
+                    upload.media
+                } catch(failure:Exception) {store.deleteLocal(upload.media.url);throw failure}
+            }
+            call.respond(ApiResponse.ok(saved))
+        }
+    }
     post("/api/v1/media/upload") {
         val principal=call.principal<AuthPrincipal>() ?: return@post call.respond(
             HttpStatusCode.Unauthorized,

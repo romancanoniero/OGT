@@ -49,15 +49,27 @@ test('search by nickname, native sharing, copy options and account cleanup prese
  await fixture(page);await page.getByRole('searchbox').fill('alias');
  await expect(page.getByRole('button',{name:'Seleccionar a Nombre público QA',exact:true})).toBeVisible();
  await page.locator('[data-share-copy]').click();expect(await page.evaluate(()=>copied.at(-1))).toBe(postUrl);
- await page.locator('[data-share-text]').click();expect(await page.evaluate(()=>copied.at(-1).includes('Historia QA'))).toBe(true);
- await page.locator('[data-share-apps]').click();await expect(page.locator('dialog')).toHaveCount(0);
+ await page.locator('[data-share-more]').click();await page.locator('[data-share-text]').click();expect(await page.evaluate(()=>copied.at(-1).includes('Historia QA'))).toBe(true);
+ await page.locator('[data-share-more]').click();await page.locator('[data-share-apps]').click();await expect(page.locator('dialog')).toHaveCount(0);
  const native=await page.evaluate(()=>shared[0]);expect(native.url).toBe(postUrl);expect(native.text.includes(postUrl)).toBe(false);
  await page.locator('#open').click();await expect(page.locator('dialog')).toBeVisible();await page.evaluate(()=>{owner='other';OgtPostShare.close();});await expect(page.locator('dialog')).toHaveCount(0);expect(await page.evaluate(()=>calls.filter(c=>c.path.endsWith('/send')).length)).toBe(0);
 });
 
 test('external fallback remains below contacts when native app sharing is unavailable',async({page})=>{
  await fixture(page,{apps:false});await expect(page.locator('[data-share-apps]')).toHaveCount(0);
- await expect(page.getByRole('link',{name:'WhatsApp',exact:true})).toHaveAttribute('href',/^https:\/\/wa.me\/\?text=/);
- await expect(page.getByRole('link',{name:'Correo',exact:true})).toHaveAttribute('href',/^mailto:/);
+ await expect(page.getByRole('link',{name:'Compartir por WhatsApp',exact:true})).toHaveAttribute('href',/^https:\/\/wa.me\/\?text=/);
+ await expect(page.getByRole('link',{name:'Compartir por Correo',exact:true})).toHaveAttribute('href',/^mailto:/);
  await page.getByRole('button',{name:'Cerrar compartir'}).click();await expect(page.locator('dialog')).toHaveCount(0);await expect(page.locator('#open')).toBeFocused();
+});
+
+
+test('the compact app strip scrolls horizontally, uses real icons and keeps the link icon-only',async({page},info)=>{
+ await page.setViewportSize({width:320,height:700});await fixture(page);
+ await expect(page.locator('.share-external img')).toHaveCount(3);
+ await expect(page.locator('[data-share-copy]')).toHaveText('');await expect(page.locator('[data-share-copy]')).toHaveAttribute('aria-label','Copiar enlace');
+ expect(await page.locator('.share-external').evaluate(row=>row.scrollWidth>row.clientWidth)).toBe(true);
+ expect(await page.locator('.share-external').evaluate(row=>row.getBoundingClientRect().height)).toBeLessThan(90);
+ await page.locator('.share-external').evaluate(row=>row.scrollLeft=row.scrollWidth);
+ await expect(page.locator('[data-share-more]')).toBeVisible();await page.locator('[data-share-more]').click();await expect(page.getByRole('menuitem',{name:'Copiar texto',exact:true})).toBeVisible();
+ await page.screenshot({path:info.outputPath('ogt-share-compact.png')});
 });

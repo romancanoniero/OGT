@@ -1,0 +1,1 @@
+WhatsApp glyph: Simple Icons, https://github.com/simple-icons/simple-icons (CC0). Telegram logo: https://telegram.org/img/t_logo.svg; https://core.telegram.org/widgets/share permits use in sharing buttons.

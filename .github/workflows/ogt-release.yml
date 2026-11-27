@@ -103,7 +103,12 @@ jobs:
         env:
           OGT_BUSINESS_TEST_JDBC: jdbc:postgresql://127.0.0.1:19432/ogt_business_qa_ci
           OGT_ERASURE_TEST_JDBC: jdbc:postgresql://127.0.0.1:19432/ogt_erasure_qa_ci
+          OGT_REQUIRE_MEDIA_ENCODER: 'true'
         run: |
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y ffmpeg
+          fi
           ./gradlew "-Pogt.dbKmpSdkPath=$GITHUB_WORKSPACE/_sdk" :backend:test :backend:businessIntegrationTest :backend:accountErasureIntegrationTest --no-daemon
   database:
     needs: checks

@@ -14,7 +14,9 @@ import java.util.UUID
 class MediaStore(
     private val root: Path,
     private val publicBase: String,
+    private val optimizeVideo: (ByteArray, String) -> ImageOptimizer.Result = VideoOptimizer::optimize,
 ) {
+    private val files = DeduplicatedFiles(root.resolve("u"))
     init {
         Files.createDirectories(uploadsDir())
     }
@@ -35,22 +37,27 @@ class MediaStore(
         val declaredExt = extensionOf(filename, contentType)
         val kind = kindOf(declaredExt)
         val optimized = if (kind == MediaKind.IMAGE) ImageOptimizer.optimize(bytes, declaredExt)
-            else ImageOptimizer.Result(bytes, declaredExt)
+            else optimizeVideo(bytes, declaredExt)
+        return persist(optimized,kind,id,bytes.size.toLong())
+    }
+
+    internal fun savePreparedVideo(bytes: ByteArray, receivedBytes: Long): MeasuredUpload {
+        require(bytes.size in 1..MAX_BYTES)
+        return persist(ImageOptimizer.Result(bytes,"mp4"),MediaKind.VIDEO,UUID.randomUUID().toString(),receivedBytes)
+    }
+
+    private fun persist(optimized: ImageOptimizer.Result, kind: MediaKind, id: String, receivedBytes: Long): MeasuredUpload {
         val ext = optimized.extension
         val stored = "$id.$ext"
         require(isSafeName(stored)) { "Nombre de archivo inválido" }
         val dest = uploadsDir().resolve(stored)
-        val temporary = Files.createTempFile(uploadsDir(), ".upload-", ".tmp")
-        try {
-            Files.write(temporary, optimized.bytes)
-            Files.move(temporary, dest)
-        } finally { Files.deleteIfExists(temporary) }
+        files.write(dest, optimized.bytes)
         return MeasuredUpload(UploadedMedia(
             id = id,
             kind = kind,
             url = publicUrl(stored),
             filename = stored,
-        ),bytes.size.toLong(),Files.size(dest))
+        ),receivedBytes,Files.size(dest))
     }
 
     fun resolvePublic(name: String): Path? {
@@ -112,7 +119,7 @@ class MediaStore(
     /** Borra un archivo de este disco. No sigue una URL que no sea `/media/u/`. */
     fun deleteLocal(url: String): Boolean {
         val file = storedName(url)?.let { resolvePublic(it) } ?: return false
-        return Files.deleteIfExists(file)
+        return files.delete(file)
     }
 
     fun contentTypeOf(name: String): String = when (name.substringAfterLast('.', "").lowercase(Locale.ROOT)) {

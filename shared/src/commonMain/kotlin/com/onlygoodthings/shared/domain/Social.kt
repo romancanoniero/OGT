@@ -51,6 +51,7 @@ data class SocialPost(
     val viewerHasDiffused: Boolean = false,
     /** Only the viewer and followed people who can still interact with this viewer. */
     val diffusedBy: List<PostDiffusion> = emptyList(),
+    val feedExpiresAtEpochMs: Long? = null,
 )
 
 @Serializable
@@ -139,6 +140,7 @@ data class SocialLiveCounters(
     val attributionChanged: Boolean = false,
     val hashtags: List<PostHashtag>? = null,
     val diffusionChanged: Boolean = false,
+    val lifetimeChanged: Boolean = false,
 ) {
     val canIngest: Boolean
         get() = !authorUserId.isNullOrBlank() && !body.isNullOrBlank()

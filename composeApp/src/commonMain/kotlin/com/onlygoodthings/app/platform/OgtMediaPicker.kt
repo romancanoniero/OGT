@@ -38,7 +38,7 @@ fun rememberOgtMediaPicker(onPicked: (OgtPickedMedia) -> Unit): OgtMediaPicker =
 
 /** Serialize selection and editing so multi-select cannot present overlapping editors. */
 @Composable
-fun rememberOgtMediaPicker(remaining: Int, videoMaxDurationMs: Long? = null, onPicked: (OgtPickedMedia) -> Unit): OgtMediaPicker {
+fun rememberOgtMediaPicker(remaining: Int, videoMaxDurationMs: Long? = PostMediaRules.MAX_VIDEO_MS, onPicked: (OgtPickedMedia) -> Unit): OgtMediaPicker {
     if (LocalInspectionMode.current) {
         return remember { OgtMediaPicker(pickPhoto = {}, pickVideo = {}, pickLibrary = {}, takeCamera = {}) }
     }

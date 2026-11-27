@@ -17,6 +17,7 @@ END='# END OGT OPERATIONS v1'
 BLOCK='''# BEGIN OGT OPERATIONS v1
 * * * * * /usr/bin/python3 -B /home/iankmp/ogt/operations-runtime/ogt_operations.py >> /home/iankmp/ogt/operations/events.log 2>&1
 17 * * * * /usr/bin/python3 -B /home/iankmp/ogt/operations-runtime/ogt_backup.py --if-due --retention-days 30 >> /home/iankmp/ogt/operations/events.log 2>&1
+43 3 * * * /usr/bin/python3 -B /home/iankmp/ogt/operations-runtime/ogt_retention.py --apply >> /home/iankmp/ogt/operations/events.log 2>&1
 # END OGT OPERATIONS v1
 '''
 
@@ -49,7 +50,7 @@ def main():
     # Validate the complete immutable package before copying executable code.
     from release_guard import verify_manifest
     manifest=json.loads((release/'release-manifest.json').read_text());verify_manifest(release,manifest['sourceSha'])
-    for name in ('ogt_operations.py','ogt_backup.py'):
+    for name in ('ogt_operations.py','ogt_backup.py','ogt_retention.py'):
         atomic(root/'operations-runtime'/name,(release/'scripts'/name).read_text())
     original=read_cron();updated=cron_with_block(original)
     if updated!=original:

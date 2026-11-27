@@ -110,6 +110,13 @@ fun Application.module() {
     val redis = RedisCache(redisUrl)
     val identity = IdentityStore(db)
     val invitationDelivery = InvitationDeliveryWorker(db)
+    val lifetimeReminders = com.onlygoodthings.backend.social.PostLifetimeReminders(db)
+    launch(kotlinx.coroutines.Dispatchers.IO) {
+        while(isActive) {
+            runCatching { lifetimeReminders.process() }.onFailure { org.slf4j.LoggerFactory.getLogger("PostLifetime").warn("Expiry reminders deferred") }
+            delay(15*60_000L)
+        }
+    }
     launch(kotlinx.coroutines.Dispatchers.IO) {
         while(isActive) {
             runCatching { invitationDelivery.processPending() }

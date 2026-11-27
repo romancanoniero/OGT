@@ -25,7 +25,7 @@ import java.util.Base64
 class MediaRoutesTest {
     @TempDir lateinit var root: Path
     @Test fun `public videos support the byte ranges requested by Apple without bypassing revocation`() = testApplication {
-        val store = MediaStore(root, "http://localhost")
+        val store = MediaStore(root, "http://localhost") { bytes, ext -> ImageOptimizer.Result(bytes, ext) }
         val bytes = ByteArray(512) { it.toByte() }
         val video = store.save(bytes, "video.mp4", "video/mp4")
         val revoked = store.save(bytes, "revoked.mp4", "video/mp4")

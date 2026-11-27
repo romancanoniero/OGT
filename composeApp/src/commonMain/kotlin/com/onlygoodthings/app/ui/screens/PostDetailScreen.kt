@@ -208,6 +208,16 @@ fun PostDetailScreen(
     val pageScroll = rememberScrollState()
     val commentList = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    var lifetime by remember(post.id,me.id) { mutableStateOf<com.onlygoodthings.shared.domain.PostLifetime?>(null) }
+    var renewing by remember(post.id,me.id) { mutableStateOf(false) }
+    var lifetimeError by remember(post.id,me.id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(post.id,me.id,post.feedExpiresAtEpochMs) {
+        if(!post.isStory) {
+            try { lifetime=auth.postLifetime(post.id) }
+            catch(cancel:kotlinx.coroutines.CancellationException) { throw cancel }
+            catch(_:Exception) { /* Older servers and offline details remain usable. */ }
+        }
+    }
     val imeOnScroll = rememberOgtImeOnScroll()
     val hideImeOnScrollDown = remember {
         object : NestedScrollConnection {
@@ -295,6 +305,19 @@ fun PostDetailScreen(
             extras = extras,
             extrasVisible = !commentsFocus,
         )
+        if (!commentsFocus && lifetime?.expiresAtEpochMs!=null) {
+            OgtCaption(if(lifetime?.archived==true) "Archivada del feed. El contenido y los mensajes se conservan." else "Vigencia de 90 días. Podés renovarla sin perder contenido.")
+            androidx.compose.material3.TextButton(enabled=!renewing,onClick={
+                renewing=true;lifetimeError=null
+                scope.launch {
+                    try { lifetime=auth.postLifetime(post.id,renew=true) }
+                    catch(cancel:kotlinx.coroutines.CancellationException) { throw cancel }
+                    catch(_:Exception) { lifetimeError="No pudimos renovar la publicación. Volvé a intentarlo." }
+                    finally { renewing=false }
+                }
+            }) { Text(if(renewing) "Renovando…" else "Renovar por 90 días") }
+            lifetimeError?.let { OgtCaption(it) }
+        }
         if (!commentsFocus && going) {
             val whenWhere = gatheringWhenWhere(post.place, post.eventStartsAtEpochMs, currentEpochMs())
                 ?: post.place

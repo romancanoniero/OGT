@@ -1796,3 +1796,33 @@ body.desk .center {
 .share-external button,.share-external a {flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px;box-sizing:border-box;min-height:80px;border:0;border-radius:16px;padding:12px 6px;background:var(--sand);color:var(--ink);font:inherit;font-size:12px;text-align:center;text-decoration:none;cursor:pointer;}
 .share-external :disabled {opacity:.5;cursor:default;}
 .share-external>*>span:first-child {font-size:23px;color:var(--secondary);}
+
+/* Compact horizontal app strip: keep generous touch targets without full-width cards. */
+.ogt-share-sheet h2 {font-size:20px;margin:0 0 10px;}
+.share-person {flex-basis:72px;min-height:88px;padding:6px 2px;font-size:11px;gap:4px;}
+.share-face {width:48px;height:48px;font-size:17px;}
+.ogt-share-sheet footer {position:relative;margin-top:12px;padding-top:8px;}
+.share-external {overflow-x:auto;gap:8px;align-items:flex-start;padding:2px 0 4px;scrollbar-width:thin;}
+.share-external button,.share-external a {flex:0 0 68px;width:68px;min-height:72px;border-radius:12px;padding:4px 0;gap:4px;background:transparent;}
+.share-external small {font:inherit;font-size:11px;line-height:14px;max-width:100%;white-space:nowrap;}
+.share-app-icon {display:grid;place-items:center;box-sizing:border-box;flex:none;width:48px;height:48px;border-radius:50%;background:var(--sand);color:var(--secondary);object-fit:contain;font-size:22px;}
+.share-external>*>span:first-child {font-size:22px;}
+.share-external [data-share-copy] {padding-bottom:22px;}
+.share-overflow {position:absolute;z-index:2;right:0;bottom:86px;min-width:160px;padding:6px;border:1px solid var(--line,#d8dce1);border-radius:14px;background:var(--surface,#fff);box-shadow:0 8px 24px #103f5026;}
+.share-overflow[hidden] {display:none;}
+.share-overflow button {display:block;width:100%;min-height:44px;border:0;border-radius:10px;background:transparent;color:var(--ink);font:inherit;text-align:left;padding:10px;cursor:pointer;}
+.share-overflow button:focus-visible {outline:2px solid var(--secondary);}
+.share-send[hidden] {display:none;}
+/* The local video editor keeps the original file and the surrounding publication draft. */
+.post-video-editor{width:min(560px,94vw);max-height:92dvh;overflow:auto;border:1px solid #365052;border-radius:20px;background:#132b2d;color:#fff;padding:20px}
+.post-video-editor::backdrop{background:#000b}
+.post-video-editor video{width:100%;max-height:30dvh;background:#101314;border-radius:12px;object-fit:contain}
+.post-video-editor h2{margin:0 0 8px;font-size:24px}
+.post-video-editor p{margin:8px 0}
+.post-video-editor label{display:grid;grid-template-columns:55px 1fr;align-items:center;gap:12px;margin:12px 0}
+.post-video-editor input[type=range]{width:100%;accent-color:#e3c36c;min-height:40px}
+.video-trim-film{display:flex;overflow:hidden;border:2px solid #e3c36c;border-radius:8px;margin-top:12px}
+.video-trim-film canvas{width:12.5%;height:52px;object-fit:cover}
+.video-trim-actions{position:sticky;bottom:0;display:flex;justify-content:space-between;gap:16px;padding:10px 0;background:#132b2d}
+.video-trim-actions button{min-height:44px;padding:8px 16px;border-radius:12px}
+.post-lifetime{padding:12px 16px;margin-bottom:12px;border:1px solid #dde5e4;border-radius:12px}

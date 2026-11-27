@@ -1,6 +1,8 @@
 package com.onlygoodthings.backend.stories
 
 import com.onlygoodthings.backend.media.ImageOptimizer
+import com.onlygoodthings.backend.media.DeduplicatedFiles
+import com.onlygoodthings.backend.media.VideoOptimizer
 import com.onlygoodthings.shared.domain.MediaKind
 import com.onlygoodthings.shared.domain.StoryRules
 import java.nio.ByteBuffer
@@ -17,6 +19,7 @@ import javax.crypto.spec.SecretKeySpec
 /** Private namespace; never reachable through the ordinary /media/u handler. */
 class StoryMediaStore(private val root: Path, private val base: String) {
     private val directory = root.resolve("stories-private")
+    private val files = DeduplicatedFiles(directory)
     private val secret: ByteArray
     init {
         Files.createDirectories(directory)
@@ -38,7 +41,8 @@ class StoryMediaStore(private val root: Path, private val base: String) {
         if (video) {
             val duration = mp4DurationMs(bytes)
             require(duration in 1..StoryRules.MAX_VIDEO_MS) { "El video debe durar hasta 30 segundos" }
-            return Validated(bytes, "video/mp4", MediaKind.VIDEO, duration)
+            val optimized = VideoOptimizer.optimize(bytes, "mp4")
+            return Validated(optimized.bytes, "video/${optimized.extension}", MediaKind.VIDEO, duration)
         }
         val extension = when {
             bytes.size >= 8 && bytes.take(8).toByteArray().contentEquals(byteArrayOf(-119,80,78,71,13,10,26,10)) -> "png"
@@ -55,11 +59,9 @@ class StoryMediaStore(private val root: Path, private val base: String) {
         return directory.resolve("$id${if (poster) "-poster" else ""}.bin")
     }
     fun write(id: String, bytes: ByteArray, poster: Boolean = false) {
-        val temp = Files.createTempFile(directory, ".pending-", ".tmp")
-        try { Files.write(temp, bytes); Files.move(temp, path(id, poster), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE) }
-        finally { Files.deleteIfExists(temp) }
+        files.write(path(id, poster), bytes, replace = true)
     }
-    fun delete(id: String) { Files.deleteIfExists(path(id)); Files.deleteIfExists(path(id, true)) }
+    fun delete(id: String) { files.delete(path(id)); files.delete(path(id, true)) }
     fun hash(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
     private fun signature(value: String): String = Base64.getUrlEncoder().withoutPadding().encodeToString(

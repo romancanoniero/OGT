@@ -2170,6 +2170,7 @@ class OgtLocalDatabase {
             anecdotes = anecdotesOf(post.id).map(::toDomain),
             viewerHasDiffused = post.viewerHasDiffused,
             diffusedBy = post.diffusedBy,
+            feedExpiresAtEpochMs = post.feedExpiresAtEpochMs,
         )
     }
 
@@ -2286,6 +2287,7 @@ private fun String.isPublishedAnimalId(): Boolean =
 private val honorJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
 internal fun SocialPost.asLocalPost(): LocalSocialPost = LocalSocialPost(
+    feedExpiresAtEpochMs = feedExpiresAtEpochMs,
     id = id,
     authorKind = authorKind,
     authorUserId = if (authorKind == AuthorKind.USER) authorId else null,

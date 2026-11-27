@@ -136,6 +136,7 @@ data class LocalSocialPost(
     val hashtags: List<com.onlygoodthings.shared.domain.PostHashtag> = emptyList(),
     val viewerHasDiffused: Boolean = false,
     val diffusedBy: List<com.onlygoodthings.shared.domain.PostDiffusion> = emptyList(),
+    val feedExpiresAtEpochMs: Long? = null,
 )
 
 @Serializable
