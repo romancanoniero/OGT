@@ -327,7 +327,7 @@ function applyLive(live) {
     if (route().page === "p" && route().id === live.id) {
       const main = document.getElementById("main");
       if (main) {
-        main.innerHTML = `<div class="chrome"><a href="#/inicio">Inicio</a><h1>Publicación</h1></div><p class="empty">Esta publicación ya no está visible.</p>`;
+        main.innerHTML = `${postDetailHeader()}<p class="empty">Esta publicación ya no está visible.</p>`;
       }
     }
     paintPulse();
@@ -584,6 +584,23 @@ function route() {
   const parts = path.split("/").filter(Boolean);
   const query = Object.fromEntries(new URLSearchParams(qs || ""));
   return { page: parts[0] || (hasSession() ? "inicio" : "intro"), id: parts[1] || "", query };
+}
+
+function isPostBackTarget(hash) {
+  return typeof hash === "string" && /^#\/(inicio|buscar|mascotas|ayuda|mensajes|avisos|billetera|perfil|ajustes|reglas|empresa|p)(?:\/|\?|$)/.test(hash);
+}
+
+function rememberPostBack(event) {
+  if (route().page !== "p" || event.newURL !== location.href || isPostBackTarget(history.state?.ogtPostBack)) return;
+  const previous = new URL(event.oldURL);
+  if (previous.origin !== location.origin || previous.pathname !== location.pathname || previous.search !== location.search || !isPostBackTarget(previous.hash)) return;
+  history.replaceState({ ...history.state, ogtPostBack: previous.hash }, "", location.href);
+}
+
+function postDetailHeader(title = "Publicación") {
+  const target = history.state?.ogtPostBack;
+  const href = isPostBackTarget(target) ? target : "#/inicio";
+  return `<div class="chrome"><a class="post-back" href="${escapeHtml(href)}" data-post-back aria-label="Volver" title="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m15 18-6-6 6-6"/></svg></a><h1>${escapeHtml(title)}</h1></div>`;
 }
 
 function renderNav(page) {
@@ -2376,7 +2393,8 @@ async function renderInicio() {
 
 async function renderPost(id) {
   const main = document.getElementById("main");
-  main.innerHTML = `<div class="chrome"><a href="#/inicio">Inicio</a><h1>Publicación</h1></div><p class="empty">Cargando…</p>`;
+  const current = () => route().page === "p" && route().id === id;
+  main.innerHTML = `${postDetailHeader()}<p class="empty">Cargando…</p>`;
   try {
     await loadSession();
     if (!lastFeed.length) await loadFeed();
@@ -2386,12 +2404,13 @@ async function renderPost(id) {
       mergePost(remote);
       post = lastFeed.find((p) => p.id === id);
     }
+    if (!current()) return;
     if (!post) {
-      main.innerHTML = `<div class="chrome"><a href="#/inicio">Inicio</a><h1>Publicación</h1></div><p class="empty">No encontramos esta publicación.</p>`;
+      main.innerHTML = `${postDetailHeader()}<p class="empty">No encontramos esta publicación.</p>`;
       return;
     }
     const title = isAnecdoteShare(post) ? "Anécdota" : (post.honoreeName || post.topic || "Publicación");
-    main.innerHTML = `<div class="chrome"><a href="#/inicio">Inicio</a><h1>${escapeHtml(title)}</h1></div>${
+    main.innerHTML = `${postDetailHeader(title)}${
       postCard(post, { openable: false, previewStories: false, compose: true })
     }`;
     if(post.authorId===me.userId && !post.isStory && !post.listingId && !isAnecdoteShare(post)) {
@@ -2401,7 +2420,8 @@ async function renderPost(id) {
     bindSocial(main, { onDetail: true });
     await paintLoadedComments(post.id);
   } catch (e) {
-    main.innerHTML = `<div class="chrome"><a href="#/inicio">Inicio</a><h1>Publicación</h1></div><p class="err">${escapeHtml(e.message)}</p>`;
+    if (!current()) return;
+    main.innerHTML = `${postDetailHeader()}<p class="err">${escapeHtml(e.message)}</p>`;
   }
 }
 
@@ -5545,9 +5565,14 @@ async function show() {
 }
 
 document.addEventListener("click", (ev) => {
+  const back = ev.target.closest("[data-post-back]");
+  if (back && !ev.defaultPrevented && ev.button === 0 && !ev.metaKey && !ev.ctrlKey && !ev.shiftKey && !ev.altKey && isPostBackTarget(history.state?.ogtPostBack) && history.length > 1) {
+    ev.preventDefault();
+    history.back();
+  }
   if (!ev.target.closest(".menu, .more")) closeMenu();
 });
-window.addEventListener("hashchange", () => show());
+window.addEventListener("hashchange", (event) => { rememberPostBack(event); show(); });
 window.addEventListener("ogt:authed", () => {
   if (hasSession()) enterAfterAuth();
 });

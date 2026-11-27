@@ -143,6 +143,20 @@ button { font: inherit; background: none; border: 0; cursor: pointer; color: inh
 }
 .chrome a { color: var(--secondary); font-size: 15px; font-weight: 600; }
 .chrome h1 { border: 0; padding: 0; font-size: 22px; }
+.chrome .post-back {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--hairline);
+  border-radius: 50%;
+  color: var(--ink);
+  text-decoration: none;
+}
+.chrome .post-back:hover { background: var(--sand); }
+.chrome .post-back:focus-visible { outline: 2px solid var(--secondary); outline-offset: 3px; }
+.chrome .post-back svg { width: 22px; height: 22px; }
 .section-head {
   display: flex;
   align-items: center;

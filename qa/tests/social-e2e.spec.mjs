@@ -26,7 +26,7 @@ function api(request, token) {
   };
 }
 
-test('publish in UI, persist, comment, enforce ownership and remove own post', async ({ page, browser, request }) => {
+test('publish in UI, persist, comment, enforce ownership and remove own post', async ({ page, context, browser, request }, testInfo) => {
   const author = api(request, await signup(page, 'Autora QA Social'));
   const text = `QA historia solidaria ${Date.now()}`;
   await page.goto('/#/publicar/accion');
@@ -43,6 +43,25 @@ test('publish in UI, persist, comment, enforce ownership and remove own post', a
   await page.reload();
   await expect(page.locator('#main')).toContainText(text);
   await expect(page.locator('#main')).toContainText('Vecina QA Reconocida');
+  // Back from a post returns to its source rather than creating another history entry.
+  await page.locator('.section-avatar').click();
+  await expect(page).toHaveURL(/#\/perfil$/);
+  await page.locator(`#profile-posts [data-open="${post.id}"] h2`).click();
+  await expect(page.getByRole('link', { name: 'Volver', exact: true })).toHaveAttribute('href', '#/perfil');
+  await page.reload();
+  await expect(page.locator('#main')).toContainText(text);
+  await page.screenshot({ path: testInfo.outputPath('post-back-arrow.png') });
+  await page.getByRole('link', { name: 'Volver', exact: true }).click();
+  await expect(page).toHaveURL(/#\/perfil$/);
+  await page.goForward();
+  await expect(page.getByRole('link', { name: 'Volver', exact: true })).toHaveAttribute('href', '#/perfil');
+  const direct = await context.newPage();
+  try {
+    await direct.goto('/#/p/' + post.id);
+    await expect(direct.getByRole('link', { name: 'Volver', exact: true })).toHaveAttribute('href', '#/inicio');
+    await direct.getByRole('link', { name: 'Volver', exact: true }).click();
+    await expect(direct).toHaveURL(/#\/inicio$/);
+  } finally { await direct.close(); }
   const otherContext = await browser.newContext();
   await otherContext.route('**/*', route => ['localhost', '127.0.0.1'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
   try {
