@@ -622,18 +622,7 @@ fun PostDetailScreen(
                 title = "Compartir anécdota",
                 shareText = anecdoteShareText(honoree, story.body, post.id),
                 onDismiss = { shareAnecdoteId = null },
-                onRepost = {
-                    db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE)
-                    scope.launch {
-                        val remote = runCatching { auth.feed.repostAnecdote(story.id) }.getOrNull()
-                        if (remote != null) db.upsertRemoteSocial(remote) else db.repostAnecdote(me, story.id)
-                        reposted = true
-                    }
-                },
-                onInvite = {
-                    db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE)
-                    onInvite()
-                },
+                postLink = com.onlygoodthings.shared.domain.postPublicLink(post.id),
                 onExternal = { db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE) },
             )
         }
@@ -709,11 +698,7 @@ fun PostDetailScreen(
         PostShareSheet(
             shareText = shareBody,
             onDismiss = { shareOpen = false },
-            onRepost = { auth.diffusePost(post.id,true) },
-            onInvite = {
-                db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE)
-                onInvite()
-            },
+            postLink = com.onlygoodthings.shared.domain.postPublicLink(post.id),
             onExternal = { db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE) },
         )
     }

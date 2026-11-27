@@ -76,6 +76,19 @@ class AuthController(
         }
     }
 
+    /** Use the account captured at Send for both requests, even if the active session changes. */
+    suspend fun sharePostWith(owner:String,recipient:String,text:String,link:String) {
+        check(owner.isNotBlank() && preview.currentUserId==owner) { "La sesión cambió" }
+        val bearer=sessionToken(false)
+        check(preview.currentUserId==owner) { "La sesión cambió" }
+        val ownSession=SessionStore().apply { firebaseJwt=bearer;apiBaseUrl=session.apiBaseUrl }
+        val client=createPlatformHttpClient()
+        try {
+            val ownApi=AuthSessionApi(ownSession,client)
+            ownApi.sharePostTo(recipient,text,link) { preview.currentUserId==owner }
+        } finally { client.close() }
+    }
+
     private val settingsMutex = kotlinx.coroutines.sync.Mutex()
     private val accountWorkScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob()+kotlinx.coroutines.Dispatchers.Default)
 

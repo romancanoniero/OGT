@@ -42,3 +42,10 @@ test('unnamed posts do not acquire an author as honoree, anecdotes retain contex
   assert.ok(html.includes('&lt;img onerror=&quot;x&quot;&gt;'));
   assert.ok(!html.includes('<img onerror'));
 });
+
+test('the diffusion footer is an icon with an accessible action and no visible label',()=>{
+ const html=sandbox.postCard({...base,viewerHasDiffused:true});
+ const button=html.match(/<button[^>]*data-diffuse="post"[^>]*>([\s\S]*?)<\/button>/);
+ assert.ok(button);assert.ok(!button[1].includes('Difundido')&&!button[1].includes('Difundir'));
+ assert.ok(html.includes('aria-label="Dejar de difundir"'));
+});

@@ -15,13 +15,14 @@ for path in web/app/crm/control/index.html web/app/crm/empresas/index.html backe
 done
 node --check web/app/post-invitations.js
 node --check web/app/post-carousel.js
+node --check web/app/post-share.js
 node --check web/app/publication-place.js
 node --check web/app/adoption.js
 node --check web/app/app.js
 node --check web/app/auth.js
 node --check web/app/content-attribution.js
 find web/app/crm -type f -name '*.js' -print0 | xargs -0 -n 1 node --check
-node --test qa/adoption.test.mjs qa/hashtags.test.mjs qa/auth-unit.test.mjs qa/crm-*.test.mjs qa/content-attribution.test.mjs qa/honoree-card.test.mjs qa/post-carousel.test.mjs
+node --test qa/adoption.test.mjs qa/hashtags.test.mjs qa/auth-unit.test.mjs qa/crm-*.test.mjs qa/content-attribution.test.mjs qa/honoree-card.test.mjs qa/post-carousel.test.mjs qa/post-share.test.mjs
 python3 -m unittest qa.test_editorial_honorees qa.test_editorial_media
 python3 -m unittest discover -s qa -p 'test_release*.py' -v
 if [ "$MODE" = --check ]; then

@@ -22,10 +22,9 @@ fun PostDiffusionButton(postId:String) {
     val post=remember(postId,tick) { db.posts.firstOrNull { it.id==postId } } ?: return
     val active=post.viewerHasDiffused
     val color=if(active)OgtColors.expressionOn else OgtColors.expressionIdle
-    Column(Modifier.width(58.dp).semantics(mergeDescendants=true) { selected=active;contentDescription=if(active)"Difundido. Tocar para dejar de difundir" else "Difundir a tus seguidores" }
-        .clickable { auth.diffusePost(postId) }.padding(vertical=4.dp),horizontalAlignment=Alignment.CenterHorizontally) {
-        Box(Modifier.size(32.dp),contentAlignment=Alignment.Center) { OgtStitchIcon(Res.drawable.qs_diffuse,"",tint=color) }
-        Text(if(active)"Difundido" else "Difundir",fontSize=10.sp,color=color,maxLines=1)
+    Box(Modifier.size(48.dp).semantics { selected=active;contentDescription=if(active)"Dejar de difundir" else "Difundir a tus seguidores" }
+        .clickable { auth.diffusePost(postId) },contentAlignment=Alignment.Center) {
+        OgtStitchIcon(Res.drawable.qs_diffuse,"",tint=color)
     }
 }
 

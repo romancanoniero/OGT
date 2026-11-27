@@ -57,13 +57,15 @@ class OgtSheetCloser(
 fun OgtBottomSheet(
     onDismiss: () -> Unit,
     maxHeight: Dp = 520.dp,
+    dismissEnabled: Boolean = true,
     content: @Composable ColumnScope.(OgtSheetCloser) -> Unit,
 ) {
+    val canDismiss by androidx.compose.runtime.rememberUpdatedState(dismissEnabled)
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
     var finished by remember { mutableStateOf(false) }
     val closer = remember {
         OgtSheetCloser(
-            close = { if (visibility.targetState) visibility.targetState = false },
+            close = { if (canDismiss && visibility.targetState) visibility.targetState = false },
             closeNow = {
                 if (!finished) {
                     finished = true

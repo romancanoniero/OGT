@@ -350,12 +350,7 @@ fun FeedScreen(
                     )
                 },
                 onDismiss = { sharePostId = null },
-                onRepost = { auth.diffusePost(post.id,true) },
-                onInvite = {
-                    db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE)
-                    backgroundFeedEvent(auth.feed, scope, post.id, FeedEventKind.SHARE)
-                    onInvite()
-                },
+                postLink = com.onlygoodthings.shared.domain.postPublicLink(honorLink),
                 onExternal = {
                     db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE)
                     backgroundFeedEvent(auth.feed, scope, post.id, FeedEventKind.SHARE)

@@ -41,3 +41,10 @@ fun parsePostDeepLink(uri: String): String? {
     val token = src.substring(at + marker.length).takeWhile { it.isLetterOrDigit() || it == '-' || it == '_' || it == '.' }
     return token.takeIf { it.length >= 3 }
 }
+
+/** The chat limit is 800 characters; keep the destination before a potentially long caption. */
+fun postShareMessage(text: String, link: String): String {
+    require(Regex("^https?://[^\\s]+$").matches(link) && link.length <= 200) { "Enlace de publicación inválido" }
+    val caption=text.replace(link, "").trim()
+    return if(caption.isBlank())link else link+"\n\n"+caption.take(798-link.length)
+}

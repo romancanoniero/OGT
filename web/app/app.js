@@ -441,7 +441,7 @@ function paintPost(post) {
     if (count && count.classList.contains("count")) count.textContent = post.impactCount || 0;
   }
   const diffuse=card.querySelector(':scope > .actions [data-diffuse]');
-  if(diffuse){diffuse.classList.toggle('on',Boolean(post.viewerHasDiffused));diffuse.setAttribute('aria-pressed',String(Boolean(post.viewerHasDiffused)));diffuse.setAttribute('aria-label',post.viewerHasDiffused?'Dejar de difundir':'Difundir a tus seguidores');diffuse.querySelector('span').textContent=post.viewerHasDiffused?'Difundido':'Difundir';}
+  if(diffuse){diffuse.classList.toggle('on',Boolean(post.viewerHasDiffused));diffuse.setAttribute('aria-pressed',String(Boolean(post.viewerHasDiffused)));diffuse.setAttribute('aria-label',post.viewerHasDiffused?'Dejar de difundir':'Difundir a tus seguidores');}
   const diffusion=card.querySelector(':scope > .post-diffusion-credit'),creditBox=document.createElement('div');creditBox.innerHTML=diffusionCredit(post);
   if(diffusion)creditBox.firstElementChild?diffusion.replaceWith(creditBox.firstElementChild):diffusion.remove();
   else if(creditBox.firstElementChild)card.querySelector(':scope > .actions')?.before(creditBox.firstElementChild);
@@ -1120,6 +1120,22 @@ function publicLink(post) {
   return `${location.origin}/#/p/${id}`;
 }
 
+function openPostShare(post) {
+  const owner=me.userId;
+  const credentials=Promise.resolve(window.OgtAuth?.getToken ? window.OgtAuth.getToken() : authToken());
+  const request=async(path,body)=>{
+    if(me.userId!==owner)throw new Error("La sesión cambió");
+    const bearer=await credentials;
+    if(me.userId!==owner)throw new Error("La sesión cambió");
+    if(!bearer)throw new Error("Iniciá sesión para compartir");
+    const reply=await fetch(`${API}${path}`,{method:'POST',headers:{Authorization:`Bearer ${bearer}`,'Content-Type':'application/json'},body:JSON.stringify(body||{})});
+    const json=await reply.json();if(!reply.ok || !json.success){const error=new Error(json.message || 'No se pudo compartir');if(me.userId===owner&&isAuthExpired(error,reply.status,json.errorCode))await expireSession();throw error;}
+    if(me.userId!==owner)throw new Error("La sesión cambió");return json.data;
+  };
+  globalThis.OgtPostShare.open({api:request,returnFocus:document.querySelector(`[data-share="${CSS.escape(post.id)}"]`),ownerId:owner,isCurrent:()=>me.userId===owner,text:shareText(post),url:publicLink(post),
+    onShared:()=>{void request('/api/v1/social/feed-event',{postId:post.id,kind:'SHARE'}).catch(()=>{});}});
+}
+
 function shareText(post) {
   const headline = isAnecdoteShare(post) && post.honoreeName
     ? `Anécdota del homenaje a ${post.honoreeName}`
@@ -1171,7 +1187,7 @@ function actionsFor(post, { onDetail = false } = {}) {
     items.push(["source", kind === "NEWS" ? "Abrir la nota original" : "Abrir fuente"]);
   }
   items.push(["copy", "Copiar enlace"]);
-  items.push(["share", "Copiar texto para compartir"]);
+  items.push(["share", "Compartir"]);
   items.push(["diffuse", post.viewerHasDiffused ? "Dejar de difundir" : "Difundir"]);
   if (!mine && post.authorId && !following.has(post.authorId)) {
     items.push(["follow", `Seguir a ${post.authorName || "esta persona"}`]);
@@ -1428,8 +1444,7 @@ async function runAction(id, post, onDetail) {
       await diffusePost(post.id);
       return;
     case "share":
-      await api("/api/v1/social/feed-event", { postId: post.id, kind: "SHARE" }).catch(() => {});
-      await copyText(shareText(post), "Texto copiado");
+      openPostShare(post);
       return;
     case "follow":
       await api("/api/v1/social/follow", { userId: post.authorId });
@@ -1981,7 +1996,7 @@ function postCard(post, { openable = true, previewStories = true, compose = fals
       <button class="act" aria-label="Comentar">${icon("qs-comment")}</button>
       <span class="count">${post.commentCount || 0}</span>
       <button class="act" data-share="${escapeHtml(post.id)}" aria-label="Compartir">${icon("qs-share")}</button>
-      <button type="button" class="act post-diffuse${post.viewerHasDiffused?' on':''}" data-diffuse="${escapeHtml(post.id)}" aria-pressed="${Boolean(post.viewerHasDiffused)}" aria-label="${post.viewerHasDiffused?'Dejar de difundir':'Difundir a tus seguidores'}">${diffuseIcon}<span>${post.viewerHasDiffused?'Difundido':'Difundir'}</span></button>
+      <button type="button" class="act post-diffuse${post.viewerHasDiffused?' on':''}" data-diffuse="${escapeHtml(post.id)}" aria-pressed="${Boolean(post.viewerHasDiffused)}" aria-label="${post.viewerHasDiffused?'Dejar de difundir':'Difundir a tus seguidores'}">${diffuseIcon}</button>
     </div>
     ${storiesBlock(post, { preview: previewStories, compose })}
     ${lostActionsHtml(post, { onDetail: compose && !openable })}
@@ -4804,6 +4819,7 @@ function pesos(cents) {
 }
 
 async function clearClientSession() {
+  globalThis.OgtPostShare?.close();
   if (window.OgtAuth) await OgtAuth.signOut();
   me = { userId: "", role: "USER" };
   lastFeed = [];
