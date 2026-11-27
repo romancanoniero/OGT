@@ -83,12 +83,16 @@ class RestFeedRepository(
         pageSize: Int,
         mode: FeedMode,
         family: FeedTopicFamily?,
-    ): List<SocialPost> = loadNearbyFeed(cursor,pageSize,mode,family,50)
+    ): List<SocialPost> = loadNearbyFeed(cursor,pageSize,mode,family,com.onlygoodthings.shared.domain.AdoptionProximity.DEFAULT_RADIUS_KM)
 
     suspend fun feedLocation():com.onlygoodthings.shared.domain.GeoPoint? {
         val data:JsonObject=post("/api/v1/social/feed-scope",buildJsonObject {})
         return com.onlygoodthings.shared.domain.AdoptionProximity.point((data["latitude"] as? JsonPrimitive)?.doubleOrNull,(data["longitude"] as? JsonPrimitive)?.doubleOrNull)
     }
+
+    suspend fun discoveryScope():com.onlygoodthings.shared.domain.FeedDiscoveryScope = post("/api/v1/social/feed-scope",buildJsonObject {})
+    suspend fun saveDiscoveryPlace(place:String,point:com.onlygoodthings.shared.domain.GeoPoint):com.onlygoodthings.shared.domain.FeedDiscoveryScope =
+        post("/api/v1/users/discovery-place",buildJsonObject { put("place",place);put("latitude",point.latitude);put("longitude",point.longitude) })
 
     suspend fun loadNearbyFeed(cursor:String?,pageSize:Int,mode:FeedMode,family:FeedTopicFamily?,adoptionRadiusKm:Int):List<SocialPost> =
         post("/api/v1/social/feed", buildJsonObject {
@@ -166,6 +170,9 @@ class RestFeedRepository(
         post("/api/v1/social/anecdote/heart", buildJsonObject {
             put("anecdoteId", JsonPrimitive(anecdoteId))
         })
+
+    override suspend fun diffusePost(postId: String, enabled: Boolean): SocialPost =
+        post("/api/v1/social/post/diffuse", buildJsonObject { put("postId",postId);put("enabled",enabled) })
 
     override suspend fun repostAnecdote(anecdoteId: String): SocialPost =
         post("/api/v1/social/anecdote/repost", buildJsonObject {

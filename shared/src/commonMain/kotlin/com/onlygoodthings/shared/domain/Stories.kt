@@ -36,6 +36,7 @@ object StoryRules {
     val stories: List<Story>,
     val serverNowEpochMs: Long,
     val nextCursor: String? = null,
+    val discoverySettings: DiscoverySettings? = null,
 )
 
 /** A cached page may never extend server-authorized visibility. */

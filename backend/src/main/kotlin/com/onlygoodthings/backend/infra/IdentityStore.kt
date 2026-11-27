@@ -185,6 +185,8 @@ class IdentityStore(private val db: Database) {
                 "receivedPostInvitations" to exportJsonRows(connection,"SELECT jsonb_build_object('id',id,'postId',post_id,'purpose',purpose,'status',status,'createdAt',created_at) FROM post_invitations WHERE recipient_user_id=?::uuid ORDER BY created_at",userId),
                 "anecdotes" to exportJsonRows(connection,"SELECT to_jsonb(a) FROM post_anecdotes a WHERE author_user_id=?::uuid ORDER BY created_at",userId),
                 "uploads" to exportJsonRows(connection,"SELECT to_jsonb(u) FROM uploaded_media_owners u WHERE uploader_user_id=?::uuid ORDER BY created_at",userId),
+                "diffusions" to exportJsonRows(connection,"SELECT to_jsonb(d) FROM post_diffusions d WHERE user_id=?::uuid ORDER BY created_at",userId),
+                "discoveryPlace" to exportJsonRows(connection,"SELECT jsonb_build_object('place',discovery_place,'latitude',ST_Y(discovery_location),'longitude',ST_X(discovery_location)) FROM users WHERE id=?::uuid",userId),
                 "reactions" to exportJsonRows(connection,"SELECT to_jsonb(i) FROM post_impacts i WHERE user_id=?::uuid ORDER BY created_at",userId),
                 "volunteerSignups" to exportJsonRows(connection,"SELECT to_jsonb(s)-'check_in_location' || jsonb_build_object('latitude',ST_Y(check_in_location),'longitude',ST_X(check_in_location)) FROM volunteer_signups s WHERE user_id=?::uuid ORDER BY created_at",userId),
                 "submittedReports" to exportJsonRows(connection,"SELECT jsonb_build_object('id',id,'postId',post_id,'commentId',comment_id,'reason',reason,'details',details,'createdAt',created_at) FROM content_reports WHERE reporter_id=?::uuid ORDER BY created_at",userId),

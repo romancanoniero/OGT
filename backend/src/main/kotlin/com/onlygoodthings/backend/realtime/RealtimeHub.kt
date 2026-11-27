@@ -71,6 +71,11 @@ class RealtimeHub(private val redis: RedisCache) {
         fanoutTree(path,payload)
     }
 
+    fun projectDiscoverySettings(payloadJson:String) {
+        val path="${OgtDbPaths.DISCOVERY_SETTINGS}/current"
+        redis.publish("ogt:tree:$path",payloadJson);fanoutTree(path,payloadJson)
+    }
+
     fun projectUser(userId: String, payloadJson: String) {
         val path = OgtDbPaths.user(userId)
         redis.publish("ogt:tree:$path", payloadJson)

@@ -29,6 +29,7 @@ interface FeedRepository {
     suspend fun deleteAnecdote(anecdoteId: String)
     suspend fun clapAnecdote(anecdoteId: String): SocialAnecdote
     suspend fun heartAnecdote(anecdoteId: String): SocialAnecdote
+    suspend fun diffusePost(postId: String, enabled: Boolean): SocialPost = error("Difusión no disponible")
     suspend fun repostAnecdote(anecdoteId: String): SocialPost
     suspend fun editPost(postId: String, body: String, topic: String? = null, attributionUrl: String? = null): SocialPost
     suspend fun deletePost(postId: String)

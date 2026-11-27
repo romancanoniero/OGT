@@ -7,20 +7,21 @@
     if (typed.length) return typed.map((item, index) => ({...item, index})).sort((a, b) => (a.sortOrder ?? a.index) - (b.sortOrder ?? b.index));
     return (Array.isArray(post.mediaUrls) ? post.mediaUrls : []).filter(Boolean).map(url => ({url, kind: /\.(mp4|webm)(?:[?#]|$)/i.test(url) ? 'VIDEO' : 'IMAGE'}));
   }
-  function html(post, {mediaUrl = url => url, frameOf = () => ({x: .5, y: .5, zoom: 1})} = {}) {
+  function html(post, {mediaUrl = url => url, frameOf = () => ({x: .5, y: .5, zoom: 1}), initialIndex = 0, expandable = true} = {}) {
     const items = rows(post);
     if (!items.length) return '';
+    const selected = Math.max(0, Math.min(items.length - 1, Number.isFinite(Number(initialIndex)) ? Math.trunc(Number(initialIndex)) : 0));
     const slides = items.map((item, index) => {
       const source = escape(mediaUrl(item.url)), label = `${item.kind === 'VIDEO' ? 'Video' : 'Foto'} ${index + 1} de ${items.length}`;
       const frame = frameOf({...post, media: [item]});
       const media = item.kind === 'VIDEO'
-        ? `<video class="media" src="${source}"${item.posterUrl ? ` poster="${escape(mediaUrl(item.posterUrl))}"` : ''} playsinline preload="${index ? 'none' : 'metadata'}" aria-label="${label}"></video>`
-        : `<img class="media" src="${source}" alt="${escape(item.altText || '')}"${index ? ' loading="lazy"' : ''} data-frame-x="${frame.x}" data-frame-y="${frame.y}" data-frame-zoom="${frame.zoom}" onload="window.ogtPlaceFrame&&window.ogtPlaceFrame(this)">`;
+        ? `<video class="media" src="${source}"${item.posterUrl ? ` poster="${escape(mediaUrl(item.posterUrl))}"` : ''} crossorigin="anonymous" playsinline preload="${index ? 'none' : 'metadata'}" aria-label="${label}"></video>`
+        : `<img class="media" src="${source}" alt="${escape(item.altText || '')}" loading="lazy" decoding="async" data-frame-x="${frame.x}" data-frame-y="${frame.y}" data-frame-zoom="${frame.zoom}" onload="window.ogtPlaceFrame&&window.ogtPlaceFrame(this)">`;
       const buttons = item.kind === 'VIDEO' ? `<button type="button" class="post-video-play" data-video-play aria-label="Reproducir video"><span aria-hidden="true">▶</span></button><button type="button" class="post-video-sound" data-video-sound aria-label="Silenciar video" aria-pressed="false"><span aria-hidden="true">${soundIcon(false)}</span></button>` : '';
-      return `<div class="post-media-slide" data-media-page="${index}" role="group" aria-label="${label}"${index ? ' hidden' : ''}><div class="media-slot">${media}${buttons}</div></div>`;
+      return `<div class="post-media-slide" data-media-page="${index}" role="group" aria-label="${label}"${index !== selected ? ' hidden' : ''}><div class="media-slot">${media}${buttons}</div></div>`;
     }).join('');
-    const dots = items.length > 1 ? `<div class="post-media-dots" role="group" aria-label="Elegir foto o video">${items.map((item, index) => `<button type="button" class="post-media-dot" data-media-go="${index}" aria-label="Ir a ${item.kind === 'VIDEO' ? 'video' : 'foto'} ${index + 1} de ${items.length}" aria-current="${index === 0}"><span aria-hidden="true"></span></button>`).join('')}</div>` : '';
-    return `<div class="post-carousel" data-post-media data-media-key="${escape(JSON.stringify(items))}" data-media-active="0" role="region" aria-roledescription="carrusel" aria-label="Fotos y videos de la publicación"${items.length > 1 ? ' tabindex="0"' : ''}>${slides}${dots}<span class="post-media-status" role="status" aria-live="polite"></span></div>`;
+    const dots = items.length > 1 ? `<div class="post-media-dots" role="group" aria-label="Elegir foto o video">${items.map((item, index) => `<button type="button" class="post-media-dot" data-media-go="${index}" aria-label="Ir a ${item.kind === 'VIDEO' ? 'video' : 'foto'} ${index + 1} de ${items.length}" aria-current="${index === selected}"><span aria-hidden="true"></span></button>`).join('')}</div>` : '';
+    return `<div class="post-carousel" data-post-media data-media-key="${escape(JSON.stringify(items))}" data-media-active="${selected}" role="region" aria-roledescription="carrusel" aria-label="Fotos y videos de la publicación"${items.length > 1 ? ' tabindex="0"' : ''}>${slides}${items.length > 1 ? `<span class="post-media-count" aria-hidden="true">${selected + 1}/${items.length}</span>` : ''}${expandable ? `<button type="button" class="post-media-expand" data-media-expand aria-label="Ampliar archivo actual"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M3 3l6 6m12-6-6 6M3 21l6-6m12 6-6-6"/></svg></button>` : ''}${dots}<span class="post-media-status" role="status" aria-live="polite"></span></div>`;
   }
   function soundIcon(muted) {
     return `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 9h4l5-4v14l-5-4H3z"/>${muted?'<path d="m16 8 6 6-2 2-6-6zm4 0 2 2-6 6-2-2z"/>':'<path d="M15 8v2c2 1 2 3 0 4v2c5-2 5-6 0-8m3-4v2c6 3 6 9 0 12v2c9-4 9-12 0-16"/>'}</svg>`;
@@ -53,6 +54,8 @@
       }
     });
     carousel.dataset.mediaActive = String(active);
+    const counter = carousel.querySelector('.post-media-count');
+    if (counter) counter.textContent = `${active + 1}/${slides.length}`;
     carousel.querySelectorAll('[data-media-go]').forEach(button => button.setAttribute('aria-current', String(Number(button.dataset.mediaGo) === active)));
     const status = carousel.querySelector('.post-media-status');
     if (status) status.textContent = slides[active]?.getAttribute('aria-label') || '';
@@ -63,6 +66,11 @@
     carousels.forEach(carousel => {
       if (carousel.dataset.mediaBound) return;
       carousel.dataset.mediaBound = 'true';
+      carousel.querySelector('[data-media-expand]')?.addEventListener('click', event => {
+        event.preventDefault();event.stopPropagation();
+        carousel.dispatchEvent(new CustomEvent('ogt:media-open', {bubbles: true, detail: {index: Number(carousel.dataset.mediaActive)}}));
+      });
+      scope.OgtMediaPrefetch?.enqueueUrls([...carousel.querySelectorAll('img.media,video.media')].flatMap(node=>[node.getAttribute('src'),node.getAttribute('poster')].filter(Boolean)));
       carousel.querySelectorAll('video').forEach(video=>{
         video.controls=false;video.loop=false;video.muted=muted;
         ['play','pause','ended','volumechange'].forEach(name=>video.addEventListener(name,()=>paintVideo(video)));
@@ -110,6 +118,20 @@
     const previousBind=bind;bind=function(root){previousBind(root);root.querySelectorAll('[data-post-media]').forEach(node=>visibility.observe(node));if(root.matches?.('[data-post-media]'))visibility.observe(root);};
   }
   if(typeof document!=='undefined')document.addEventListener('visibilitychange',()=>{if(document.hidden && activeVideo)activeVideo.pause();});
+  function openViewer(post, options = {}) {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'post post-media-viewer';dialog.setAttribute('aria-label', 'Fotos y videos de la publicación');
+    dialog.innerHTML = html(post, {...options, expandable: false}) + '<button type="button" class="post-media-viewer-close" aria-label="Cerrar visor">✕</button>';
+    if (!dialog.querySelector('[data-post-media]')) return;
+    document.querySelectorAll('[data-post-media] video').forEach(video => video.pause());
+    document.body.append(dialog);bind(dialog);
+    const close = () => dialog.close();
+    dialog.querySelector('.post-media-viewer-close').addEventListener('click', close);
+    dialog.addEventListener('close', () => {dialog.querySelectorAll('video').forEach(video => video.pause());dialog.remove();}, {once: true});
+    dialog.showModal();
+    const video = dialog.querySelector('[data-media-page]:not([hidden]) video');
+    if (video) toggleVideo(video);
+  }
   function typesHtml(post) {
     const items=rows(post);if(!items.length)return '';
     const icon=(kind,label,path)=>`<span class="post-media-type${items.some(item=>item.kind===kind)?' has':''}" role="img" aria-label="${items.some(item=>item.kind===kind)?'Contiene':'Sin'} ${label}"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="currentColor"><path fill-rule="evenodd" d="${path}"/></svg></span>`;
@@ -132,5 +154,5 @@
       show(next, retained >= 0 ? retained : oldIndex);
     }
   }
-  scope.OgtPostCarousel = {rows, html, bind, update, typesHtml};
+  scope.OgtPostCarousel = {rows, html, bind, update, typesHtml, openViewer};
 })(globalThis);

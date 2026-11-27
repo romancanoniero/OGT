@@ -2,6 +2,7 @@ package com.onlygoodthings.backend.crm
 
 import com.onlygoodthings.backend.social.recognitionCrmRoutes
 import com.onlygoodthings.backend.modules.adoptionCrmRoutes
+import com.onlygoodthings.backend.modules.discoveryCrmRoutes
 import com.onlygoodthings.backend.auth.AuthPrincipal
 import com.onlygoodthings.backend.auth.FirebaseTokenVerifier
 import com.onlygoodthings.backend.http.JsonBody
@@ -360,6 +361,12 @@ private suspend fun crmContext(
 }
 
 fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: RealtimeHub, media: MediaStore) {
+    discoveryCrmRoutes(db,hub) { call,write ->
+        val context=crmContext(call,db,verifier)
+        if(context==null)null else if(context.platformRole!="OWNER" && (write || context.platformRole!="OPERATIONS")) {
+            call.respond(HttpStatusCode.Forbidden,ApiResponse.fail<Unit>("Solo el propietario puede cambiar el descubrimiento del sistema.","FORBIDDEN"));null
+        } else context.userId
+    }
     adoptionCrmRoutes(db) { call ->
         val context = crmContext(call, db, verifier)
         if (context == null) null else if (context.platformRole !in setOf("OWNER", "OPERATIONS")) {

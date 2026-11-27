@@ -41,12 +41,11 @@ fun PostMediaViewer(
     onClose: () -> Unit,
 ) {
     if (media.isEmpty()) return
-    val pager = rememberPagerState(initialPage = startIndex.coerceIn(0, media.lastIndex)) { media.size }
     Dialog(
         onDismissRequest = onClose,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Box(Modifier.fillMaxSize().background(OgtColors.ink)) {
+        Box(Modifier.fillMaxSize().background(OgtColors.ink).windowInsetsPadding(WindowInsets.statusBars)) {
             com.onlygoodthings.app.ui.components.PostedMediaCarousel(media,Res.drawable.feed_story_donacion,tag,
                 modifier=Modifier.fillMaxSize(),initialIndex=startIndex,autoPlay=true)
             CircleIconButton(
@@ -54,9 +53,8 @@ fun PostMediaViewer(
                 label = "Cerrar",
                 onClick = onClose,
                 modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .windowInsetsPadding(WindowInsets.statusBars)
-                    .padding(start = 12.dp, top = 8.dp),
+                    .align(Alignment.TopEnd)
+                    .padding(end = 12.dp, top = 8.dp),
             )
         }
     }

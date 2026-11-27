@@ -140,7 +140,7 @@ private const val FeedPageSize = 12
 /** Feed Social de Buenas Acciones — fiel a Stitch `6b7ded9b…`. */
 @Composable
 fun FeedScreen(
-    onOpenPost: (String) -> Unit,
+    onOpenPost: (String, Int) -> Unit,
     onNotifications: () -> Unit,
     onProfile: () -> Unit,
     onMessages: () -> Unit = {},
@@ -249,23 +249,6 @@ fun FeedScreen(
             item(key = "chrome-mode") {
                 FeedModeRow(mode = feedMode, onMode = { presentation.mode = it }, copy = copy)
             }
-            if (feedMode == FeedMode.HOME) item(key = "chrome-adoption-radius") {
-                var expanded by remember { mutableStateOf(false) }
-                Column(Modifier.fillMaxWidth().padding(horizontal=16.dp)) {
-                    Box {
-                        androidx.compose.material3.TextButton(onClick={expanded=true}) {
-                            Text(if(presentation.adoptionRadiusKm==0) "Adopciones: sin límite de distancia" else "Adopciones: hasta ${presentation.adoptionRadiusKm} km")
-                        }
-                        androidx.compose.material3.DropdownMenu(expanded=expanded,onDismissRequest={expanded=false}) {
-                            com.onlygoodthings.shared.domain.AdoptionProximity.radiusOptions.forEach { km ->
-                                androidx.compose.material3.DropdownMenuItem(text={Text(if(km==0)"Sin límite (incluye ubicación pendiente)" else "Hasta $km km")},onClick={presentation.adoptionRadiusKm=km;expanded=false})
-                            }
-                        }
-                    }
-                    if (timeline.locationChecked && timeline.viewerLocation==null && presentation.adoptionRadiusKm>0)
-                        OgtCaption("Activá tu ubicación para ver adopciones cercanas, o elegí Sin límite.")
-                }
-            }
             item(key = "chrome-family") {
                 FeedFamilyRow(family = feedFamily, onFamily = { presentation.family = it }, copy = copy)
             }
@@ -291,10 +274,10 @@ fun FeedScreen(
                     kind = kind,
                     discovery = db.isDiscovery(me.id, post),
                     comments = comments,
-                    onOpen = {
+                    onOpen = { mediaIndex ->
                         db.recordFeedEvent(me.id, post.id, FeedEventKind.IMPRESSION)
                         backgroundFeedEvent(auth.feed, scope, post.id, FeedEventKind.IMPRESSION)
-                        onOpenPost(db.openFeedTarget(post))
+                        onOpenPost(db.openFeedTarget(post), mediaIndex)
                     },
                     onOpenAuthor = {
                         val authorId = post.authorUserId
@@ -367,10 +350,7 @@ fun FeedScreen(
                     )
                 },
                 onDismiss = { sharePostId = null },
-                onRepost = {
-                    db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE)
-                    backgroundFeedEvent(auth.feed, scope, post.id, FeedEventKind.SHARE)
-                },
+                onRepost = { auth.diffusePost(post.id,true) },
                 onInvite = {
                     db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE)
                     backgroundFeedEvent(auth.feed, scope, post.id, FeedEventKind.SHARE)
@@ -530,7 +510,7 @@ private fun NeighborPostCard(
     kind: FeedCardKind,
     discovery: Boolean,
     comments: List<LocalComment>,
-    onOpen: () -> Unit,
+    onOpen: (Int) -> Unit,
     onOpenAuthor: () -> Unit,
     onInvite: () -> Unit,
     onShare: () -> Unit,
@@ -543,6 +523,8 @@ private fun NeighborPostCard(
     isAdoptionAuthor: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    var mediaIndex by remember(post.id) { mutableStateOf(0) }
+    val open = { onOpen(mediaIndex) }
     Box(modifier) {
     when (kind) {
         FeedCardKind.LOST_PET -> LostPetFeedCard(
@@ -551,7 +533,8 @@ private fun NeighborPostCard(
             media = media,
             listing = listing,
             sightings = listing?.let { LocalOgtDb.current.sightingsOf(it.id) }.orEmpty(),
-            onOpen = onOpen,
+            onOpen = open,
+            onMediaPageChanged = { mediaIndex = it },
             onOpenAuthor = onOpenAuthor,
             onShare = onShare,
             onOverflow = onOverflow,
@@ -562,7 +545,8 @@ private fun NeighborPostCard(
             profile = profile,
             media = media,
             listing = listing,
-            onOpen = onOpen,
+            onOpen = open,
+            onMediaPageChanged = { mediaIndex = it },
             onOpenAuthor = onOpenAuthor,
             isAuthor = isAdoptionAuthor,
             onAdopt = onAdopt,
@@ -575,7 +559,8 @@ private fun NeighborPostCard(
             post = post,
             profile = profile,
             media = media,
-            onOpen = onOpen,
+            onOpen = open,
+            onMediaPageChanged = { mediaIndex = it },
             onShare = onShare,
             onOverflow = onOverflow,
             onClap = onClap,
@@ -584,7 +569,8 @@ private fun NeighborPostCard(
             post = post,
             profile = profile,
             media = media,
-            onOpen = onOpen,
+            onOpen = open,
+            onMediaPageChanged = { mediaIndex = it },
             onShare = onShare,
             onOverflow = onOverflow,
             onClap = onClap,
@@ -597,7 +583,8 @@ private fun NeighborPostCard(
             kind = kind,
             discovery = discovery,
             comments = comments,
-            onOpen = onOpen,
+            onOpen = open,
+            onMediaPageChanged = { mediaIndex = it },
             onOpenAuthor = onOpenAuthor,
             onInvite = onInvite,
             onShare = onShare,
@@ -616,6 +603,7 @@ private fun LostPetFeedCard(
     listing: LocalAnimalListing?,
     sightings: List<com.onlygoodthings.shared.data.local.LocalSighting>,
     onOpen: () -> Unit,
+    onMediaPageChanged: (Int) -> Unit,
     onOpenAuthor: () -> Unit,
     onShare: () -> Unit,
     onOverflow: () -> Unit = {},
@@ -652,9 +640,10 @@ private fun LostPetFeedCard(
             OgtCaption("Última vista · $lastSeen · ${radius} m")
             listing?.marks?.takeIf { it.isNotBlank() }?.let { OgtCaption(it) }
             com.onlygoodthings.app.ui.components.PostMediaTypes(media)
-            ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen)
+            ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen, onMediaPageChanged = onMediaPageChanged)
             com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
             PostActionRow(
+                diffusePostId = post.id,
                 clapped = clapped,
                 thanks = thanks,
                 comments = post.commentCount,
@@ -696,6 +685,7 @@ private fun AdoptionFeedCard(
     media: List<LocalPostMedia>,
     listing: LocalAnimalListing?,
     onOpen: () -> Unit,
+    onMediaPageChanged: (Int) -> Unit,
     onOpenAuthor: () -> Unit,
     isAuthor: Boolean,
     onAdopt: () -> Unit,
@@ -728,9 +718,10 @@ private fun AdoptionFeedCard(
                 OgtPill(copy.petsAdoption, OgtColors.sand, OgtColors.ink)
                 ImpactTruthPills(post)
             }
-            ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen)
+            ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen, onMediaPageChanged = onMediaPageChanged)
             com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
             PostActionRow(
+                diffusePostId = post.id,
                 clapped = clapped,
                 thanks = thanks,
                 comments = post.commentCount,
@@ -780,6 +771,7 @@ private fun TernuraFeedCard(
     profile: PostLook,
     media: List<LocalPostMedia>,
     onOpen: () -> Unit,
+    onMediaPageChanged: (Int) -> Unit,
     onShare: () -> Unit,
     onOverflow: () -> Unit = {},
     onClap: () -> Unit,
@@ -811,9 +803,10 @@ private fun TernuraFeedCard(
             }
             ImpactTruthPills(post)
             com.onlygoodthings.app.ui.components.PostMediaTypes(media)
-            ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen)
+            ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen, onMediaPageChanged = onMediaPageChanged)
             com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
             PostActionRow(
+                diffusePostId = post.id,
                 clapped = clapped,
                 thanks = thanks,
                 comments = post.commentCount,
@@ -842,6 +835,7 @@ private fun HomenajeFeedCard(
     profile: PostLook,
     media: List<LocalPostMedia>,
     onOpen: () -> Unit,
+    onMediaPageChanged: (Int) -> Unit,
     onShare: () -> Unit,
     onOverflow: () -> Unit = {},
     onClap: () -> Unit,
@@ -889,9 +883,10 @@ private fun HomenajeFeedCard(
                 OgtCaption("La familia puede reivindicar este crédito.")
             }
             com.onlygoodthings.app.ui.components.PostMediaTypes(media)
-            ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen)
+            ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen, onMediaPageChanged = onMediaPageChanged)
             com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
             PostActionRow(
+                diffusePostId = post.id,
                 clapped = clapped,
                 thanks = thanks,
                 comments = post.commentCount,
@@ -933,9 +928,10 @@ private fun ListingPhotoStrip(
     media: List<LocalPostMedia>,
     fallback: DrawableResource,
     onOpen: () -> Unit,
+    onMediaPageChanged: (Int) -> Unit,
 ) {
     com.onlygoodthings.app.ui.components.PostedMediaCarousel(media,fallback,null,
-        modifier=Modifier.ogtBleedHorizontal(12.dp).aspectRatio(POST_FRAME_RATIO),onOpen={onOpen()})
+        modifier=Modifier.ogtBleedHorizontal(12.dp).aspectRatio(POST_FRAME_RATIO),onOpen={onOpen()},onPageChanged=onMediaPageChanged)
 }
 
 @Composable
@@ -947,6 +943,7 @@ private fun StoryFeedCard(
     discovery: Boolean,
     comments: List<LocalComment>,
     onOpen: () -> Unit,
+    onMediaPageChanged: (Int) -> Unit,
     onOpenAuthor: () -> Unit,
     onInvite: () -> Unit,
     onShare: () -> Unit,
@@ -980,9 +977,11 @@ private fun StoryFeedCard(
             discovery = discovery,
             petStory = petStory,
             onOpen = onOpen,
+            onMediaPageChanged = onMediaPageChanged,
         )
         com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
         PostActionRow(
+                diffusePostId = post.id,
             clapped = clapped,
             thanks = thanks,
             comments = post.commentCount,
@@ -1177,10 +1176,11 @@ private fun PostMediaPager(
     discovery: Boolean,
     petStory: Boolean = false,
     onOpen: () -> Unit,
+    onMediaPageChanged: (Int) -> Unit,
 ) {
     com.onlygoodthings.app.ui.components.PostedMediaCarousel(media,fallback,tag,
-        modifier=Modifier.fillMaxWidth().aspectRatio(POST_FRAME_RATIO),onOpen={onOpen()}) {
-        OverlayChip(Modifier.align(Alignment.TopStart).padding(12.dp),tag,if(petStory)OgtColors.secondary else OgtColors.ink)
+        modifier=Modifier.fillMaxWidth().aspectRatio(POST_FRAME_RATIO),onOpen={onOpen()},onPageChanged=onMediaPageChanged) {
+        OverlayChip(Modifier.align(Alignment.TopStart).padding(start=12.dp,top=if(media.size>1)48.dp else 12.dp),tag,if(petStory)OgtColors.secondary else OgtColors.ink)
     }
 }
 

@@ -63,6 +63,8 @@ docker exec -i ogt-postgres psql -X -v ON_ERROR_STOP=1 --single-transaction -U o
 docker exec -i ogt-postgres psql -X -v ON_ERROR_STOP=1 --single-transaction -U ogt -d onlygoodthings < "$RELEASE/database/migrations/42_imported_profiles.sql"
 docker exec -i ogt-postgres psql -X -v ON_ERROR_STOP=1 --single-transaction -U ogt -d onlygoodthings < "$RELEASE/database/migrations/43_adoption_details.sql"
 docker exec -i ogt-postgres psql -X -v ON_ERROR_STOP=1 --single-transaction -U ogt -d onlygoodthings < "$RELEASE/database/migrations/44_adoption_location.sql"
+docker exec -i ogt-postgres psql -X -v ON_ERROR_STOP=1 --single-transaction -U ogt -d onlygoodthings < "$RELEASE/database/migrations/45_discovery_settings.sql"
+docker exec -i ogt-postgres psql -X -v ON_ERROR_STOP=1 --single-transaction -U ogt -d onlygoodthings < "$RELEASE/database/migrations/46_post_diffusions.sql"
 rsync -a --delete "$RELEASE/backend-dist/" "$ROOT/backend-dist/"
 rsync -a --delete "$RELEASE/web-app/" "$ROOT/web-app/"
 cp "$RELEASE/docker-compose.yml" "$RELEASE/Dockerfile" "$RELEASE/web-nginx.conf" "$ROOT/"

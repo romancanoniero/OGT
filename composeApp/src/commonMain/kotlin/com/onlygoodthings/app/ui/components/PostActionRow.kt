@@ -68,7 +68,9 @@ fun PostActionRow(
     onShare: (() -> Unit)? = null,
     extras: List<PostExtraAction> = emptyList(),
     extrasVisible: Boolean = true,
+    diffusePostId: String? = null,
 ) {
+    diffusePostId?.let { PostDiffusionCredit(it) }
     Row(
         modifier
             .fillMaxWidth()
@@ -112,6 +114,7 @@ fun PostActionRow(
                 onClick = onShare,
             )
         }
+        diffusePostId?.let { PostDiffusionButton(it) }
         extras.forEach { extra ->
             AnimatedVisibility(
                 visible = extrasVisible,

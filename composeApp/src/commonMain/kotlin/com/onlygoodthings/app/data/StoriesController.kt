@@ -18,6 +18,7 @@ import kotlin.time.TimeSource
 import kotlinx.coroutines.flow.collectLatest
 
 class StoriesController(private val session: SessionStore, private val prefs: AuthPrefs, private val tokenProvider: suspend () -> String? = { session.firebaseJwt }) {
+    var onDiscoverySettings:(DiscoverySettings)->Unit={}
     private val http=createPlatformHttpClient()
     private val mediaCache=StoryMediaCache(fetch={ url ->
         val (requestUrl,bearer)=com.onlygoodthings.app.media.StoreReviewMedia.request(url)
@@ -133,6 +134,7 @@ class StoriesController(private val session: SessionStore, private val prefs: Au
                     val rows=page.stories.toMutableList()
                     while(page.nextCursor!=null && rows.size<2000) { page=api.list(page.nextCursor);rows+=page.stories }
                     if(owner!=user || generation!=version) return@launch
+                    page.discoverySettings?.let(onDiscoverySettings)
                     val fresh=activeStories(rows.distinctBy { it.id },page.serverNowEpochMs)
                     mediaCache.authorize(user,fresh,page.serverNowEpochMs)
                     if(owner!=user || generation!=version) return@launch

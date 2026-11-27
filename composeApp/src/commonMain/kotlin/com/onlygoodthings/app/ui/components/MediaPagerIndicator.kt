@@ -22,7 +22,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.unit.sp
 
-/** Contador n/m arriba a la derecha y dots al pie, al centro. Solo si hay más de un medio. */
+/** Contador n/m arriba a la izquierda y dots al pie, al centro. Solo si hay más de un medio. */
 @Composable
 fun MediaPagerIndicator(
     pageIndex: Int,
@@ -34,7 +34,7 @@ fun MediaPagerIndicator(
     Box(modifier.fillMaxSize()) {
         Box(
             Modifier
-                .align(Alignment.TopEnd)
+                .align(Alignment.TopStart)
                 .padding(12.dp)
                 .clip(CircleShape)
                 .background(Color(0x99000000))

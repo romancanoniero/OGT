@@ -89,6 +89,9 @@ class LocalFeedRepository(
     override suspend fun heartAnecdote(anecdoteId: String): SocialAnecdote =
         db.toDomain(db.heartAnecdote(currentUserId, anecdoteId) ?: error("Anécdota inexistente"))
 
+    override suspend fun diffusePost(postId: String, enabled: Boolean): SocialPost =
+        db.toDomain(db.diffusePost(db.user(currentUserId),postId,enabled))
+
     override suspend fun repostAnecdote(anecdoteId: String): SocialPost =
         db.toDomain(db.repostAnecdote(db.user(currentUserId), anecdoteId) ?: error("No se pudo repostear"))
 

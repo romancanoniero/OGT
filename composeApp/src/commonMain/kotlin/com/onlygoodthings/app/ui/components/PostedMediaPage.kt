@@ -28,7 +28,11 @@ import kotlinx.coroutines.launch
 private object PostedPlayback {
     var activeId by mutableStateOf<String?>(null)
     var muted by mutableStateOf(false)
+    private var sequence=0L
+    fun newPlayerId()="posted-${++sequence}"
 }
+
+fun pausePostedMediaPlayback() { PostedPlayback.activeId=null }
 
 /** One player at a time; changing page, leaving the viewport or disposing pauses it. */
 @Composable
@@ -41,9 +45,10 @@ fun PostedMediaPage(
     val preview=LocalInspectionMode.current
     var loaded by remember(item?.id,item?.url) { mutableStateOf(false) }
     var visible by remember { mutableStateOf(true) }
-    val key=item?.id
+    val key=remember(item?.id,item?.url) { PostedPlayback.newPlayerId() }
     val playing=loaded && active && visible && PostedPlayback.activeId==key
-    val url=remember(item?.url) { item?.url?.let { OgtMediaCache.cachedFileUrl(it) ?: it } }
+    // Recheck on play: the background prefetch can finish after this page was composed.
+    val url=remember(item?.url,loaded) { item?.url?.let { OgtMediaCache.cachedFileUrl(it) ?: it } }
     fun toggle() {
         if(video) {
             if(!inlineVideo && onOpen!=null) { onOpen();return }
@@ -105,9 +110,9 @@ fun PostedMediaPage(
                     if(PostedPlayback.muted)"Activar sonido" else "Silenciar video",size=18.dp,tint=Color.White)
             }
         }
-        if(onOpen!=null) Box(Modifier.align(Alignment.TopEnd).padding(top=44.dp,end=8.dp).size(36.dp).clip(CircleShape)
+        if(onOpen!=null) Box(Modifier.align(Alignment.TopEnd).padding(top=8.dp,end=8.dp).size(48.dp).clip(CircleShape)
             .background(Color.Black.copy(alpha=.42f)).clickable { onOpen() },contentAlignment=Alignment.Center) {
-            OgtStitchIcon(Res.drawable.qs_expand,"Abrir publicación o visor",size=16.dp,tint=Color.White)
+            OgtStitchIcon(Res.drawable.qs_expand,"Ampliar archivo actual",size=24.dp,tint=Color.White)
         }
     }
 }
@@ -127,16 +132,19 @@ fun PostMediaTypes(media:List<LocalPostMedia>,modifier:Modifier=Modifier) {
 fun PostedMediaCarousel(
     media:List<LocalPostMedia>,fallback:DrawableResource,description:String?,modifier:Modifier=Modifier,
     initialIndex:Int=0,onOpen:((Int)->Unit)?=null,autoPlay:Boolean=false,inlineVideo:Boolean=true,
+    onPageChanged:(Int)->Unit={},
     overlay:@Composable BoxScope.()->Unit={},
 ) {
     val pager=androidx.compose.foundation.pager.rememberPagerState(initialPage=initialIndex.coerceIn(0,(media.size-1).coerceAtLeast(0))) { media.size.coerceAtLeast(1) }
     val scope=rememberCoroutineScope()
+    val pageChanged by rememberUpdatedState(onPageChanged)
+    LaunchedEffect(pager) { snapshotFlow { pager.currentPage }.collect { pageChanged(it) } }
     fun go(page:Int) { scope.launch { pager.animateScrollToPage(page.coerceIn(0,(media.size-1).coerceAtLeast(0))) } }
     Box(modifier) {
         androidx.compose.foundation.pager.HorizontalPager(state=pager,modifier=Modifier.fillMaxSize(),key={media.getOrNull(it)?.id ?: it}) { page ->
             PostedMediaPage(media.getOrNull(page),fallback,description,active=pager.currentPage==page && !pager.isScrollInProgress,
                 multiple=media.size>1,modifier=Modifier.fillMaxSize(),autoPlay=autoPlay,inlineVideo=inlineVideo,
-                onPrevious={go(page-1)},onNext={go(page+1)},onOpen=onOpen?.let { open -> { open(page) } })
+                onPrevious={go(page-1)},onNext={go(page+1)},onOpen=onOpen?.let { open -> { pageChanged(page);open(page) } })
         }
         overlay()
         MediaPagerIndicator(pager.currentPage,media.size,onPageSelected={go(it)})

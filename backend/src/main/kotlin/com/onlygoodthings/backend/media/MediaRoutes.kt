@@ -14,6 +14,8 @@ import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
 import io.ktor.server.request.header
+import io.ktor.http.content.OutgoingContent
+import io.ktor.util.cio.readChannel
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
@@ -27,33 +29,41 @@ fun Route.publicMediaRoutes(store: MediaStore,available:(String)->Boolean={true}
         val name = call.parameters["name"].orEmpty()
         val file = store.resolvePublic(name)
             ?: return@get call.respond(HttpStatusCode.NotFound, ApiResponse.fail<Unit>("Archivo inexistente", "NOT_FOUND"))
-        val bytes=withContext(Dispatchers.IO) {
-            if(!available(name)) null
-            else try { Files.readAllBytes(file) } catch (_: java.nio.file.NoSuchFileException) { null }
-        }
-            ?: return@get call.respond(HttpStatusCode.NotFound)
-        call.response.header(HttpHeaders.CacheControl, "public, max-age=300, must-revalidate")
-        call.response.header(HttpHeaders.AcceptRanges, "bytes")
+        val metadata=withContext(Dispatchers.IO) {
+            if(!available(name))null else try { Files.size(file) to Files.getLastModifiedTime(file).toMillis() } catch(_:java.nio.file.NoSuchFileException){null}
+        } ?: return@get call.respond(HttpStatusCode.NotFound)
+        val size=metadata.first
+        call.response.header(HttpHeaders.CacheControl,"public, max-age=300, must-revalidate")
+        call.response.header(HttpHeaders.AcceptRanges,"bytes")
+        val etag="\"$name:${metadata.first}:${metadata.second}\""
+        call.response.header(HttpHeaders.ETag,etag)
+        if(call.request.header(HttpHeaders.IfNoneMatch)?.split(',')?.any { it.trim().removePrefix("W/")==etag || it.trim()=="*" }==true)
+            return@get call.respond(HttpStatusCode.NotModified)
         val type = ContentType.parse(store.contentTypeOf(name))
         // AVFoundation starts remote playback with bytes=0-1. Returning the
         // entire MP4 for that request makes Apple reject an otherwise valid file.
-        val range = call.request.header(HttpHeaders.Range)
-        if (range == null || call.request.header(HttpHeaders.IfRange) != null) {
-            return@get call.respondBytes(bytes, type)
+        val range=call.request.header(HttpHeaders.Range)
+        val partial=range!=null && (call.request.header(HttpHeaders.IfRange)==null || call.request.header(HttpHeaders.IfRange)==etag)
+        var start=0L;var end=size-1
+        if(partial) {
+            val match=Regex("bytes=(\\d*)-(\\d*)").matchEntire(range!!)
+            val first=match?.groupValues?.get(1).orEmpty();val last=match?.groupValues?.get(2).orEmpty()
+            val requestedStart=if(first.isNotEmpty())first.toLongOrNull() else last.toLongOrNull()?.takeIf { it>0 }?.let { (size-it).coerceAtLeast(0) }
+            val requestedEnd=if(first.isEmpty() || last.isEmpty())size-1 else last.toLongOrNull()?.coerceAtMost(size-1)
+            if(requestedStart==null || requestedEnd==null || requestedStart !in 0 until size || requestedEnd<requestedStart) {
+                call.response.header(HttpHeaders.ContentRange,"bytes */$size")
+                return@get call.respond(HttpStatusCode.RequestedRangeNotSatisfiable)
+            }
+            start=requestedStart;end=requestedEnd
+            call.response.header(HttpHeaders.ContentRange,"bytes $start-$end/$size")
         }
-        val match = Regex("bytes=(\\d*)-(\\d*)").matchEntire(range)
-        val first = match?.groupValues?.get(1).orEmpty()
-        val last = match?.groupValues?.get(2).orEmpty()
-        val start = if (first.isNotEmpty()) first.toLongOrNull()
-            else last.toLongOrNull()?.takeIf { it > 0 }?.let { (bytes.size - it).coerceAtLeast(0) }
-        val end = if (first.isEmpty() || last.isEmpty()) bytes.lastIndex.toLong()
-            else last.toLongOrNull()?.coerceAtMost(bytes.lastIndex.toLong())
-        if (start == null || end == null || start !in 0..bytes.lastIndex || end < start) {
-            call.response.header(HttpHeaders.ContentRange, "bytes */${bytes.size}")
-            return@get call.respond(HttpStatusCode.RequestedRangeNotSatisfiable)
-        }
-        call.response.header(HttpHeaders.ContentRange, "bytes $start-$end/${bytes.size}")
-        call.respondBytes(bytes.copyOfRange(start.toInt(), end.toInt() + 1), type, HttpStatusCode.PartialContent)
+        val first=start;val last=end
+        call.respond(object:OutgoingContent.ReadChannelContent() {
+            override val contentType=type
+            override val contentLength=(last-first+1).coerceAtLeast(0)
+            override val status=if(partial)HttpStatusCode.PartialContent else HttpStatusCode.OK
+            override fun readFrom()=file.toFile().readChannel(first,last)
+        })
     }
 }
 

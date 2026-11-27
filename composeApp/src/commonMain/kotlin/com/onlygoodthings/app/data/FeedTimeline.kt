@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-data class FeedQuery(val mode:FeedMode=FeedMode.HOME,val family:FeedTopicFamily?=null,val adoptionRadiusKm:Int=50)
+data class FeedQuery(val mode:FeedMode=FeedMode.HOME,val family:FeedTopicFamily?=null,val adoptionRadiusKm:Int=AdoptionProximity.DEFAULT_RADIUS_KM)
 data class FeedPageState(
     val posts:List<LocalSocialPost> = emptyList(),
     val ready:Boolean=false,
@@ -27,11 +27,11 @@ data class FeedPageState(
 class FeedPresentation {
     var mode by mutableStateOf(FeedMode.HOME)
     var family by mutableStateOf<FeedTopicFamily?>(null)
-    var adoptionRadiusKm by mutableStateOf(50)
+    var adoptionRadiusKm by mutableStateOf(AdoptionProximity.DEFAULT_RADIUS_KM)
     val query get()=FeedQuery(mode,family,adoptionRadiusKm)
     private val positions=mutableMapOf<FeedQuery,LazyListState>()
     private val acknowledgedOwn=mutableMapOf<FeedQuery,Int>()
-    fun position(query:FeedQuery)=positions.getOrPut(query) { LazyListState() }
+    fun position(query:FeedQuery)=positions.getOrPut(query.copy(adoptionRadiusKm=AdoptionProximity.DEFAULT_RADIUS_KM)) { LazyListState() }
     fun acknowledgeOwn(query:FeedQuery,revision:Int):Boolean {
         val previous=acknowledgedOwn[query] ?: 0
         acknowledgedOwn[query]=revision
@@ -40,6 +40,7 @@ class FeedPresentation {
 }
 
 sealed interface FeedSignal {
+    data class Discovery(val value:DiscoverySettings):FeedSignal
     data object Connected:FeedSignal
     data class Post(val value:SocialLiveCounters):FeedSignal
 }
@@ -60,6 +61,7 @@ class FeedTimeline(
     private val transportStarted:()->Boolean=OgtSdk::isStarted,
     private val signals:()->Flow<FeedSignal> = {
         merge(OgtRealtime().observeSocialPosts().map { FeedSignal.Post(it) },
+            OgtRealtime().observeDiscoverySettings().map { FeedSignal.Discovery(it) },
             OgtRealtime().observeFeedConnections().map { FeedSignal.Connected })
     },
 ) {
@@ -70,7 +72,16 @@ class FeedTimeline(
     var presentation=FeedPresentation();private set
     var viewerLocation by mutableStateOf<GeoPoint?>(null); private set
     var locationChecked by mutableStateOf(false); private set
-    fun confirmViewerLocation(point:GeoPoint?) { viewerLocation=point;locationChecked=true;rebuild() }
+    var viewerUsesManualPlace by mutableStateOf(false);private set
+    private var discoveryVersion=0L
+    fun applyDiscoverySettings(settings:DiscoverySettings) {
+        if(settings.version<discoveryVersion || settings.adoptionRadiusKm !in 1..500)return
+        discoveryVersion=settings.version
+        if(presentation.adoptionRadiusKm==settings.adoptionRadiusKm)return
+        presentation.adoptionRadiusKm=settings.adoptionRadiusKm;rebuild()
+        if(owner.isNotBlank())refresh(presentation.query,force=true)
+    }
+    fun confirmViewerLocation(point:GeoPoint?,manual:Boolean=false) { viewerLocation=point;viewerUsesManualPlace=manual;locationChecked=true;rebuild() }
     private var owner=""
     private var generation=0
     private var initialized=false
@@ -101,7 +112,7 @@ class FeedTimeline(
         val me=db.userOrNull(owner)
         val here=if(locationChecked)viewerLocation else me?.let { AdoptionProximity.point(it.latitude,it.longitude)?.takeUnless { it.latitude==0.0 && it.longitude==0.0 } }
         return AdoptionProximity.allows(db.isOwnPost(post,db.viewerAliases(owner)),here,
-            AdoptionProximity.point(animal?.latitude,animal?.longitude),query.adoptionRadiusKm)
+            AdoptionProximity.point(animal?.latitude,animal?.longitude),presentation.adoptionRadiusKm)
     }
     private fun publish(query:FeedQuery,value:FeedPageState) {
         if(value.ready)db.rememberFeedOrder(owner,query.mode,query.family,value.posts.map { it.id })
@@ -130,7 +141,7 @@ class FeedTimeline(
     }
     fun start(userId:String) {
         if(owner==userId && accountJob?.isActive==true)return
-        clear();viewerLocation=null;locationChecked=false;owner=userId;followed=db.followedIds(userId)
+        clear();viewerLocation=null;viewerUsesManualPlace=false;locationChecked=false;discoveryVersion=0;owner=userId;followed=db.followedIds(userId)
         if(userId.isNotBlank())db.bindSocialFeedViewer(userId)
         if(userId.isBlank())return
         val version=generation
@@ -153,6 +164,7 @@ class FeedTimeline(
                             signals().collect { signal ->
                                 attempt=0
                                 when(signal) {
+                                    is FeedSignal.Discovery -> applyDiscoverySettings(signal.value)
                                     FeedSignal.Connected -> {
                                         validatedAt=null
                                         val query=presentation.query
@@ -275,7 +287,7 @@ class FeedTimeline(
             reconcile(setOf(live.id),emptySet());rebuild();return
         }
         val before=db.posts.firstOrNull { it.id==live.id }
-        val needsContent=before==null || (live.body!=null && live.body!=before.body) ||
+        val needsContent=live.diffusionChanged || before==null || (live.body!=null && live.body!=before.body) ||
             (live.tag!=null && live.tag!=before.tag) || live.listingId!=null
         if(before!=null) { db.applySocialLive(live);rebuild() }
         // Unknown posts are admitted only after authenticated REST hydration (including media).

@@ -80,6 +80,7 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${libs.versions.coroutines.get()}")
             implementation("io.ktor:ktor-client-mock:3.1.3")
         }
         androidInstrumentedTest {

@@ -11,6 +11,7 @@ export function mountStories(root, api, {ownerId=null}={}) {
   const button=(label,action)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.addEventListener('click',action);return b;};
   async function list() {
     let page=await api('/api/v1/stories/list',{}), all=[...(page.stories || [])];
+    if(page.discoverySettings)window.dispatchEvent(new CustomEvent('ogt-discovery-settings',{detail:page.discoverySettings}));
     const now=page.serverNowEpochMs;
     while(page.nextCursor && all.length<2000) {page=await api('/api/v1/stories/list',{cursor:page.nextCursor});all.push(...(page.stories || []));}
     return all.filter(s=>s.status==='VISIBLE' && s.expiresAtEpochMs>now);

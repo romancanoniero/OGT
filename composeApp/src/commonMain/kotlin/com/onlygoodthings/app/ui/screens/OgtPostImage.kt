@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.Dp
 import com.onlygoodthings.shared.domain.placePostFrame
 import com.onlygoodthings.app.map.decodeTileBitmap
 import com.onlygoodthings.app.media.OgtMediaCache
+import com.onlygoodthings.app.media.MediaImageCache
 import com.onlygoodthings.app.media.isRemoteMediaUrl
 import com.onlygoodthings.app.media.postPreviewUrl
 import com.onlygoodthings.app.platform.localFilePath
@@ -86,14 +87,13 @@ fun OgtPostImage(
     }
     key(fetchUrl) {
         var bitmap by remember(fetchUrl) {
-            mutableStateOf(OgtMediaCache.peek(fetchUrl)?.let(::decodeTileBitmap))
+            mutableStateOf(MediaImageCache.peek(fetchUrl))
         }
         var loading by remember(fetchUrl) { mutableStateOf(bitmap == null) }
         LaunchedEffect(fetchUrl) {
             if (bitmap == null) loading = true
-            val bytes = OgtMediaCache.load(fetchUrl)
-                ?: posterUrl?.takeIf { it != fetchUrl && canFetch(it) }?.let { OgtMediaCache.load(it) }
-            bitmap = bytes?.let(::decodeTileBitmap)
+            bitmap = MediaImageCache.load(fetchUrl)
+                ?: posterUrl?.takeIf { it != fetchUrl && canFetch(it) }?.let { MediaImageCache.load(it) }
             loading = false
         }
         val ready = bitmap

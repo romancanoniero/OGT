@@ -446,6 +446,13 @@ span.avatar svg { width: 18px; height: 18px; }
 .post-media-dot span { width: 7px; height: 7px; border-radius: 50%; background: white; opacity: .5; }
 .post-media-dot[aria-current="true"] span { background: white; opacity: 1; transform: scale(1.25); }
 .post-media-dot:focus-visible { outline: 2px solid var(--secondary); outline-offset: 1px; }
+.post-media-count { position:absolute;z-index:3;top:12px;left:12px;border-radius:20px;padding:4px 10px;background:#0009;color:white;font-size:12px;font-weight:700;pointer-events:none; }
+.post-media-expand,.post-media-viewer-close { position:absolute;z-index:4;top:8px;right:8px;display:grid;place-items:center;width:48px;height:48px;padding:0;border:0;border-radius:50%;background:#111213aa;color:white;cursor:pointer; }
+.post-media-expand:focus-visible,.post-media-viewer-close:focus-visible { outline:2px solid white;outline-offset:2px; }
+.post-media-viewer { position:fixed;inset:0;box-sizing:border-box;width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;margin:0;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);border:0;background:var(--ink); }
+.post-media-viewer::backdrop { background:var(--ink); }
+.post.post-media-viewer .post-carousel,.post.post-media-viewer .post-media-slide,.post.post-media-viewer .media-slot { height:100%;width:100%;aspect-ratio:auto; }
+.post-media-viewer-close { top:calc(8px + env(safe-area-inset-top)); }
 .post-media-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .actions { display: flex; gap: 8px; margin-top: 12px; }
 .act {
@@ -1755,9 +1762,13 @@ body.desk .center {
 
 .post-video-play,.post-video-sound { position:absolute;z-index:2;display:grid;place-items:center;border:0;border-radius:50%;background:#11121399;color:white;cursor:pointer; }
 .post-video-play { left:50%;top:50%;transform:translate(-50%,-50%);width:52px;height:52px;font-size:24px; }
-.is-playing .post-video-play { left:10px;top:10px;transform:none;width:36px;height:36px;font-size:16px; }
+.is-playing .post-video-play { left:10px;top:48px;transform:none;width:36px;height:36px;font-size:16px; }
 .post-video-sound { right:10px;bottom:10px;width:40px;height:40px; }
 .post-video-play:focus-visible,.post-video-sound:focus-visible { outline:2px solid white;outline-offset:2px; }
 .post-media-types { display:flex;gap:8px;margin:4px 0 8px; }
 .post-media-type { display:inline-flex;color:var(--muted);opacity:.35; }
 .post-media-type.has { color:var(--secondary);opacity:1; }
+
+.post-diffuse { width:58px;min-width:58px;height:52px;gap:1px;border:0;font-size:10px;align-content:center; }
+.post-diffuse span {display:block;}
+.post-diffusion-credit {margin:8px 20px 0;}

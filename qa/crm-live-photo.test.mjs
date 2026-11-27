@@ -23,7 +23,7 @@ test('el aviso usa url y mediaUrls, los nombres que ya pinta la web', () => {
   assert.match(app, /:scope > \.media-slot img\.media, :scope > img\.media/);
   assert.match(app, /function ensureLiveSlot\(img\)/);
   assert.match(app, /className = "media-slot"/);
-  assert.match(app, /OgtPostCarousel\.html\(post, \{mediaUrl, frameOf: mediaFrameOf\}\)/);
+  assert.match(app, /OgtPostCarousel\.html\(post, \{mediaUrl, frameOf: mediaFrameOf, initialIndex:/);
   assert.match(app, /OgtPostCarousel\.update\(card, post, \{mediaUrl, frameOf: mediaFrameOf\}\)/);
   const carousel = readFileSync(new URL('web/app/post-carousel.js', root), 'utf8');
   assert.match(carousel, /<div class="media-slot">/);
@@ -38,7 +38,7 @@ test('el feed publico carga el JavaScript actualizado de la aplicacion', () => {
   assert.match(bootstrap, /\/app\.js\?v=[a-zA-Z0-9_-]+/);
   assert.match(html, /\/bootstrap\.js\?v=[a-zA-Z0-9_-]+/);
   assert.match(nginx, /location = \/index\.html[\s\S]*no-store/);
-  assert.match(nginx, /location ~\*\s*\\\.\(css\|js\|mjs[\s\S]*?no-store/);
+  assert.match(nginx, /location ~\*\s*\\\.\(css\|js\|mjs[\s\S]*?must-revalidate/);
 });
 
 test('Control lee la misma foto sin cambiar el cromo', () => {

@@ -7,6 +7,7 @@ const source=readFileSync(new URL('../web/app/app.js',import.meta.url),'utf8');
 const cardSource=source.slice(source.indexOf('function postCard('),source.indexOf('\nfunction isTrueque(',source.indexOf('function postCard(')));
 const escapeHtml=value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const sandbox={
+  diffusionCredit:()=>'',diffuseIcon:'',
   escapeHtml,mediaUrl:v=>v,mediaFrameOf:()=>({x:.5,y:.5,zoom:1}),
   isAnecdoteShare:p=>Boolean(p.parentPostId),isHomenaje:p=>p.topic==='Homenaje',cardKind:()=> 'NEWS',
   icon:()=>'',avatarHtml:()=>'',ago:()=> 'Ahora',

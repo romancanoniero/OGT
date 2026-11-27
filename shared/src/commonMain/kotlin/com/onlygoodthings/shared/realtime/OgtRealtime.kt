@@ -45,6 +45,13 @@ class OgtRealtime(
         ((snap.getValue() as? Map<String, Any?>)?.get("at") as? Number)?.toLong()
     }
 
+    fun observeDiscoverySettings():Flow<com.onlygoodthings.shared.domain.DiscoverySettings> = observeChildren(OgtDbPaths.DISCOVERY_SETTINGS) { snap ->
+        val raw=snap.getValue() as? Map<*,*> ?: return@observeChildren null
+        val radius=(raw["adoptionRadiusKm"] as? Number)?.toInt() ?: return@observeChildren null
+        val version=(raw["version"] as? Number)?.toLong() ?: return@observeChildren null
+        if(radius in 1..500)com.onlygoodthings.shared.domain.DiscoverySettings(radius,version) else null
+    }
+
     /** Story revisions arrive as child_changed; the gateway does not send a root value here. */
     fun observeStoryInvalidations(): Flow<Unit> = observeStoryChanges().map { Unit }.onStart { emit(Unit) }
 

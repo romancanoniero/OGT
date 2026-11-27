@@ -93,6 +93,11 @@ const REPORTS = {
 
 /** Último feed: el detalle no tiene GET de un post. */
 let lastFeed = [];
+let feedCacheTimer=null;
+const pendingClaps=new Set();
+function feedCacheKey(){return 'ogt.feed.'+me.userId+'.'+feedMode+'.'+feedType;}
+function persistFeedCache(){clearTimeout(feedCacheTimer);const owner=me.userId;feedCacheTimer=setTimeout(()=>{if(!owner||me.userId!==owner)return;try{sessionStorage.setItem(feedCacheKey(),JSON.stringify(lastFeed.slice(0,200)));}catch{}},100);}
+function restoreFeedCache(){if(!me.userId)return [];try{const saved=JSON.parse(sessionStorage.getItem(feedCacheKey())||'[]');return Array.isArray(saved)?saved.filter(p=>p&&typeof p.id==='string'&&!hiddenIds.has(p.id)).slice(0,200):[];}catch{return [];}}
 let disposeStories=()=>{};
 let lastListings = [];
 const animalHydrationVersions = new Map();
@@ -115,6 +120,7 @@ function startRealtime() {
   if (!window.OgtRealtime || realtime) return;
   realtime = new window.OgtRealtime();
   realtime.start(authToken());
+  if(typeof realtime.observeDiscoverySettings==='function')realtime.observeDiscoverySettings(raw=>applyDiscoverySettings(typeof raw==='string'?JSON.parse(raw):raw));
   realtime.observeSocialPosts(function (raw) {
     const live = typeof raw === "string" ? JSON.parse(raw) : raw;
     applyLive(live);
@@ -251,7 +257,8 @@ function applyChatMessageLive(live) {
 }
 
 function newestFirst(a, b) {
-  return (Number(b.createdAtEpochMs) || 0) - (Number(a.createdAtEpochMs) || 0);
+  const activity=post=>Math.max(Number(post.createdAtEpochMs)||0,...(post.diffusedBy||[]).filter(p=>p.userId===me.userId || following.has(p.userId)).map(p=>Number(p.createdAtEpochMs)||0));
+  return activity(b)-activity(a);
 }
 
 function sortFeed() {
@@ -322,6 +329,10 @@ function applyProfileLive(live) {
 
 function applyLive(live) {
   if (!live || !live.id || hiddenIds.has(live.id)) return;
+  if(live.diffusionChanged) {
+    const owner=me.userId;
+    void loadFeed(feedType).then(()=>{if(me.userId===owner){paintFeedList();const post=lastFeed.find(p=>p.id===live.id);if(post)paintPost(post);}}).catch(()=>{});
+  }
   if (live.removedAnecdoteId) dropLiveAnecdote(live.id, live.removedAnecdoteId);
   if (live.moderationStatus && live.moderationStatus !== "VISIBLE") {
     lastFeed = lastFeed.filter((p) => p.id !== live.id);
@@ -429,6 +440,11 @@ function paintPost(post) {
     const count = clap.nextElementSibling;
     if (count && count.classList.contains("count")) count.textContent = post.impactCount || 0;
   }
+  const diffuse=card.querySelector(':scope > .actions [data-diffuse]');
+  if(diffuse){diffuse.classList.toggle('on',Boolean(post.viewerHasDiffused));diffuse.setAttribute('aria-pressed',String(Boolean(post.viewerHasDiffused)));diffuse.setAttribute('aria-label',post.viewerHasDiffused?'Dejar de difundir':'Difundir a tus seguidores');diffuse.querySelector('span').textContent=post.viewerHasDiffused?'Difundido':'Difundir';}
+  const diffusion=card.querySelector(':scope > .post-diffusion-credit'),creditBox=document.createElement('div');creditBox.innerHTML=diffusionCredit(post);
+  if(diffusion)creditBox.firstElementChild?diffusion.replaceWith(creditBox.firstElementChild):diffusion.remove();
+  else if(creditBox.firstElementChild)card.querySelector(':scope > .actions')?.before(creditBox.firstElementChild);
   const commentBtn = card.querySelector(":scope > .actions [aria-label='Comentar']");
   if (commentBtn) {
     const count = commentBtn.nextElementSibling;
@@ -1156,6 +1172,7 @@ function actionsFor(post, { onDetail = false } = {}) {
   }
   items.push(["copy", "Copiar enlace"]);
   items.push(["share", "Copiar texto para compartir"]);
+  items.push(["diffuse", post.viewerHasDiffused ? "Dejar de difundir" : "Difundir"]);
   if (!mine && post.authorId && !following.has(post.authorId)) {
     items.push(["follow", `Seguir a ${post.authorName || "esta persona"}`]);
   }
@@ -1406,6 +1423,9 @@ async function runAction(id, post, onDetail) {
       return;
     case "copy":
       await copyText(publicLink(post), "Enlace copiado");
+      return;
+    case "diffuse":
+      await diffusePost(post.id);
       return;
     case "share":
       await api("/api/v1/social/feed-event", { postId: post.id, kind: "SHARE" }).catch(() => {});
@@ -1890,8 +1910,26 @@ function paintAdoption(card,post) {
   bindAdoptionClose(card,post);
 }
 
+const pendingDiffusions=new Set();
+const diffuseIcon='<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V5h14l-3-3m3 3-3 3m5 7v4H6l3 3m-3-3 3-3"/></svg>';
+function diffusionCredit(post){
+  const person=(post.diffusedBy||[]).find(p=>p.userId!==me.userId)||(post.diffusedBy||[])[0];
+  return person?`<p class="meta post-diffusion-credit">${escapeHtml(person.userId===me.userId?'Difundido por vos':`${person.displayName} difundió`)}</p>`:'';
+}
+async function diffusePost(id){
+  const owner=me.userId,key=owner+':'+id,before=lastFeed.find(p=>p.id===id);
+  if(!before||pendingDiffusions.has(key))return;
+  pendingDiffusions.add(key);const desired=!before.viewerHasDiffused;
+  const oldPerson=(before.diffusedBy||[]).find(p=>p.userId===owner),people=(before.diffusedBy||[]).filter(p=>p.userId!==owner);
+  if(desired)people.unshift(oldPerson||{userId:owner,displayName:me.displayName||'Vos',createdAtEpochMs:Date.now()});
+  const optimistic=mergePost({...before,viewerHasDiffused:desired,diffusedBy:people});paintPost(optimistic);persistFeedCache();
+  try{const saved=await api('/api/v1/social/post/diffuse',{postId:id,enabled:desired});if(me.userId===owner){paintPost(mergePost(saved));persistFeedCache();}}
+  catch(error){if(me.userId===owner){const current=lastFeed.find(p=>p.id===id);if(current&&current.viewerHasDiffused===desired){paintPost(mergePost({...current,viewerHasDiffused:before.viewerHasDiffused,diffusedBy:(current.diffusedBy||[]).filter(p=>p.userId!==owner).concat(oldPerson?[oldPerson]:[])}));persistFeedCache();}toast('No se pudo guardar la difusión. Volvé a intentarlo.');}}
+  finally{pendingDiffusions.delete(key);}
+}
+
 function postCard(post, { openable = true, previewStories = true, compose = false } = {}) {
-  const shown = globalThis.OgtPostCarousel.html(post, {mediaUrl, frameOf: mediaFrameOf});
+  const shown = globalThis.OgtPostCarousel.html(post, {mediaUrl, frameOf: mediaFrameOf, initialIndex: !openable && route().id === post.id ? route().query.media : 0});
   const share = isAnecdoteShare(post);
   const homage = isHomenaje(post);
   const listing = cardKind(post);
@@ -1936,12 +1974,14 @@ function postCard(post, { openable = true, previewStories = true, compose = fals
     ${post.hashtags?.length ? `<p class="meta post-hashtags">${post.hashtags.map(tag=>escapeHtml("#"+String(tag.label||tag.key).replace(/\s/g,""))).join(" ")}</p>` : ""}
     ${lostMapHtml(post)}
     ${truequeActionsHtml(post)}
+    ${diffusionCredit(post)}
     <div class="actions">
       <button class="act${post.viewerHasImpacted ? " on" : ""}" data-clap="${escapeHtml(post.id)}" aria-label="Aplauso">${icon("qs-clap")}</button>
       <span class="count">${post.impactCount || 0}</span>
       <button class="act" aria-label="Comentar">${icon("qs-comment")}</button>
       <span class="count">${post.commentCount || 0}</span>
       <button class="act" data-share="${escapeHtml(post.id)}" aria-label="Compartir">${icon("qs-share")}</button>
+      <button type="button" class="act post-diffuse${post.viewerHasDiffused?' on':''}" data-diffuse="${escapeHtml(post.id)}" aria-pressed="${Boolean(post.viewerHasDiffused)}" aria-label="${post.viewerHasDiffused?'Dejar de difundir':'Difundir a tus seguidores'}">${diffuseIcon}<span>${post.viewerHasDiffused?'Difundido':'Difundir'}</span></button>
     </div>
     ${storiesBlock(post, { preview: previewStories, compose })}
     ${lostActionsHtml(post, { onDetail: compose && !openable })}
@@ -2068,6 +2108,18 @@ function lostActionsHtml(post, { onDetail = false } = {}) {
 
 function bindSocial(root, { onDetail = false } = {}) {
   globalThis.OgtPostCarousel.bind(root);
+  root.querySelectorAll('[data-post]').forEach(card => {
+    if (card.dataset.mediaOpenBound) return;
+    card.dataset.mediaOpenBound = 'true';
+    card.addEventListener('ogt:media-open', event => {
+      event.stopPropagation();
+      const post = lastFeed.find(row => row.id === card.dataset.post);
+      if (!post) return;
+      const index = event.detail.index;
+      if (onDetail) globalThis.OgtPostCarousel.openViewer(post, {mediaUrl, frameOf: mediaFrameOf, initialIndex: index});
+      else location.hash = `#/p/${post.id}?media=${index}`;
+    });
+  });
   root.querySelectorAll('[data-adoption-close]').forEach(button=>{
     const card=button.closest('[data-post]'),post=lastFeed.find(row=>row.id===card?.dataset.post);
     if(post)bindAdoptionClose(card,post);
@@ -2075,17 +2127,17 @@ function bindSocial(root, { onDetail = false } = {}) {
   root.querySelectorAll(".who a").forEach((a) => {
     a.addEventListener("click", (ev) => ev.stopPropagation());
   });
-  root.querySelectorAll("[data-clap]").forEach((btn) => {
-    btn.addEventListener("click", async (ev) => {
-      ev.stopPropagation();
-      try {
-        const updated = await api("/api/v1/social/impact", { postId: btn.dataset.clap });
-        paintPost(mergePost(updated));
-      } catch (e) {
-        alert(e.message);
-      }
-    });
-  });
+  const clapButtons=[...root.querySelectorAll('[data-clap]')];if(root.matches?.('[data-clap]'))clapButtons.push(root);
+  clapButtons.forEach(btn=>btn.addEventListener('click',async ev=>{
+    ev.stopPropagation();const id=btn.dataset.clap;if(pendingClaps.has(id))return;
+    const owner=me.userId,before=lastFeed.find(post=>post.id===id),was=btn.classList.contains('on'),count=Number(btn.nextElementSibling?.textContent)||0;
+    pendingClaps.add(id);btn.disabled=true;btn.classList.toggle('on',!was);btn.setAttribute('aria-pressed',String(!was));if(btn.nextElementSibling)btn.nextElementSibling.textContent=String(Math.max(0,count+(was?-1:1)));
+    const optimistic=before?mergePost({...before,viewerHasImpacted:!was,impactCount:Math.max(0,count+(was?-1:1))}):null;persistFeedCache();
+    try{const updated=await api('/api/v1/social/impact',{postId:id});if(me.userId===owner)paintPost(mergePost(updated));}
+    catch(e){if(me.userId===owner){if(before&&lastFeed.find(post=>post.id===id)===optimistic)paintPost(mergePost(before));else{btn.classList.toggle('on',was);if(btn.nextElementSibling)btn.nextElementSibling.textContent=String(count);}alert(e.message);}}
+    finally{pendingClaps.delete(id);btn.disabled=false;if(me.userId===owner)persistFeedCache();}
+  }));
+  root.querySelectorAll('[data-diffuse]').forEach(button=>button.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();void diffusePost(button.dataset.diffuse);}));
   root.querySelectorAll("[data-story-clap]").forEach((btn) => {
     btn.addEventListener("click", async (ev) => {
       ev.stopPropagation();
@@ -2158,7 +2210,7 @@ function bindSocial(root, { onDetail = false } = {}) {
   root.querySelectorAll("[data-open]").forEach((card) => {
     card.addEventListener("click", (ev) => {
       if (ev.target.closest("button, a, form, .menu, video")) return;
-      location.hash = `#/p/${card.dataset.open}`;
+      location.hash = `#/p/${card.dataset.open}?media=${Number(card.querySelector('[data-post-media]')?.dataset.mediaActive || 0)}`;
     });
   });
   root.querySelectorAll("form[data-anecdote-post]").forEach((form) => {
@@ -2341,8 +2393,15 @@ const FEED_TYPES = [
 let feedType = "";
 let feedMode = "HOME";
 let feedRequestVersion = 0;
-let adoptionRadiusKm = 50;
+let adoptionRadiusKm = 20;
 let feedLocation = null;
+let discoverySettingsVersion=0;
+function applyDiscoverySettings(settings,reload=true){
+ if(!settings||!Number.isInteger(settings.adoptionRadiusKm)||settings.adoptionRadiusKm<1||settings.adoptionRadiusKm>500||Number(settings.version)<discoverySettingsVersion)return;
+ discoverySettingsVersion=Number(settings.version);const changed=adoptionRadiusKm!==settings.adoptionRadiusKm;adoptionRadiusKm=settings.adoptionRadiusKm;
+ if(changed&&reload&&document.getElementById('feed-list')){paintFeedList();void loadFeed(feedType).then(paintFeedList).catch(()=>{});}
+}
+window.addEventListener('ogt-discovery-settings',event=>applyDiscoverySettings(event.detail));
 function nearbyInHome(post) { return globalThis.OgtAdoptionNearby(post,post.animalListing || listingOf(post) || (cardKind(post)==="ADOPTION"?{kind:"ADOPTION"}:null),{mode:feedMode,radiusKm:adoptionRadiusKm,viewer:feedLocation,ownerId:me.userId}); }
 
 function familyOfFeedType(type) {
@@ -2365,18 +2424,23 @@ function visibleFeed(type) {
 
 async function loadFeed(type) {
   const next = type === undefined ? "" : type;
-  const version=++feedRequestVersion;
-  const payload = { pageSize: 40, mode: feedMode, adoptionRadiusKm };
+  const version=++feedRequestVersion,owner=me.userId;
+  const before=new Map(lastFeed.map(post=>[post.id,post]));
+  const payload = { pageSize: 200, mode: feedMode };
   const family = familyOfFeedType(next);
   if (family) payload.family = family;
   const [posts,scope] = await Promise.all([api("/api/v1/social/feed", payload),api("/api/v1/social/feed-scope",{}).catch(()=>null)]);
-  if(version===feedRequestVersion)feedLocation=scope;
+  if(owner!==me.userId)return lastFeed;
+  if(version===feedRequestVersion){feedLocation=scope;applyDiscoverySettings(scope?.settings,false);}
   if(version!==feedRequestVersion)return lastFeed;
-  lastFeed = (Array.isArray(posts) ? posts : posts?.items || []).filter((p) => !hiddenIds.has(p.id));
+  const current=new Map(lastFeed.map(post=>[post.id,post]));
+  lastFeed = (Array.isArray(posts) ? posts : posts?.items || []).filter((p) => !hiddenIds.has(p.id)).map(post=>current.has(post.id)&&current.get(post.id)!==before.get(post.id)?current.get(post.id):post);
   sortFeed();
+  globalThis.OgtMediaPrefetch?.enqueue(lastFeed,mediaUrl);
   await loadListings();
   startRealtime();
   paintRail();
+  persistFeedCache();
   return lastFeed;
 }
 
@@ -2392,7 +2456,7 @@ async function loadListings() {
 }
 
 function adoptionRadiusHtml() {
- return `<div data-adoption-radius ${feedMode==='HOME'?'':'hidden'}><label class="field">Distancia de adopciones<select aria-label="Distancia de adopciones">${[[50,'Hasta 50 km'],[100,'Hasta 100 km'],[250,'Hasta 250 km'],[0,'Sin límite (incluye ubicación pendiente)']].map(([km,label])=>`<option value="${km}" ${km===adoptionRadiusKm?'selected':''}>${label}</option>`).join('')}</select></label><p class="hint" data-adoption-location></p><button type="button" class="ghost" data-feed-location>Usar mi ubicación para adopciones</button></div>`;
+ return `<div data-adoption-location-box ${feedMode==='HOME'?'':'hidden'}><p class="hint" data-adoption-location></p><button type="button" class="ghost" data-feed-location>Usar mi ubicación para adopciones</button></div>`;
 }
 function feedPillsHtml() {
   return `<div class="chips feed-pills" aria-label="Selección del feed">${[["HOME","Para vos"],["FOLLOWING","Siguiendo"]].map(([mode,label])=>`<button type="button" class="chip${mode===feedMode?" on":""}" data-feed-mode="${mode}" aria-pressed="${mode===feedMode}">${label}</button>`).join("")}</div><div class="chips feed-pills" id="feed-type" role="tablist" aria-label="Tipo de publicación">
@@ -2403,24 +2467,27 @@ function feedPillsHtml() {
 function paintFeedList() {
   const box = document.getElementById("feed-list");
   if (!box) return;
-  const scope=document.querySelector('[data-adoption-radius]');if(scope)scope.hidden=feedMode!=='HOME';
-  const hint=document.querySelector('[data-adoption-location]');if(hint)hint.textContent=adoptionRadiusKm===0?'Incluye adopciones de todas las zonas y con ubicación pendiente.':feedLocation?.latitude==null?'Indicá tu ubicación o elegí Sin límite para ver adopciones.':'Las adopciones sin ubicación confirmada aparecen al elegir Sin límite.';
+  const scope=document.querySelector('[data-adoption-location-box]');if(scope)scope.hidden=feedMode!=='HOME';
+  const hint=document.querySelector('[data-adoption-location]');if(hint)hint.textContent=feedLocation?.latitude==null?'Elegí tu barrio en el perfil o compartí tu ubicación para ver adopciones cercanas.':'';
   const list = visibleFeed(feedType);
-  box.innerHTML = list.length
-    ? list.map((p) => postCard(p, { previewStories: false })).join("")
-    : `<p class="empty">No hay publicaciones de este tipo.</p>`;
-  bindSocial(box);
+  if(!list.length){box.innerHTML=`<p class="empty">No hay publicaciones de este tipo.</p>`;return;}
+  box.querySelector(':scope > .empty')?.remove();
+  const wanted=new Set(list.map(post=>post.id)),existing=new Map([...box.children].filter(node=>node.dataset.post).map(node=>[node.dataset.post,node]));
+  for(const [id,node] of existing)if(!wanted.has(id))node.remove();
+  let cursor=box.firstElementChild;
+  for(const post of list){
+    let node=existing.get(post.id);
+    if(!node){const holder=document.createElement('div');holder.innerHTML=postCard(post,{previewStories:false});node=holder.firstElementChild;bindSocial(holder);box.insertBefore(node,cursor);}
+    else {paintPost(post);if(node!==cursor)box.insertBefore(node,cursor);}
+    cursor=node.nextElementSibling;
+  }
 }
 
 function bindFeedPills() {
-  document.querySelector('[data-adoption-radius] select')?.addEventListener('change',async event=>{
-    adoptionRadiusKm=Number(event.target.value);paintFeedList();
-    try {await loadFeed(feedType);paintFeedList();}catch(error){toast(error.message);}
-  });
   document.querySelector('[data-feed-location]')?.addEventListener('click',async event=>{
     const button=event.currentTarget;button.disabled=true;
     try {
-      if(!navigator.geolocation)throw new Error('Este navegador no ofrece ubicación. Podés elegir Sin límite.');
+      if(!navigator.geolocation)throw new Error('Este navegador no ofrece ubicación. Elegí tu barrio en el perfil.');
       const fix=await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{timeout:10000,maximumAge:120000}));
       await api('/api/v1/me/location',{latitude:fix.coords.latitude,longitude:fix.coords.longitude,accuracyMeters:fix.coords.accuracy});
       await loadFeed(feedType);paintFeedList();
@@ -2462,6 +2529,7 @@ async function renderInicio() {
   bindFeedPills();
   try {
     await loadSession();
+    const saved=restoreFeedCache();if(saved.length){lastFeed=saved;paintFeedList();}
     await loadFeed(feedType);
     paintFeedList();
     const rail=document.getElementById("ephemeral-stories");
@@ -4529,6 +4597,7 @@ async function renderAjustes() {
         <p class="delete-err" id="delete-account-err" hidden></p>
       </div>
     </form>`;
+  void mountDiscoveryPlaceProfile(main);
   let pendingPhoto = null;
   const preview = main.querySelector(".avatar.lg");
   document.getElementById("pick-photo")?.addEventListener("click", () => {
@@ -4641,6 +4710,21 @@ const COMMUNITY_RULES = {
   ],
 };
 
+async function mountDiscoveryPlaceProfile(main) {
+ const owner=me.userId;
+ try {
+  const [{publicationPlaceHtml,bindPublicationPlace},saved]=await Promise.all([import('./publication-place.js?v=20261127-location'),api('/api/v1/social/feed-scope',{})]);
+  const profile=main.querySelector('#profile-form');if(!profile||me.userId!==owner)return;
+  const form=document.createElement('form');form.className='profile-edit';form.innerHTML=`<h2>Tu zona para adopciones</h2><p class="hint">Si no usás GPS, elegí tu barrio o localidad. Usamos una ubicación aproximada.</p>${publicationPlaceHtml({optional:false,name:'discoveryPlace',label:'Barrio o localidad para adopciones'})}<button class="publish-cta" type="submit">Guardar zona</button><p role="status" data-zone-status></p>`;
+  profile.after(form);const input=form.querySelector('[name=discoveryPlace]');input.value=saved.place||'';
+  const selector=bindPublicationPlace(form.querySelector('[data-publication-place]'),{api,initialPoint:saved.place?{latitude:saved.latitude,longitude:saved.longitude}:null});
+  form.addEventListener('submit',async event=>{event.preventDefault();if(me.userId!==owner)return;const point=selector.point(),status=form.querySelector('[data-zone-status]'),button=form.querySelector('[type=submit]');if(!point){status.textContent='Elegí una zona de las sugerencias para confirmar su ubicación.';return;}button.disabled=true;
+   try{const scope=await api('/api/v1/users/discovery-place',{place:selector.value(),...point});if(me.userId!==owner)return;feedLocation=scope;applyDiscoverySettings(scope.settings);status.textContent='Zona guardada.';}
+   catch(e){status.textContent=e.message;}finally{button.disabled=false;}
+  });
+ }catch{} // Existing account settings remain available when place lookup is unavailable.
+}
+
 async function renderReglas() {
   await loadSession();
   const main = document.getElementById("main");
@@ -4724,7 +4808,9 @@ async function clearClientSession() {
   if (window.OgtAuth) await OgtAuth.signOut();
   me = { userId: "", role: "USER" };
   lastFeed = [];
-  adoptionRadiusKm=50;feedLocation=null;feedRequestVersion++;
+  pendingClaps.clear();pendingDiffusions.clear();clearTimeout(feedCacheTimer);discoverySettingsVersion=0;
+  for(const key of Object.keys(sessionStorage))if(key.startsWith('ogt.feed.'))sessionStorage.removeItem(key);
+  adoptionRadiusKm=20;feedLocation=null;feedRequestVersion++;
   lastRanking = [];
   following.clear();
   realtime = null;

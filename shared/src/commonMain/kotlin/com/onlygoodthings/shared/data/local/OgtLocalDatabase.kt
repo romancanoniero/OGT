@@ -826,6 +826,7 @@ class OgtLocalDatabase {
                 protagonistUserId = protagonistOf(post),
                 topic = post.tag,
                 hashtags = post.hashtags,
+                diffusedBy = post.diffusedBy,
                 createdAtEpochMs = post.createdAtEpochMs,
                 impactCount = post.impactCount,
                 commentCount = post.commentCount,
@@ -899,7 +900,7 @@ class OgtLocalDatabase {
         if (family != null && family !in feedTopicFamilies(post.tag, post.sourceUrl,post.hashtags)) return false
         if (isOwnPost(post, viewerAliases(viewerId))) return true
         if (mode == FeedMode.FOLLOWING) {
-            val mine = setOfNotNull(post.authorUserId, protagonistOf(post))
+            val mine = setOfNotNull(post.authorUserId, protagonistOf(post)) + post.diffusedBy.map { it.userId }
             return mine.any { it in followedIds(viewerId) }
         }
         return rankedFeed(viewerId, mode, nowEpochMs, 0, 40, family).any { it.id == post.id }
@@ -938,7 +939,7 @@ class OgtLocalDatabase {
     }
 
     fun isDiscovery(userId: String, post: LocalSocialPost): Boolean {
-        val mine = setOfNotNull(post.authorUserId, protagonistOf(post))
+        val mine = setOfNotNull(post.authorUserId, protagonistOf(post)) + post.diffusedBy.map { it.userId }
         val followed = followedIds(userId)
         return userId !in mine && mine.none { it in followed }
     }
@@ -1042,8 +1043,10 @@ class OgtLocalDatabase {
                     shouldShowInFeed(viewerId, post, mode, family)
             }
             .sortedByDescending { it.createdAtEpochMs }
-        return if(mode==FeedMode.FOLLOWING)body.sortedWith(compareByDescending<LocalSocialPost> { it.createdAtEpochMs }.thenBy { it.id })
-            else (pinned + body).distinctBy { it.id }.sortedByDescending { it.createdAtEpochMs }
+        val followed=followedIds(viewerId)
+        fun activity(post:LocalSocialPost)=maxOf(post.createdAtEpochMs,post.diffusedBy.filter { it.userId in aliases || it.userId in followed }.maxOfOrNull { it.createdAtEpochMs } ?: 0L)
+        return if(mode==FeedMode.FOLLOWING)body.sortedWith(compareByDescending<LocalSocialPost> { activity(it) }.thenBy { it.id })
+            else (pinned + body).distinctBy { it.id }.sortedByDescending(::activity)
     }
 
     /** Remove only IDs explicitly checked with the server, preserving other pages and pending drafts. */
@@ -1398,6 +1401,15 @@ class OgtLocalDatabase {
     fun replaceComment(localId: String, remote: SocialComment) {
         comments.removeAll { it.id == localId }
         applySocialComment(remote)
+    }
+
+    fun diffusePost(viewer: LocalUser, postId: String, enabled: Boolean): LocalSocialPost {
+        val index = posts.indexOfFirst { it.id == postId && !it.isStory }
+        require(index >= 0) { "La publicación no está disponible" }
+        val post = posts[index]
+        val existing = post.diffusedBy.firstOrNull { it.userId == viewer.id }
+        val people = post.diffusedBy.filterNot { it.userId == viewer.id } + if(enabled) listOf(existing ?: com.onlygoodthings.shared.domain.PostDiffusion(viewer.id,viewer.displayName,currentEpochMs())) else emptyList()
+        return post.copy(viewerHasDiffused=enabled,diffusedBy=people).also { posts[index]=it;bumpFeed();bumpSocial() }
     }
 
     fun repostAnecdote(viewer: LocalUser, anecdoteId: String): LocalSocialPost? {
@@ -2150,6 +2162,8 @@ class OgtLocalDatabase {
         hashtags = post.hashtags,
             publicationKind = post.publicationKind,
             anecdotes = anecdotesOf(post.id).map(::toDomain),
+            viewerHasDiffused = post.viewerHasDiffused,
+            diffusedBy = post.diffusedBy,
         )
     }
 
@@ -2291,6 +2305,8 @@ internal fun SocialPost.asLocalPost(): LocalSocialPost = LocalSocialPost(
     empresaQueSuma = empresaQueSuma,
     parentPostId = anecdoteParentPostId(null, sourceUrl),
     viewerHasImpacted = viewerHasImpacted,
+    viewerHasDiffused = viewerHasDiffused,
+    diffusedBy = diffusedBy,
 )
 
 fun LocalSocialPost.isAnecdoteShare(): Boolean =

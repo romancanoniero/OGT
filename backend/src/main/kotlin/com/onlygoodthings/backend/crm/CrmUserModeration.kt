@@ -295,7 +295,7 @@ internal val crmContributionPaths = setOf(
     "/api/v1/social/publish", "/api/v1/social/post/edit",
     "/api/v1/social/comment", "/api/v1/social/comment/edit",
     "/api/v1/social/anecdote", "/api/v1/social/anecdote/edit",
-    "/api/v1/social/anecdote/repost", "/api/v1/social/impact",
+    "/api/v1/social/anecdote/repost", "/api/v1/social/post/diffuse", "/api/v1/social/impact",
     "/api/v1/social/anecdote/impact", "/api/v1/social/anecdote/heart",
     "/api/v1/social/follow", "/api/v1/social/promote", "/api/v1/ads/spend",
     "/api/v1/media/upload", "/api/v1/honor/issue", "/api/v1/honor/attach",

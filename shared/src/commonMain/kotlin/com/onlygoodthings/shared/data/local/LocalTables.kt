@@ -134,6 +134,8 @@ data class LocalSocialPost(
     val categoryId: String? = null,
     val publicationKind: String? = null,
     val hashtags: List<com.onlygoodthings.shared.domain.PostHashtag> = emptyList(),
+    val viewerHasDiffused: Boolean = false,
+    val diffusedBy: List<com.onlygoodthings.shared.domain.PostDiffusion> = emptyList(),
 )
 
 @Serializable

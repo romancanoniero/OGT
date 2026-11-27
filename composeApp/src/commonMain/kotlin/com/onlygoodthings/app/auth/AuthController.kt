@@ -42,6 +42,40 @@ class AuthController(
         }.also { session.firebaseJwt = it }
     }
     private val api = account
+    private val diffusionScope=kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob()+kotlinx.coroutines.Dispatchers.Main)
+    private val diffusing=mutableSetOf<Pair<String,String>>()
+    var diffusionError by mutableStateOf<String?>(null)
+    /** Explicit set/unset is retry-safe. The request uses the account/token captured on tap. */
+    fun diffusePost(postId:String,enabled:Boolean?=null) {
+        val owner=preview.currentUserId;val key=owner to postId
+        val before=db.posts.firstOrNull { it.id==postId } ?: return
+        val bearer=session.firebaseJwt ?: return
+        if(owner.isBlank() || key in diffusing)return
+        val desired=enabled ?: !before.viewerHasDiffused
+        val oldPerson=before.diffusedBy.firstOrNull { it.userId==owner }
+        val people=before.diffusedBy.filterNot { it.userId==owner } + if(desired)listOf(oldPerson ?: com.onlygoodthings.shared.domain.PostDiffusion(owner,preview.me().displayName,com.onlygoodthings.shared.realtime.currentEpochMs())) else emptyList()
+        val optimistic=before.copy(viewerHasDiffused=desired,diffusedBy=people)
+        db.posts[db.posts.indexOf(before)]=optimistic;db.bumpSocial();preview.persistSocialFeed();diffusing+=key
+        val client=createPlatformHttpClient()
+        val ownSession=SessionStore().apply { firebaseJwt=bearer;apiBaseUrl=session.apiBaseUrl }
+        diffusionScope.launch {
+            try {
+                val saved=RestFeedRepository(client,ownSession).diffusePost(postId,desired)
+                if(preview.currentUserId==owner){db.upsertRemoteSocial(saved);preview.persistSocialFeed()}
+            } catch(cancel:kotlinx.coroutines.CancellationException) {throw cancel}
+            catch(_:Exception) {
+                if(preview.currentUserId==owner) {
+                    val index=db.posts.indexOfFirst { it.id==postId }
+                    if(index>=0 && db.posts[index].viewerHasDiffused==desired) {
+                        val current=db.posts[index]
+                        db.posts[index]=current.copy(viewerHasDiffused=before.viewerHasDiffused,diffusedBy=current.diffusedBy.filterNot { it.userId==owner }+listOfNotNull(oldPerson));db.bumpSocial();preview.persistSocialFeed()
+                    }
+                    diffusionError="No se pudo guardar la difusión. Volvé a intentarlo."
+                }
+            } finally {diffusing-=key;client.close()}
+        }
+    }
+
     private val settingsMutex = kotlinx.coroutines.sync.Mutex()
     private val accountWorkScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob()+kotlinx.coroutines.Dispatchers.Default)
 
@@ -97,14 +131,22 @@ class AuthController(
                 session.firebaseJwt=token
             }
         },
-        load={ query -> feedTimeline.confirmViewerLocation(feed.feedLocation());feed.loadNearbyFeed("0",40,query.mode,query.family,query.adoptionRadiusKm) },
+        load={ query ->
+            val owner=preview.currentUserId
+            val scope=feed.discoveryScope()
+            check(owner.isNotBlank() && preview.currentUserId==owner) { "La sesión cambió" }
+            feedTimeline.applyDiscoverySettings(scope.settings)
+            feedTimeline.confirmViewerLocation(com.onlygoodthings.shared.domain.AdoptionProximity.point(scope.latitude,scope.longitude),manual=scope.place!=null)
+            feed.loadNearbyFeed("0",200,query.mode,query.family,scope.settings.adoptionRadiusKm)
+        },
         visible=feed::visiblePostIds,
         loadPost=feed::getPost,
         reconcile=preview::reconcileFeedVisibility,
         persist=preview::persistSocialFeed,
-        prefetch={ com.onlygoodthings.app.media.OgtMediaCache.prefetch(it) },
+        prefetch={ com.onlygoodthings.app.media.OgtMediaCache.enqueue(it) },
     )
     val postInvitations = com.onlygoodthings.shared.data.remote.RestPostInvitations(createPlatformHttpClient(), session)
+    init { stories.onDiscoverySettings={ feedTimeline.applyDiscoverySettings(it) } }
 
     suspend fun updateMyLocation(latitude: Double, longitude: Double, accuracyMeters: Double?) {
         val ok = api.updateLocation(latitude, longitude, accuracyMeters)
@@ -114,7 +156,7 @@ class AuthController(
         val idx = db.users.indexOfFirst { it.id == me.id }
         if (idx >= 0) db.users[idx] = updated
         preview.overlayUser = updated
-        feedTimeline.confirmViewerLocation(com.onlygoodthings.shared.domain.GeoPoint(latitude,longitude))
+        if(!feedTimeline.viewerUsesManualPlace)feedTimeline.confirmViewerLocation(com.onlygoodthings.shared.domain.GeoPoint(latitude,longitude))
         feedTimeline.localChanged()
         feedTimeline.refresh(feedTimeline.presentation.query,force=true)
     }
@@ -374,6 +416,7 @@ class AuthController(
     }
 
     suspend fun signOut() {
+        diffusionError=null
         prefs.sessionSignedOut = true
         error = null
         needsCommunityConsent = true

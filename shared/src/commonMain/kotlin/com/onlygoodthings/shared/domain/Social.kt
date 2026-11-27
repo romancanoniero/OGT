@@ -48,7 +48,13 @@ data class SocialPost(
     val eventStartsAtEpochMs: Long? = null,
     val hashtags: List<PostHashtag> = emptyList(),
     val animalListing: AnimalListingDto? = null,
+    val viewerHasDiffused: Boolean = false,
+    /** Only the viewer and followed people who can still interact with this viewer. */
+    val diffusedBy: List<PostDiffusion> = emptyList(),
 )
+
+@Serializable
+data class PostDiffusion(val userId: String, val displayName: String, val createdAtEpochMs: Long)
 
 @Serializable
 data class SocialAnecdote(
@@ -132,6 +138,7 @@ data class SocialLiveCounters(
     val attributionUrl: String? = null,
     val attributionChanged: Boolean = false,
     val hashtags: List<PostHashtag>? = null,
+    val diffusionChanged: Boolean = false,
 ) {
     val canIngest: Boolean
         get() = !authorUserId.isNullOrBlank() && !body.isNullOrBlank()

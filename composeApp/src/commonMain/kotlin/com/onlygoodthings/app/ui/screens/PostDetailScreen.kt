@@ -141,6 +141,7 @@ import org.jetbrains.compose.resources.painterResource
 @Composable
 fun PostDetailScreen(
     postId: String = "",
+    initialMediaIndex: Int = 0,
     onBack: () -> Unit,
     onPetsMap: () -> Unit = {},
     onAdopt: () -> Unit = {},
@@ -259,6 +260,7 @@ fun PostDetailScreen(
     }
     val actions: @Composable () -> Unit = {
         PostActionRow(
+            diffusePostId = post.id,
             clapped = clapped,
             thanks = thanks,
             comments = comments.size,
@@ -402,6 +404,7 @@ fun PostDetailScreen(
                             onOpenSighting = { row -> report = row },
                             onExpandMap = { mapOpen = true },
                             onOpenMedia = { mediaPage = it },
+                            initialMediaIndex = initialMediaIndex,
                         )
                         FeedCardKind.ADOPTION -> AdoptionDetail(
                             post = post,
@@ -414,6 +417,7 @@ fun PostDetailScreen(
                             onAdopt = onAdopt,
                             onEdit = onEdit,
                             onOpenMedia = { mediaPage = it },
+                            initialMediaIndex = initialMediaIndex,
                         )
                         FeedCardKind.PET_STORY -> PetStoryDetail(
                             post = post,
@@ -422,6 +426,7 @@ fun PostDetailScreen(
                             media = media,
                             actions = actions,
                             onOpenMedia = { mediaPage = it },
+                            initialMediaIndex = initialMediaIndex,
                         )
                         FeedCardKind.TERNURA -> TernuraDetail(
                             post = post,
@@ -430,6 +435,7 @@ fun PostDetailScreen(
                             media = media,
                             actions = actions,
                             onOpenMedia = { mediaPage = it },
+                            initialMediaIndex = initialMediaIndex,
                         )
                         FeedCardKind.HOMENAJE -> HomenajeDetail(
                             post = post,
@@ -438,6 +444,7 @@ fun PostDetailScreen(
                             media = media,
                             actions = actions,
                             onOpenMedia = { mediaPage = it },
+                            initialMediaIndex = initialMediaIndex,
                             onShareAnecdote = { shareAnecdoteId = it },
                         )
                         FeedCardKind.NEWS -> NewsDetail(
@@ -447,6 +454,7 @@ fun PostDetailScreen(
                             media = media,
                             actions = actions,
                             onOpenMedia = { mediaPage = it },
+                            initialMediaIndex = initialMediaIndex,
                         )
                         FeedCardKind.COMMUNITY -> CommunityDetail(
                             post = post,
@@ -455,6 +463,7 @@ fun PostDetailScreen(
                             media = media,
                             actions = actions,
                             onOpenMedia = { mediaPage = it },
+                            initialMediaIndex = initialMediaIndex,
                             canRsvp = canRsvp,
                             going = going,
                             onRsvp = {
@@ -700,10 +709,7 @@ fun PostDetailScreen(
         PostShareSheet(
             shareText = shareBody,
             onDismiss = { shareOpen = false },
-            onRepost = {
-                db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE)
-                reposted = true
-            },
+            onRepost = { auth.diffusePost(post.id,true) },
             onInvite = {
                 db.recordFeedEvent(me.id, post.id, FeedEventKind.SHARE)
                 onInvite()
@@ -833,6 +839,7 @@ private fun LostPetDetail(
     onOpenSighting: (LocalSighting) -> Unit,
     onExpandMap: () -> Unit,
     onOpenMedia: (Int) -> Unit,
+    initialMediaIndex: Int,
 ) {
     val resolved = listing?.resolved == true
     val petName = listing?.displayPetName()?.ifBlank { null } ?: post.tag
@@ -846,7 +853,7 @@ private fun LostPetDetail(
             OgtPill("Urgente", OgtColors.sunset, OgtColors.sunsetText)
         }
     }
-    DetailMedia(media, petName, height = 220.dp, onOpen = onOpenMedia)
+    DetailMedia(media, petName, height = 220.dp, onOpen = onOpenMedia, initialIndex = initialMediaIndex)
     com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
     Text(petName, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = OgtColors.ink)
     if (kindLine != null) OgtCaption(kindLine)
@@ -893,6 +900,7 @@ private fun AdoptionDetail(
     onAdopt: () -> Unit,
     onEdit: () -> Unit,
     onOpenMedia: (Int) -> Unit,
+    initialMediaIndex: Int,
 ) {
     val copy = LocalOgtCopy.current
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -900,7 +908,7 @@ private fun AdoptionDetail(
         OgtPill(copy.petsAdoption, OgtColors.sand, OgtColors.ink)
     }
     AuthorLine(authorName, level, post)
-    DetailMedia(media, post.tag, height = 240.dp, onOpen = onOpenMedia)
+    DetailMedia(media, post.tag, height = 240.dp, onOpen = onOpenMedia, initialIndex = initialMediaIndex)
     com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
     actions()
     if (isAuthor) {
@@ -941,10 +949,11 @@ private fun PetStoryDetail(
     media: List<LocalPostMedia>,
     actions: @Composable () -> Unit,
     onOpenMedia: (Int) -> Unit,
+    initialMediaIndex: Int,
 ) {
     OgtPill(post.tag, OgtColors.sand, OgtColors.secondary)
     AuthorLine(authorName, level, post)
-    DetailMedia(media, post.tag, height = 220.dp, onOpen = onOpenMedia)
+    DetailMedia(media, post.tag, height = 220.dp, onOpen = onOpenMedia, initialIndex = initialMediaIndex)
     com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
     actions()
     Text(post.body, fontSize = 16.sp, lineHeight = 22.sp, color = OgtColors.ink)
@@ -961,6 +970,7 @@ private fun TernuraDetail(
     media: List<LocalPostMedia>,
     actions: @Composable () -> Unit,
     onOpenMedia: (Int) -> Unit,
+    initialMediaIndex: Int,
 ) {
     val copy = LocalOgtCopy.current
     val db = LocalOgtDb.current
@@ -970,7 +980,7 @@ private fun TernuraDetail(
         OgtPill(post.tag, OgtColors.sand, OgtColors.secondary)
     }
     AuthorLine(authorName, level, post, showCredit = false)
-    DetailMedia(media, post.tag, height = 240.dp, onOpen = onOpenMedia)
+    DetailMedia(media, post.tag, height = 240.dp, onOpen = onOpenMedia, initialIndex = initialMediaIndex)
     com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
     Text(post.body, fontSize = 16.sp, lineHeight = 22.sp, color = OgtColors.ink)
     if (credit != authorName || db.creditPending(post)) {
@@ -989,6 +999,7 @@ private fun HomenajeDetail(
     media: List<LocalPostMedia>,
     actions: @Composable () -> Unit,
     onOpenMedia: (Int) -> Unit,
+    initialMediaIndex: Int,
     onShareAnecdote: (String) -> Unit,
 ) {
     val copy = LocalOgtCopy.current
@@ -1019,7 +1030,7 @@ private fun HomenajeDetail(
     if (db.creditPending(post)) {
         OgtCaption("La familia puede reivindicar este crédito.")
     }
-    DetailMedia(media, post.tag, height = 220.dp, onOpen = onOpenMedia)
+    DetailMedia(media, post.tag, height = 220.dp, onOpen = onOpenMedia, initialIndex = initialMediaIndex)
     com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
     Text(post.body, fontSize = 16.sp, lineHeight = 22.sp, color = OgtColors.ink)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1269,11 +1280,12 @@ private fun NewsDetail(
     media: List<LocalPostMedia>,
     actions: @Composable () -> Unit,
     onOpenMedia: (Int) -> Unit,
+    initialMediaIndex: Int,
 ) {
     OgtPill(post.tag)
     AuthorLine(authorName, level, post)
     com.onlygoodthings.app.ui.components.HonoreeTitle(post.honoreeName, detail = true)
-    DetailMedia(media, post.tag, height = 220.dp, onOpen = onOpenMedia)
+    DetailMedia(media, post.tag, height = 220.dp, onOpen = onOpenMedia, initialIndex = initialMediaIndex)
     com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
     actions()
     Text(post.body, fontSize = 16.sp, lineHeight = 22.sp, color = OgtColors.ink)
@@ -1290,6 +1302,7 @@ private fun CommunityDetail(
     media: List<LocalPostMedia>,
     actions: @Composable () -> Unit,
     onOpenMedia: (Int) -> Unit,
+    initialMediaIndex: Int,
     canRsvp: Boolean = false,
     going: Boolean = false,
     onRsvp: () -> Unit = {},
@@ -1299,7 +1312,7 @@ private fun CommunityDetail(
     OgtPill(post.tag)
     AuthorLine(authorName, level, post, showPlace = !gathering)
     com.onlygoodthings.app.ui.components.HonoreeTitle(post.honoreeName, detail = true)
-    DetailMedia(media, post.tag, height = 220.dp, onOpen = onOpenMedia)
+    DetailMedia(media, post.tag, height = 220.dp, onOpen = onOpenMedia, initialIndex = initialMediaIndex)
     com.onlygoodthings.app.ui.components.AttributionLink(post.attributionUrl)
     if (whenWhere != null) {
         OgtCaption("Cuándo y dónde")
@@ -1347,6 +1360,7 @@ private fun DetailMedia(
     tag: String,
     height: androidx.compose.ui.unit.Dp,
     onOpen: (Int) -> Unit,
+    initialIndex: Int,
 ) {
     if (media.isEmpty()) {
         Box(
@@ -1358,7 +1372,7 @@ private fun DetailMedia(
         return
     }
     com.onlygoodthings.app.ui.components.PostedMediaCarousel(media,Res.drawable.feed_story_donacion,tag,
-        modifier=Modifier.ogtBleedHorizontal(OgtDimens.margin).aspectRatio(POST_FRAME_RATIO),onOpen=onOpen,inlineVideo=false)
+        modifier=Modifier.ogtBleedHorizontal(OgtDimens.margin).aspectRatio(POST_FRAME_RATIO),onOpen=onOpen,inlineVideo=false,initialIndex=initialIndex)
 }
 
 private fun lostSpeciesSize(listing: LocalAnimalListing?): String? {

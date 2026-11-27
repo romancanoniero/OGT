@@ -20,6 +20,7 @@ fun dbListenAllowed(rawPath: String, userId: String): Boolean {
         OgtDbPaths.IMPACT_ALERTS,
         OgtDbPaths.SOCIAL_FEED,
         OgtDbPaths.STORY_CHANGES,
+        OgtDbPaths.DISCOVERY_SETTINGS,
         OgtDbPaths.USERS,
     )
     if (publicRoots.any { path == it || path.startsWith("$it/") }) return true

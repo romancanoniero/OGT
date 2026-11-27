@@ -18,6 +18,9 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        #if DEBUG
+        OgtPerformanceProbe.shared.startIfRequested()
+        #endif
         UNUserNotificationCenter.current().delegate = self
         Messaging.messaging().delegate = self
         UNUserNotificationCenter.current().getNotificationSettings { settings in
@@ -644,3 +647,67 @@ final class OgtFirebaseHost: NSObject, IosAuthHost, ASAuthorizationControllerDel
         return top
     }
 }
+
+
+#if DEBUG
+/// Opt-in, local QA capture. No collection without the launch environment variable.
+private final class OgtPerformanceProbe: NSObject {
+    static let shared = OgtPerformanceProbe()
+    private var link: CADisplayLink?
+    private var previous: CFTimeInterval = 0
+    private var intervals: [Double] = []
+    private var started = Date()
+    private var seconds: Double = 60
+    private var phase = "manual"
+    func startIfRequested() {
+        guard let value = ProcessInfo.processInfo.environment["OGT_PERF_CAPTURE_SECONDS"], let requested = Double(value) else { return }
+        seconds = min(180, max(10, requested))
+        if let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first {
+            try? FileManager.default.createDirectory(at: caches, withIntermediateDirectories: true)
+            try? Data("{\"started\":true}".utf8).write(to: caches.appendingPathComponent("ogt-performance-status.json"), options: .atomic)
+        }
+        phase = ProcessInfo.processInfo.environment["OGT_PERF_PHASE"] ?? "manual"
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            self.started = Date()
+            self.link = CADisplayLink(target: self, selector: #selector(self.frame(_:)))
+            self.link?.add(to: .main, forMode: .common)
+            DispatchQueue.main.asyncAfter(deadline: .now() + self.seconds) { self.finish() }
+        }
+    }
+    @objc private func frame(_ sender: CADisplayLink) {
+        guard UIApplication.shared.applicationState == .active else { previous = 0; return }
+        let now = CACurrentMediaTime()
+        if previous > 0 { intervals.append((now - previous) * 1000) }
+        previous = now
+    }
+    private func finish() {
+        link?.invalidate(); link = nil
+        let samples = intervals.sorted(), elapsed = Date().timeIntervalSince(started)
+        let capturePhase = phase, startUTC = ISO8601DateFormatter().string(from: started)
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
+        var memory = mach_task_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<natural_t>.size)
+        let capacity = Int(count)
+        let result = withUnsafeMutablePointer(to: &memory) { pointer in
+            pointer.withMemoryRebound(to: integer_t.self, capacity: capacity) {
+                task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
+            }
+        }
+        let rss = result == KERN_SUCCESS ? memory.resident_size : 0
+        DispatchQueue.global(qos: .utility).async {
+            let files = FileManager.default
+            guard let caches = files.urls(for: .cachesDirectory, in: .userDomainMask).first else { return }
+            let media = caches.appendingPathComponent("ogt-media-cache", isDirectory: true)
+            let urls = (try? files.contentsOfDirectory(at: media, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey])) ?? []
+            let sizes = urls.compactMap { try? $0.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]) }.filter { $0.isRegularFile == true }.map { $0.fileSize ?? 0 }
+            let percentile: (Double) -> Double = { fraction in samples.isEmpty ? 0 : samples[min(samples.count - 1, Int(Double(samples.count) * fraction))] }
+            let maximum: Double = samples.last ?? 0
+            let report: [String: Any] = ["measurement": "CADisplayLink main-thread intervals, not rendered FPS", "build": build, "phase": capturePhase, "startUTC": startUTC, "durationSeconds": elapsed, "sampleCount": samples.count, "p50IntervalMs": percentile(0.5), "p95IntervalMs": percentile(0.95), "maxIntervalMs": maximum, "intervalsOver50ms": samples.filter { $0 > 50 }.count, "residentBytes": rss, "mediaCacheFiles": sizes.count, "mediaCacheBytes": sizes.reduce(0, +)]
+            if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) {
+                do { try data.write(to: caches.appendingPathComponent("ogt-performance.json"), options: .atomic) }
+                catch { try? Data("{\"writeFailed\":true}".utf8).write(to:caches.appendingPathComponent("ogt-performance-status.json"),options:.atomic) }
+            }
+        }
+    }
+}
+#endif

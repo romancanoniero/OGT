@@ -58,7 +58,7 @@ class SocialSqlRepository(private val db: Database) {
         pageSize: Int,
         cursor: String?,
         family: com.onlygoodthings.shared.domain.FeedTopicFamily? = null,
-        adoptionRadiusKm: Int = 50,
+        adoptionRadiusKm: Int = com.onlygoodthings.backend.modules.DiscoverySettingsRepository(db).get().adoptionRadiusKm,
     ): List<SocialPost> {
         require(adoptionRadiusKm in 0..20_000) { "Radio de adopciones inválido" }
         val offset = cursor?.toIntOrNull() ?: 0
@@ -68,7 +68,8 @@ class SocialSqlRepository(private val db: Database) {
             .flatMap { it.hashtags }.distinctBy { it.interestKey }.take(12)
         val inventory=if(mode==FeedMode.FOLLOWING)loadCandidates(graphIds=viewer.followedIds+viewer.userId)
             else loadCandidates(viewer=viewer,adoptionRadiusKm=adoptionRadiusKm)+(if(preferred.isEmpty())emptyList() else loadCandidates(preferred,viewer=viewer,adoptionRadiusKm=adoptionRadiusKm))
-        val candidates = (inventory + loadMatchedFriendNeeds(viewer)).distinctBy { it.postId }.filter { it.authorUserId !in excluded }
+        val diffused = loadDiffusedCandidates(viewer,if(mode==FeedMode.HOME)adoptionRadiusKm else 0)
+        val candidates = (diffused + inventory + loadMatchedFriendNeeds(viewer)).distinctBy { it.postId }.filter { it.authorUserId !in excluded }
         val ranked = FeedRanker.rank(candidates, viewer, mode, System.currentTimeMillis(), offset, pageSize, family)
         if (ranked.isEmpty()) return emptyList()
         val hydrated = hydratePosts(ranked.map { it.postId }, userId).associateBy { it.id }
@@ -726,6 +727,10 @@ class SocialSqlRepository(private val db: Database) {
         return anecdoteById(anecdoteId, userId) ?: error("Anécdota inexistente")
     }
 
+    fun setDiffusion(userId:String,postId:String,enabled:Boolean) {
+        PostDiffusions(db).set(userId,postId,enabled)
+    }
+
     fun repostAnecdote(anecdoteId: String, userId: String): SocialPost {
         val anecdote = anecdoteById(anecdoteId, userId) ?: error("Anécdota inexistente")
         val parent = byId(anecdote.postId, userId) ?: error("Homenaje inexistente")
@@ -865,7 +870,7 @@ class SocialSqlRepository(private val db: Database) {
         var lat: Double? = null
         var lng: Double? = null
         connection.prepareStatement(
-            "SELECT ST_Y(home_location) AS lat, ST_X(home_location) AS lng FROM users WHERE id = ?::uuid",
+            "SELECT ST_Y(COALESCE(discovery_location,home_location)) AS lat, ST_X(COALESCE(discovery_location,home_location)) AS lng FROM users WHERE id = ?::uuid",
         ).use { stmt ->
             stmt.setString(1, userId)
             stmt.executeQuery().use { rs ->
@@ -922,16 +927,10 @@ class SocialSqlRepository(private val db: Database) {
         ViewerContext(userId, followed, events, lat, lng, offeredTagIds = offered)
     }
 
-    fun feedScope(userId:String): Map<String,Double?> = db.withConnection { c ->
-        c.prepareStatement("SELECT ST_Y(home_location) AS lat,ST_X(home_location) AS lng FROM users WHERE id=?::uuid").use { q ->
-            q.setString(1,userId);q.executeQuery().use { r ->
-                if(r.next()) mapOf("latitude" to r.optDouble("lat"),"longitude" to r.optDouble("lng"))
-                else mapOf("latitude" to null,"longitude" to null)
-            }
-        }
-    }
+    fun feedScope(userId:String)=com.onlygoodthings.backend.modules.DiscoverySettingsRepository(db).scope(userId)
 
-    private fun loadCandidates(preferred:List<PostHashtag> = emptyList(),graphIds:Set<String>?=null,viewer:ViewerContext?=null,adoptionRadiusKm:Int=0): List<FeedCandidate> = db.withConnection { connection ->
+    private fun loadCandidates(preferred:List<PostHashtag> = emptyList(),graphIds:Set<String>?=null,viewer:ViewerContext?=null,adoptionRadiusKm:Int=0,ids:Set<String>?=null): List<FeedCandidate> = db.withConnection { connection ->
+        val idFilter=if(ids==null)"" else " AND p.id IN ("+ids.joinToString(",") { "'$it'::uuid" }+")" // IDs originate only from the UUID database column.
         val topicFilter=if(preferred.isEmpty())"" else " AND ("+preferred.joinToString(" OR ") { "p.hashtags @> ?::jsonb" }+")"
         val graphFilter=if(graphIds==null)"" else " AND (p.author_user_id=ANY(?::uuid[]) OR EXISTS(SELECT 1 FROM post_people fp WHERE fp.post_id=p.id AND fp.role='PROTAGONIST' AND fp.user_id=ANY(?::uuid[])))"
         val nearby=viewer!=null && adoptionRadiusKm>0
@@ -958,7 +957,7 @@ class SocialSqlRepository(private val db: Database) {
             LEFT JOIN animal_listings a ON a.id = p.listing_id
             LEFT JOIN timebank_needs tn ON tn.post_id = p.id AND tn.open
             WHERE p.moderation_status = 'VISIBLE' AND p.is_story = FALSE
-            $topicFilter $graphFilter $proximityFilter
+            $topicFilter $graphFilter $proximityFilter $idFilter
             ORDER BY p.created_at DESC
             LIMIT 200
             """.trimIndent(),
@@ -1152,10 +1151,13 @@ class SocialSqlRepository(private val db: Database) {
                 val media = loadMedia(connection, ids)
                 val animals = com.onlygoodthings.backend.modules.AnimalSqlRepository(db).forPosts(connection, posts.map { it.id })
                 val anecdotes = loadAnecdotes(connection, ids, viewerId)
+                val diffusions = PostDiffusions(db).forPosts(connection, ids, viewerId)
                 posts.map { post ->
                     val items = media[post.id].orEmpty()
                     post.copy(
                         media = items,
+                        diffusedBy = diffusions[post.id].orEmpty(),
+                        viewerHasDiffused = diffusions[post.id].orEmpty().any { it.userId==viewerId },
                         animalListing = animals[post.id],
                         mediaUrls = items.map { it.url }.ifEmpty { post.mediaUrls },
                         anecdotes = anecdotes[post.id].orEmpty().filter { it.authorUserId !in excluded }.map { it.copy(comments=filterBlockedComments(it.comments,excluded)) },
@@ -1163,6 +1165,12 @@ class SocialSqlRepository(private val db: Database) {
                 }
             }
         }
+    }
+
+    private fun loadDiffusedCandidates(viewer:ViewerContext,radius:Int):List<FeedCandidate> {
+        val people=PostDiffusions(db).inventory(viewer.userId)
+        if(people.isEmpty())return emptyList()
+        return loadCandidates(viewer=viewer,adoptionRadiusKm=radius,ids=people.keys).map { it.copy(diffusedBy=people[it.postId].orEmpty()) }
     }
 
     private fun loadAnecdotes(

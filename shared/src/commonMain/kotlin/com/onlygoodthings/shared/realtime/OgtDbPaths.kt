@@ -11,6 +11,7 @@ object OgtDbPaths {
     const val SOCIAL_FEED = "ogt/social/posts"
     /** Only an invalidation timestamp; never private story metadata. */
     const val STORY_CHANGES = "ogt/storyChanges"
+    const val DISCOVERY_SETTINGS = "ogt/discoverySettings"
     /** Cara pública (nombre y foto). No lleva datos privados. */
     const val USERS = "ogt/users"
     const val PRESENCE = "ogt/presence"

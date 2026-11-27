@@ -75,7 +75,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
                 else -> runCatching { com.onlygoodthings.shared.domain.FeedTopicFamily.valueOf(key) }.getOrNull()
             }
         }
-        call.respond(ApiResponse.ok(repository.feed(principal.userId, mode, pageSize, cursor, family, dataMap.optInt("adoptionRadiusKm",50))))
+        call.respond(ApiResponse.ok(repository.feed(principal.userId, mode, pageSize, cursor, family)))
     }
 
     post("/api/v1/social/post/get") {
@@ -489,6 +489,16 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
         if(!call.request.path().endsWith("/delete"))repository.requireContentInteraction(principal.userId,dataMap.optString("postId"),dataMap.optString("commentId"),dataMap.optString("anecdoteId"))
         val anecdote = repository.heartAnecdote(dataMap.reqString("anecdoteId"), principal.userId)
         call.respond(ApiResponse.ok(anecdote, "Corazón registrado"))
+    }
+
+    post("/api/v1/social/post/diffuse") {
+        val principal=call.principal<AuthPrincipal>() ?: return@post call.respond(HttpStatusCode.Unauthorized)
+        val data=JsonBody.receiveMap(call);val id=data.reqString("postId")
+        val enabled=data["enabled"] as? Boolean ?: return@post call.respond(HttpStatusCode.BadRequest,ApiResponse.fail<Unit>("Acción inválida","BAD_REQUEST"))
+        repository.setDiffusion(principal.userId,id,enabled)
+        val saved=repository.byId(id,principal.userId) ?: return@post call.respond(HttpStatusCode.NotFound)
+        hub.projectSocialPost(id,WsCodec.json.encodeToString(SocialLiveCounters.serializer(),SocialLiveCounters(id,saved.commentCount,saved.impactCount,diffusionChanged=true)))
+        call.respond(ApiResponse.ok(saved))
     }
 
     post("/api/v1/social/anecdote/repost") {

@@ -1,5 +1,5 @@
 import { mountRecognitionCategories, mountPostInvitations } from './crm-recognition.js?v=1';
-import { mountAdoptionTags } from './crm-adoption.js?v=1';
+import { mountAdoptionTags } from './crm-adoption.js?v=20261127-discovery';
 import { mountAuditDashboard } from './crm-dashboard.js?v=media-audit-1';
 import { mountOperations } from './crm-operations.js?v=ops-1';
 import { mountTeam, mountTeamInbox } from './crm-team.js?v=team-1';

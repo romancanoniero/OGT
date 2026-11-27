@@ -36,6 +36,7 @@ import com.onlygoodthings.backend.parking.ParkingSqlRepository
 import com.onlygoodthings.backend.parking.parkingRoutes
 import com.onlygoodthings.backend.routing.FootRoutingService
 import com.onlygoodthings.backend.realtime.RealtimeHub
+import com.onlygoodthings.backend.modules.discoveryRoutes
 import com.onlygoodthings.backend.realtime.dbGatewayRoutes
 import com.onlygoodthings.backend.notify.NoticeSqlRepository
 import com.onlygoodthings.backend.notify.noticeRoutes
@@ -258,7 +259,7 @@ fun Application.module() {
             }
             crmRoutes(db, verifier, hub, mediaStore)
             crmStoryRoutes(db, verifier, stories, hub)
-            storyRoutes(stories, hub)
+            storyRoutes(stories, hub) { com.onlygoodthings.backend.modules.DiscoverySettingsRepository(db).get() }
             parkingRoutes(ParkingSqlRepository(db), redis, hub, FootRoutingService.fromEnv(), parkingProximity)
             socialRoutes(SocialSqlRepository(db), hub)
             recognitionCategoryRoutes(db)
@@ -282,6 +283,7 @@ fun Application.module() {
             noticeRoutes(NoticeSqlRepository(db))
             referralRoutes(db)
             animalRoutes(db, hub)
+            discoveryRoutes(db)
             geoRoutes()
             timebankRoutes(db)
             neighborRoutes(db, hub)

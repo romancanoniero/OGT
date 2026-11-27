@@ -144,6 +144,8 @@ fun App() {
         }
         var gpsAwaiting by remember { mutableStateOf(false) }
         var selectedPostId by remember { mutableStateOf("") }
+        var selectedPostMediaIndex by remember { mutableStateOf(0) }
+        LaunchedEffect(route) { com.onlygoodthings.app.ui.components.pausePostedMediaPlayback() }
         var selectedMatchId by remember { mutableStateOf("") }
         var selectedNeighborId by remember { mutableStateOf(OgtIds.ValeriaP) }
         var selectedSpotId by remember { mutableStateOf(OgtIds.SpotCorrientes) }
@@ -166,12 +168,16 @@ fun App() {
         if (storePreview) auth.markOnboardingDone()
         val session = LocalOgtSession.current
         val db = LocalOgtDb.current
+        auth.diffusionError?.let { message ->
+            androidx.compose.material3.AlertDialog(onDismissRequest={auth.diffusionError=null},title={androidx.compose.material3.Text("No se pudo difundir")},text={androidx.compose.material3.Text(message)},confirmButton={androidx.compose.material3.TextButton(onClick={auth.diffusionError=null}){androidx.compose.material3.Text("Aceptar")}})
+        }
+
         fun openEditPost(postId: String, from: OgtRoute = OgtRoute.Feed) {
             val post = db.post(postId)
             val listing = post.listingId?.let { id -> db.animals.firstOrNull { it.id == id } }
             val kind = feedCardKind(post.tag, listing?.kind, post.sourceUrl, post.publicationKind)
             editPostId = postId
-            selectedPostId = postId
+            selectedPostId = postId; selectedPostMediaIndex = 0
             when (kind) {
                 FeedCardKind.LOST_PET -> {
                     animalPublishKind = ComposePostKind.LOST
@@ -274,7 +280,7 @@ fun App() {
         LaunchedEffect(OgtIncomingLinks.latestPostId) {
             val postId = OgtIncomingLinks.latestPostId ?: return@LaunchedEffect
             if (db.posts.any { it.id == postId }) {
-                selectedPostId = postId
+                selectedPostId = postId; selectedPostMediaIndex = 0
                 OgtIncomingLinks.clearPost()
                 if (!authGate) route = OgtRoute.PostDetail
             }
@@ -533,8 +539,8 @@ fun App() {
                     OgtRoute.Feed, OgtRoute.PostDetail, OgtRoute.NeighborProfile -> {
                         // El feed sigue compuesto bajo la ficha: atrás vuelve a la misma tarjeta.
                         FeedScreen(
-                            onOpenPost = { id ->
-                                selectedPostId = id
+                            onOpenPost = { id, mediaIndex ->
+                                selectedPostId = id; selectedPostMediaIndex = mediaIndex
                                 route = OgtRoute.PostDetail
                             },
                             onNotifications = openNotifications,
@@ -548,7 +554,7 @@ fun App() {
                             onPetsMap = { route = OgtRoute.PetsMap },
                             onAdopt = { route = OgtRoute.Animals },
                             onEditPost = { id ->
-                                selectedPostId = id
+                                selectedPostId = id; selectedPostMediaIndex = 0
                                 openEditPost(id)
                             },
                             onOpenRules = {
@@ -561,7 +567,7 @@ fun App() {
                                 userId = selectedNeighborId,
                                 onBack = { route = OgtRoute.Feed },
                                 onOpenPost = { id ->
-                                    selectedPostId = id
+                                    selectedPostId = id; selectedPostMediaIndex = 0
                                     route = OgtRoute.PostDetail
                                 },
                                 onOpenChat = { matchId ->
@@ -574,6 +580,7 @@ fun App() {
                         if (route == OgtRoute.PostDetail) {
                             PostDetailScreen(
                                 postId = selectedPostId,
+                                initialMediaIndex = selectedPostMediaIndex,
                                 onBack = { route = OgtRoute.Feed },
                                 onPetsMap = { route = OgtRoute.PetsMap },
                                 onAdopt = { route = OgtRoute.AdoptApply },
@@ -643,11 +650,11 @@ fun App() {
                         },
                         onPetsMap = { route = OgtRoute.PetsMap },
                         onOpenAdoption = { id ->
-                            selectedPostId = id
+                            selectedPostId = id; selectedPostMediaIndex = 0
                             route = OgtRoute.PostDetail
                         },
                         onEditAdoption = { id ->
-                            selectedPostId = id
+                            selectedPostId = id; selectedPostMediaIndex = 0
                             openEditPost(id, from = OgtRoute.Animals)
                         },
                     )
@@ -706,7 +713,7 @@ fun App() {
                             route = noticeBack.takeUnless { it == OgtRoute.Notifications } ?: OgtRoute.Feed
                         },
                         onOpenPost = { postId ->
-                            selectedPostId = postId
+                            selectedPostId = postId; selectedPostMediaIndex = 0
                             route = OgtRoute.PostDetail
                         },
                         onOpenPets = { route = OgtRoute.Animals },
@@ -719,7 +726,7 @@ fun App() {
                         if (settingsResume) closeSettingsLeaf() else route = OgtRoute.Feed
                     }
                     OgtRoute.PostInvitation -> PostInvitationScreen(
-                        onOpenPost = { selectedPostId = it; route = OgtRoute.PostDetail },
+                        onOpenPost = { selectedPostId = it; selectedPostMediaIndex = 0; route = OgtRoute.PostDetail },
                         onBack = { session.rememberInvitationToken(null); route = OgtRoute.Feed },
                     )
                     OgtRoute.ClaimHonor -> ClaimHonorScreen(

@@ -34,6 +34,7 @@ class OgtWebRealtime {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var listenJob: Job? = null
     private var userJob: Job? = null
+    private var discoveryJob: Job? = null
     private val commentJobs = mutableMapOf<String, Job>()
 
     fun start(token: String, endpoint: String? = null) {
@@ -81,6 +82,7 @@ class OgtWebRealtime {
     }
 
     fun shutdown() {
+        discoveryJob?.cancel();discoveryJob=null
         listenJob?.cancel()
         listenJob = null
         userJob?.cancel()
@@ -88,6 +90,13 @@ class OgtWebRealtime {
         commentJobs.values.forEach { it.cancel() }
         commentJobs.clear()
         OgtSdk.shutdown()
+    }
+
+    fun observeDiscoverySettings(onSettings:(String)->Unit):()->Unit {
+        discoveryJob?.cancel()
+        val job=scope.launch { OgtRealtime().observeDiscoverySettings().collect { value ->
+            onSettings(liveJson.encodeToString(com.onlygoodthings.shared.domain.DiscoverySettings.serializer(),value))
+        } };discoveryJob=job;return{job.cancel()}
     }
 }
 

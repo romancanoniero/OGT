@@ -32,6 +32,7 @@ data class FeedCandidate(
     val placement: PostPlacement = PostPlacement.ORGANIC,
     val needTagId: String? = null,
     val hashtags: List<com.onlygoodthings.shared.domain.PostHashtag> = emptyList(),
+    val diffusedBy: List<com.onlygoodthings.shared.domain.PostDiffusion> = emptyList(),
 ) {
     fun families(): Set<FeedTopicFamily> = feedTopicFamilies(topic,sourceUrl,hashtags)
     fun family(): FeedTopicFamily = families().firstOrNull { it != FeedTopicFamily.OTHER } ?: FeedTopicFamily.OTHER
@@ -170,7 +171,7 @@ object FeedRanker {
         } else items
         // Affinity selects/expands recommendations, but original posting time determines
         // their presentation. Keep the previous order only for identical timestamps.
-        return ordered.sortedByDescending { it.second.createdAtEpochMs }
+        return ordered.sortedByDescending { activityTime(it.second, viewer) }
             .drop(offset.coerceAtLeast(0)).take(limit.coerceIn(0,200)).map { it.first }
     }
 
@@ -224,8 +225,11 @@ object FeedRanker {
         return tag in viewer.offeredTagIds
     }
 
+    private fun activityTime(post: FeedCandidate, viewer: ViewerContext): Long = maxOf(post.createdAtEpochMs,
+        post.diffusedBy.filter { it.userId == viewer.userId || it.userId in viewer.followedIds }.maxOfOrNull { it.createdAtEpochMs } ?: 0L)
+
     private fun inGraph(post: FeedCandidate, viewer: ViewerContext): Boolean {
-        val mine = setOfNotNull(post.authorUserId, post.protagonistUserId)
+        val mine = setOfNotNull(post.authorUserId, post.protagonistUserId) + post.diffusedBy.map { it.userId }
         return viewer.userId in mine || mine.any { it in viewer.followedIds }
     }
 

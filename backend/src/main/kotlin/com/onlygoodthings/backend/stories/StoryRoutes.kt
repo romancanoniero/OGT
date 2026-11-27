@@ -15,11 +15,11 @@ import kotlinx.coroutines.withContext
 import java.nio.file.Files
 import java.util.Base64
 
-fun Route.storyRoutes(repository: StorySqlRepository, hub: RealtimeHub) {
+fun Route.storyRoutes(repository: StorySqlRepository, hub: RealtimeHub,discovery:()->com.onlygoodthings.shared.domain.DiscoverySettings={com.onlygoodthings.shared.domain.DiscoverySettings()}) {
     post("/api/v1/stories/list") {
         val viewer=call.principal<AuthPrincipal>() ?: return@post call.respond(HttpStatusCode.Unauthorized)
         val body=JsonBody.receiveMap(call)
-        call.respond(ApiResponse.ok(repository.list(viewer.userId,body.optString("cursor"))))
+        call.respond(ApiResponse.ok(repository.list(viewer.userId,body.optString("cursor")).copy(discoverySettings=discovery())))
     }
     post("/api/v1/stories/publish") {
         val viewer=call.principal<AuthPrincipal>() ?: return@post call.respond(HttpStatusCode.Unauthorized)
