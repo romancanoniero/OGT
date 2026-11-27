@@ -14,7 +14,9 @@ const sandbox={
   storiesBlock:p=>`<p>${escapeHtml(p.body)}</p>`,
   OgtAttribution:{link:()=>({outerHTML:'<a>Fuente y créditos</a>'})},
 };
-vm.createContext(sandbox);vm.runInContext(cardSource,sandbox);
+vm.createContext(sandbox);
+vm.runInContext(readFileSync(new URL('../web/app/post-carousel.js',import.meta.url),'utf8'),sandbox);
+vm.runInContext(cardSource,sandbox);
 const base={id:'post',authorName:'Romorio',topic:'Homenaje',body:'Relato original',mediaUrls:['https://example.test/photo.jpg']};
 
 test('honoree is a heading before media, even for news or a matching author name',()=>{

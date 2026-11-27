@@ -386,14 +386,16 @@ fun OgtDraftMediaStrip(
 @Composable
 private fun DraftStill(item: OgtPickedMedia, description: String?, modifier: Modifier) {
     val remote = !item.fromDevice && (item.path.startsWith("https://") || item.path.startsWith("http://"))
+    val source = if (remote) item.path else if (item.fromDevice) "file://${item.path}" else "asset://${item.path}"
+    val poster = item.posterPath?.let { if (remote) it else "file://$it" }
     OgtPostImage(
-        url = if (remote) item.path else if (item.fromDevice) "file://${item.path}" else "asset://${item.path}",
+        url = com.onlygoodthings.app.media.postPreviewUrl(item.kind, source, poster),
         assetKey = if (remote || item.fromDevice || item.kind == MediaKind.VIDEO) "" else item.path,
         fallback = Res.drawable.publish_photo,
         contentDescription = description,
         modifier = modifier,
         contentScale = ContentScale.Crop,
-        posterUrl = item.posterPath?.let { if (remote) it else "file://$it" },
+        posterUrl = poster,
     )
 }
 

@@ -48,10 +48,13 @@ import com.onlygoodthings.app.resources.Res
 import com.onlygoodthings.app.resources.feed_avatar_reply
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.ui.components.OgtBackButton
+import com.onlygoodthings.app.ui.components.OgtPrimaryButton
 import com.onlygoodthings.shared.data.local.OgtIds
 import com.onlygoodthings.shared.domain.POST_FRAME_RATIO
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 /**
  * Perfil de alguien de la comunidad (no el ajuste de cuenta).
@@ -62,6 +65,7 @@ fun NeighborProfileScreen(
     userId: String,
     onBack: () -> Unit,
     onOpenPost: (String) -> Unit,
+    onOpenChat: (String) -> Unit,
 ) {
     val db = LocalOgtDb.current
     val auth = LocalAuth.current
@@ -87,6 +91,8 @@ fun NeighborProfileScreen(
     val posts = remember(userId, db.posts.size) { db.postsOfAuthor(userId) }
     var following by remember(userId, db.follows.size) { mutableStateOf(db.isFollowing(me.id, userId)) }
     val mine = userId == me.id
+    var openingChat by remember(me.id, userId) { mutableStateOf(false) }
+    var contactError by remember(me.id, userId) { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize().background(Color(0xFFFBF8FC)).verticalScroll(rememberScrollState())) {
         Row(
             Modifier
@@ -144,6 +150,29 @@ fun NeighborProfileScreen(
                 ) {
                     Text(if (following) "Siguiendo" else "Seguir", color = ink, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
+                Spacer(Modifier.height(8.dp))
+                OgtPrimaryButton(
+                    text = if (openingChat) "Abriendo…" else "Enviar mensaje",
+                    enabled = !openingChat,
+                ) {
+                    openingChat = true
+                    contactError = null
+                    scope.launch {
+                        try {
+                            check(session.me().id == me.id)
+                            val thread = auth.account.startConversation(userId, "mensaje")
+                            check(session.me().id == me.id)
+                            onOpenChat(thread.matchId)
+                        } catch (cancel: CancellationException) {
+                            throw cancel
+                        } catch (_: Exception) {
+                            contactError = "No pudimos abrir la conversación. Volvé a intentarlo."
+                        } finally {
+                            openingChat = false
+                        }
+                    }
+                }
+                contactError?.let { Text(it, color = OgtColors.error, fontSize = 13.sp) }
             }
             Spacer(Modifier.height(16.dp))
         }

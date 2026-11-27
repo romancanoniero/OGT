@@ -13,6 +13,7 @@ import io.ktor.server.auth.principal
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
+import io.ktor.server.request.header
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
@@ -32,7 +33,27 @@ fun Route.publicMediaRoutes(store: MediaStore,available:(String)->Boolean={true}
         }
             ?: return@get call.respond(HttpStatusCode.NotFound)
         call.response.header(HttpHeaders.CacheControl, "public, max-age=300, must-revalidate")
-        call.respondBytes(bytes, ContentType.parse(store.contentTypeOf(name)))
+        call.response.header(HttpHeaders.AcceptRanges, "bytes")
+        val type = ContentType.parse(store.contentTypeOf(name))
+        // AVFoundation starts remote playback with bytes=0-1. Returning the
+        // entire MP4 for that request makes Apple reject an otherwise valid file.
+        val range = call.request.header(HttpHeaders.Range)
+        if (range == null || call.request.header(HttpHeaders.IfRange) != null) {
+            return@get call.respondBytes(bytes, type)
+        }
+        val match = Regex("bytes=(\\d*)-(\\d*)").matchEntire(range)
+        val first = match?.groupValues?.get(1).orEmpty()
+        val last = match?.groupValues?.get(2).orEmpty()
+        val start = if (first.isNotEmpty()) first.toLongOrNull()
+            else last.toLongOrNull()?.takeIf { it > 0 }?.let { (bytes.size - it).coerceAtLeast(0) }
+        val end = if (first.isEmpty() || last.isEmpty()) bytes.lastIndex.toLong()
+            else last.toLongOrNull()?.coerceAtMost(bytes.lastIndex.toLong())
+        if (start == null || end == null || start !in 0..bytes.lastIndex || end < start) {
+            call.response.header(HttpHeaders.ContentRange, "bytes */${bytes.size}")
+            return@get call.respond(HttpStatusCode.RequestedRangeNotSatisfiable)
+        }
+        call.response.header(HttpHeaders.ContentRange, "bytes $start-$end/${bytes.size}")
+        call.respondBytes(bytes.copyOfRange(start.toInt(), end.toInt() + 1), type, HttpStatusCode.PartialContent)
     }
 }
 

@@ -22,6 +22,7 @@ import com.onlygoodthings.shared.domain.placePostFrame
 import com.onlygoodthings.app.map.decodeTileBitmap
 import com.onlygoodthings.app.media.OgtMediaCache
 import com.onlygoodthings.app.media.isRemoteMediaUrl
+import com.onlygoodthings.app.media.postPreviewUrl
 import com.onlygoodthings.app.platform.localFilePath
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.data.LocalOgtSession
@@ -142,7 +143,7 @@ fun OgtPostImage(
     onAspect: ((Float) -> Unit)? = null,
 ) {
     OgtPostImage(
-        url = item.url,
+        url = postPreviewUrl(item.kind, item.url, item.posterUrl),
         assetKey = item.assetKey.ifBlank { posterAssetKey(item) },
         fallback = fallback,
         contentDescription = contentDescription,

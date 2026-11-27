@@ -564,6 +564,11 @@ fun App() {
                                     selectedPostId = id
                                     route = OgtRoute.PostDetail
                                 },
+                                onOpenChat = { matchId ->
+                                    selectedMatchId = matchId
+                                    chatBack = OgtRoute.NeighborProfile
+                                    route = OgtRoute.Chat
+                                },
                             )
                         }
                         if (route == OgtRoute.PostDetail) {

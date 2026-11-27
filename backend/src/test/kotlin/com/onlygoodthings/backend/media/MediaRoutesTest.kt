@@ -4,6 +4,7 @@ import com.onlygoodthings.backend.auth.AuthPrincipal
 import com.onlygoodthings.shared.domain.UserRole
 import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.bodyAsBytes
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.*
@@ -23,6 +24,47 @@ import java.util.Base64
 
 class MediaRoutesTest {
     @TempDir lateinit var root: Path
+    @Test fun `public videos support the byte ranges requested by Apple without bypassing revocation`() = testApplication {
+        val store = MediaStore(root, "http://localhost")
+        val bytes = ByteArray(512) { it.toByte() }
+        val video = store.save(bytes, "video.mp4", "video/mp4")
+        val revoked = store.save(bytes, "revoked.mp4", "video/mp4")
+        environment { config = MapApplicationConfig() }
+        application {
+            install(ContentNegotiation) { json() }
+            routing { publicMediaRoutes(store) { it != revoked.filename } }
+        }
+        val path = "/media/u/${video.filename}"
+        val entire = client.get(path)
+        assertEquals(HttpStatusCode.OK, entire.status)
+        assertArrayEquals(bytes, entire.bodyAsBytes())
+        val conditional = client.get(path) { header(HttpHeaders.Range, "bytes=0-1"); header(HttpHeaders.IfRange, "unknown-validator") }
+        assertEquals(HttpStatusCode.OK, conditional.status)
+        assertArrayEquals(bytes, conditional.bodyAsBytes())
+        for ((range, expected) in listOf(
+            "bytes=0-1" to (0..1), "bytes=128-255" to (128..255),
+            "bytes=500-" to (500..511), "bytes=-12" to (500..511),
+            "bytes=500-999" to (500..511),
+        )) {
+            val response = client.get(path) { header(HttpHeaders.Range, range) }
+            assertEquals(HttpStatusCode.PartialContent, response.status, range)
+            assertEquals("bytes", response.headers[HttpHeaders.AcceptRanges])
+            assertEquals("bytes ${expected.first}-${expected.last}/512", response.headers[HttpHeaders.ContentRange])
+            assertEquals("video/mp4", response.headers[HttpHeaders.ContentType]?.substringBefore(';'))
+            assertArrayEquals(bytes.copyOfRange(expected.first, expected.last + 1), response.bodyAsBytes())
+        }
+        for (range in listOf("bytes=512-", "bytes=3-2", "bytes=-0", "bytes=999999999999999999999-")) {
+            val response = client.get(path) { header(HttpHeaders.Range, range) }
+            assertEquals(HttpStatusCode.RequestedRangeNotSatisfiable, response.status, range)
+            assertEquals("bytes */512", response.headers[HttpHeaders.ContentRange])
+        }
+        assertEquals(HttpStatusCode.NotFound, client.get("/media/u/${revoked.filename}") {
+            header(HttpHeaders.Range, "bytes=0-1")
+        }.status)
+        assertEquals(HttpStatusCode.NotFound, client.get("/media/u/00000000-0000-0000-0000-000000000000.mp4") {
+            header(HttpHeaders.Range, "bytes=0-1")
+        }.status)
+    }
     @Test fun `authenticated HTTP upload returns a public compressed image and rejects bad input`() = testApplication {
         environment { config = MapApplicationConfig() }
         application {

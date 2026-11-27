@@ -31,7 +31,7 @@ object OgtMediaCache {
         val key = canonicalMediaUrl(url)
         if (key.isBlank()) return null
         memory[key]?.let { return it }
-        return readMediaCacheFile(diskName(key))?.also { putMemory(key, it) }
+        return readCachedFile(key)?.also { putMemory(key, it) }
     }
 
     fun ingest(url: String) {
@@ -64,7 +64,7 @@ object OgtMediaCache {
         if (key.isBlank()) return null
         if (key.startsWith("file://") || key.startsWith("/")) return key
         val path = mediaCacheFilePath(diskName(key))
-        return if (readMediaCacheFile(diskName(key)) != null) "file://$path" else null
+        return if (readCachedFile(key) != null) "file://$path" else null
     }
 
     suspend fun cachedPlayableUrl(url: String): String {
@@ -73,6 +73,20 @@ object OgtMediaCache {
         if (key.startsWith("file://") || key.startsWith("/")) return key
         load(key)
         return cachedFileUrl(key) ?: key
+    }
+
+    internal fun readCachedFile(
+        key: String,
+        readFile: (String) -> ByteArray? = ::readMediaCacheFile,
+        writeFile: (String, ByteArray) -> Unit = ::writeMediaCacheFile,
+    ): ByteArray? {
+        val name = diskName(key)
+        readFile(name)?.let { return it }
+        val legacy = legacyDiskName(key)
+        if (legacy == name) return null
+        // Preserve existing cached downloads, giving AVFoundation a supported extension.
+        val bytes = readFile(legacy) ?: return null
+        return runCatching { writeFile(name, bytes); readFile(name) }.getOrNull()
     }
 
     suspend fun load(url: String): ByteArray? {
@@ -151,6 +165,12 @@ private fun isRemoteUrl(url: String): Boolean =
     url.startsWith("http://") || url.startsWith("https://")
 
 internal fun diskName(url: String): String {
+    val legacy = legacyDiskName(url)
+    val extension = url.substringBefore('#').substringBefore('?').substringAfterLast('.').lowercase()
+    return if (extension == "mp4" || extension == "webm") legacy.removeSuffix(".bin") + "." + extension else legacy
+}
+
+internal fun legacyDiskName(url: String): String {
     val tail = url.substringAfterLast('/').ifBlank { url.takeLast(48) }
     val safe = buildString(tail.length) {
         tail.forEach { ch ->

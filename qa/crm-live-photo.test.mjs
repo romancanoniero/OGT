@@ -18,11 +18,16 @@ test('el aviso usa url y mediaUrls, los nombres que ya pinta la web', () => {
   assert.ok(photo.indexOf('live?.url') < photo.indexOf('live?.mediaUrls'));
   assert.ok(photo.indexOf('live?.mediaUrls') < photo.indexOf('live?.imageUrl'));
   assert.match(app, /function replaceShownPhoto\(postId, imageUrl\)/);
-  assert.match(app, /\[data-post="\$\{cssAttr\(postId\)\}"\] img\.media/);
+  assert.match(app, /\[data-post="\$\{cssAttr\(postId\)\}"\]/);
+  assert.match(app, /\[data-media-page="0"\] img\.media/);
   assert.match(app, /:scope > \.media-slot img\.media, :scope > img\.media/);
   assert.match(app, /function ensureLiveSlot\(img\)/);
   assert.match(app, /className = "media-slot"/);
-  assert.match(app, /const shown = photo \? `<div class="media-slot">\$\{img\}<\/div>` : ""/);
+  assert.match(app, /OgtPostCarousel\.html\(post, \{mediaUrl, frameOf: mediaFrameOf\}\)/);
+  assert.match(app, /OgtPostCarousel\.update\(card, post, \{mediaUrl, frameOf: mediaFrameOf\}\)/);
+  const carousel = readFileSync(new URL('web/app/post-carousel.js', root), 'utf8');
+  assert.match(carousel, /<div class="media-slot">/);
+  assert.match(carousel, /data-frame-x/);
   const css = readFileSync(new URL('web/app/styles.css', root), 'utf8');
   assert.match(css, /\.post \.media-slot/);
   assert.match(css, /aspect-ratio: 16 \/ 9/);

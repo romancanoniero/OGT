@@ -433,6 +433,15 @@ span.avatar svg { width: 18px; height: 18px; }
   object-fit: cover;
   object-position: center center;
 }
+.post-media-slide[hidden] { display: none; }
+.post-carousel { touch-action: pan-y pinch-zoom; }
+.post-carousel:focus-visible { outline: 2px solid var(--secondary); outline-offset: 4px; }
+.post-media-dots { display: flex; justify-content: center; flex-wrap: wrap; gap: 2px; padding-top: 6px; }
+.post-media-dot { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; }
+.post-media-dot span { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); opacity: .4; }
+.post-media-dot[aria-current="true"] span { background: var(--secondary); opacity: 1; transform: scale(1.25); }
+.post-media-dot:focus-visible { outline: 2px solid var(--secondary); outline-offset: 1px; }
+.post-media-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .actions { display: flex; gap: 8px; margin-top: 12px; }
 .act {
   width: 44px; height: 44px; border-radius: 999px; border: 1px solid var(--hairline);

@@ -430,25 +430,7 @@ function paintPost(post) {
   }
   const credit = card.querySelector(":scope > .post-attribution");
   if (credit) credit.replaceChildren(...[globalThis.OgtAttribution.link(post.attributionUrl)].filter(Boolean));
-  const frame = mediaFrameOf(post);
-  const photo = post.media?.[0]?.url || post.mediaUrls?.[0];
-  const next = photo ? mediaUrl(photo) : "";
-  card.querySelectorAll(":scope > .media-slot img.media, :scope > img.media").forEach((img) => {
-    ensureLiveSlot(img);
-    const srcChanged = Boolean(next) && img.getAttribute("src") !== next;
-    if (srcChanged) {
-      img.style.left = "";
-      img.style.top = "";
-      img.style.width = "";
-      img.style.height = "";
-      img.addEventListener("load", () => placeLiveFrame(img), { once: true });
-      img.src = next;
-    }
-    img.dataset.frameX = String(frame.x);
-    img.dataset.frameY = String(frame.y);
-    img.dataset.frameZoom = String(frame.zoom);
-    if (!srcChanged && img.complete && img.naturalWidth) placeLiveFrame(img);
-  });
+  globalThis.OgtPostCarousel.update(card, post, {mediaUrl, frameOf: mediaFrameOf});
   paintAuthor(card, post);
 }
 
@@ -1777,7 +1759,9 @@ function ensureLiveSlot(img) {
 function replaceShownPhoto(postId, imageUrl) {
   const next = mediaUrl(imageUrl);
   if (!next) return;
-  document.querySelectorAll(`[data-post="${cssAttr(postId)}"] img.media`).forEach((img) => {
+  document.querySelectorAll(`[data-post="${cssAttr(postId)}"]`).forEach((card) => {
+    const img = card.querySelector('[data-media-page="0"] img.media, :scope > .media-slot img.media, :scope > img.media');
+    if (!img) return;
     ensureLiveSlot(img);
     img.dataset.frameX = "0.5";
     img.dataset.frameY = "0.5";
@@ -1835,12 +1819,7 @@ window.addEventListener("resize", () => {
 });
 
 function postCard(post, { openable = true, previewStories = true, compose = false } = {}) {
-  const photo = post.media?.[0]?.url || post.mediaUrls?.[0];
-  const frame = mediaFrameOf(post);
-  const img = photo
-    ? `<img class="media" src="${escapeHtml(mediaUrl(photo))}" alt="" data-frame-x="${frame.x}" data-frame-y="${frame.y}" data-frame-zoom="${frame.zoom}" onload="window.ogtPlaceFrame&&window.ogtPlaceFrame(this)">`
-    : "";
-  const shown = photo ? `<div class="media-slot">${img}</div>` : "";
+  const shown = globalThis.OgtPostCarousel.html(post, {mediaUrl, frameOf: mediaFrameOf});
   const share = isAnecdoteShare(post);
   const homage = isHomenaje(post);
   const honoree = String(post.honoreeName || "").trim();
@@ -2013,6 +1992,7 @@ function lostActionsHtml(post, { onDetail = false } = {}) {
 }
 
 function bindSocial(root, { onDetail = false } = {}) {
+  globalThis.OgtPostCarousel.bind(root);
   root.querySelectorAll(".who a").forEach((a) => {
     a.addEventListener("click", (ev) => ev.stopPropagation());
   });
@@ -2098,7 +2078,7 @@ function bindSocial(root, { onDetail = false } = {}) {
   });
   root.querySelectorAll("[data-open]").forEach((card) => {
     card.addEventListener("click", (ev) => {
-      if (ev.target.closest("button, a, form, .menu")) return;
+      if (ev.target.closest("button, a, form, .menu, video")) return;
       location.hash = `#/p/${card.dataset.open}`;
     });
   });
