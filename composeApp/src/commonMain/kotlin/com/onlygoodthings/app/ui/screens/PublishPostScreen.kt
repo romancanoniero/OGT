@@ -165,7 +165,7 @@ fun PublishPostScreen(editPostId:String?=null,onDone:()->Unit,onBack:()->Unit=on
             }
             OgtSectionTitle("Fotos o video")
             if(editing)Text("Los archivos de esta publicación se conservan.",color=OgtColors.muted)
-            else OgtDraftMediaStrip(media,missing=false,heroDescription="Fotos o video de la publicación",onBusyChange={preparing=it})
+            else OgtDraftMediaStrip(media,missing=false,heroDescription="Fotos o video de la publicación",onBusyChange={preparing=it},reorderEnabled=!busy)
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 Checkbox(includePlace,{includePlace=it},enabled=!busy)
                 Text("Incluir lugar (opcional)")

@@ -93,11 +93,13 @@ internal fun LocalPostMedia.toDraft(): OgtPickedMedia {
 internal fun AnimalMediaBlock(
     draftMedia: MutableList<OgtPickedMedia>,
     missing: Boolean,
+    reorderEnabled: Boolean = true,
 ) {
     OgtDraftMediaStrip(
         items = draftMedia,
         missing = missing,
         heroDescription = "Foto de la mascota",
+        reorderEnabled = reorderEnabled,
     )
 }
 

@@ -96,7 +96,7 @@ fun PublishAdoptionScreen(
         ScreenColumn {
             OgtCaption("Estos datos van a la ficha de adopción. El horario de visita se habla después, con quien postula.")
             Text("1. Foto", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
-            AnimalMediaBlock(draftMedia, missing = triedPublish && draftMedia.isEmpty())
+            AnimalMediaBlock(draftMedia, missing = triedPublish && draftMedia.isEmpty(), reorderEnabled = !saving)
             Text("2. Nombre", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
             OutlinedTextField(
                 value = name,

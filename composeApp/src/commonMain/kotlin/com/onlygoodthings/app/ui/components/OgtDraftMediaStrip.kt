@@ -13,6 +13,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.drag
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,12 +21,15 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -35,6 +39,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,7 +54,14 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
@@ -56,6 +69,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.onlygoodthings.app.platform.OgtPickedMedia
+import com.onlygoodthings.app.platform.MediaDropSlot
+import com.onlygoodthings.app.platform.mediaDropIndex
+import com.onlygoodthings.app.platform.movePickedMedia
 import com.onlygoodthings.app.platform.rememberOgtMediaPicker
 import com.onlygoodthings.app.resources.Res
 import com.onlygoodthings.app.resources.publish_action_add
@@ -69,6 +85,7 @@ import com.onlygoodthings.app.ui.screens.ogtBleedHorizontal
 import com.onlygoodthings.shared.domain.MediaKind
 import com.onlygoodthings.shared.domain.PostMediaRules
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.isActive
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.roundToInt
 
@@ -79,8 +96,8 @@ private enum class ThumbWait { UP, SCROLL }
 
 /**
  * La zona grande es la portada. El + va primero en la tira.
- * Un toque corto pone esa pieza de portada; si se mantiene, se arrastra al héroe
- * sin mover el carrusel.
+ * Un toque corto elige la portada. Mantener pulsado permite ordenar la tira
+ * o llevar una pieza al héroe; los bordes desplazan la tira durante el arrastre.
  */
 @Composable
 fun OgtDraftMediaStrip(
@@ -88,6 +105,7 @@ fun OgtDraftMediaStrip(
     missing: Boolean,
     heroDescription: String,
     onBusyChange: (Boolean) -> Unit = {},
+    reorderEnabled: Boolean = true,
 ) {
     val remaining = (PostMediaRules.MAX_ITEMS - items.size).coerceAtLeast(0)
     val picker = rememberOgtMediaPicker(remaining) { picked ->
@@ -104,6 +122,12 @@ fun OgtDraftMediaStrip(
     var dragWindow by remember { mutableStateOf(Offset.Zero) }
     var overHero by remember { mutableStateOf(false) }
     val density = LocalDensity.current
+    val currentItems by rememberUpdatedState(items)
+    val canReorder by rememberUpdatedState(reorderEnabled)
+    val listState = rememberLazyListState()
+    val thumbBounds = remember { mutableMapOf<String, Rect>() }
+    var rowBounds by remember { mutableStateOf(Rect.Zero) }
+    var dropIndex by remember { mutableStateOf<Int?>(null) }
     val cover = items.firstOrNull()
     var toolsVideoId by remember { mutableStateOf<String?>(null) }
     val videos = items.filter { it.kind == MediaKind.VIDEO && it.fromDevice }
@@ -111,6 +135,7 @@ fun OgtDraftMediaStrip(
         ?: cover?.takeIf { it.kind == MediaKind.VIDEO && it.fromDevice } ?: videos.firstOrNull()
     LaunchedEffect(cover?.id) { if (cover?.kind == MediaKind.VIDEO) toolsVideoId = cover.id }
     LaunchedEffect(items.size) {
+        thumbBounds.keys.retainAll(items.map { it.id }.toSet())
         if (items.isNotEmpty()) sourceOpen = false
     }
     fun pickAndClose(action: () -> Unit) {
@@ -118,9 +143,38 @@ fun OgtDraftMediaStrip(
         action()
     }
     fun promoteToCover(index: Int) {
-        if (index <= 0 || index >= items.size) return
-        val item = items.removeAt(index)
-        items.add(0, item)
+        currentItems.getOrNull(index)?.let { movePickedMedia(currentItems, it.id, 0) }
+    }
+    fun updateDropTarget() {
+        val id = draggingId ?: return
+        overHero = heroBounds.contains(dragWindow)
+        val visible = listState.layoutInfo.visibleItemsInfo.map { it.key }.toSet()
+        dropIndex = when {
+            overHero -> 0
+            dragWindow.y < rowBounds.top || dragWindow.y > rowBounds.bottom -> null
+            else -> mediaDropIndex(currentItems.map { it.id }, id, dragWindow.x,
+                thumbBounds.filterKeys { it in visible }.map { (key, rect) -> MediaDropSlot(key, rect.center.x) })
+        }
+    }
+    LaunchedEffect(draggingId) {
+        if (draggingId == null) return@LaunchedEffect
+        val edge = with(density) { 28.dp.toPx() }
+        val pixelsPerSecond = with(density) { 600.dp.toPx() }
+        var previousFrame = withFrameNanos { it }
+        while (isActive) {
+            val frame = withFrameNanos { it }
+            val seconds = ((frame - previousFrame) / 1_000_000_000f).coerceIn(0f, 0.05f)
+            previousFrame = frame
+            if (dragWindow.y in rowBounds.top..rowBounds.bottom && rowBounds.width > 0f) {
+                val speed = when {
+                    dragWindow.x < rowBounds.left + edge -> -((rowBounds.left + edge - dragWindow.x) / edge).coerceIn(0f, 1f)
+                    dragWindow.x > rowBounds.right - edge -> ((dragWindow.x - rowBounds.right + edge) / edge).coerceIn(0f, 1f)
+                    else -> 0f
+                }
+                if (speed != 0f) listState.scrollBy(speed * pixelsPerSecond * seconds)
+            }
+            updateDropTarget()
+        }
     }
     val wellLine = when {
         missing -> OgtColors.error
@@ -128,7 +182,47 @@ fun OgtDraftMediaStrip(
         else -> OgtColors.hairline
     }
     val dragging = items.firstOrNull { it.id == draggingId }
-    Box(Modifier.onGloballyPositioned { rootBounds = it.boundsInWindow() }) {
+    Box(Modifier.onGloballyPositioned { rootBounds = it.boundsInWindow() }.pointerInput(Unit) {
+        awaitEachGesture {
+            val down = awaitFirstDown()
+            if (!canReorder) return@awaitEachGesture
+            val point = rootBounds.topLeft + down.position
+            if (!rowBounds.contains(point)) return@awaitEachGesture
+            val visible = listState.layoutInfo.visibleItemsInfo.map { it.key }.toSet()
+            val id = currentItems.firstOrNull { it.id in visible && thumbBounds[it.id]?.contains(point) == true }?.id
+                ?: return@awaitEachGesture
+            pressedId = id
+            try {
+                val wait = withTimeoutOrNull(OgtMotion.pressArmMs.toLong()) {
+                    while (true) {
+                        val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
+                        if (change == null || !change.pressed) return@withTimeoutOrNull ThumbWait.UP
+                        if (change.isConsumed || (change.position - down.position).getDistance() > viewConfiguration.touchSlop) return@withTimeoutOrNull ThumbWait.SCROLL
+                    }
+                    @Suppress("UNREACHABLE_CODE")
+                    ThumbWait.UP
+                }
+                if (wait == ThumbWait.UP) {
+                    promoteToCover(currentItems.indexOfFirst { it.id == id })
+                } else if (wait != ThumbWait.SCROLL) {
+                    draggingId = id
+                    dragWindow = point
+                    updateDropTarget()
+                    val completed = drag(down.id) { change ->
+                        dragWindow += change.positionChange()
+                        updateDropTarget()
+                        if (change.positionChange() != Offset.Zero) change.consume()
+                    }
+                    if (completed && canReorder) dropIndex?.let { movePickedMedia(currentItems, id, it) }
+                }
+            } finally {
+                draggingId = null
+                pressedId = null
+                dropIndex = null
+                overHero = false
+            }
+        }
+    }) {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -172,6 +266,8 @@ fun OgtDraftMediaStrip(
                 }
             }
             LazyRow(
+                state = listState,
+                modifier = Modifier.onGloballyPositioned { rowBounds = it.boundsInWindow() },
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(end = 4.dp),
                 userScrollEnabled = draggingId == null,
@@ -189,62 +285,36 @@ fun OgtDraftMediaStrip(
                         animationSpec = OgtMotion.press,
                         label = "thumb-press",
                     )
-                    var origin by remember(item.id) { mutableStateOf(Offset.Zero) }
                     Box(
                         Modifier
                             .size(72.dp)
                             .scale(scale)
                             .graphicsLayer { alpha = if (draggingThis) 0.35f else 1f }
-                            .onGloballyPositioned { origin = it.positionInWindow() }
+                            .onGloballyPositioned { thumbBounds[item.id] = it.boundsInWindow() }
                             .clip(ThumbShape)
                             .border(1.dp, OgtColors.hairline, ThumbShape)
-                            .pointerInput(item.id) {
-                                awaitEachGesture {
-                                    val down = awaitFirstDown()
-                                    pressedId = item.id
-                                    val slop = viewConfiguration.touchSlop
-                                    val wait = withTimeoutOrNull(OgtMotion.pressArmMs.toLong()) {
-                                        while (true) {
-                                            val event = awaitPointerEvent()
-                                            val change = event.changes.firstOrNull { it.id == down.id }
-                                            if (change == null || !change.pressed) return@withTimeoutOrNull ThumbWait.UP
-                                            if ((change.position - down.position).getDistance() > slop) {
-                                                return@withTimeoutOrNull ThumbWait.SCROLL
-                                            }
-                                        }
-                                        @Suppress("UNREACHABLE_CODE")
-                                        ThumbWait.UP
-                                    }
-                                    when (wait) {
-                                        ThumbWait.UP -> {
-                                            pressedId = null
-                                            promoteToCover(items.indexOfFirst { it.id == item.id })
-                                            return@awaitEachGesture
-                                        }
-                                        ThumbWait.SCROLL -> {
-                                            pressedId = null
-                                            return@awaitEachGesture
-                                        }
-                                        else -> {
-                                            draggingId = item.id
-                                            dragWindow = origin + down.position
-                                            overHero = heroBounds.contains(dragWindow)
-                                            drag(down.id) { change ->
-                                                dragWindow += change.positionChange()
-                                                overHero = heroBounds.contains(dragWindow)
-                                                if (change.positionChange() != Offset.Zero) change.consume()
-                                            }
-                                            val at = items.indexOfFirst { it.id == item.id }
-                                            if (overHero) promoteToCover(at)
-                                        }
-                                    }
-                                    draggingId = null
-                                    pressedId = null
-                                    overHero = false
+                            .semantics(mergeDescendants = true) {
+                                contentDescription = "${if (item.kind == MediaKind.VIDEO) "Video" else "Foto"} ${index + 1} de ${items.size}"
+                                role = Role.Button
+                                onClick("Usar como portada") { if (reorderEnabled) promoteToCover(index); reorderEnabled }
+                                customActions = if (!reorderEnabled) emptyList() else buildList {
+                                    if (index > 0) add(CustomAccessibilityAction("Mover a la posición anterior") { movePickedMedia(items, item.id, index - 1) })
+                                    if (index < items.lastIndex) add(CustomAccessibilityAction("Mover a la posición siguiente") { movePickedMedia(items, item.id, index + 1) })
                                 }
                             },
                     ) {
-                        DraftStill(item, if (item.kind == MediaKind.VIDEO) "Video $index" else "Foto $index", Modifier.fillMaxSize())
+                        DraftStill(item, null, Modifier.fillMaxSize())
+                        val from = items.indexOfFirst { it.id == draggingId }
+                        val destination = dropIndex
+                        if (destination != null && destination != from && index == destination) {
+                            Box(Modifier.align(if (destination < from) Alignment.CenterStart else Alignment.CenterEnd)
+                                .fillMaxHeight().width(3.dp).background(OgtColors.secondary))
+                        }
+                        Box(Modifier.align(Alignment.BottomEnd).padding(4.dp).clip(CircleShape)
+                            .background(OgtColors.ink.copy(alpha = 0.72f)).padding(horizontal = 5.dp, vertical = 1.dp)
+                            .clearAndSetSemantics { }) {
+                            Text("${index + 1}", color = OgtColors.canvas, fontSize = 10.sp)
+                        }
                         if (item.kind == MediaKind.VIDEO) {
                             Box(
                                 Modifier.align(Alignment.BottomStart).padding(4.dp)
@@ -314,15 +384,16 @@ fun OgtDraftMediaStrip(
 }
 
 @Composable
-private fun DraftStill(item: OgtPickedMedia, description: String, modifier: Modifier) {
+private fun DraftStill(item: OgtPickedMedia, description: String?, modifier: Modifier) {
+    val remote = !item.fromDevice && (item.path.startsWith("https://") || item.path.startsWith("http://"))
     OgtPostImage(
-        url = if (item.fromDevice) "file://${item.path}" else "asset://${item.path}",
-        assetKey = if (item.fromDevice || item.kind == MediaKind.VIDEO) "" else item.path,
+        url = if (remote) item.path else if (item.fromDevice) "file://${item.path}" else "asset://${item.path}",
+        assetKey = if (remote || item.fromDevice || item.kind == MediaKind.VIDEO) "" else item.path,
         fallback = Res.drawable.publish_photo,
         contentDescription = description,
         modifier = modifier,
         contentScale = ContentScale.Crop,
-        posterUrl = item.posterPath?.let { "file://$it" },
+        posterUrl = item.posterPath?.let { if (remote) it else "file://$it" },
     )
 }
 

@@ -85,7 +85,7 @@ fun PublishGatheringScreen(editPostId:String?=null,onDone:()->Unit,onBack:()->Un
             }
             OgtCaption("Usá el horario local de tu dispositivo. Asistiré estará disponible hasta que empiece la actividad.")
             PublicationPlaceField(value=place,onValueChange={place=it},label="Lugar o punto de encuentro",enabled=!busy)
-            if(!editing)OgtDraftMediaStrip(items=media,missing=false,heroDescription="La actividad",onBusyChange={preparing=it}) else OgtCaption("Se conservan las fotos y videos de esta publicación.")
+            if(!editing)OgtDraftMediaStrip(items=media,missing=false,heroDescription="La actividad",onBusyChange={preparing=it},reorderEnabled=!busy) else OgtCaption("Se conservan las fotos y videos de esta publicación.")
             AttributionField(attribution,{attribution=it},enabled=!busy)
             PublicationRightsNotice()
             error?.let{Text(it,color=OgtColors.error)}

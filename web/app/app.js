@@ -2449,9 +2449,13 @@ const PUBLISH_MAX_FILES = 10;
 const PUBLISH_MAX_BYTES = 8 * 1024 * 1024;
 
 let publishFiles = [];
+let disposePublishMedia = () => {};
+let publishMediaVersion = 0;
 
 function clearPublishFiles() {
-  publishFiles.forEach((row) => URL.revokeObjectURL(row.url));
+  ++publishMediaVersion;
+  disposePublishMedia();disposePublishMedia = () => {};
+  publishFiles.forEach((row) => { if (row.file && row.url.startsWith("blob:")) URL.revokeObjectURL(row.url); });
   publishFiles = [];
 }
 
@@ -2498,28 +2502,48 @@ function bindChipGroup(form, name, onPick) {
   });
 }
 
-function bindPublishMedia(form) {
+function bindPublishMedia(form, existing = []) {
+  disposePublishMedia();disposePublishMedia = () => {};
+  const version = ++publishMediaVersion;
+  if (!publishFiles.length && existing.length) publishFiles = existing.map(media => ({ media: { ...media }, url: media.url }));
   const thumbs = form.querySelector("[data-thumbs]");
+  let orderingReady = false;
+  const enabled = () => !form.inert && !form.querySelector('[data-submit]')?.disabled;
+  const status = document.createElement('p');status.className='media-order-status';status.setAttribute('role','status');
+  thumbs?.after(status);
+  thumbs?.setAttribute('role','list');thumbs?.setAttribute('aria-label','Orden de las imágenes');
   function paintMedia() {
     if (!thumbs) return;
-    thumbs.innerHTML = publishFiles.map((row) => (
-      row.file.type.startsWith("video/")
-        ? `<video src="${row.url}" muted></video>`
-        : `<img src="${row.url}" alt="">`
-    )).join("");
+    thumbs.setAttribute("role",publishFiles.length?"list":"group");
+    thumbs.innerHTML = publishFiles.map((row,index) => {
+      const video = row.media?.kind === 'VIDEO' || row.file?.type.startsWith('video/');
+      const source = escapeHtml(row.media ? mediaUrl(row.url) : row.url);
+      return `<div class="media-thumb" data-media-index="${index}" role="listitem" tabindex="0" aria-label="${video?'Video':'Foto'} ${index+1} de ${publishFiles.length}">
+        ${video ? `<video src="${source}" muted playsinline preload="metadata" draggable="false"${row.media?.posterUrl?` poster="${escapeHtml(mediaUrl(row.media.posterUrl))}"`:''}></video>` : `<img src="${source}" alt="" draggable="false">`}
+        <span class="media-order-number" aria-hidden="true">${index+1}</span>
+        <div class="media-order-actions"><button type="button" data-media-before aria-label="Mover imagen ${index+1} antes"${!orderingReady||index===0?' disabled':''}>←</button><button type="button" data-media-after aria-label="Mover imagen ${index+1} después"${!orderingReady||index===publishFiles.length-1?' disabled':''}>→</button></div>
+        <button type="button" class="media-remove" data-media-remove aria-label="Quitar imagen ${index+1}">×</button></div>`;
+    }).join('');
   }
+  thumbs?.addEventListener('click', event => {
+    const button=event.target.closest('[data-media-remove]');if(!button || !enabled())return;
+    const at=Number(button.closest('[data-media-index]').dataset.mediaIndex),row=publishFiles[at];if(!row)return;
+    publishFiles.splice(at,1);if(row.file && row.url.startsWith('blob:'))URL.revokeObjectURL(row.url);paintMedia();
+  });
+  import('./media-order.js?v=1').then(({mountMediaOrder})=>{
+    if(version!==publishMediaVersion || !form.isConnected || !thumbs)return;
+    orderingReady=true;paintMedia();
+    disposePublishMedia=mountMediaOrder(thumbs,{items:()=>publishFiles,paint:paintMedia,enabled,announce:message=>{status.textContent=message;}});
+  }).catch(()=>{if(form.isConnected){status.className='hint';status.textContent='No se pudo habilitar el orden de las imágenes.';}});
   form.querySelector("[data-add-media]")?.addEventListener("click", () => {
-    form.querySelector("[data-file]")?.click();
+    if(enabled())form.querySelector("[data-file]")?.click();
   });
   form.querySelector("[data-file]")?.addEventListener("change", (ev) => {
-    const picked = [...(ev.target.files || [])];
-    ev.target.value = "";
+    const picked = [...(ev.target.files || [])];ev.target.value = "";
+    if(!enabled())return;
     picked.forEach((file) => {
       if (publishFiles.length >= PUBLISH_MAX_FILES) return;
-      if (file.size > PUBLISH_MAX_BYTES) {
-        toast("Cada archivo puede pesar hasta 8 MB");
-        return;
-      }
+      if (file.size > PUBLISH_MAX_BYTES) {toast("Cada archivo puede pesar hasta 8 MB");return;}
       publishFiles.push({ file, url: URL.createObjectURL(file) });
     });
     paintMedia();
@@ -2529,7 +2553,9 @@ function bindPublishMedia(form) {
 
 async function uploadPublishMedia(altText) {
   const media = [];
-  for (const row of publishFiles) {
+  const selected = publishFiles.slice();
+  for (const [sortOrder,row] of selected.entries()) {
+    if(row.media){media.push({...row.media,sortOrder});continue;}
     const uploaded = await api("/api/v1/media/upload", {
       filename: row.file.name || "foto.jpg",
       contentType: row.file.type || "image/jpeg",
@@ -2538,6 +2564,7 @@ async function uploadPublishMedia(altText) {
     media.push({
       kind: uploaded.kind || (row.file.type.startsWith("video/") ? "VIDEO" : "IMAGE"),
       url: uploaded.url,
+      sortOrder,
       altText,
     });
   }
@@ -2736,14 +2763,7 @@ function bindAnimalForm(kind, editing) {
   const submit = form.querySelector("[data-submit]");
   const missingLine = form.querySelector("[data-missing]");
   const place = lost ? bindPlaceSearch(form, editing) : null;
-  bindPublishMedia(form);
-  if (existingMedia.length && !publishFiles.length) {
-    const thumbs = form.querySelector("[data-thumbs]");
-    if (thumbs) {
-      thumbs.innerHTML = existingMedia.map((row) =>
-        `<img src="${escapeHtml(mediaUrl(row.url))}" alt="">`).join("");
-    }
-  }
+  bindPublishMedia(form,existingMedia);
   bindChipGroup(form, "species", (code) => { species = code; });
   bindChipGroup(form, "size", (code) => { size = code; });
   bindChipGroup(form, "sex", (code) => { sex = code; });
@@ -2776,7 +2796,7 @@ function bindAnimalForm(kind, editing) {
   function collectMissing() {
     const val = (name) => String(form.querySelector(`[name=${name}]`)?.value || "").trim();
     const bits = [];
-    if (!publishFiles.length && !existingMedia.length) bits.push("una foto");
+    if (!publishFiles.length) bits.push("una foto");
     if (!val("petName")) bits.push("el nombre");
     if (!species) bits.push("la especie");
     if (!size) bits.push("el tamaño");
@@ -2826,9 +2846,7 @@ function bindAnimalForm(kind, editing) {
     submit.disabled = true;
     submit.textContent = editing ? "Guardando…" : "Publicando…";
     try {
-      const media = publishFiles.length
-        ? await uploadPublishMedia(lost ? "Mascota perdida" : "Adopción")
-        : existingMedia;
+      const media = await uploadPublishMedia(lost ? "Mascota perdida" : "Adopción");
       const body = {
         listingId: editing?.listingId,
         kind: spec.animal,
@@ -5485,6 +5503,7 @@ async function renderPostInvitation(token) {
 }
 
 async function show() {
+  ++publishMediaVersion;disposePublishMedia();disposePublishMedia=()=>{};
   closeMenu();
   const { page, id } = route();
   if(page==="invitacion" && /^[A-Za-z0-9_-]{32,64}$/.test(id||"")) {

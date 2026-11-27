@@ -509,6 +509,7 @@ fun PublishActionScreen(
                                 missing = showMissing && missingMedia,
                                 heroDescription = "Evidencia",
                                 onBusyChange = { mediaPreparing = it },
+                                reorderEnabled = !publishing,
                             )
                         }
 

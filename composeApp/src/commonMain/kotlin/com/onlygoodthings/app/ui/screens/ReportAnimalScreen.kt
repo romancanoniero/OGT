@@ -96,7 +96,7 @@ fun ReportAnimalScreen(
         ScreenColumn {
             OgtCaption("Lo que complete acá es lo que ve la comunidad en la alerta: señas y última vista. El radio lo define el CRM.")
             Text("1. Foto clara", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
-            AnimalMediaBlock(draftMedia, missing = triedPublish && draftMedia.isEmpty())
+            AnimalMediaBlock(draftMedia, missing = triedPublish && draftMedia.isEmpty(), reorderEnabled = !saving)
             Text("2. ¿Cómo se llama?", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
             OutlinedTextField(
                 value = name,
