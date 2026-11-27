@@ -2449,14 +2449,18 @@ const PUBLISH_MAX_FILES = 10;
 const PUBLISH_MAX_BYTES = 8 * 1024 * 1024;
 
 let publishFiles = [];
+const publishMediaDrafts = new Map();
+let publishMediaContext = null;
 let disposePublishMedia = () => {};
 let publishMediaVersion = 0;
 
-function clearPublishFiles() {
-  ++publishMediaVersion;
-  disposePublishMedia();disposePublishMedia = () => {};
-  publishFiles.forEach((row) => { if (row.file && row.url.startsWith("blob:")) URL.revokeObjectURL(row.url); });
-  publishFiles = [];
+function clearPublishFiles(context = publishMediaContext) {
+  const active = context === publishMediaContext;
+  if (active) {++publishMediaVersion;disposePublishMedia();disposePublishMedia = () => {};}
+  const files = active ? publishFiles : publishMediaDrafts.get(context) || [];
+  files.forEach((row) => { if (row.file && row.url.startsWith("blob:")) URL.revokeObjectURL(row.url); });
+  publishMediaDrafts.delete(context);
+  if (active) {publishMediaContext = null;publishFiles = [];}
 }
 
 function fileToBase64(file) {
@@ -2502,10 +2506,17 @@ function bindChipGroup(form, name, onPick) {
   });
 }
 
-function bindPublishMedia(form, existing = []) {
+function bindPublishMedia(form, existing = [], context = route().id || 'new') {
   disposePublishMedia();disposePublishMedia = () => {};
   const version = ++publishMediaVersion;
-  if (!publishFiles.length && existing.length) publishFiles = existing.map(media => ({ media: { ...media }, url: media.url }));
+  const key = `${me.userId}:${context}`;
+  const hasDraft = publishMediaContext === key || publishMediaDrafts.has(key);
+  if (publishMediaContext !== key) {
+    if (publishMediaContext !== null) publishMediaDrafts.set(publishMediaContext,publishFiles);
+    publishFiles = publishMediaDrafts.get(key) || [];
+    publishMediaContext = key;
+  }
+  if (!hasDraft && existing.length) publishFiles = existing.map(media => ({ media: { ...media }, url: media.url }));
   const thumbs = form.querySelector("[data-thumbs]");
   let orderingReady = false;
   const enabled = () => !form.inert && !form.querySelector('[data-submit]')?.disabled;
@@ -2763,7 +2774,7 @@ function bindAnimalForm(kind, editing) {
   const submit = form.querySelector("[data-submit]");
   const missingLine = form.querySelector("[data-missing]");
   const place = lost ? bindPlaceSearch(form, editing) : null;
-  bindPublishMedia(form,existingMedia);
+  bindPublishMedia(form,existingMedia,editing?.listingId ? `animal:${editing.listingId}` : kind);
   bindChipGroup(form, "species", (code) => { species = code; });
   bindChipGroup(form, "size", (code) => { size = code; });
   bindChipGroup(form, "sex", (code) => { sex = code; });
@@ -2833,6 +2844,7 @@ function bindAnimalForm(kind, editing) {
     ev.preventDefault();
     const missing = paintMissing(true);
     if (missing.length) return;
+    const mediaContext = publishMediaContext;
     const val = (name) => String(form.querySelector(`[name=${name}]`)?.value || "").trim();
     const petName = titleCasePersonName(val("petName"));
     const marks = val("marks");
@@ -2872,7 +2884,7 @@ function bindAnimalForm(kind, editing) {
       const saved = editing
         ? await api("/api/v1/animals/update", body)
         : await api("/api/v1/animals/publish", body);
-      clearPublishFiles();
+      clearPublishFiles(mediaContext);
       mergePost(listingToPost(saved));
       if (saved.listingId) {
         lastListings = lastListings.filter((row) => row.listingId !== saved.listingId);
@@ -3050,6 +3062,7 @@ function bindPublishForm(kind, catalog=[], invitationsModule=null,placeModule=nu
   });
   form.addEventListener("submit", async (ev) => {
     ev.preventDefault();
+    const mediaContext = publishMediaContext;
     const body = story.value.trim();
     const honoree = String(nameField?.value || "").trim();
     if ((honor || recognition) && !honoree) {
@@ -3107,7 +3120,7 @@ function bindPublishForm(kind, catalog=[], invitationsModule=null,placeModule=nu
         attributionUrl,
         media,
       });
-      clearPublishFiles();
+      clearPublishFiles(mediaContext);
       mergePost(saved);
       toast("Publicado en el feed");
       location.hash = `#/p/${saved.id}`;
@@ -3348,6 +3361,7 @@ async function renderUnifiedPublication(catalog,invitationsModule,initialTag=nul
   bindPublishMedia(form);paint();
   form.addEventListener('submit',async event=>{
     event.preventDefault();if(busy)return;error.textContent='';
+    const mediaContext = publishMediaContext;
     try {
       addFree();if(!selected.size)throw new Error('Elegí al menos un hashtag.');
       const requiresRecognition=recognition(),honoree=name.value.trim();
@@ -3367,7 +3381,7 @@ async function renderUnifiedPublication(catalog,invitationsModule,initialTag=nul
       const media=uploaded || (uploaded=await uploadPublishMedia([...selected.values()][0].label));
       const saved=await api('/api/v1/social/publish',{body,hashtags,place,media,requestId,publicationKind:'POST',
         honoreeFullName:requiresRecognition?honoree:undefined,protagonistUserId:requiresRecognition?person?.userId:undefined,invitations,attributionUrl});
-      clearPublishFiles();mergePost(saved);toast('Publicado en el feed');location.hash='#/p/'+saved.id;
+      clearPublishFiles(mediaContext);mergePost(saved);toast('Publicado en el feed');location.hash='#/p/'+saved.id;
       if(invitations.length)await invitationsModule.openInvitationManager({api,postId:saved.id,toast});
     }catch(e){error.textContent=e.message;}
     finally{busy=false;form.inert=false;submit.textContent='Publicar';}

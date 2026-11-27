@@ -73,3 +73,51 @@ test('editing an adoption reorders existing uploads and appends new photos witho
  expect(uploaded).toBe(1);expect(edited.postId).toBe(original.postId);expect(edited.createdAtEpochMs).toBe(original.createdAtEpochMs);expect(edited.description).toBe(original.description);
  expect(edited.media).toHaveLength(3);expect(edited.media[0].url).toBe(original.media[2].url);expect(edited.media[2].url).toBe(original.media[1].url);expect(await rgb(request,edited.media[1].url)).toEqual([255,255,0]);
 });
+
+test('switching between adoption editors keeps each post photos and its unsaved selection separate',async({page,request})=>{
+ const token=await signup(page);const api=async(path,data)=>{const r=await request.post('/api/v1/'+path,{headers:{Authorization:`Bearer ${token}`},data});expect(r.ok(),await r.text()).toBe(true);return(await r.json()).data;};
+ const selected=await files(4),media=[];
+ for(const file of selected.slice(0,3)){const saved=await api('media/upload',{filename:file.name,contentType:file.mimeType,bytesBase64:file.buffer.toString('base64')});media.push({kind:'IMAGE',url:saved.url});}
+ const create=(petName,photos)=>api('animals/publish',{kind:'ADOPTION',species:'DOG',size:'SMALL',petName,ageLabel:'3 meses',temperament:'Cariñosos',description:'QA selecciones independientes',place:'Barrio QA',media:photos});
+ const first=await create('Primero QA',media.slice(0,2)),second=await create('Segundo QA',media.slice(2));
+ const sources=()=>page.locator('[data-thumbs] img').evaluateAll(imgs=>imgs.map(img=>img.src));
+ await page.goto('/#/publicar/adopcion?listing='+first.listingId);
+ await expect(page.getByRole('button',{name:'Mover imagen 2 antes',exact:true})).toBeEnabled();
+ await page.getByRole('button',{name:'Mover imagen 2 antes',exact:true}).click();await page.locator('[data-file]').setInputFiles([selected[3]]);
+ await expect(page.locator('[data-media-index]')).toHaveCount(3);const firstSelection=await sources();
+ await page.evaluate(id=>{location.hash='#/publicar/adopcion?listing='+id;},second.listingId);
+ await expect(page.locator('[name=petName]')).toHaveValue(second.petName);
+ await expect(page.locator('[data-media-index]')).toHaveCount(1);
+ expect(new URL((await sources())[0]).pathname).toBe(new URL(second.media[0].url).pathname);
+ await page.evaluate(id=>{location.hash='#/publicar/adopcion?listing='+id;},first.listingId);
+ await expect(page.locator('[name=petName]')).toHaveValue(first.petName);
+ await expect(page.locator('[data-media-index]')).toHaveCount(3);expect(await sources()).toEqual(firstSelection);
+ for(let count=3;count>0;count--)await page.getByRole('button',{name:'Quitar imagen 1',exact:true}).click();
+ await page.evaluate(id=>{location.hash='#/publicar/adopcion?listing='+id;},second.listingId);
+ await expect(page.locator('[name=petName]')).toHaveValue(second.petName);await expect(page.locator('[data-media-index]')).toHaveCount(1);
+ await page.evaluate(id=>{location.hash='#/publicar/adopcion?listing='+id;},first.listingId);
+ await expect(page.locator('[name=petName]')).toHaveValue(first.petName);await expect(page.locator('[data-media-index]')).toHaveCount(0);
+ const unchanged=await api('animals/get',{listingId:first.listingId});expect(unchanged.media.map(m=>m.url)).toEqual(first.media.map(m=>m.url));expect(unchanged.createdAtEpochMs).toBe(first.createdAtEpochMs);
+});
+
+test('finishing a save only clears that post selection when another editor was opened meanwhile',async({page,request})=>{
+ const token=await signup(page);const api=async(path,data)=>{const r=await request.post('/api/v1/'+path,{headers:{Authorization:`Bearer ${token}`},data});expect(r.ok(),await r.text()).toBe(true);return(await r.json()).data;};
+ const selected=await files(3),media=[];
+ for(const file of selected.slice(0,2)){const saved=await api('media/upload',{filename:file.name,contentType:file.mimeType,bytesBase64:file.buffer.toString('base64')});media.push({kind:'IMAGE',url:saved.url});}
+ const create=(petName,photo)=>api('animals/publish',{kind:'ADOPTION',species:'DOG',size:'SMALL',petName,ageLabel:'3 meses',temperament:'Cariñosos',description:'QA guardado independiente',place:'Barrio QA',media:[photo]});
+ const first=await create('Primero QA',media[0]),second=await create('Segundo QA',media[1]);
+ await page.goto('/#/publicar/adopcion?listing='+first.listingId);await expect(page.locator('[data-media-index]')).toHaveCount(1);
+ let release;const gate=new Promise(resolve=>{release=resolve;});
+ await page.route('**/api/v1/animals/update',async route=>{await gate;await route.continue();});
+ const pending=page.waitForRequest(r=>r.url().endsWith('/api/v1/animals/update'));await page.locator('[data-submit]').click();await pending;
+ try {
+  await page.evaluate(id=>{location.hash='#/publicar/adopcion?listing='+id;},second.listingId);
+  await expect(page.locator('[name=petName]')).toHaveValue(second.petName);await page.locator('[data-file]').setInputFiles([selected[2]]);
+  await expect(page.locator('[data-media-index]')).toHaveCount(2);
+ }finally{release();}
+ await expect(page).toHaveURL(new RegExp('#/p/'+first.postId+'$'));
+ await page.evaluate(id=>{location.hash='#/publicar/adopcion?listing='+id;},second.listingId);
+ await expect(page.locator('[name=petName]')).toHaveValue(second.petName);await expect(page.locator('[data-media-index]')).toHaveCount(2);
+ await expect.poll(()=>page.locator('[data-thumbs] img').evaluateAll(imgs=>imgs.length===2 && imgs.every(img=>img.complete && img.naturalWidth>0))).toBe(true);
+ const unchanged=await api('animals/get',{listingId:second.listingId});expect(unchanged.media.map(m=>m.url)).toEqual(second.media.map(m=>m.url));
+});
