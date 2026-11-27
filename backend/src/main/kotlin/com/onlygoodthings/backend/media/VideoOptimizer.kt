@@ -26,7 +26,7 @@ object VideoOptimizer {
             val target=work.resolve("trim.mp4")
             val duration=(endMs-startMs)/1000.0
             val bitrate=((MediaStore.MAX_BYTES*8*.80/duration).toInt()-96_000).coerceIn(100_000,1_600_000)
-            val result=run(listOf("ffmpeg","-hide_banner","-loglevel","error","-nostdin","-y","-protocol_whitelist","file,pipe","-threads","1",
+            val result=run(listOf("ffmpeg","-hide_banner","-loglevel","error","-nostdin","-y","-protocol_whitelist","file,pipe","-filter_threads","1","-threads","1",
                 "-ss",(startMs/1000.0).toString(),"-i",source.toString(),"-t",duration.toString(),"-map","0:v:0","-map","0:a?","-map_metadata","-1",
                 "-vf","scale=w='min(iw,1280)':h='min(ih,1280)':force_original_aspect_ratio=decrease:force_divisible_by=2",
                 "-c:v","libx264","-preset","veryfast","-b:v",bitrate.toString(),"-maxrate",bitrate.toString(),"-bufsize",(bitrate*2).toString(),
@@ -54,7 +54,7 @@ object VideoOptimizer {
             if (!info.simple || info.pixelFormat !in setOf("yuv420p", "yuvj420p", "nv12")) return ImageOptimizer.Result(bytes, extension)
             val target = work.resolve("optimized.mp4")
             val encoded = run(listOf("ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
-                "-protocol_whitelist", "file,pipe", "-threads", "1", "-i", source.toString(),
+                "-protocol_whitelist", "file,pipe", "-filter_threads", "1", "-threads", "1", "-i", source.toString(),
                 "-map", "0:v:0", "-map", "0:a?", "-map_metadata", "-1",
                 "-vf", "scale=w='min(iw,1280)':h='min(ih,1280)':force_original_aspect_ratio=decrease:force_divisible_by=2",
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "24", "-pix_fmt", "yuv420p", "-threads", "1",

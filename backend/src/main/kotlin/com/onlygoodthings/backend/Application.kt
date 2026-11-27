@@ -113,12 +113,6 @@ fun Application.module() {
     val lifetimeReminders = com.onlygoodthings.backend.social.PostLifetimeReminders(db)
     launch(kotlinx.coroutines.Dispatchers.IO) {
         while(isActive) {
-            runCatching { lifetimeReminders.process() }.onFailure { org.slf4j.LoggerFactory.getLogger("PostLifetime").warn("Expiry reminders deferred") }
-            delay(15*60_000L)
-        }
-    }
-    launch(kotlinx.coroutines.Dispatchers.IO) {
-        while(isActive) {
             runCatching { invitationDelivery.processPending() }
                 .onFailure { org.slf4j.LoggerFactory.getLogger("Invitations").warn("Invitation delivery deferred") }
             delay(5_000)
@@ -143,6 +137,14 @@ fun Application.module() {
             null
         },
     )
+
+    // Firebase must be initialized before claiming the one-shot reminder jobs.
+    launch(kotlinx.coroutines.Dispatchers.IO) {
+        while(isActive) {
+            runCatching { lifetimeReminders.process() }.onFailure { org.slf4j.LoggerFactory.getLogger("PostLifetime").warn("Expiry reminders deferred") }
+            delay(15*60_000L)
+        }
+    }
 
     install(CallLogging) { level = Level.INFO; filter { call -> !call.request.path().startsWith("/i/") } }
     install(DoubleReceive)
