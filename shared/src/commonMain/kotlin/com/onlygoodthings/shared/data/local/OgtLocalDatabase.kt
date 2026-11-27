@@ -441,12 +441,21 @@ class OgtLocalDatabase {
         if (remote.authorKind == AuthorKind.USER) {
             applyUserLive(remote.authorId, remote.authorName, remote.authorPhotoUrl)
         }
-        val incoming = remote.asLocalPost()
+        var animalChanged = false
+        remote.animalListing?.let { animal ->
+            val row = toLocalListing(animal, remote.authorId)
+            val at = animals.indexOfFirst { it.id == row.id }
+            if (at < 0) { animals += row; animalChanged = true }
+            else if (animals[at] != row) { animals[at] = row; animalChanged = true }
+        }
+        val incoming = remote.asLocalPost().let { post ->
+            remote.animalListing?.let { animal -> post.copy(listingId = animal.listingId, place = animal.place) } ?: post
+        }
         val index = posts.indexOfFirst { it.id == incoming.id }
         if (index >= 0) {
             val current = posts[index]
             posts[index] = incoming.copy(
-                place = if(incoming.publicationKind=="CONVOCATORIA")incoming.place.ifBlank { current.place } else remote.place ?: current.place,
+                place = if(incoming.publicationKind=="CONVOCATORIA")incoming.place.ifBlank { current.place } else remote.animalListing?.place ?: remote.place ?: current.place,
                 timeLabel = current.timeLabel.ifBlank { incoming.timeLabel },
                 listingId = current.listingId ?: incoming.listingId,
                 honoreeName = incoming.honoreeName?.takeIf { it.isNotBlank() } ?: current.honoreeName,
@@ -513,6 +522,7 @@ class OgtLocalDatabase {
                 )
             }
         }
+        if (animalChanged) { bumpLost(); bumpSocial() }
         if (!silent) bumpFeed()
     }
 
@@ -1690,13 +1700,18 @@ class OgtLocalDatabase {
         vaccinated: Boolean = false,
         sterilized: Boolean = false,
         homeNeeds: String = "",
+        title: String? = null,
+        adoptionDetails: com.onlygoodthings.shared.domain.AdoptionDetails? = null,
+        attributionUrl: String? = null,
     ): LocalSocialPost? {
         val name = titleCasePersonName(petName.trim())
         val story = description.trim()
+        val modern = adoptionDetails?.copy(presentation = adoptionDetails.presentation.ifBlank { story })
         val lost = kind == "LOST"
-        if (name.isEmpty() || story.isEmpty() || species.isBlank() || size.isBlank()) return null
+        if (story.isEmpty() || species.isBlank() || (adoptionDetails == null && (name.isEmpty() || size.isBlank()))) return null
+        if (adoptionDetails != null && (kind != "ADOPTION" || title.isNullOrBlank() || title.length > 120 || story.length > 1500)) return null
         if (lost && (marks.trim().isEmpty() || lastSeenPlace.trim().isEmpty())) return null
-        if (!lost && (ageLabel.trim().isEmpty() || place.trim().isEmpty() || temperament.trim().isEmpty())) return null
+        if (!lost && (place.trim().isEmpty() || (adoptionDetails == null && (ageLabel.trim().isEmpty() || temperament.trim().isEmpty())))) return null
         val now = currentEpochMs()
         val listingId = "animal-pub-$now"
         val postId = "post-pub-$now"
@@ -1709,7 +1724,7 @@ class OgtLocalDatabase {
             species = species,
             size = size,
             urgency = if (lost) "HIGH" else "LOW",
-            title = if (lost) "Se busca a $name" else listOf(name, ageLabel.trim()).filter { it.isNotBlank() }.joinToString(" · "),
+            title = if (adoptionDetails != null) title!!.trim() else if (lost) "Se busca a $name" else listOf(name, ageLabel.trim()).filter { it.isNotBlank() }.joinToString(" · "),
             description = story,
             place = if (lost) seen.ifBlank { barrio } else barrio,
             alertRadiusM = if (lost) alertRadiusM else 0,
@@ -1728,6 +1743,7 @@ class OgtLocalDatabase {
             sterilized = sterilized,
             homeNeeds = homeNeeds.trim(),
             createdAtEpochMs = now,
+            adoptionDetails = modern,
         )
         val post = LocalSocialPost(
             id = postId,
@@ -1737,13 +1753,15 @@ class OgtLocalDatabase {
             place = if (lost) seen.ifBlank { barrio } else barrio,
             timeLabel = "Ahora",
             tag = if (lost) "Mascota perdida" else "Adopción",
-            body = story,
+            body = modern?.presentation ?: story,
             impactCount = 0,
             commentCount = 0,
             isStory = false,
             storyLabel = null,
             createdAtEpochMs = now,
             listingId = listingId,
+            attributionUrl = com.onlygoodthings.shared.domain.ContentAttribution.normalize(attributionUrl),
+            hashtags = adoptionDetails?.let(com.onlygoodthings.shared.domain.AdoptionRules::hashtags).orEmpty(),
         )
         ingestPublishedPost(post)
         bumpLost()
@@ -1772,11 +1790,16 @@ class OgtLocalDatabase {
         lastSeenPlace: String = "",
         latitude: Double? = null,
         longitude: Double? = null,
+        title: String? = null,
+        adoptionDetails: com.onlygoodthings.shared.domain.AdoptionDetails? = null,
+        attributionUrl: String? = null,
     ): LocalSocialPost? {
         val name = titleCasePersonName(petName.trim())
         val story = description.trim()
+        val modern = adoptionDetails?.copy(presentation = adoptionDetails.presentation.ifBlank { story })
         val barrio = place.trim()
-        if (name.isEmpty() || story.isEmpty() || species.isBlank() || size.isBlank()) return null
+        if (story.isEmpty() || species.isBlank() || (adoptionDetails == null && (name.isEmpty() || size.isBlank()))) return null
+        if (adoptionDetails != null && (title.isNullOrBlank() || title.length > 120 || story.length > 1500)) return null
         val postIdx = posts.indexOfFirst { it.id == postId }
         if (postIdx < 0) return null
         val post = posts[postIdx]
@@ -1791,15 +1814,15 @@ class OgtLocalDatabase {
             if (marks.trim().isEmpty() || lastSeenPlace.trim().isEmpty()) return null
         } else if (listing.kind != "ADOPTION") {
             return null
-        } else if (ageLabel.trim().isEmpty() || barrio.isEmpty() || temperament.trim().isEmpty()) {
+        } else if (barrio.isEmpty() || (adoptionDetails == null && (ageLabel.trim().isEmpty() || temperament.trim().isEmpty()))) {
             return null
         }
         val seen = lastSeenPlace.trim()
         animals[animalIdx] = listing.copy(
             species = species,
             size = size,
-            title = if (lost) "Se busca a $name" else listOf(name, ageLabel.trim()).filter { it.isNotBlank() }.joinToString(" · "),
-            description = story,
+            title = if (adoptionDetails != null) title!!.trim() else if (listing.adoptionDetails != null) listing.title else if (lost) "Se busca a $name" else listOf(name, ageLabel.trim()).filter { it.isNotBlank() }.joinToString(" · "),
+            description = if (modern != null) listing.description else story,
             place = if (lost) seen.ifBlank { barrio } else barrio,
             petName = name,
             marks = if (lost) marks.trim() else listing.marks,
@@ -1813,8 +1836,11 @@ class OgtLocalDatabase {
             vaccinated = if (lost) listing.vaccinated else vaccinated,
             sterilized = if (lost) listing.sterilized else sterilized,
             homeNeeds = if (lost) listing.homeNeeds else homeNeeds.trim(),
+            adoptionDetails = if (lost) null else modern ?: listing.adoptionDetails,
         )
-        val updated = post.copy(body = story, place = if (lost) seen.ifBlank { barrio } else barrio)
+        val updated = post.copy(body = modern?.presentation ?: story, place = if (lost) seen.ifBlank { barrio } else barrio,
+            attributionUrl = if (attributionUrl == null) post.attributionUrl else com.onlygoodthings.shared.domain.ContentAttribution.normalize(attributionUrl),
+            hashtags = adoptionDetails?.let(com.onlygoodthings.shared.domain.AdoptionRules::hashtags) ?: post.hashtags)
         posts[postIdx] = updated
         bumpLost()
         bumpFeed()
@@ -1864,9 +1890,11 @@ class OgtLocalDatabase {
             id = remote.postId,
             listingId = remote.listingId,
             authorUserId = localAuthorId,
-            body = remote.description,
+            body = remote.adoptionDetails?.presentation?.takeIf { it.isNotBlank() } ?: remote.description,
             place = remote.place,
             tag = if (remote.kind == "LOST") "Mascota perdida" else "Adopción",
+            attributionUrl = remote.attributionUrl,
+            hashtags = remote.hashtags.ifEmpty { remote.adoptionDetails?.let(com.onlygoodthings.shared.domain.AdoptionRules::hashtags) ?: old.hashtags },
         )
         replaceRemoteMedia(localPostId, remote)
         bumpLost()
@@ -1894,13 +1922,15 @@ class OgtLocalDatabase {
             place = remote.place,
             timeLabel = "Ahora",
             tag = if (remote.kind == "LOST") "Mascota perdida" else "Adopción",
-            body = remote.description,
+            body = remote.adoptionDetails?.presentation?.takeIf { it.isNotBlank() } ?: remote.description,
             impactCount = 0,
             commentCount = 0,
             isStory = false,
             storyLabel = null,
             createdAtEpochMs = remote.createdAtEpochMs,
             listingId = remote.listingId,
+            attributionUrl = remote.attributionUrl,
+            hashtags = remote.hashtags.ifEmpty { remote.adoptionDetails?.let(com.onlygoodthings.shared.domain.AdoptionRules::hashtags).orEmpty() },
         )
         if (postIdx >= 0) {
             val current = posts[postIdx]
@@ -1964,6 +1994,7 @@ class OgtLocalDatabase {
         sterilized = remote.sterilized,
         homeNeeds = remote.homeNeeds,
         createdAtEpochMs = remote.createdAtEpochMs,
+        adoptionDetails = remote.adoptionDetails,
     )
 
     private fun replaceRemoteMedia(oldPostId: String, remote: AnimalListingDto) {
@@ -1979,6 +2010,9 @@ class OgtLocalDatabase {
                 assetKey = item.assetKey.orEmpty(),
                 altText = item.altText,
                 durationMs = item.durationMs,
+                frameX = item.frameX,
+                frameY = item.frameY,
+                frameZoom = item.frameZoom,
             )
         }
     }

@@ -180,13 +180,12 @@ test('image API rejects invalid content and simultaneous uploads keep distinct r
 test('adoption publishes from UI, preserves its photo and restricts edits to the reporter', async ({ page, browser, request }) => {
   const owner = api(request, await signup(page, 'Vecina QA Mascotas'));
   await page.goto('/#/publicar/adopcion');
-  await page.locator('[name=petName]').fill('Luna QA');
+  await page.locator('[name=title]').fill('Luna QA');
   await page.locator('[data-group=species] [data-code=DOG]').click();
   await page.locator('[data-group=size] [data-code=MEDIUM]').click();
-  await page.getByLabel('Edad', { exact: true }).fill('2 años');
-  await page.getByLabel('Carácter', { exact: true }).fill('Tranquila');
-  await page.getByLabel('Historia y cuidados', { exact: true }).fill('QA necesita un hogar responsable');
-  await page.getByLabel('Barrio', { exact: true }).fill('Palermo');
+  await page.getByLabel('Edad (opcional)', { exact: true }).fill('2 años');
+  await page.getByLabel('Presentación', { exact: true }).fill('QA necesita un hogar responsable');
+  await page.getByLabel('Barrio o localidad', { exact: true }).fill('Palermo');
   await page.locator('#publish-form [data-file]').setInputFiles({ name: 'pet.jpg', mimeType: 'image/jpeg', buffer: await readFile(new URL('../../backend/src/test/resources/images/rotated.jpg', import.meta.url)) });
   const published = page.waitForResponse(r => r.url().endsWith('/api/v1/animals/publish'));
   await page.getByRole('button', { name: 'Publicar en adopción', exact: true }).click();
@@ -214,10 +213,13 @@ test('adoption publishes from UI, preserves its photo and restricts edits to the
     const other = api(request, await signup(otherPage, 'Vecino QA Mascotas'));
     await otherPage.goto('http://localhost:19082/#/p/' + listing.postId);
     await expect.poll(() => otherPage.locator('.post .media-slot img.media').first().evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
-    const edit = { ...stored, kind: 'ADOPTION', description: 'QA ficha actualizada' };
+    const edit = { ...stored, kind: 'ADOPTION', description: 'QA ficha actualizada', adoptionDetails: {...stored.adoptionDetails,presentation:'QA ficha actualizada'} };
     await other('animals/update', edit, false);
     expect((await owner('animals/get', { listingId: listing.listingId })).description).toBe(stored.description);
-    expect((await owner('animals/update', edit)).description).toBe(edit.description);
+    const updated=await owner('animals/update', edit);
+    expect(updated.description).toBe(stored.description);
+    expect(updated.adoptionDetails.presentation).toBe(edit.description);
+    expect((await owner('social/post/get',{postId:listing.postId})).body).toBe(edit.description);
     const before = await owner('auth/me');
     const resolved = await owner('animals/resolve', { listingId: listing.listingId });
     expect(resolved.verifiedOutcome).toBe(false);

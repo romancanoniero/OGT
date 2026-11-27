@@ -1,6 +1,7 @@
 package com.onlygoodthings.backend.crm
 
 import com.onlygoodthings.backend.social.recognitionCrmRoutes
+import com.onlygoodthings.backend.modules.adoptionCrmRoutes
 import com.onlygoodthings.backend.auth.AuthPrincipal
 import com.onlygoodthings.backend.auth.FirebaseTokenVerifier
 import com.onlygoodthings.backend.http.JsonBody
@@ -359,6 +360,12 @@ private suspend fun crmContext(
 }
 
 fun Route.crmRoutes(db: Database, verifier: FirebaseTokenVerifier, hub: RealtimeHub, media: MediaStore) {
+    adoptionCrmRoutes(db) { call ->
+        val context = crmContext(call, db, verifier)
+        if (context == null) null else if (context.platformRole !in setOf("OWNER", "OPERATIONS")) {
+            call.respond(HttpStatusCode.Forbidden, ApiResponse.fail<Unit>("Solo personal autorizado puede administrar el catálogo.", "FORBIDDEN")); null
+        } else context.userId
+    }
     recognitionCrmRoutes(db) { call ->
         val context=crmContext(call,db,verifier)
         if(context==null) null else if(context.platformRole !in setOf("OWNER","OPERATIONS")) {

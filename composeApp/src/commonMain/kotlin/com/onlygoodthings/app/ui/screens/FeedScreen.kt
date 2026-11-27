@@ -726,7 +726,7 @@ private fun AdoptionFeedCard(
                 onShare = onShare,
             )
             Text(listing?.displayPetName()?.ifBlank { null } ?: post.tag, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = OgtColors.ink)
-            listing?.let { row ->
+            listing?.takeIf { it.adoptionDetails == null }?.let { row ->
                 val bits = listOfNotNull(
                     row.ageLabel.takeIf { it.isNotBlank() },
                     when (row.sex) { "HEMBRA" -> "Hembra"; "MACHO" -> "Macho"; else -> null },
@@ -742,12 +742,13 @@ private fun AdoptionFeedCard(
                     )
                 }
             }
-            OgtCaption(listing?.description ?: post.body)
+            listing?.let { AdoptionSummary(it) }
+            OgtCaption(listing?.adoptionPresentation() ?: post.body)
             listing?.homeNeeds?.takeIf { it.isNotBlank() }?.let { OgtCaption("Hogar · $it") }
             if (!post.place.isBlank()) OgtCaption(post.place)
             if (isAuthor) {
                 OgtPrimaryButton(copy.petsEdit, onClick = onEdit)
-            } else {
+            } else if (listing?.resolved != true) {
                 OgtPrimaryButton(copy.petsWantAdopt, onClick = onOpen)
             }
         }

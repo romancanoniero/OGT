@@ -1747,3 +1747,8 @@ body.desk .center {
 .post-invitation-sheet .publish-cta { display: flex; width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .post-invitation-sheet button, .post-invitation-sheet a { min-height: 44px; margin: 4px 0; }
 .post-invitation-sheet [data-close], .post-invitation-sheet [data-toggle-invite] { width: 100%; }
+.adoption-tag-group {border:0;padding:0;margin:12px 0;min-width:0}
+.adoption-tag-group legend {font-weight:600;margin-bottom:8px}
+.adoption-info {padding:0 20px 12px}
+.adoption-info .meta {margin:4px 0;white-space:pre-line}
+.publish .field select {font:inherit;color:inherit;background:transparent;border:0;padding:12px 0;width:100%}

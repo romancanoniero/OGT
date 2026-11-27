@@ -159,9 +159,10 @@ private fun PetListingCard(
         if (lost) {
             OgtCaption("Alerta · ${animal.place} · ${animal.alertRadiusM} m")
         }
-        if (species.isNotBlank()) OgtCaption(species)
+        if (animal.adoptionDetails == null && species.isNotBlank()) OgtCaption(species)
         Text(animal.title, fontWeight = FontWeight.Bold)
-        OgtCaption(animal.description)
+        if (!lost) AdoptionSummary(animal)
+        OgtCaption(animal.adoptionPresentation())
         if (!animal.place.isBlank()) OgtCaption(animal.place)
         if (lost) {
             OgtPrimaryButton(copy.petsMapCta) { onMap() }

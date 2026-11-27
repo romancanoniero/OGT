@@ -86,17 +86,17 @@ test('switching between adoption editors keeps each post photos and its unsaved 
  await page.getByRole('button',{name:'Mover imagen 2 antes',exact:true}).click();await page.locator('[data-file]').setInputFiles([selected[3]]);
  await expect(page.locator('[data-media-index]')).toHaveCount(3);const firstSelection=await sources();
  await page.evaluate(id=>{location.hash='#/publicar/adopcion?listing='+id;},second.listingId);
- await expect(page.locator('[name=petName]')).toHaveValue(second.petName);
+ await expect(page.locator('[name=title]')).toHaveValue(second.petName);
  await expect(page.locator('[data-media-index]')).toHaveCount(1);
  expect(new URL((await sources())[0]).pathname).toBe(new URL(second.media[0].url).pathname);
  await page.evaluate(id=>{location.hash='#/publicar/adopcion?listing='+id;},first.listingId);
- await expect(page.locator('[name=petName]')).toHaveValue(first.petName);
+ await expect(page.locator('[name=title]')).toHaveValue(first.petName);
  await expect(page.locator('[data-media-index]')).toHaveCount(3);expect(await sources()).toEqual(firstSelection);
  for(let count=3;count>0;count--)await page.getByRole('button',{name:'Quitar imagen 1',exact:true}).click();
  await page.evaluate(id=>{location.hash='#/publicar/adopcion?listing='+id;},second.listingId);
- await expect(page.locator('[name=petName]')).toHaveValue(second.petName);await expect(page.locator('[data-media-index]')).toHaveCount(1);
+ await expect(page.locator('[name=title]')).toHaveValue(second.petName);await expect(page.locator('[data-media-index]')).toHaveCount(1);
  await page.evaluate(id=>{location.hash='#/publicar/adopcion?listing='+id;},first.listingId);
- await expect(page.locator('[name=petName]')).toHaveValue(first.petName);await expect(page.locator('[data-media-index]')).toHaveCount(0);
+ await expect(page.locator('[name=title]')).toHaveValue(first.petName);await expect(page.locator('[data-media-index]')).toHaveCount(0);
  const unchanged=await api('animals/get',{listingId:first.listingId});expect(unchanged.media.map(m=>m.url)).toEqual(first.media.map(m=>m.url));expect(unchanged.createdAtEpochMs).toBe(first.createdAtEpochMs);
 });
 
@@ -112,12 +112,12 @@ test('finishing a save only clears that post selection when another editor was o
  const pending=page.waitForRequest(r=>r.url().endsWith('/api/v1/animals/update'));await page.locator('[data-submit]').click();await pending;
  try {
   await page.evaluate(id=>{location.hash='#/publicar/adopcion?listing='+id;},second.listingId);
-  await expect(page.locator('[name=petName]')).toHaveValue(second.petName);await page.locator('[data-file]').setInputFiles([selected[2]]);
+  await expect(page.locator('[name=title]')).toHaveValue(second.petName);await page.locator('[data-file]').setInputFiles([selected[2]]);
   await expect(page.locator('[data-media-index]')).toHaveCount(2);
  }finally{release();}
  await expect(page).toHaveURL(new RegExp('#/p/'+first.postId+'$'));
  await page.evaluate(id=>{location.hash='#/publicar/adopcion?listing='+id;},second.listingId);
- await expect(page.locator('[name=petName]')).toHaveValue(second.petName);await expect(page.locator('[data-media-index]')).toHaveCount(2);
+ await expect(page.locator('[name=title]')).toHaveValue(second.petName);await expect(page.locator('[data-media-index]')).toHaveCount(2);
  await expect.poll(()=>page.locator('[data-thumbs] img').evaluateAll(imgs=>imgs.length===2 && imgs.every(img=>img.complete && img.naturalWidth>0))).toBe(true);
  const unchanged=await api('animals/get',{listingId:second.listingId});expect(unchanged.media.map(m=>m.url)).toEqual(second.media.map(m=>m.url));
 });

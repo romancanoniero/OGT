@@ -7,6 +7,10 @@ import com.onlygoodthings.shared.domain.AnimalListingDto
 import com.onlygoodthings.shared.domain.MediaKind
 import com.onlygoodthings.shared.domain.PostMediaItem
 import com.onlygoodthings.shared.domain.forReading
+import com.onlygoodthings.shared.domain.AdoptionDetails
+import com.onlygoodthings.shared.domain.AdoptionRules
+import com.onlygoodthings.shared.protocol.WsCodec
+import com.onlygoodthings.backend.social.PostHashtags
 import java.sql.Connection
 import java.sql.ResultSet
 import java.util.UUID
@@ -32,6 +36,9 @@ data class AnimalWrite(
     val longitude: Double,
     val alertRadiusM: Int,
     val media: List<PostMediaItem>,
+    val adoptionDetails: AdoptionDetails? = null,
+    val attributionUrl: String? = null,
+    val attributionSpecified: Boolean = false,
 )
 
 class AnimalSqlRepository(private val db: Database) {
@@ -44,6 +51,7 @@ class AnimalSqlRepository(private val db: Database) {
             insertListing(connection, listingId, reporterId, write)
             insertPost(connection, postId, listingId, reporterId, write)
             replaceMedia(connection, postId, write.media, write.title)
+            saveAdoptionDetails(connection, listingId, postId, write)
             connection.commit()
             loadByListing(connection, listingId) ?: error("No se pudo leer la ficha publicada")
         } catch (error: Exception) {
@@ -54,7 +62,7 @@ class AnimalSqlRepository(private val db: Database) {
         }
     }
 
-    fun update(reporterId: String, listingId: String, write: AnimalWrite): AnimalListingDto =
+    fun update(reporterId: String, listingId: String, requested: AnimalWrite): AnimalListingDto =
         db.withConnection { connection ->
             connection.autoCommit = false
             try {
@@ -65,6 +73,12 @@ class AnimalSqlRepository(private val db: Database) {
                     stmt.executeQuery().use { rs -> if (rs.next()) rs.getString(1) else null }
                 } ?: error("Ficha inexistente")
                 if (owner != reporterId) error("Solo el autor puede editar esta ficha")
+                val previous = loadByListing(connection, listingId)
+                val write = requested.copy(
+                    adoptionDetails = requested.adoptionDetails ?: previous?.adoptionDetails,
+                    title = if (requested.adoptionDetails == null && previous?.adoptionDetails != null) previous.title else requested.title,
+                    attributionUrl = if (requested.attributionSpecified) requested.attributionUrl else previous?.attributionUrl,
+                )
                 connection.prepareStatement(
                     """
                     UPDATE animal_listings SET
@@ -110,7 +124,7 @@ class AnimalSqlRepository(private val db: Database) {
                     WHERE id = ?::uuid
                     """.trimIndent(),
                 ).use { stmt ->
-                    stmt.setString(1, write.description)
+                    stmt.setString(1, write.adoptionDetails?.presentation?.takeIf { it.isNotBlank() } ?: write.description)
                     stmt.setString(2, topicOf(write.kind))
                     stmt.setDouble(3, write.longitude)
                     stmt.setDouble(4, write.latitude)
@@ -119,6 +133,7 @@ class AnimalSqlRepository(private val db: Database) {
                     stmt.executeUpdate()
                 }
                 replaceMedia(connection, postId, write.media, write.title)
+                saveAdoptionDetails(connection, listingId, postId, write)
                 connection.commit()
                 loadByListing(connection, listingId) ?: error("No se pudo leer la ficha editada")
             } catch (error: Exception) {
@@ -165,8 +180,8 @@ class AnimalSqlRepository(private val db: Database) {
             """
             SELECT a.id AS listing_id, p.id AS post_id,
                    a.reporter_user_id::text AS reporter_id, u.firebase_uid,
-                   a.kind::text, a.species::text, COALESCE(a.size::text, 'MEDIUM') AS size,
-                   a.urgency::text, a.title, a.description, a.place_label,
+                   a.kind::text, a.species::text, CASE WHEN a.adoption_details IS NULL THEN COALESCE(a.size::text, 'MEDIUM') ELSE COALESCE(a.size::text, '') END AS size,
+                   a.urgency::text, a.title, a.description, a.place_label, a.adoption_details, p.attribution_url, p.hashtags,
                    a.alert_radius_m, a.resolved, a.pet_name, a.age_label, a.sex,
                    a.temperament, a.vaccinated, a.sterilized, a.home_needs,
                    a.marks, a.last_seen_place,
@@ -245,7 +260,7 @@ class AnimalSqlRepository(private val db: Database) {
         ).use { stmt ->
             stmt.setString(1, postId)
             stmt.setString(2, reporterId)
-            stmt.setString(3, write.description)
+            stmt.setString(3, write.adoptionDetails?.presentation?.takeIf { it.isNotBlank() } ?: write.description)
             stmt.setArray(4, connection.createArrayOf("text", write.media.map { it.url }.toTypedArray()))
             stmt.setDouble(5, write.longitude)
             stmt.setDouble(6, write.latitude)
@@ -263,24 +278,40 @@ class AnimalSqlRepository(private val db: Database) {
     }
 
     private fun replaceMedia(connection: Connection, postId: String, media: List<PostMediaItem>, alt: String) {
+        data class Saved(val id: String, val url: String, val original: String?, val source: String?, val duration: Int?, val x: Double?, val y: Double?, val zoom: Double?, val alt: String?, val created: java.sql.Timestamp)
+        val previous = connection.prepareStatement("SELECT * FROM post_media WHERE post_id=?::uuid").use { q ->
+            q.setString(1, postId)
+            q.executeQuery().use { rs -> buildList { while (rs.next()) add(Saved(rs.getString("id"), rs.getString("url"), rs.stringOrNull("original_url"), rs.stringOrNull("source_url"),
+                (rs.getObject("duration_ms") as? Number)?.toInt(), rs.doubleOrNull("frame_x"), rs.doubleOrNull("frame_y"), rs.doubleOrNull("frame_zoom"), rs.stringOrNull("alt_text"), rs.getTimestamp("created_at"))) } }
+        }
+        val retained = mutableSetOf<String>()
         connection.prepareStatement("DELETE FROM post_media WHERE post_id = ?::uuid").use { stmt ->
             stmt.setString(1, postId)
             stmt.executeUpdate()
         }
         media.take(10).forEachIndexed { order, item ->
+            val old = previous.firstOrNull { it.id !in retained && (it.id == item.id || it.url == item.url) }
+            old?.let { retained += it.id }
             connection.prepareStatement(
                 """
-                INSERT INTO post_media (id, post_id, kind, url, poster_url, sort_order, alt_text)
-                VALUES (?::uuid, ?::uuid, ?::media_kind, ?, ?, ?, ?)
+                INSERT INTO post_media (id, post_id, kind, url, poster_url, sort_order, alt_text,original_url,source_url,duration_ms,frame_x,frame_y,frame_zoom,created_at)
+                VALUES (?::uuid, ?::uuid, ?::media_kind, ?, ?, ?, ?,?,?,?,?,?,?,COALESCE(?::timestamptz,now()))
                 """.trimIndent(),
             ).use { stmt ->
-                stmt.setString(1, UUID.randomUUID().toString())
+                stmt.setString(1, old?.id ?: UUID.randomUUID().toString())
                 stmt.setString(2, postId)
                 stmt.setString(3, item.kind.name)
                 stmt.setString(4, item.url)
                 stmt.setString(5, item.posterUrl)
                 stmt.setInt(6, order)
-                stmt.setString(7, item.altText ?: alt)
+                stmt.setString(7, item.altText ?: old?.alt ?: alt)
+                stmt.setString(8, old?.original)
+                stmt.setString(9, old?.source)
+                stmt.setObject(10, item.durationMs ?: old?.duration, java.sql.Types.INTEGER)
+                stmt.setObject(11, item.frameX ?: old?.x, java.sql.Types.DOUBLE)
+                stmt.setObject(12, item.frameY ?: old?.y, java.sql.Types.DOUBLE)
+                stmt.setObject(13, item.frameZoom ?: old?.zoom, java.sql.Types.DOUBLE)
+                stmt.setTimestamp(14, old?.created)
                 stmt.executeUpdate()
             }
         }
@@ -289,7 +320,7 @@ class AnimalSqlRepository(private val db: Database) {
     private fun bindListingBody(stmt: java.sql.PreparedStatement, write: AnimalWrite, start: Int) {
         var i = start
         stmt.setString(i++, write.species)
-        stmt.setString(i++, write.size)
+        stmt.setString(i++, write.size.takeIf { it.isNotBlank() })
         stmt.setString(i++, write.urgency)
         stmt.setString(i++, write.title)
         stmt.setString(i++, write.description)
@@ -314,8 +345,8 @@ class AnimalSqlRepository(private val db: Database) {
             """
             SELECT a.id AS listing_id, p.id AS post_id,
                    a.reporter_user_id::text AS reporter_id, u.firebase_uid,
-                   a.kind::text, a.species::text, COALESCE(a.size::text, 'MEDIUM') AS size,
-                   a.urgency::text, a.title, a.description, a.place_label,
+                   a.kind::text, a.species::text, CASE WHEN a.adoption_details IS NULL THEN COALESCE(a.size::text, 'MEDIUM') ELSE COALESCE(a.size::text, '') END AS size,
+                   a.urgency::text, a.title, a.description, a.place_label, a.adoption_details, p.attribution_url, p.hashtags,
                    a.alert_radius_m, a.resolved, a.pet_name, a.age_label, a.sex,
                    a.temperament, a.vaccinated, a.sterilized, a.home_needs,
                    a.marks, a.last_seen_place,
@@ -398,7 +429,49 @@ class AnimalSqlRepository(private val db: Database) {
         latitude = doubleOrNull("lat"),
         longitude = doubleOrNull("lng"),
         createdAtEpochMs = getLong("created_ms"),
+        adoptionDetails = stringOrNull("adoption_details")?.let { WsCodec.json.decodeFromString(AdoptionDetails.serializer(), it) },
+        attributionUrl = stringOrNull("attribution_url"),
+        hashtags = PostHashtags.read(stringOrNull("hashtags")),
     )
+
+    private fun saveAdoptionDetails(c: Connection, listingId: String, postId: String, write: AnimalWrite) {
+        c.prepareStatement("UPDATE animal_listings SET adoption_details=?::jsonb WHERE id=?::uuid").use { q ->
+            q.setString(1, write.adoptionDetails?.let { WsCodec.json.encodeToString(AdoptionDetails.serializer(), it) })
+            q.setString(2, listingId); q.executeUpdate()
+        }
+        val hashtags = write.adoptionDetails?.let { details ->
+            val tags = AdoptionRules.hashtags(details)
+            val categoryIds = c.prepareStatement("SELECT id,tag_key FROM recognition_categories WHERE tag_key=ANY(?)").use { q ->
+                q.setArray(1,c.createArrayOf("text",tags.map { it.key }.toTypedArray()))
+                q.executeQuery().use { rs -> buildMap { while(rs.next())put(rs.getString("tag_key"),rs.getString("id")) } }
+            }
+            tags.map { it.copy(categoryId = categoryIds[it.key]) }
+        }
+        c.prepareStatement("UPDATE social_posts SET attribution_url=?,hashtags=COALESCE(?::jsonb,hashtags) WHERE id=?::uuid").use { q ->
+            q.setString(1, write.attributionUrl)
+            q.setString(2, hashtags?.let(PostHashtags::json))
+            q.setString(3, postId); q.executeUpdate()
+        }
+    }
+
+    /** One batch per feed/page; no per-card queries and no media duplicated in the response. */
+    fun forPosts(c: Connection, ids: List<String>): Map<String, AnimalListingDto> {
+        if (ids.isEmpty()) return emptyMap()
+        val placeholders = ids.joinToString(",") { "?::uuid" }
+        return c.prepareStatement("""
+            SELECT a.id AS listing_id,p.id AS post_id,a.reporter_user_id::text AS reporter_id,u.firebase_uid,
+                   a.kind::text,a.species::text,COALESCE(a.size::text,'') AS size,a.urgency::text,
+                   a.title,a.description,a.place_label,a.adoption_details,p.attribution_url,p.hashtags,
+                   a.alert_radius_m,a.resolved,a.pet_name,a.age_label,a.sex,a.temperament,a.vaccinated,a.sterilized,
+                   a.home_needs,a.marks,a.last_seen_place,ST_Y(a.location) AS lat,ST_X(a.location) AS lng,
+                   EXTRACT(EPOCH FROM a.created_at)*1000 AS created_ms
+            FROM social_posts p JOIN animal_listings a ON a.id=p.listing_id JOIN users u ON u.id=a.reporter_user_id
+            WHERE p.id IN ($placeholders)
+        """.trimIndent()).use { q ->
+            ids.forEachIndexed { index, id -> q.setString(index + 1, id) }
+            q.executeQuery().use { rs -> buildMap { while (rs.next()) { val row=rs.toDto();put(row.postId,row) } } }
+        }
+    }
 
     private fun topicOf(kind: String): String = if (kind == "LOST") "Mascota perdida" else "Adopción"
 }

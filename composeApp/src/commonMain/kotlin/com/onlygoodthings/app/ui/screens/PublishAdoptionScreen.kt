@@ -1,259 +1,188 @@
 package com.onlygoodthings.app.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import com.onlygoodthings.app.ui.components.OgtOutlinedTextField as OutlinedTextField
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.onlygoodthings.app.data.LocalAuth
-import com.onlygoodthings.app.data.LocalOgtDb
-import com.onlygoodthings.app.data.LocalOgtSession
-import com.onlygoodthings.app.data.announcePublishedPost
-import com.onlygoodthings.app.data.persistAnimalOnServer
-import kotlinx.coroutines.launch
+import com.onlygoodthings.app.data.*
 import com.onlygoodthings.app.i18n.LocalOgtCopy
 import com.onlygoodthings.app.theme.OgtColors
-import com.onlygoodthings.app.theme.OgtDimens
-import com.onlygoodthings.app.theme.ogtOutlinedFieldColors
-import com.onlygoodthings.app.ui.components.OgtCaption
-import com.onlygoodthings.app.ui.components.OgtPill
-import com.onlygoodthings.app.ui.components.OgtPrimaryButton
-import com.onlygoodthings.app.ui.components.OgtTopBar
-import com.onlygoodthings.app.ui.components.ScreenColumn
-import com.onlygoodthings.app.ui.components.ogtDismissImeOnScroll
-import com.onlygoodthings.shared.domain.titleCasePersonName
+import com.onlygoodthings.app.ui.components.*
+import com.onlygoodthings.shared.domain.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-/**
- * Ficha para publicar un animal en adopción. No es un aviso de perdido:
- * pide lo que una familia necesita para postular.
- */
+/** One adoption publication may introduce one animal or a group. Historical traits remain stored. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun PublishAdoptionScreen(
-    onBack: () -> Unit,
-    onPublished: () -> Unit = onBack,
-    editPostId: String? = null,
-) {
-    val db = LocalOgtDb.current
-    val session = LocalOgtSession.current
-    val me = session.me()
-    val auth = LocalAuth.current
-    val copy = LocalOgtCopy.current
-    val scope = rememberCoroutineScope()
-    val editing = !editPostId.isNullOrBlank()
-    val existing = remember(editPostId) { editPostId?.let { db.post(it) } }
-    val listing = remember(editPostId) {
-        existing?.listingId?.let { id -> db.animals.firstOrNull { it.id == id } }
-    }
-    var name by remember { mutableStateOf(listing?.petName.orEmpty()) }
-    var species by remember { mutableStateOf(listing?.species.orEmpty()) }
-    var size by remember { mutableStateOf(listing?.size.orEmpty()) }
-    var sex by remember { mutableStateOf(listing?.sex.orEmpty()) }
-    var age by remember { mutableStateOf(listing?.ageLabel.orEmpty()) }
-    var temperament by remember { mutableStateOf(listing?.temperament.orEmpty()) }
-    var story by remember { mutableStateOf(listing?.description ?: existing?.body.orEmpty()) }
-    var place by remember { mutableStateOf(listing?.place?.ifBlank { me.barrio } ?: me.barrio) }
-    var homeNeeds by remember { mutableStateOf(listing?.homeNeeds.orEmpty()) }
-    var vaccinated by remember { mutableStateOf(listing?.vaccinated == true) }
-    var sterilized by remember { mutableStateOf(listing?.sterilized == true) }
-    val draftMedia = rememberAnimalDraftMedia(
-        existing?.let { db.mediaOf(it.id).map { media -> media.toDraft() } }.orEmpty(),
-    )
-    var triedPublish by remember { mutableStateOf(false) }
+fun PublishAdoptionScreen(onBack: () -> Unit, onPublished: () -> Unit = onBack, editPostId: String? = null) {
+    val db = LocalOgtDb.current; val session = LocalOgtSession.current; val auth = LocalAuth.current
+    val me = session.me(); val copy = LocalOgtCopy.current; val scope = rememberCoroutineScope()
+    val existing = remember(editPostId) { editPostId?.let(db::post) }
+    val listing = remember(editPostId) { existing?.listingId?.let { id -> db.animals.firstOrNull { it.id == id } } }
+    val editing = editPostId != null
+    var title by remember(editPostId) { mutableStateOf(listing?.displayPetName().orEmpty()) }
+    var presentation by remember(editPostId) { mutableStateOf(buildString {
+        append(listing?.adoptionDetails?.presentation?.takeIf { it.isNotBlank() } ?: listing?.description ?: existing?.body.orEmpty())
+        if (listing?.adoptionDetails?.presentation.isNullOrBlank() && !listing?.temperament.isNullOrBlank()) {
+            append("\n\nCarácter: "); append(listing?.temperament)
+        }
+    }) }
+    var age by remember(editPostId) { mutableStateOf(listing?.ageLabel.orEmpty()) }
+    var history by remember(editPostId) { mutableStateOf(listing?.adoptionDetails?.historyAndCare.orEmpty()) }
+    var place by remember(editPostId) { mutableStateOf(listing?.place?.ifBlank { me.barrio } ?: me.barrio) }
+    var home by remember(editPostId) { mutableStateOf(listing?.homeNeeds.orEmpty()) }
+    var mode by remember(editPostId) { mutableStateOf(listing?.adoptionDetails?.adoptionMode ?: "UNSPECIFIED") }
+    var count by remember(editPostId) { mutableStateOf(listing?.adoptionDetails?.availableCount?.toString().orEmpty()) }
+    var attribution by remember(editPostId) { mutableStateOf(existing?.attributionUrl.orEmpty()) }
+    var selected by remember(editPostId) { mutableStateOf(listing?.adoptionDetails?.tags.orEmpty()) }
+    var free by remember(editPostId) { mutableStateOf(listing?.adoptionDetails?.freeHashtags.orEmpty()) }
+    var freeInput by remember(editPostId) { mutableStateOf("") }
+    var catalog by remember { mutableStateOf<List<AdoptionTag>?>(null) }
+    var initialized by remember(editPostId) { mutableStateOf(listing?.adoptionDetails != null) }
+    var retry by remember { mutableIntStateOf(0) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var catalogError by remember { mutableStateOf<String?>(null) }
     var saving by remember { mutableStateOf(false) }
-    var pendingPostId by remember { mutableStateOf(editPostId) }
-    var publishError by remember { mutableStateOf<String?>(null) }
-    val missing = buildList {
-        if (draftMedia.isEmpty()) add("una foto")
-        if (name.isBlank()) add("el nombre")
-        if (species.isBlank()) add("la especie")
-        if (size.isBlank()) add("el tamaño")
-        if (age.isBlank()) add("la edad")
-        if (temperament.isBlank()) add("el carácter")
-        if (story.isBlank()) add("su historia")
-        if (place.isBlank()) add("el barrio")
+    var tried by remember { mutableStateOf(false) }
+    var pendingPostId by remember(editPostId) { mutableStateOf(editPostId) }
+    val media = rememberAnimalDraftMedia(existing?.let { db.mediaOf(it.id).map { row -> row.toDraft() } }.orEmpty())
+
+    LaunchedEffect(auth, retry) {
+        catalogError = null
+        try {
+            val loaded = auth.animals.adoptionTags()
+            catalog = loaded
+            if (!initialized) {
+                selected = listing?.let { AdoptionRules.legacyTags(loaded, it.species, it.size, it.sex, it.vaccinated, it.sterilized) }.orEmpty()
+                initialized = true
+            }
+        } catch (cancel: CancellationException) { throw cancel }
+        catch (_: Exception) { catalogError = "No pudimos cargar las etiquetas. Reintentá." }
+    }
+    fun select(tag: AdoptionTag) {
+        val next = AdoptionRules.toggle(selected, tag)
+        if (next.size + free.size > AdoptionRules.MAX_TAGS) error = "Podés elegir hasta 24 etiquetas." else { selected = next; error = null }
+    }
+    fun addFree() {
+        if (freeInput.isBlank()) return
+        val tag = Hashtags.free(freeInput)
+        val official = catalog.orEmpty().firstOrNull { it.key == tag.key || Hashtags.key(it.label) == tag.key }
+        if (official != null) {
+            require(official.active || selected.any { it.id == official.id }) { "Esa etiqueta fue desactivada en el CRM." }
+            if (selected.none { it.id == official.id }) select(official)
+        } else if (free.none { Hashtags.key(it) == tag.key }) {
+            require(free.size < 6 && selected.size + free.size < AdoptionRules.MAX_TAGS) { "Podés agregar hasta seis hashtags libres." }
+            free = free + tag.label
+        }
+        freeInput = ""
+    }
+    fun missing() = buildList {
+        if (media.isEmpty()) add("una foto o video")
+        if (title.isBlank()) add("el título")
+        if (presentation.isBlank()) add("la presentación")
+        if (selected.none { it.group == "SPECIES" }) add("la especie")
+        if (place.isBlank()) add("el barrio o localidad")
     }
     Column(Modifier.fillMaxSize().background(OgtColors.canvas).ogtDismissImeOnScroll().verticalScroll(rememberScrollState())) {
-        OgtTopBar(title = if (editing) copy.petsEdit else copy.petsAdoption, onBack = onBack)
+        OgtTopBar(title = if (editing) "Editar adopción" else copy.petsAdoption, onBack = onBack)
         ScreenColumn {
-            OgtCaption("Estos datos van a la ficha de adopción. El horario de visita se habla después, con quien postula.")
-            Text("1. Foto", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
-            AnimalMediaBlock(draftMedia, missing = triedPublish && draftMedia.isEmpty(), reorderEnabled = !saving)
-            Text("2. Nombre", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
-            OutlinedTextField(
-                value = name,
-                onValueChange = { if (it.length <= 40) name = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Luna", color = OgtColors.muted) },
-                shape = RoundedCornerShape(OgtDimens.buttonRadius),
-                colors = ogtOutlinedFieldColors(missing = triedPublish && name.isBlank()),
-            )
-            Text("3. Especie, tamaño y sexo", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
-            AnimalChoicePills(AnimalSpecies, species, { species = it }, missing = triedPublish && species.isBlank())
-            AnimalChoicePills(AnimalSizes, size, { size = it }, missing = triedPublish && size.isBlank())
-            AnimalChoicePills(AnimalSexes, sex, { sex = it })
-            Text("4. Edad", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
-            OutlinedTextField(
-                value = age,
-                onValueChange = { if (it.length <= 30) age = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("6 meses, 3 años…", color = OgtColors.muted) },
-                shape = RoundedCornerShape(OgtDimens.buttonRadius),
-                colors = ogtOutlinedFieldColors(missing = triedPublish && age.isBlank()),
-            )
-            Text("5. Carácter", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
-            OutlinedTextField(
-                value = temperament,
-                onValueChange = { if (it.length <= 120) temperament = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Cariñosa, sociable, un poco miedosa con ruidos", color = OgtColors.muted) },
-                shape = RoundedCornerShape(OgtDimens.buttonRadius),
-                colors = ogtOutlinedFieldColors(missing = triedPublish && temperament.isBlank()),
-            )
-            Text("6. Historia y cuidados", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
-            OutlinedTextField(
-                value = story,
-                onValueChange = { if (it.length <= 400) story = it },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 3,
-                placeholder = { Text("De dónde viene, cómo convive, qué come.", color = OgtColors.muted) },
-                shape = RoundedCornerShape(OgtDimens.buttonRadius),
-                colors = ogtOutlinedFieldColors(missing = triedPublish && story.isBlank()),
-            )
-            Text("7. Salud", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                BoxToggle("Vacunada", vaccinated) { vaccinated = it }
-                BoxToggle("Castrada", sterilized) { sterilized = it }
-            }
-            Text("8. Barrio", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
-            OutlinedTextField(
-                value = place,
-                onValueChange = { if (it.length <= 60) place = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Parque Centenario", color = OgtColors.muted) },
-                shape = RoundedCornerShape(OgtDimens.buttonRadius),
-                colors = ogtOutlinedFieldColors(missing = triedPublish && place.isBlank()),
-            )
-            Text("9. Qué hogar necesita", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
-            OutlinedTextField(
-                value = homeNeeds,
-                onValueChange = { if (it.length <= 160) homeNeeds = it },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 2,
-                placeholder = { Text("Patio, sin gatos, alguien en casa varias horas…", color = OgtColors.muted) },
-                shape = RoundedCornerShape(OgtDimens.buttonRadius),
-                colors = ogtOutlinedFieldColors(),
-            )
-            if (triedPublish && missing.isNotEmpty()) {
-                Text("Falta ${joinMissing(missing)}.", color = OgtColors.error, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-            }
-            OgtPrimaryButton(
-                text = when {
-                    saving && editing -> "Guardando…"
-                    saving -> "Publicando…"
-                    editing -> copy.petsSaveAdoption
-                    else -> "Publicar en adopción"
-                },
-                enabled = !saving,
-            ) {
-                if (missing.isNotEmpty()) {
-                    triedPublish = true
-                    return@OgtPrimaryButton
-                }
-                saving = true
-                publishError = null
-                val post = if (pendingPostId != null) {
-                    db.updateAnimalListing(
-                        author = me,
-                        postId = pendingPostId!!,
-                        petName = titleCasePersonName(name),
-                        species = species,
-                        size = size,
-                        description = story,
-                        place = place,
-                        ageLabel = age,
-                        sex = sex,
-                        temperament = temperament,
-                        vaccinated = vaccinated,
-                        sterilized = sterilized,
-                        homeNeeds = homeNeeds,
-                    )
-                } else {
-                    db.publishAnimalListing(
-                        author = me,
-                        kind = "ADOPTION",
-                        petName = titleCasePersonName(name),
-                        species = species,
-                        size = size,
-                        description = story,
-                        place = place,
-                        ageLabel = age,
-                        sex = sex,
-                        temperament = temperament,
-                        vaccinated = vaccinated,
-                        sterilized = sterilized,
-                        homeNeeds = homeNeeds,
-                    )
-                } ?: run {
-                    saving = false
-                    return@OgtPrimaryButton
-                }
-                pendingPostId = post.id
-                if (db.mediaOf(post.id).isNotEmpty()) {
-                    db.replaceAnimalMedia(post.id, "Adopción", draftMedia)
-                } else {
-                    db.attachAnimalMedia(post.id, "Adopción", draftMedia)
-                }
-                session.persistPublishedAnimals()
-                auth.ensureDevBearer()
-                scope.launch {
-                    try {
-                        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                            val live = persistAnimalOnServer(db, auth.animals, me, post, draftMedia, session.here(), { session.currentUserId == me.id }, auth::uploadPostMedia)
-                            session.persistPublishedAnimals()
-                            if (!editing) announcePublishedPost(db, live)
+            AnimalMediaBlock(media, missing = tried && media.isEmpty(), reorderEnabled = !saving)
+            OgtOutlinedTextField(title, { if (it.length <= AdoptionRules.MAX_TITLE) title = it },
+                Modifier.fillMaxWidth(), label = { Text("Título del posteo") }, enabled = !saving,
+                placeholder = { Text("Tres hermanitos buscan hogar") }, singleLine = true, isError = tried && title.isBlank())
+            OgtOutlinedTextField(presentation, { if (it.length <= AdoptionRules.MAX_PRESENTATION) presentation = it },
+                Modifier.fillMaxWidth(), label = { Text("Presentación") }, enabled = !saving, minLines = 3,
+                placeholder = { Text("Presentá a los animales y contá cómo son.") }, isError = tried && presentation.isBlank())
+            Text("Etiquetas", fontWeight = FontWeight.SemiBold)
+            catalogError?.let { message -> Text(message, color = OgtColors.error); TextButton(onClick = { retry++ }) { Text("Reintentar etiquetas") } }
+            val options = (catalog.orEmpty().filter { it.active } + selected).distinctBy { it.id }
+            for (group in AdoptionRules.groups) {
+                val rows = options.filter { it.group == group }
+                if (rows.isNotEmpty()) {
+                    OgtCaption(AdoptionRules.groupLabel(group))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        rows.forEach { tag ->
+                            FilterChip(selected = selected.any { it.id == tag.id }, enabled = !saving,
+                                onClick = { select(tag) }, label = { Text(PostHashtag(tag.key, tag.label).display) })
                         }
-                        onPublished()
-                    } catch (cancel: kotlinx.coroutines.CancellationException) {
-                        throw cancel
-                    } catch (failure: Exception) {
-                        publishError = failure.message ?: "No se pudo publicar. Volvé a intentarlo."
-                    } finally {
-                        saving = false
                     }
                 }
             }
-            publishError?.let { Text(it, color = OgtColors.error, fontSize = 13.sp) }
+            OgtOutlinedTextField(freeInput, { if (it.length <= 60) freeInput = it }, Modifier.fillMaxWidth(),
+                label = { Text("Otro hashtag (opcional)") }, enabled = !saving, singleLine = true)
+            TextButton(onClick = { try { addFree() } catch (e: Exception) { error = e.message } }, enabled = !saving) { Text("Agregar hashtag") }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                free.forEach { tag -> FilterChip(selected = true, onClick = { free = free - tag }, enabled = !saving,
+                    label = { Text("#${tag} ×") }) }
+            }
+            OgtOutlinedTextField(age, { if (it.length <= 30) age = it }, Modifier.fillMaxWidth(),
+                label = { Text("Edad (opcional)") }, placeholder = { Text("3 meses, entre 1 y 2 años…") }, enabled = !saving)
+            OgtOutlinedTextField(history, { if (it.length <= AdoptionRules.MAX_HISTORY) history = it }, Modifier.fillMaxWidth(),
+                label = { Text("Historia y cuidados (opcional)") }, enabled = !saving, minLines = 2)
+            PublicationPlaceField(place, { place = it }, label = "Barrio o localidad", enabled = !saving)
+            OgtOutlinedTextField(home, { if (it.length <= 160) home = it }, Modifier.fillMaxWidth(),
+                label = { Text("Qué hogar necesita") }, enabled = !saving, minLines = 2,
+                placeholder = { Text("Patio, convivencia con otros animales, tiempo en casa…") })
+            Text("Cómo se pueden adoptar", fontWeight = FontWeight.SemiBold)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("UNSPECIFIED" to "No indicado", "SEPARATE" to "Por separado", "TOGETHER" to "Juntos").forEach { (code, label) ->
+                    FilterChip(selected = mode == code, onClick = { mode = code }, enabled = !saving, label = { Text(label) })
+                }
+            }
+            OgtOutlinedTextField(count, { if (it.length <= 3 && it.all(Char::isDigit)) count = it }, Modifier.fillMaxWidth(),
+                label = { Text("Cantidad que sigue buscando hogar (opcional)") }, enabled = !saving, singleLine = true)
+            AttributionField(attribution, { attribution = it }, enabled = !saving, label = "Fuentes y créditos (opcional)")
+            if (tried && missing().isNotEmpty()) Text("Falta ${joinMissing(missing())}.", color = OgtColors.error)
+            error?.let { Text(it, color = OgtColors.error) }
+            OgtPrimaryButton(if (saving) "Guardando…" else if (editing) copy.petsSaveAdoption else "Publicar en adopción", enabled = !saving) {
+                try {
+                    addFree()
+                    if (missing().isNotEmpty()) { tried = true; return@OgtPrimaryButton }
+                    val loaded = requireNotNull(catalog) { "Reintentá cargar las etiquetas antes de publicar." }
+                    require(count.isBlank() || count.toIntOrNull()?.let { it in 1..100 } == true) { "La cantidad disponible debe estar entre 1 y 100." }
+                    val details = AdoptionRules.normalize(AdoptionDetails(presentation = presentation, historyAndCare = history, tags = selected, freeHashtags = free,
+                        adoptionMode = mode, availableCount = count.toIntOrNull()), loaded, selected.filterNot { it.active }.map { it.id }.toSet())
+                    val credit = ContentAttribution.normalize(attribution).orEmpty()
+                    val species = details.tags.first { it.group == "SPECIES" }.legacyValue.ifBlank { "OTHER" }
+                    val size = AdoptionRules.singleValue(details, "SIZE")
+                    val sex = AdoptionRules.singleValue(details, "SEX")
+                    val vaccinated = AdoptionRules.singleValue(details, "VACCINATION") == "ALL"
+                    val sterilized = AdoptionRules.singleValue(details, "STERILIZATION") == "ALL"
+                    val name = listing?.petName?.ifBlank { null } ?: title.take(40)
+                    val post = if (pendingPostId != null) db.updateAnimalListing(me, pendingPostId!!, name, species, size, presentation, place,
+                        ageLabel = age, sex = sex, temperament = listing?.temperament.orEmpty(), vaccinated = vaccinated, sterilized = sterilized,
+                        homeNeeds = home, title = title, adoptionDetails = details, attributionUrl = credit)
+                    else db.publishAnimalListing(me, "ADOPTION", name, species, size, presentation, place,
+                        ageLabel = age, sex = sex, vaccinated = vaccinated, sterilized = sterilized,
+                        homeNeeds = home, title = title, adoptionDetails = details, attributionUrl = credit)
+                    requireNotNull(post) { "Revisá los datos de la adopción." }
+                    pendingPostId = post.id; saving = true; error = null
+                    if (db.mediaOf(post.id).isNotEmpty()) db.replaceAnimalMedia(post.id, "Adopción", media) else db.attachAnimalMedia(post.id, "Adopción", media)
+                    session.persistPublishedAnimals(); auth.ensureDevBearer()
+                    scope.launch {
+                        try {
+                            withContext(NonCancellable) {
+                                val live = persistAnimalOnServer(db, auth.animals, me, post, media, session.here(), { session.currentUserId == me.id }, auth::uploadPostMedia)
+                                session.persistPublishedAnimals(); if (!editing) announcePublishedPost(db, live)
+                            }
+                            onPublished()
+                        } catch (cancel: CancellationException) { throw cancel }
+                        catch (e: Exception) { error = e.message ?: "No se pudo guardar. Reintentá." }
+                        finally { saving = false }
+                    }
+                } catch (e: Exception) { error = e.message }
+            }
             Spacer(Modifier.height(24.dp))
         }
-    }
-}
-
-@Composable
-private fun BoxToggle(label: String, on: Boolean, onChange: (Boolean) -> Unit) {
-    androidx.compose.foundation.layout.Box(Modifier.clickable { onChange(!on) }) {
-        OgtPill(
-            label,
-            if (on) OgtColors.secondary else OgtColors.sand,
-            if (on) OgtColors.onPrimary else OgtColors.ink,
-        )
     }
 }

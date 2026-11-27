@@ -81,7 +81,7 @@
     const next = container.firstElementChild;
     current?.querySelectorAll('video').forEach(video => video.pause());
     if (current) next ? current.replaceWith(next) : current.remove();
-    else if (next) card.querySelector(':scope > .post-attribution')?.before(next);
+    else if (next) card.querySelector(':scope > .post-attribution, :scope > .post-hashtags, :scope > .actions')?.before(next);
     if (next) {
       bind(next);
       const retained = items.findIndex(item => (options?.mediaUrl || (url => url))(item.url) === oldUrl);

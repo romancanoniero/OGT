@@ -112,7 +112,8 @@ fun AdoptApplicationScreen(
         ScreenColumn {
             OgtPill(copy.petsAdoption, OgtColors.sand, OgtColors.ink)
             OgtSectionTitle(listing?.title ?: post.tag)
-            OgtCaption(listing?.description ?: post.body)
+            listing?.let { AdoptionSummary(it, detailed = true) }
+            OgtCaption(listing?.adoptionPresentation() ?: post.body)
             if (post.place.isNotBlank()) OgtCaption(post.place)
             if (existing != null || remote.value != null || sent) {
                 OgtCard {

@@ -277,10 +277,12 @@ data class LocalAnimalListing(
     /** Qué necesita el hogar (patio, sin niñes, otra mascota, etc.). */
     val homeNeeds: String = "",
     val createdAtEpochMs: Long = 0L,
+    val adoptionDetails: com.onlygoodthings.shared.domain.AdoptionDetails? = null,
 ) {
     /** Nombre para título de ficha: mascota, no el lema del aviso. */
     fun displayPetName(): String =
-        petName.ifBlank { title.substringBefore("·").trim() }.ifBlank { title }
+        if (kind == "ADOPTION" && adoptionDetails != null) title
+        else petName.ifBlank { title.substringBefore("·").trim() }.ifBlank { title }
 }
 
 @Serializable

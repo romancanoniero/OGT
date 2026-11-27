@@ -103,14 +103,15 @@ private data class NearbyAnimalDto(
 
 fun Route.animalRoutes(db: Database, hub: RealtimeHub) {
     val animals = AnimalSqlRepository(db)
+    adoptionCatalogRoutes(db)
     val outcomes = OutcomeSqlRepository(db)
     post("/api/v1/animals/publish") {
         val principal = requireUser(call) ?: return@post
         val objectMapper = JsonBody.objectMapper
         val dataMap = objectMapper.readValue(call.receiveText(), object : com.fasterxml.jackson.core.type.TypeReference<Map<String, Any?>>() {})
-        val write = animalWriteFrom(dataMap, animals.homeLocation(principal.userId))
+        val write = animalWriteFrom(dataMap, animals.homeLocation(principal.userId), AdoptionTags(db).list(true))
         val saved = animals.publish(principal.userId, write)
-        projectAnimal(hub, saved)
+        projectAnimal(db, hub, saved)
         if (saved.kind == "LOST") broadcastLostAlert(hub, saved)
         call.respond(ApiResponse.ok(saved, "Ficha grabada"))
     }
@@ -120,13 +121,14 @@ fun Route.animalRoutes(db: Database, hub: RealtimeHub) {
         val objectMapper = JsonBody.objectMapper
         val dataMap = objectMapper.readValue(call.receiveText(), object : com.fasterxml.jackson.core.type.TypeReference<Map<String, Any?>>() {})
         val listingId = dataMap.reqString("listingId")
-        val write = animalWriteFrom(dataMap, animals.homeLocation(principal.userId))
+        val previous = animals.get(listingId)
+        val write = animalWriteFrom(dataMap, animals.homeLocation(principal.userId), AdoptionTags(db).list(true), previous)
         val saved = try {
             animals.update(principal.userId, listingId, write)
         } catch (error: IllegalStateException) {
             return@post call.respond(HttpStatusCode.Forbidden, ApiResponse.fail<Unit>(error.message ?: "No se pudo editar", "FORBIDDEN"))
         }
-        projectAnimal(hub, saved)
+        projectAnimal(db, hub, saved)
         call.respond(ApiResponse.ok(saved, "Ficha actualizada"))
     }
 
@@ -137,7 +139,7 @@ fun Route.animalRoutes(db: Database, hub: RealtimeHub) {
         val reporter = animals.reporterOf(listingId)
             ?: return@post call.respond(HttpStatusCode.NotFound, ApiResponse.fail<Unit>("Ficha inexistente", "NOT_FOUND"))
         if (!animals.markResolved(listingId)) {
-            return@post call.respond(ApiResponse.ok("ok", "La ficha ya estaba resuelta"))
+            return@post call.respond(ApiResponse.ok(AnimalResolveResult(listingId, false, "La ficha ya estaba resuelta")))
         }
         val outcome = if (principal.userId != reporter) {
             outcomes.award(
@@ -155,6 +157,7 @@ fun Route.animalRoutes(db: Database, hub: RealtimeHub) {
         } else {
             null
         }
+        animals.get(listingId)?.let { projectAnimal(db, hub, it) }
         call.respond(
             ApiResponse.ok(
                 AnimalResolveResult(
@@ -193,7 +196,8 @@ fun Route.animalRoutes(db: Database, hub: RealtimeHub) {
         val rows = db.withConnection { connection ->
             connection.prepareStatement(
                 """
-                SELECT id, kind, species, size, urgency, title, description,
+                SELECT id, kind, species, size, urgency, title,
+                       COALESCE(NULLIF(adoption_details->>'presentation',''),description) AS description,
                        ST_Y(location) AS lat, ST_X(location) AS lng, alert_radius_m,
                        ST_Distance(location::geography, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography) AS meters
                 FROM animal_listings
@@ -237,14 +241,27 @@ fun Route.animalRoutes(db: Database, hub: RealtimeHub) {
     }
 }
 
-internal fun animalWriteFrom(dataMap: Map<String, Any?>, home: Pair<Double, Double>?): AnimalWrite {
+internal fun animalWriteFrom(dataMap: Map<String, Any?>, home: Pair<Double, Double>?, catalog: List<com.onlygoodthings.shared.domain.AdoptionTag> = emptyList(), previous: AnimalListingDto? = null): AnimalWrite {
     val kind = (dataMap.optString("kind") ?: "LOST").uppercase()
     val petName = titleCasePersonName(dataMap.optString("petName").orEmpty())
     val age = dataMap.optString("ageLabel").orEmpty()
     val lost = kind == "LOST"
-    val title = dataMap.optString("title")?.takeIf { it.isNotBlank() }
+    val adoption = if (!lost && dataMap["adoptionDetails"] != null) {
+        val parsed = JsonBody.objectMapper.convertValue(dataMap["adoptionDetails"], com.onlygoodthings.shared.domain.AdoptionDetails::class.java)
+        val draft = parsed.copy(presentation = parsed.presentation.ifBlank { dataMap.reqString("description") }.trim())
+        com.onlygoodthings.shared.domain.AdoptionRules.normalize(draft, catalog,
+            previous?.adoptionDetails?.tags?.map { it.id }?.toSet()
+                ?: com.onlygoodthings.shared.domain.AdoptionRules.legacyTags(catalog, previous?.species.orEmpty(), previous?.size, previous?.sex.orEmpty(), previous?.vaccinated == true, previous?.sterilized == true).map { it.id }.toSet())
+    } else previous?.adoptionDetails?.takeUnless { lost }
+    val title = (if (!lost && previous?.adoptionDetails != null && dataMap["adoptionDetails"] == null) previous.title else dataMap.optString("title"))?.takeIf { it.isNotBlank() }
         ?: if (lost) "Se busca a $petName" else listOf(petName, age).filter { it.isNotBlank() }.joinToString(" · ")
     val marks = dataMap.optString("marks").orEmpty()
+    val temperament = dataMap.optString("temperament") ?: previous?.temperament.orEmpty()
+    val description = if (!lost && dataMap["adoptionDetails"] != null) previous?.description ?: adoption!!.presentation else dataMap.reqString("description")
+    val effectiveAdoption = if (adoption != null && dataMap["adoptionDetails"] == null && previous != null &&
+        (description != previous.description || temperament != previous.temperament)) {
+        adoption.copy(presentation = if (temperament.isNotBlank() && !description.contains(temperament, ignoreCase = true)) "$description\n\nCarácter: $temperament" else description)
+    } else adoption
     val lastSeenPlace = dataMap.optString("lastSeenPlace").orEmpty()
     val lat = dataMap.optDouble("latitude") ?: if (lost) null else home?.first ?: -34.6037
     val lng = dataMap.optDouble("longitude") ?: if (lost) null else home?.second ?: -58.3816
@@ -254,6 +271,13 @@ internal fun animalWriteFrom(dataMap: Map<String, Any?>, home: Pair<Double, Doub
         require(lat != null && lng != null) { "Falta el punto de última vista" }
     }
     val media = dataMap.optMediaItems()
+    if (!lost && adoption != null) {
+        if (dataMap["adoptionDetails"] != null) require(!dataMap.optString("title").isNullOrBlank()) { "Ingresá el título del posteo." }
+        require(title.trim().length in 1..com.onlygoodthings.shared.domain.AdoptionRules.MAX_TITLE) { "Ingresá un título de hasta 120 caracteres." }
+        require(effectiveAdoption!!.presentation.trim().length in 1..com.onlygoodthings.shared.domain.AdoptionRules.MAX_PRESENTATION) { "Ingresá una presentación de hasta 1500 caracteres." }
+        require(!dataMap.optString("place").isNullOrBlank() && dataMap.optString("place")!!.length <= 200) { "Ingresá el barrio o localidad." }
+        require(media.isNotEmpty()) { "Agregá al menos una foto o video." }
+    }
     require(media.size <= 10) { "Podés incluir hasta 10 archivos." }
     media.forEach { item ->
         require(isPublishedAnimalMediaUrl(item.url) && item.posterUrl?.let(::isPublishedAnimalMediaUrl) != false) {
@@ -262,17 +286,17 @@ internal fun animalWriteFrom(dataMap: Map<String, Any?>, home: Pair<Double, Doub
     }
     return AnimalWrite(
         kind = if (lost) "LOST" else "ADOPTION",
-        species = dataMap.reqString("species"),
-        size = dataMap.optString("size") ?: "MEDIUM",
+        species = adoption?.tags?.firstOrNull { it.group == "SPECIES" }?.legacyValue?.ifBlank { "OTHER" } ?: dataMap.reqString("species"),
+        size = if (adoption != null) com.onlygoodthings.shared.domain.AdoptionRules.singleValue(adoption, "SIZE") else dataMap.optString("size") ?: "MEDIUM",
         urgency = dataMap.optString("urgency") ?: if (lost) "HIGH" else "LOW",
         title = title,
-        description = dataMap.reqString("description"),
-        petName = petName,
+        description = description,
+        petName = if (adoption != null) previous?.petName?.takeIf { it.isNotBlank() } ?: petName.ifBlank { title.take(40) } else petName,
         ageLabel = age,
-        sex = dataMap.optString("sex").orEmpty(),
-        temperament = dataMap.optString("temperament").orEmpty(),
-        vaccinated = dataMap.optBoolean("vaccinated"),
-        sterilized = dataMap.optBoolean("sterilized"),
+        sex = if (adoption != null) com.onlygoodthings.shared.domain.AdoptionRules.singleValue(adoption, "SEX") else dataMap.optString("sex").orEmpty(),
+        temperament = temperament,
+        vaccinated = if (adoption != null) com.onlygoodthings.shared.domain.AdoptionRules.singleValue(adoption, "VACCINATION") == "ALL" else dataMap.optBoolean("vaccinated"),
+        sterilized = if (adoption != null) com.onlygoodthings.shared.domain.AdoptionRules.singleValue(adoption, "STERILIZATION") == "ALL" else dataMap.optBoolean("sterilized"),
         homeNeeds = dataMap.optString("homeNeeds").orEmpty(),
         marks = marks,
         lastSeenPlace = lastSeenPlace,
@@ -281,6 +305,9 @@ internal fun animalWriteFrom(dataMap: Map<String, Any?>, home: Pair<Double, Doub
         longitude = lng ?: -58.3816,
         alertRadiusM = if (lost) OgtCrmDefaults.LOST_ALERT_RADIUS_M else 0,
         media = media,
+        adoptionDetails = effectiveAdoption,
+        attributionUrl = if (dataMap.containsKey("attributionUrl")) com.onlygoodthings.shared.domain.ContentAttribution.normalize(dataMap.optString("attributionUrl")) else previous?.attributionUrl,
+        attributionSpecified = dataMap.containsKey("attributionUrl"),
     )
 }
 
@@ -305,26 +332,40 @@ private fun Map<String, Any?>.optMediaItems(): List<PostMediaItem> {
             posterUrl = row["posterUrl"] as? String,
             sortOrder = (row["sortOrder"] as? Number)?.toInt() ?: index,
             altText = row["altText"] as? String,
+            durationMs = (row["durationMs"] as? Number)?.toInt(),
+            frameX = (row["frameX"] as? Number)?.toDouble(),
+            frameY = (row["frameY"] as? Number)?.toDouble(),
+            frameZoom = (row["frameZoom"] as? Number)?.toDouble(),
         )
     }
 }
 
-private fun projectAnimal(hub: RealtimeHub, saved: AnimalListingDto) {
+private fun projectAnimal(db: Database, hub: RealtimeHub, saved: AnimalListingDto) {
     if (saved.postId.isBlank()) return
+    val counters = db.withConnection { c ->
+        c.prepareStatement("SELECT comment_count,impact_count FROM social_posts WHERE id=?::uuid").use { q ->
+            q.setString(1,saved.postId)
+            q.executeQuery().use { rs -> if(rs.next()) rs.getInt("comment_count") to rs.getInt("impact_count") else 0 to 0 }
+        }
+    }
     hub.projectSocialPost(
         saved.postId,
         WsCodec.json.encodeToString(
             SocialLiveCounters.serializer(),
             SocialLiveCounters(
                 id = saved.postId,
-                commentCount = 0,
-                impactCount = 0,
+                commentCount = counters.first,
+                impactCount = counters.second,
                 authorUserId = saved.reporterUserId,
-                body = saved.description,
+                body = saved.adoptionDetails?.presentation?.takeIf { it.isNotBlank() } ?: saved.description,
                 tag = if (saved.kind == "LOST") "Mascota perdida" else "Adopción",
                 place = saved.place,
                 createdAtEpochMs = saved.createdAtEpochMs,
                 listingId = saved.listingId,
+                honoreeName = if (saved.kind == "ADOPTION") (if (saved.adoptionDetails != null) saved.title else saved.petName.ifBlank { saved.title }) else null,
+                attributionChanged = true,
+                attributionUrl = saved.attributionUrl,
+                hashtags = saved.hashtags.takeIf { it.isNotEmpty() } ?: saved.adoptionDetails?.let(com.onlygoodthings.shared.domain.AdoptionRules::hashtags),
             ),
         ),
     )

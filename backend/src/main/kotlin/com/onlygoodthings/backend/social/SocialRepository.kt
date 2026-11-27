@@ -1124,11 +1124,13 @@ class SocialSqlRepository(private val db: Database) {
                     buildList { while (rs.next()) add(rs.toPost()) }
                 }
                 val media = loadMedia(connection, ids)
+                val animals = com.onlygoodthings.backend.modules.AnimalSqlRepository(db).forPosts(connection, posts.map { it.id })
                 val anecdotes = loadAnecdotes(connection, ids, viewerId)
                 posts.map { post ->
                     val items = media[post.id].orEmpty()
                     post.copy(
                         media = items,
+                        animalListing = animals[post.id],
                         mediaUrls = items.map { it.url }.ifEmpty { post.mediaUrls },
                         anecdotes = anecdotes[post.id].orEmpty().filter { it.authorUserId !in excluded }.map { it.copy(comments=filterBlockedComments(it.comments,excluded)) },
                     )

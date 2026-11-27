@@ -127,6 +127,8 @@ private fun animalWriteJson(
     put("marks", JsonPrimitive(listing.marks))
     put("lastSeenPlace", JsonPrimitive(listing.lastSeenPlace))
     put("place", JsonPrimitive(listing.place))
+    listing.adoptionDetails?.let { put("adoptionDetails", com.onlygoodthings.shared.protocol.WsCodec.json.encodeToJsonElement(com.onlygoodthings.shared.domain.AdoptionDetails.serializer(), it)) }
+    put("attributionUrl", JsonPrimitive(post.attributionUrl.orEmpty()))
     put("radius", JsonPrimitive(listing.alertRadiusM))
     (listing.latitude ?: here?.latitude)?.let { put("latitude", JsonPrimitive(it)) }
     (listing.longitude ?: here?.longitude)?.let { put("longitude", JsonPrimitive(it)) }
@@ -137,11 +139,16 @@ private fun List<LocalPostMedia>.toJson(): JsonArray = buildJsonArray {
     forEach { item ->
         add(
             buildJsonObject {
+                put("id", JsonPrimitive(item.id))
                 put("kind", JsonPrimitive(item.kind.name))
                 put("url", JsonPrimitive(item.url))
                 item.posterUrl?.let { put("posterUrl", JsonPrimitive(it)) }
                 put("sortOrder", JsonPrimitive(item.sortOrder))
                 item.altText?.let { put("altText", JsonPrimitive(it)) }
+                item.durationMs?.let { put("durationMs", JsonPrimitive(it)) }
+                item.frameX?.let { put("frameX", JsonPrimitive(it)) }
+                item.frameY?.let { put("frameY", JsonPrimitive(it)) }
+                item.frameZoom?.let { put("frameZoom", JsonPrimitive(it)) }
             },
         )
     }

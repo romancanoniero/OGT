@@ -18,6 +18,10 @@ class RestAnimalsRepository(
     private val client: HttpClient,
     private val session: SessionStore,
 ) {
+    suspend fun adoptionTags(): List<com.onlygoodthings.shared.domain.AdoptionTag> =
+        post("/api/v1/animals/adoption/tags", buildJsonObject {})
+    suspend fun getListing(listingId: String): AnimalListingDto =
+        post("/api/v1/animals/get", buildJsonObject { put("listingId", kotlinx.serialization.json.JsonPrimitive(listingId)) })
     suspend fun contact(request: com.onlygoodthings.shared.domain.AnimalContactRequest): com.onlygoodthings.shared.domain.TimebankThread =
         post("/api/v1/animals/contact", kotlinx.serialization.json.Json.encodeToJsonElement(com.onlygoodthings.shared.domain.AnimalContactRequest.serializer(), request) as JsonObject)
 

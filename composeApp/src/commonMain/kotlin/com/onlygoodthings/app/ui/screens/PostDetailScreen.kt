@@ -905,11 +905,12 @@ private fun AdoptionDetail(
     actions()
     if (isAuthor) {
         OgtPrimaryButton(copy.petsEdit, onClick = onEdit)
-    } else {
+        listing?.let { CloseAdoptionControl(it) }
+    } else if (listing?.resolved != true) {
         OgtPrimaryButton(copy.petsWantAdopt, onClick = onAdopt)
     }
     Text(listing?.displayPetName()?.ifBlank { null } ?: post.tag, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-    listing?.let { row ->
+    listing?.takeIf { it.adoptionDetails == null }?.let { row ->
         val bits = listOfNotNull(
             row.ageLabel.takeIf { it.isNotBlank() },
             when (row.sex) { "HEMBRA" -> "Hembra"; "MACHO" -> "Macho"; else -> null },
@@ -926,7 +927,8 @@ private fun AdoptionDetail(
             )
         }
     }
-    OgtCaption(listing?.description ?: post.body)
+    listing?.let { AdoptionSummary(it, detailed = true) }
+    OgtCaption(listing?.adoptionPresentation() ?: post.body)
     listing?.homeNeeds?.takeIf { it.isNotBlank() }?.let { OgtCaption("Hogar · $it") }
     if (!post.place.isBlank()) OgtCaption(post.place)
 }

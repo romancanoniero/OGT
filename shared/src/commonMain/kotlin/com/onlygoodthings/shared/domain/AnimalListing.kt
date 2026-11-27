@@ -31,6 +31,9 @@ data class AnimalListingDto(
     val longitude: Double? = null,
     val createdAtEpochMs: Long = 0L,
     val media: List<PostMediaItem> = emptyList(),
+    val adoptionDetails: AdoptionDetails? = null,
+    val attributionUrl: String? = null,
+    val hashtags: List<PostHashtag> = emptyList(),
 )
 
 @Serializable

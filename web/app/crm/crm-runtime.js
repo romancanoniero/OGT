@@ -1,4 +1,5 @@
 import { mountRecognitionCategories, mountPostInvitations } from './crm-recognition.js?v=1';
+import { mountAdoptionTags } from './crm-adoption.js?v=1';
 import { mountAuditDashboard } from './crm-dashboard.js?v=media-audit-1';
 import { mountOperations } from './crm-operations.js?v=ops-1';
 import { mountTeam, mountTeamInbox } from './crm-team.js?v=team-1';
@@ -12,6 +13,7 @@ const controlSections = [
   { id: 'resumen', label: 'Resumen', icon: 'qs_feed.svg', keys: null },
   { id: 'operacion', label: 'Estado del servicio', icon: 'qs_notifications.svg', operations: true },
   { id: 'categorias', label: 'Categorías de reconocimiento', icon: 'qs_feed.svg', recognition: 'categories' },
+  { id: 'etiquetas-adopcion', label: 'Etiquetas de adopción', icon: 'qs_pets.svg', recognition: 'adoption' },
   { id: 'invitaciones-post', label: 'Invitaciones a publicaciones', icon: 'qs_invite.svg', recognition: 'invitations' },
   { id: 'usuarios', label: 'Usuarios', icon: 'qs_user.svg', view: 'listing' },
   { id: 'empresas', label: 'Empresas', icon: 'qs_form.svg', keys: ['Empresas', 'Empresas por verificar'] },
@@ -584,7 +586,7 @@ export async function start() {
       };
       const sections = (mode === 'control' ? controlSections : empresaSections).filter(section=>(!section.operations&&!section.recognition)||['OWNER','OPERATIONS'].includes(permission.platformRole)).map(section =>
         mode==='control'&&section.id==='resumen'&&['OWNER','OPERATIONS'].includes(permission.platformRole) ? {...section,supplement:container=>mountAuditDashboard(container,{request:(path,data,signal)=>api(path,token,data,signal)})} :
-        section.recognition ? {...section,mount:container=>(section.recognition==='categories'?mountRecognitionCategories:mountPostInvitations)(container,{request:(path,data,signal)=>api(path,token,data,signal)})} :
+        section.recognition ? {...section,mount:container=>(section.recognition==='adoption'?mountAdoptionTags:section.recognition==='categories'?mountRecognitionCategories:mountPostInvitations)(container,{request:(path,data,signal)=>api(path,token,data,signal)})} :
         section.operations ? {...section,mount:container=>mountOperations(container,{request:(path,data,signal)=>api(path,token,data,signal)})} :
         section.team ? {...section,mount:container=>mountTeam(container,{companyId:chosen,actorId:identity.currentUser().uid,request:(path,data,signal)=>api(path,token,data,signal),onAccess:()=>void checkAccess()})} :
         section.registration ? {...section,mount:container=>mountCompanyApplication(container,{actorId:identity.currentUser().uid,request:(path,data,signal)=>api(path,token,data,signal),onAccess:()=>void checkAccess()})} :

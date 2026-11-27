@@ -95,6 +95,7 @@ const REPORTS = {
 let lastFeed = [];
 let disposeStories=()=>{};
 let lastListings = [];
+const animalHydrationVersions = new Map();
 let me = { userId: "", role: "USER" };
 const following = new Set();
 const hiddenIds = new Set(JSON.parse(sessionStorage.getItem("ogt.hidden") || "[]"));
@@ -258,6 +259,7 @@ function sortFeed() {
 }
 
 function mergePost(next) {
+  if (next?.animalListing) next = listingToPost(next.animalListing, next);
   const clean = {};
   Object.keys(next || {}).forEach((k) => {
     if (next[k] !== undefined) clean[k] = next[k];
@@ -392,6 +394,14 @@ function applyLive(live) {
   }
   const merged = mergePost(patch);
   paintPost(merged);
+  if (live.listingId) {
+    const version=(animalHydrationVersions.get(live.id)||0)+1,owner=me.userId;
+    animalHydrationVersions.set(live.id,version);
+    void api('/api/v1/social/post/get',{postId:live.id}).then(remote=>{
+      if(animalHydrationVersions.get(live.id)!==version || me.userId!==owner || !hasSession())return;
+      const refreshed=mergePost(remote);paintPost(refreshed);paintPulse();
+    }).catch(()=>{});
+  }
   if (patch.authorName) paintAuthor(merged);
   paintPulse();
   if (document.getElementById("feed-list") && !document.querySelector(`[data-post="${merged.id}"]`)) {
@@ -429,7 +439,16 @@ function paintPost(post) {
     if (body) body.textContent = post.body;
   }
   const credit = card.querySelector(":scope > .post-attribution");
-  if (credit) credit.replaceChildren(...[globalThis.OgtAttribution.link(post.attributionUrl)].filter(Boolean));
+  const link=globalThis.OgtAttribution.link(post.attributionUrl);
+  if(!link)credit?.remove();
+  else if(credit)credit.replaceChildren(link);
+  else {const box=document.createElement('div');box.className='post-attribution';box.append(link);card.querySelector(':scope > .post-hashtags, :scope > .actions')?.before(box);}
+  const tags=card.querySelector(':scope > .post-hashtags');
+  const tagText=(post.hashtags||[]).map(tag=>'#'+String(tag.label||tag.key).replace(/\s/g,'')).join(' ');
+  if(!tagText)tags?.remove();
+  else if(tags)tags.textContent=tagText;
+  else {const row=document.createElement('p');row.className='meta post-hashtags';row.textContent=tagText;card.querySelector(':scope > .actions')?.before(row);}
+  paintAdoption(card,post);
   globalThis.OgtPostCarousel.update(card, post, {mediaUrl, frameOf: mediaFrameOf});
   paintAuthor(card, post);
 }
@@ -976,6 +995,7 @@ function formatAlertRadius(meters) {
 
 function listingOf(post) {
   if (!post) return null;
+  if (post.animalListing) return post.animalListing;
   return lastListings.find((row) => row.postId === post.id || (post.listingId && row.listingId === post.listingId)) || null;
 }
 
@@ -1288,6 +1308,9 @@ async function resolveListing(post) {
   try {
     const result = await api("/api/v1/animals/resolve", { listingId });
     lastListings = lastListings.filter((row) => row.listingId !== listingId);
+    if(cardKind(post)==='ADOPTION') {
+      const updated=await api('/api/v1/animals/get',{listingId});mergePost(listingToPost(updated,post));
+    }
     mergePost({ id: post.id, listingResolved: true });
     toast(result?.message || "Marcado resuelto");
     if (route().page === "p") renderPost(post.id);
@@ -1408,10 +1431,10 @@ async function runAction(id, post, onDetail) {
       bindDialog(post);
       return;
     case "edit":
-      if (cardKind(post) === "LOST_PET") {
+      if (["LOST_PET", "ADOPTION"].includes(cardKind(post))) {
         const listingId = post.listingId || listingOf(post)?.listingId;
         if (listingId) {
-          location.hash = `#/publicar/perdida?listing=${listingId}`;
+          location.hash = `#/publicar/${cardKind(post) === "ADOPTION" ? "adopcion" : "perdida"}?listing=${listingId}`;
           return;
         }
       }
@@ -1826,12 +1849,54 @@ window.addEventListener("resize", () => {
   document.querySelectorAll(".post .media-slot img.media").forEach(placeLiveFrame);
 });
 
+function adoptionTitle(row) {
+  if(!row)return '';
+  return row.adoptionDetails ? row.title : row.petName || String(row.title||'').split('·')[0].trim();
+}
+function adoptionHashtags(details) {
+  const rows=[{key:'adopcion',label:'Adopción'},...(details.tags||[]),...(details.freeHashtags||[]).map(label=>({key:label.normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().replace(/\s/g,''),label}))];
+  return [...new Map(rows.map(tag=>[tag.key,{key:tag.key,label:tag.label}])).values()];
+}
+function adoptionInfoHtml(post,detailed=false) {
+  const row=listingOf(post);if(!row || row.kind!=='ADOPTION')return '';
+  const details=row.adoptionDetails,lines=[];
+  if(row.ageLabel)lines.push(row.ageLabel);
+  if(!details){if(row.temperament)lines.push(row.temperament);if(row.sex)lines.push(row.sex==='HEMBRA'?'Hembra':row.sex==='MACHO'?'Macho':row.sex);if(row.vaccinated)lines.push('Vacunada');if(row.sterilized)lines.push('Castrada');}
+  if(details?.adoptionMode==='SEPARATE')lines.push('Se pueden adoptar por separado');
+  if(details?.adoptionMode==='TOGETHER')lines.push('Buscan un hogar juntos');
+  if(row.resolved)lines.push('Adopción cerrada');
+  else if(details?.availableCount)lines.push(details.availableCount===1?'Queda 1 buscando hogar':`Quedan ${details.availableCount} buscando hogar`);
+  if(row.homeNeeds)lines.push('Hogar · '+row.homeNeeds);
+  if(row.place)lines.push(row.place);
+  if(detailed && details?.historyAndCare)lines.push('Historia y cuidados · '+details.historyAndCare);
+  const close=detailed && isAuthor(post) && !row.resolved ? `<button type="button" class="ghost" data-adoption-close>Todos encontraron hogar</button>`:'';
+  return lines.length || close ? `<div class="adoption-info" data-detailed="${detailed}">${lines.map(line=>`<p class="meta">${escapeHtml(line)}</p>`).join('')}${close}</div>`:'';
+}
+function bindAdoptionClose(card,post) {
+  const button=card.querySelector('[data-adoption-close]');if(!button)return;
+  button.onclick=event=>{event.stopPropagation();openDialog('<h2>¿Todos encontraron hogar?</h2><p>Se cerrará el aviso de adopción para todos los animales de esta publicación.</p><button type="button" class="ghost" data-close-dialog>Cancelar</button><button type="button" class="primary" data-adoption-confirm>Confirmar cierre</button>');
+    const dialog=document.getElementById('dialog');dialog.querySelectorAll('[data-close-dialog]').forEach(control=>{control.onclick=closeDialog;});
+    dialog.querySelector('[data-adoption-confirm]').onclick=()=>{closeDialog();void resolveListing(post);};
+  };
+}
+function paintAdoption(card,post) {
+  if(cardKind(post)!=='ADOPTION')return;
+  const heading=card.querySelector(':scope > .honoree');if(heading)heading.textContent=adoptionTitle(listingOf(post))||post.honoreeName||'';
+  const old=card.querySelector(':scope > .adoption-info'),box=document.createElement('div');
+  box.innerHTML=adoptionInfoHtml(post,old?.dataset.detailed==='true' || route().page==='p');
+  const next=box.firstElementChild;
+  if(old)next?old.replaceWith(next):old.remove();
+  else if(next)card.querySelector(':scope > [data-post-media], :scope > .post-attribution, :scope > .post-hashtags, :scope > .actions')?.before(next);
+  bindAdoptionClose(card,post);
+}
+
 function postCard(post, { openable = true, previewStories = true, compose = false } = {}) {
   const shown = globalThis.OgtPostCarousel.html(post, {mediaUrl, frameOf: mediaFrameOf});
   const share = isAnecdoteShare(post);
   const homage = isHomenaje(post);
-  const honoree = String(post.honoreeName || "").trim();
   const listing = cardKind(post);
+  const honoree = String((listing === "ADOPTION" ? adoptionTitle(listingOf(post)) : null) || post.honoreeName || "").trim();
+  const credit = globalThis.OgtAttribution.link(post.attributionUrl);
   const pill = share
     ? `<span class="stories-head">${icon("qs-anecdote")}<span class="pill">Anécdota</span></span>`
     : homage
@@ -1864,8 +1929,9 @@ function postCard(post, { openable = true, previewStories = true, compose = fals
     ${lostExtrasHtml(post)}
     ${truequeExtrasHtml(post)}
     ${truequeBodyHtml(post)}
+    ${listing === "ADOPTION" ? adoptionInfoHtml(post, compose) : ""}
     ${shown}
-    <div class="post-attribution">${globalThis.OgtAttribution.link(post.attributionUrl)?.outerHTML || ""}</div>
+    ${credit ? `<div class="post-attribution">${credit.outerHTML}</div>` : ""}
     ${post.hashtags?.length ? `<p class="meta post-hashtags">${post.hashtags.map(tag=>escapeHtml("#"+String(tag.label||tag.key).replace(/\s/g,""))).join(" ")}</p>` : ""}
     ${lostMapHtml(post)}
     ${truequeActionsHtml(post)}
@@ -2001,6 +2067,10 @@ function lostActionsHtml(post, { onDetail = false } = {}) {
 
 function bindSocial(root, { onDetail = false } = {}) {
   globalThis.OgtPostCarousel.bind(root);
+  root.querySelectorAll('[data-adoption-close]').forEach(button=>{
+    const card=button.closest('[data-post]'),post=lastFeed.find(row=>row.id===card?.dataset.post);
+    if(post)bindAdoptionClose(card,post);
+  });
   root.querySelectorAll(".who a").forEach((a) => {
     a.addEventListener("click", (ev) => ev.stopPropagation());
   });
@@ -2548,11 +2618,12 @@ function bindPublishMedia(form, existing = [], context = route().id || 'new') {
     paintMedia();
   });
   paintMedia();
+  const selected = () => publishMediaContext === key ? publishFiles : publishMediaDrafts.get(key) || [];
+  return {count: () => selected().length, upload: alt => uploadPublishMedia(alt, selected().slice()), clear: () => clearPublishFiles(key)};
 }
 
-async function uploadPublishMedia(altText) {
+async function uploadPublishMedia(altText, selected = publishFiles.slice()) {
   const media = [];
-  const selected = publishFiles.slice();
   for (const [sortOrder,row] of selected.entries()) {
     if(row.media){media.push({...row.media,sortOrder});continue;}
     const uploaded = await api("/api/v1/media/upload", {
@@ -2581,9 +2652,12 @@ function listingToPost(saved, base) {
     listingResolved: Boolean(saved.resolved),
     listingUrgency: saved.urgency,
     topic: lost ? "Mascota perdida" : "Adopción",
-    body: saved.description || existing.body,
+    body: saved.adoptionDetails?.presentation || saved.description || existing.body,
     media: saved.media?.length ? saved.media : existing.media,
-    honoreeName: saved.petName || existing.honoreeName,
+    honoreeName: saved.kind === "ADOPTION" ? adoptionTitle(saved) : saved.petName || existing.honoreeName,
+    animalListing: saved,
+    attributionUrl: saved.attributionUrl || null,
+    hashtags: saved.hashtags?.length ? saved.hashtags : saved.adoptionDetails ? adoptionHashtags(saved.adoptionDetails) : existing.hashtags,
     petName: saved.petName,
     place: saved.place || saved.lastSeenPlace || existing.place,
     lastSeenPlace: saved.lastSeenPlace || saved.place,
@@ -3150,6 +3224,15 @@ async function renderPublicar(kind) {
         || await api("/api/v1/animals/get", { listingId }).catch(() => null);
     }
     const title = editing ? (lost ? "Editar alerta" : "Editar adopción") : spec.title;
+    if (!lost) {
+      const owner = me.userId;
+      const {mountAdoptionForm} = await import('./adoption.js?v=1');
+      mountAdoptionForm(main, {api,editing,bindMedia:bindPublishMedia,isCurrentOwner:()=>me.userId===owner && hasSession(),
+        mediaHtml:`<div class="media-pick"><button type="button" class="media-add" data-add-media>${icon("qs-plus")} Fotos o videos</button><input type="file" data-file accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" multiple><div class="media-thumbs" data-thumbs></div></div>`,
+        onSaved(saved) {lastListings=lastListings.filter(row=>row.listingId!==saved.listingId);lastListings.unshift(saved);mergePost(listingToPost(saved));toast(editing?"Adopción actualizada":"Publicado en adopción");location.hash=`#/p/${saved.postId}`;}
+      });
+      return;
+    }
     main.innerHTML = `<div class="chrome"><a href="#/publicar">Publicar</a><h1>${escapeHtml(title)}</h1></div>
       <form class="publish" id="publish-form">
         <p class="hint">${lost
@@ -3400,7 +3483,7 @@ function listingRow(row) {
     ${photo ? `<img src="${escapeHtml(mediaUrl(photo))}" alt="">` : `<span class="avatar">${icon(lost ? "qs-paw" : "qs-pets")}</span>`}
     <span class="copy">
       <span class="stories-head">${icon(lost ? "qs-paw" : "qs-pets")}<span class="pill">${lost ? "Mascota perdida" : "Adopción"}</span></span>
-      <strong>${escapeHtml(row.petName || row.title || "Mascota")}</strong>
+      <strong>${escapeHtml(row.kind === "ADOPTION" ? adoptionTitle(row) : row.petName || row.title || "Mascota")}</strong>
       <span>${escapeHtml([speciesLabel(row.species), sizeLabel(row.size), place].filter(Boolean).join(" · "))}</span>
     </span>
   </a>`;

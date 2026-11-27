@@ -263,7 +263,7 @@ class FeedTimeline(
         }
         val before=db.posts.firstOrNull { it.id==live.id }
         val needsContent=before==null || (live.body!=null && live.body!=before.body) ||
-            (live.tag!=null && live.tag!=before.tag)
+            (live.tag!=null && live.tag!=before.tag) || live.listingId!=null
         if(before!=null) { db.applySocialLive(live);rebuild() }
         // Unknown posts are admitted only after authenticated REST hydration (including media).
         if(initialized && (needsContent || live.id in removed))hydrate(live.id)

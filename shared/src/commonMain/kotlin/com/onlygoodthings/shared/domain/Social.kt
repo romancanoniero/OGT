@@ -47,6 +47,7 @@ data class SocialPost(
     val place: String? = null,
     val eventStartsAtEpochMs: Long? = null,
     val hashtags: List<PostHashtag> = emptyList(),
+    val animalListing: AnimalListingDto? = null,
 )
 
 @Serializable

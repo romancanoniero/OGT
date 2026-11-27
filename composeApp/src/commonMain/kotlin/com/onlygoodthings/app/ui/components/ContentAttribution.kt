@@ -15,10 +15,10 @@ import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.shared.domain.ContentAttribution
 
 @Composable
-fun AttributionField(value: String, onChange: (String) -> Unit, enabled: Boolean = true) {
+fun AttributionField(value: String, onChange: (String) -> Unit, enabled: Boolean = true, label: String = "Fuente o enlace original (opcional)") {
     Column {
         OgtOutlinedTextField(value, { if (it.length <= ContentAttribution.MAX_URL_LENGTH) onChange(it) },
-            Modifier.fillMaxWidth(), enabled = enabled, label = { Text("Fuente o enlace original (opcional)") },
+            Modifier.fillMaxWidth(), enabled = enabled, label = { Text(label) },
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, keyboardType = KeyboardType.Uri),
             singleLine = true)
     }
