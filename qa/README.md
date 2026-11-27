@@ -1187,3 +1187,14 @@ Validación local: 67 posts importados, 524 archivos de contenido y 28 videos. C
 La referencia física en iPhone 17R/build 20 registró 90,26 s de recorrido manual, 5.573 muestras de CADisplayLink, p95 18,01 ms y 41 intervalos del hilo principal >50 ms (máximo 82,12 ms). Es una medición de disponibilidad del hilo principal, no de FPS renderizados. El capturador es DEBUG, optativo mediante variable de lanzamiento y escribe solo un informe local; en uso normal no recolecta datos. Comparación física con build 21 pendiente de instalación y nuevo recorrido. Los 28 archivos importados incluyen 12 con pista de audio y 16 sin pista; no se infiere por ello que todos los originales sean silenciosos.
 
 Resultados y datos privados de QA: `build/media-performance-20261127` (excluidos de Git). Suite común/backend/Android y compilación iOS correctas; 125 pruebas web más 2 pruebas de caché correctas; pruebas con base sintética y flujo web completo correctas. `AuthComponents.kt`, que ya tenía una edición ajena a esta tarea, no forma parte de esta entrega.
+
+
+### Marcos adaptables y carruseles de veinte archivos — iOS 22
+
+La versión 21 seguía presentando el contenido completo dentro de un marco horizontal 16:9. La 22 adapta la altura de lectura a la primera pieza: cuadrada, vertical hasta 3:4 y horizontal hasta 1,91:1; usa 4:5 si aún no conoce las dimensiones. La altura no cambia al deslizar. Cada foto o video se ve completo con fondo oscuro. El editor y los archivos recortados previamente conservan su comportamiento. Los metadatos de tamaño se obtienen de cabeceras locales y se guardan en una caché acotada; no se descargan URLs externas desde la API para medirlas.
+
+La capacidad autorizada sube de diez a veinte archivos en el selector, la validación, el almacenamiento y el importador. La migración 47 amplía el rango de orden sin actualizar ninguna publicación ni archivo histórico. Se elimina el truncamiento silencioso de archivos en adopciones y se rechazan listas de más de veinte. Los dots caben en pantallas pequeñas, mantienen su selección y su navegación accesible.
+
+Comparación física manual build20→21: 41→4 intervalos de CADisplayLink mayores a 50 ms, p95 18,01→16,81 ms, memoria registrada 476,9→319,0 MB. El máximo aislado fue 82,1→123,6 ms. Los recorridos manuales no fueron idénticos y no equivalen a FPS renderizados ni a un ensayo de carga concurrente. La inspección de disco confirmó los 544/544 archivos de contenido/posters del feed en el iPhone, incluidos archivos no mostrados.
+
+Validación de la 22: pruebas compartidas, backend, Android y compilación iOS correctas; 128 pruebas web correctas (incluidos Chrome y WebKit con audio, pausa, swipe, ampliación y veinte dots). La prueba de persistencia verifica las veinte piezas en orden en posts normales y adopciones, conserva comentarios/créditos/fechas anteriores y rechaza la pieza 21. La instalación de iPhone se realiza en el mismo contenedor, sin borrar datos.

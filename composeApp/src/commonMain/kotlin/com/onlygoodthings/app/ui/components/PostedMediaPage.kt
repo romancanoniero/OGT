@@ -39,7 +39,7 @@ fun pausePostedMediaPlayback() { PostedPlayback.activeId=null }
 fun PostedMediaPage(
     item:LocalPostMedia?, fallback:DrawableResource, description:String?,
     active:Boolean, multiple:Boolean, modifier:Modifier=Modifier, autoPlay:Boolean=false, inlineVideo:Boolean=true,
-    onPrevious:()->Unit, onNext:()->Unit, onOpen:(()->Unit)?=null,
+    onPrevious:()->Unit, onNext:()->Unit, onOpen:(()->Unit)?=null, onAspect:((Float)->Unit)?=null,
 ) {
     val video=item?.kind==MediaKind.VIDEO
     val preview=LocalInspectionMode.current
@@ -64,7 +64,7 @@ fun PostedMediaPage(
     }
     LaunchedEffect(active,visible) { if((!active || !visible) && PostedPlayback.activeId==key)PostedPlayback.activeId=null }
     Box(modifier.background(OgtColors.ink).onGloballyPositioned { visible=!it.boundsInWindow().isEmpty }) {
-        if(item!=null) OgtPostImage(item,fallback,description,Modifier.fillMaxSize())
+        if(item!=null) OgtPostImage(item,fallback,description,Modifier.fillMaxSize(),onAspect=onAspect)
         else androidx.compose.foundation.Image(org.jetbrains.compose.resources.painterResource(fallback),description,Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Fit)
         if(video && loaded && url!=null && !preview) {
             OgtPostedVideo(url,Modifier.fillMaxSize(),playing,PostedPlayback.muted) {
@@ -132,19 +132,24 @@ fun PostMediaTypes(media:List<LocalPostMedia>,modifier:Modifier=Modifier) {
 fun PostedMediaCarousel(
     media:List<LocalPostMedia>,fallback:DrawableResource,description:String?,modifier:Modifier=Modifier,
     initialIndex:Int=0,onOpen:((Int)->Unit)?=null,autoPlay:Boolean=false,inlineVideo:Boolean=true,
-    onPageChanged:(Int)->Unit={},
+    onPageChanged:(Int)->Unit={}, fitFrameToMedia:Boolean=false,
     overlay:@Composable BoxScope.()->Unit={},
 ) {
+    val first = media.firstOrNull()
+    var readingRatio by remember(first?.id,first?.url,first?.pixelWidth,first?.pixelHeight) {
+        mutableStateOf(com.onlygoodthings.shared.domain.postReadingRatio(first?.pixelWidth,first?.pixelHeight))
+    }
     val pager=androidx.compose.foundation.pager.rememberPagerState(initialPage=initialIndex.coerceIn(0,(media.size-1).coerceAtLeast(0))) { media.size.coerceAtLeast(1) }
     val scope=rememberCoroutineScope()
     val pageChanged by rememberUpdatedState(onPageChanged)
     LaunchedEffect(pager) { snapshotFlow { pager.currentPage }.collect { pageChanged(it) } }
     fun go(page:Int) { scope.launch { pager.animateScrollToPage(page.coerceIn(0,(media.size-1).coerceAtLeast(0))) } }
-    Box(modifier) {
+    Box(if(fitFrameToMedia)modifier.aspectRatio(readingRatio) else modifier) {
         androidx.compose.foundation.pager.HorizontalPager(state=pager,modifier=Modifier.fillMaxSize(),key={media.getOrNull(it)?.id ?: it}) { page ->
             PostedMediaPage(media.getOrNull(page),fallback,description,active=pager.currentPage==page && !pager.isScrollInProgress,
                 multiple=media.size>1,modifier=Modifier.fillMaxSize(),autoPlay=autoPlay,inlineVideo=inlineVideo,
-                onPrevious={go(page-1)},onNext={go(page+1)},onOpen=onOpen?.let { open -> { pageChanged(page);open(page) } })
+                onPrevious={go(page-1)},onNext={go(page+1)},onOpen=onOpen?.let { open -> { pageChanged(page);open(page) } },
+                onAspect={ ratio -> if(page==0 && first?.pixelWidth==null)readingRatio=com.onlygoodthings.shared.domain.postReadingRatio(ratio) })
         }
         overlay()
         MediaPagerIndicator(pager.currentPage,media.size,onPageSelected={go(it)})

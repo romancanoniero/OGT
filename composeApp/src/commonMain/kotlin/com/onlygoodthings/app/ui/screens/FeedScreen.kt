@@ -931,7 +931,7 @@ private fun ListingPhotoStrip(
     onMediaPageChanged: (Int) -> Unit,
 ) {
     com.onlygoodthings.app.ui.components.PostedMediaCarousel(media,fallback,null,
-        modifier=Modifier.ogtBleedHorizontal(12.dp).aspectRatio(POST_FRAME_RATIO),onOpen={onOpen()},onPageChanged=onMediaPageChanged)
+        modifier=Modifier.ogtBleedHorizontal(12.dp),fitFrameToMedia=true,onOpen={onOpen()},onPageChanged=onMediaPageChanged)
 }
 
 @Composable
@@ -1179,7 +1179,7 @@ private fun PostMediaPager(
     onMediaPageChanged: (Int) -> Unit,
 ) {
     com.onlygoodthings.app.ui.components.PostedMediaCarousel(media,fallback,tag,
-        modifier=Modifier.fillMaxWidth().aspectRatio(POST_FRAME_RATIO),onOpen={onOpen()},onPageChanged=onMediaPageChanged) {
+        modifier=Modifier.fillMaxWidth(),fitFrameToMedia=true,onOpen={onOpen()},onPageChanged=onMediaPageChanged) {
         OverlayChip(Modifier.align(Alignment.TopStart).padding(start=12.dp,top=if(media.size>1)48.dp else 12.dp),tag,if(petStory)OgtColors.secondary else OgtColors.ink)
     }
 }

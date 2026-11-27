@@ -697,7 +697,7 @@ POST {{base}}/api/v1/ads/spend
 Authorization: Bearer {{adminJwt}}
 { "postId": "66666666-6666-6666-6666-666666666666", "amountCents": 40000, "companyId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" }
 
-El feed hidrata `media` (1 a 10 piezas IMAGE/VIDEO) y `sourceUrl` si el post es una noticia sembrada.
+El feed hidrata `media` (1 a 20 piezas IMAGE/VIDEO) y `sourceUrl` si el post es una noticia sembrada.
 Cada post exige al menos una foto o un video, como Instagram.
 
 POST {{base}}/api/v1/social/comment

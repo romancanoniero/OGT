@@ -3,6 +3,9 @@ package com.onlygoodthings.app.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,7 +34,8 @@ fun MediaPagerIndicator(
     onPageSelected: ((Int) -> Unit)? = null,
 ) {
     if (pageCount <= 1) return
-    Box(modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val dotWidth = minOf(20.dp, ((maxWidth - 96.dp) / pageCount).coerceAtLeast(8.dp))
         Box(
             Modifier
                 .align(Alignment.TopStart)
@@ -54,7 +58,7 @@ fun MediaPagerIndicator(
             repeat(pageCount) { index ->
                 val active = index == pageIndex
                 Box(
-                    Modifier.size(20.dp).semantics { contentDescription="Archivo ${index+1} de $pageCount";selected=active }.then(if(onPageSelected==null)Modifier else Modifier.clickable { onPageSelected(index) }),
+                    Modifier.width(dotWidth).height(20.dp).semantics { contentDescription="Archivo ${index+1} de $pageCount";selected=active }.then(if(onPageSelected==null)Modifier else Modifier.clickable { onPageSelected(index) }),
                     contentAlignment=Alignment.Center,
                 ) {
                     Box(Modifier.size(if(active)7.dp else 6.dp).clip(CircleShape)

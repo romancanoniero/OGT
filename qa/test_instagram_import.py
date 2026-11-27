@@ -46,10 +46,18 @@ class InstagramImportTests(unittest.TestCase):
             changed=copy.deepcopy(original);changed['posts'][0]['sourceUrl']='https://example.test/post';variants.append(changed)
             changed=copy.deepcopy(original);changed['displayName']='Unmarked profile';variants.append(changed)
             changed=copy.deepcopy(original);changed['posts']*=2;variants.append(changed)
-            changed=copy.deepcopy(original);changed['posts'][0]['media']*=11;variants.append(changed)
+            changed=copy.deepcopy(original);changed['posts'][0]['media']*=21;variants.append(changed)
             changed=copy.deepcopy(original);changed['posts'][0]['media'][0]['durationMs']='0); DELETE FROM users;';variants.append(changed)
             for variant in variants:
                 with self.subTest(variant=variants.index(variant)), self.assertRaises(ValueError):self.prepare(root,variant)
+
+    def test_twenty_file_import_is_complete_and_ordered(self):
+        with tempfile.TemporaryDirectory() as root:
+            data=self.fixture(root);data['posts'][0]['media']*=20
+            post=self.prepare(root,data)['posts'][0]
+            self.assertEqual(len(post['media']),20)
+            self.assertEqual([x['order'] for x in post['media']],list(range(20)))
+            self.assertEqual(importer.make_sql(self.prepare(root,data)).count('INSERT INTO post_media('),20)
 
     def test_location_requires_evidence_and_never_defaults_to_the_profile_neighborhood(self):
         with tempfile.TemporaryDirectory() as root:

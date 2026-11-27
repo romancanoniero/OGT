@@ -7,8 +7,20 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class PostFrameTest {
+    @Test fun lecturaAdaptaVerticalCuadradoYPaisajeSinCambiarElEditor() {
+        assertEquals(.8f, postReadingRatio(1080, 1350))
+        assertEquals(1f, postReadingRatio(1080, 1080))
+        assertEquals(.75f, postReadingRatio(1080, 1920))
+        assertEquals(1.91f, postReadingRatio(4000, 1000))
+        assertEquals(.8f, postReadingRatio(null, null))
+        assertEquals(.8f, postReadingRatio(0, 500))
+        assertEquals(.8f, postReadingRatio(Float.NaN))
+        assertTrue(PostMediaRules.isValid(20))
+        assertTrue(!PostMediaRules.isValid(21))
+    }
+
     @Test
-    fun elMarcoDelFeedEsDieciseisNovenos() {
+    fun elEditorConservaElMarcoDieciseisNovenos() {
         assertEquals(16f / 9f, POST_FRAME_RATIO)
         assertTrue(abs(POST_FRAME_RATIO - (16f / 9f)) < 0.0001f)
     }

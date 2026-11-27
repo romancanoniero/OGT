@@ -410,7 +410,7 @@ span.avatar svg { width: 18px; height: 18px; }
   object-position: center center;
   background: var(--sand);
 }
-/* Marco del feed y de la ficha: 16 / 9, el mismo de la app. El encuadre se coloca en píxeles. */
+/* Marco heredado del editor. Los carruseles de lectura adaptan su altura más abajo. */
 .post .media-slot,
 .post.open .media-slot {
   position: relative;
@@ -434,7 +434,7 @@ span.avatar svg { width: 18px; height: 18px; }
   object-position: center center;
 }
 .post-media-slide[hidden] { display: none; }
-.post [data-post-media] .media-slot { background: var(--ink); }
+.post [data-post-media] .media-slot { background: var(--ink); aspect-ratio: var(--post-media-ratio, 4 / 5); }
 .post [data-post-media] .media-slot .media {
   object-fit: contain;
   background: var(--ink);
@@ -442,7 +442,7 @@ span.avatar svg { width: 18px; height: 18px; }
 .post-carousel { position:relative; touch-action: pan-y pinch-zoom; }
 .post-carousel:focus-visible { outline: 2px solid var(--secondary); outline-offset: 4px; }
 .post-media-dots { position:absolute; z-index:3; bottom:8px; left:50%; transform:translateX(-50%); max-width:calc(100% - 96px); display:flex; justify-content:center; gap:0; border-radius:20px; background:#11121388; padding:0 4px; }
-.post-media-dot { display: grid; place-items: center; width: 20px; min-width: 12px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; }
+.post-media-dot { display: grid; place-items: center; width: 20px; min-width: 8px; flex: 1 1 20px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; }
 .post-media-dot span { width: 7px; height: 7px; border-radius: 50%; background: white; opacity: .5; }
 .post-media-dot[aria-current="true"] span { background: white; opacity: 1; transform: scale(1.25); }
 .post-media-dot:focus-visible { outline: 2px solid var(--secondary); outline-offset: 1px; }

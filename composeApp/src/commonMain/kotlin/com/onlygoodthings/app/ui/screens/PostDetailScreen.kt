@@ -1372,7 +1372,7 @@ private fun DetailMedia(
         return
     }
     com.onlygoodthings.app.ui.components.PostedMediaCarousel(media,Res.drawable.feed_story_donacion,tag,
-        modifier=Modifier.ogtBleedHorizontal(OgtDimens.margin).aspectRatio(POST_FRAME_RATIO),onOpen=onOpen,inlineVideo=false,initialIndex=initialIndex)
+        modifier=Modifier.ogtBleedHorizontal(OgtDimens.margin),fitFrameToMedia=true,onOpen=onOpen,inlineVideo=false,initialIndex=initialIndex)
 }
 
 private fun lostSpeciesSize(listing: LocalAnimalListing?): String? {

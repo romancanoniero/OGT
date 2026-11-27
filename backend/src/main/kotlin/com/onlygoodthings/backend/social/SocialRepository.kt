@@ -32,7 +32,7 @@ import com.onlygoodthings.backend.community.guardedContactWrite
 import com.onlygoodthings.backend.community.UserBlocks
 import com.onlygoodthings.backend.community.interactionSql
 
-class SocialSqlRepository(private val db: Database) {
+class SocialSqlRepository(private val db: Database, private val mediaForReading: (PostMediaItem) -> PostMediaItem = { it }) {
 
     fun ownConsent(userId: String) = db.withConnection { readCommunityConsent(it, userId) }
     fun acceptConsent(userId: String, data: Map<String, Any?>) = db.withConnection { saveCommunityConsent(it, userId, data) }
@@ -127,7 +127,7 @@ class SocialSqlRepository(private val db: Database) {
         require(body.isNotBlank()) { "El texto no puede estar vacío" }
         require(hashtags==null || publicationKind=="POST") { "Los hashtags múltiples se publican desde Publicar." }
         require(media.isNotEmpty()) { "Hace falta al menos una foto o un video" }
-        require(media.size<=10) { "Podés adjuntar hasta 10 archivos." }
+        require(media.size<=com.onlygoodthings.shared.domain.PostMediaRules.MAX_ITEMS) { "Podés adjuntar hasta 20 archivos." }
         require(requestId==null || Regex("^[A-Za-z0-9_-]{12,80}$").matches(requestId)) { "Identificador de envío inválido" }
         if(place!=null || eventStartsAtEpochMs!=null) {
             if(publicationKind=="POST") {
@@ -1149,7 +1149,7 @@ class SocialSqlRepository(private val db: Database) {
                     buildList { while (rs.next()) add(rs.toPost()) }
                 }
                 val media = loadMedia(connection, ids)
-                val animals = com.onlygoodthings.backend.modules.AnimalSqlRepository(db).forPosts(connection, posts.map { it.id })
+                val animals = com.onlygoodthings.backend.modules.AnimalSqlRepository(db, mediaForReading).forPosts(connection, posts.map { it.id })
                 val anecdotes = loadAnecdotes(connection, ids, viewerId)
                 val diffusions = PostDiffusions(db).forPosts(connection, ids, viewerId)
                 posts.map { post ->
@@ -1245,7 +1245,7 @@ class SocialSqlRepository(private val db: Database) {
                             frameX = (rs.getObject("frame_x") as? Number)?.toDouble(),
                             frameY = (rs.getObject("frame_y") as? Number)?.toDouble(),
                             frameZoom = (rs.getObject("frame_zoom") as? Number)?.toDouble(),
-                        ).forReading(rs.stringOrNull("original_url"))
+                        ).forReading(rs.stringOrNull("original_url")).let(mediaForReading)
                         getOrPut(postId) { mutableListOf() } += item
                     }
                 }

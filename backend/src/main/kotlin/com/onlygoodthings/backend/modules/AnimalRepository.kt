@@ -41,7 +41,7 @@ data class AnimalWrite(
     val attributionSpecified: Boolean = false,
 )
 
-class AnimalSqlRepository(private val db: Database) {
+class AnimalSqlRepository(private val db: Database, private val mediaForReading: (PostMediaItem) -> PostMediaItem = { it }) {
 
     fun publish(reporterId: String, write: AnimalWrite): AnimalListingDto = db.withConnection { connection ->
         connection.autoCommit = false
@@ -278,6 +278,7 @@ class AnimalSqlRepository(private val db: Database) {
     }
 
     private fun replaceMedia(connection: Connection, postId: String, media: List<PostMediaItem>, alt: String) {
+        require(media.size <= com.onlygoodthings.shared.domain.PostMediaRules.MAX_ITEMS) { "Podés incluir hasta 20 archivos." }
         data class Saved(val id: String, val url: String, val original: String?, val source: String?, val duration: Int?, val x: Double?, val y: Double?, val zoom: Double?, val alt: String?, val created: java.sql.Timestamp)
         val previous = connection.prepareStatement("SELECT * FROM post_media WHERE post_id=?::uuid").use { q ->
             q.setString(1, postId)
@@ -289,7 +290,7 @@ class AnimalSqlRepository(private val db: Database) {
             stmt.setString(1, postId)
             stmt.executeUpdate()
         }
-        media.take(10).forEachIndexed { order, item ->
+        media.forEachIndexed { order, item ->
             val old = previous.firstOrNull { it.id !in retained && (it.id == item.id || it.url == item.url) }
             old?.let { retained += it.id }
             connection.prepareStatement(
@@ -396,7 +397,7 @@ class AnimalSqlRepository(private val db: Database) {
                             frameX = (rs.getObject("frame_x") as? Number)?.toDouble(),
                             frameY = (rs.getObject("frame_y") as? Number)?.toDouble(),
                             frameZoom = (rs.getObject("frame_zoom") as? Number)?.toDouble(),
-                        ).forReading(rs.stringOrNull("original_url"))
+                        ).forReading(rs.stringOrNull("original_url")).let(mediaForReading)
                     }
                 }
             }

@@ -82,8 +82,8 @@ def prepare(path):
         seen.add(code)
         if entry['sourceUrl'] != source + 'p/' + code + '/':
             raise ValueError('Post source must belong to the reviewed account')
-        if entry['kind'] not in ('ADOPTION', 'POST') or not 1 <= len(entry['media']) <= 10:
-            raise ValueError('Classify the post and preserve all 1..10 media items')
+        if entry['kind'] not in ('ADOPTION', 'POST') or not 1 <= len(entry['media']) <= 20:
+            raise ValueError('Classify the post and preserve all 1..20 media items')
         if not entry['body'].strip() or 'importad' not in entry['body'].lower():
             raise ValueError('Post must disclose the import')
         reviewed_location(entry)

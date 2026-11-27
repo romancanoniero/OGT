@@ -96,7 +96,7 @@ class OgtLocalDatabaseTest {
         )
         db.feedPosts().forEach { post ->
             val media = db.mediaOf(post.id)
-            assertTrue(PostMediaRules.isValid(media.size), "Post ${post.id} debe tener 1..10 media")
+            assertTrue(PostMediaRules.isValid(media.size), "Post ${post.id} debe tener 1..20 media")
         }
         assertTrue(db.postMedia.any { it.kind == MediaKind.VIDEO })
         assertTrue(db.feedPosts().any { db.mediaOf(it.id).size >= 2 })

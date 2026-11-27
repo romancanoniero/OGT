@@ -483,6 +483,8 @@ class OgtLocalDatabase {
                     frameX = item.frameX,
                     frameY = item.frameY,
                     frameZoom = item.frameZoom,
+                    pixelWidth = item.pixelWidth,
+                    pixelHeight = item.pixelHeight,
                 )
             }
         }
@@ -2028,6 +2030,8 @@ class OgtLocalDatabase {
                 frameX = item.frameX,
                 frameY = item.frameY,
                 frameZoom = item.frameZoom,
+                    pixelWidth = item.pixelWidth,
+                    pixelHeight = item.pixelHeight,
             )
         }
     }
@@ -2148,6 +2152,8 @@ class OgtLocalDatabase {
                     frameX = row.frameX,
                     frameY = row.frameY,
                     frameZoom = row.frameZoom,
+                    pixelWidth = row.pixelWidth,
+                    pixelHeight = row.pixelHeight,
                 )
             },
             sourceUrl = post.sourceUrl,

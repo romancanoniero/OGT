@@ -7,6 +7,9 @@
     if (typed.length) return typed.map((item, index) => ({...item, index})).sort((a, b) => (a.sortOrder ?? a.index) - (b.sortOrder ?? b.index));
     return (Array.isArray(post.mediaUrls) ? post.mediaUrls : []).filter(Boolean).map(url => ({url, kind: /\.(mp4|webm)(?:[?#]|$)/i.test(url) ? 'VIDEO' : 'IMAGE'}));
   }
+  function readingRatio(width, height) {
+    return Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0 ? Math.max(.75, Math.min(1.91, width / height)) : .8;
+  }
   function html(post, {mediaUrl = url => url, frameOf = () => ({x: .5, y: .5, zoom: 1}), initialIndex = 0, expandable = true} = {}) {
     const items = rows(post);
     if (!items.length) return '';
@@ -21,7 +24,7 @@
       return `<div class="post-media-slide" data-media-page="${index}" role="group" aria-label="${label}"${index !== selected ? ' hidden' : ''}><div class="media-slot">${media}${buttons}</div></div>`;
     }).join('');
     const dots = items.length > 1 ? `<div class="post-media-dots" role="group" aria-label="Elegir foto o video">${items.map((item, index) => `<button type="button" class="post-media-dot" data-media-go="${index}" aria-label="Ir a ${item.kind === 'VIDEO' ? 'video' : 'foto'} ${index + 1} de ${items.length}" aria-current="${index === selected}"><span aria-hidden="true"></span></button>`).join('')}</div>` : '';
-    return `<div class="post-carousel" data-post-media data-media-key="${escape(JSON.stringify(items))}" data-media-active="${selected}" role="region" aria-roledescription="carrusel" aria-label="Fotos y videos de la publicación"${items.length > 1 ? ' tabindex="0"' : ''}>${slides}${items.length > 1 ? `<span class="post-media-count" aria-hidden="true">${selected + 1}/${items.length}</span>` : ''}${expandable ? `<button type="button" class="post-media-expand" data-media-expand aria-label="Ampliar archivo actual"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M3 3l6 6m12-6-6 6M3 21l6-6m12 6-6-6"/></svg></button>` : ''}${dots}<span class="post-media-status" role="status" aria-live="polite"></span></div>`;
+    return `<div class="post-carousel" data-post-media style="--post-media-ratio:${readingRatio(items[0].pixelWidth, items[0].pixelHeight)}" data-media-key="${escape(JSON.stringify(items))}" data-media-active="${selected}" role="region" aria-roledescription="carrusel" aria-label="Fotos y videos de la publicación"${items.length > 1 ? ' tabindex="0"' : ''}>${slides}${items.length > 1 ? `<span class="post-media-count" aria-hidden="true">${selected + 1}/${items.length}</span>` : ''}${expandable ? `<button type="button" class="post-media-expand" data-media-expand aria-label="Ampliar archivo actual"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M3 3l6 6m12-6-6 6M3 21l6-6m12 6-6-6"/></svg></button>` : ''}${dots}<span class="post-media-status" role="status" aria-live="polite"></span></div>`;
   }
   function soundIcon(muted) {
     return `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 9h4l5-4v14l-5-4H3z"/>${muted?'<path d="m16 8 6 6-2 2-6-6zm4 0 2 2-6 6-2-2z"/>':'<path d="M15 8v2c2 1 2 3 0 4v2c5-2 5-6 0-8m3-4v2c6 3 6 9 0 12v2c9-4 9-12 0-16"/>'}</svg>`;
@@ -66,6 +69,14 @@
     carousels.forEach(carousel => {
       if (carousel.dataset.mediaBound) return;
       carousel.dataset.mediaBound = 'true';
+      // The first file defines a stable frame even when another carousel page is selected.
+      const first = carousel.querySelector('[data-media-page="0"] .media');
+      const measure = () => {
+        const width = first?.naturalWidth || first?.videoWidth, height = first?.naturalHeight || first?.videoHeight;
+        if (width > 0 && height > 0) carousel.style.setProperty('--post-media-ratio', readingRatio(width, height));
+      };
+      first?.addEventListener(first.tagName === 'VIDEO' ? 'loadedmetadata' : 'load', measure);
+      measure();
       carousel.querySelector('[data-media-expand]')?.addEventListener('click', event => {
         event.preventDefault();event.stopPropagation();
         carousel.dispatchEvent(new CustomEvent('ogt:media-open', {bubbles: true, detail: {index: Number(carousel.dataset.mediaActive)}}));

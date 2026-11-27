@@ -51,6 +51,19 @@ class AdoptionIntegrationTest {
             val legacy=animals.update(owner,old.listingId,animalWriteFrom(oldPayload.filterKeys { it!="attributionUrl" },null,tags.list(true),kept))
             assertEquals(kept.title,legacy.title);assertEquals(kept.adoptionDetails,legacy.adoptionDetails);assertNull(legacy.attributionUrl)
             assertEquals(old.createdAtEpochMs,legacy.createdAtEpochMs);assertEquals(mediaBefore,mediaSnapshot())
+            // Extending a carousel must not silently drop files beyond the historical ten-item limit.
+            val twenty = (0 until 20).map { index -> mapOf("url" to "https://example.test/$index.jpg", "kind" to if(index%2==0)"IMAGE" else "VIDEO", "posterUrl" to "https://example.test/poster-$index.jpg") }
+            val twentyWrite = animalWriteFrom(oldPayload + ("media" to twenty), null)
+            val complete = animals.publish(owner, twentyWrite)
+            assertEquals(twenty.map { it["url"] }, complete.media.map { it.url })
+            assertEquals(20, animals.get(complete.listingId)!!.media.size)
+            assertEquals(complete.media.map { it.kind }, posts.byId(complete.postId,other)!!.media.map { it.kind })
+            assertThrows(IllegalArgumentException::class.java) { animals.update(owner,complete.listingId,twentyWrite.copy(media=twentyWrite.media+twentyWrite.media.first())) }
+            assertEquals(complete.media, animals.get(complete.listingId)!!.media)
+            val regular = posts.publish(owner,"Veinte archivos QA","Comunidad",twentyWrite.media,null,null,null,emptyList(),publicationKind="POST",hashtags=listOf("Gatos"))
+            assertEquals(twentyWrite.media.map { it.url }, regular.media.map { it.url })
+            assertThrows(IllegalArgumentException::class.java) { posts.publish(owner,"Demasiados archivos QA","Comunidad",twentyWrite.media+twentyWrite.media.first(),null,null,null,emptyList(),publicationKind="POST",hashtags=listOf("Gatos")) }
+
             assertEquals(1,posts.byId(old.postId,other)!!.impactCount);assertEquals(comment.id,posts.comments(old.postId).single().id)
         }
     }

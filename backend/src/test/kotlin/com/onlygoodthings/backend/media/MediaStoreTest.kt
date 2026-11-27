@@ -23,6 +23,21 @@ class MediaStoreTest {
         }
         return ByteArrayOutputStream().also { ImageIO.write(image, "png", it) }.toByteArray()
     }
+    @Test fun readingDimensionsUseLocalImageOrVideoPosterWithoutChangingStoredFraming() {
+        val store = store()
+        val photo = store.save(picture(300, 400), "photo.png", "image/png")
+        val item = com.onlygoodthings.shared.domain.PostMediaItem("p", MediaKind.IMAGE, photo.url, frameX=.2)
+        assertEquals(300 to 400, store.imageDimensions(photo.url))
+        assertEquals(300, store.forReading(item).pixelWidth)
+        assertEquals(400, store.forReading(item).pixelHeight)
+        assertEquals(.2, store.forReading(item).frameX)
+        val clip = item.copy(kind=MediaKind.VIDEO, url="https://remote.test/clip.mp4", posterUrl=photo.url)
+        assertEquals(300, store.forReading(clip).pixelWidth)
+        assertNull(store.imageDimensions("https://remote.test/photo.jpg"))
+        assertNull(store.imageDimensions("/media/u/../../secret.png"))
+        assertEquals(item.copy(url="https://remote.test/photo.jpg"), store.forReading(item.copy(url="https://remote.test/photo.jpg")))
+    }
+
     @Test fun measuredUploadReportsTheActualReceivedAndStoredBytesWithoutChangingThePublicPayload() {
         val store=MediaStore(root,"http://localhost")
         val input=javaClass.getResourceAsStream("/images/rotated.jpg")!!.readBytes()

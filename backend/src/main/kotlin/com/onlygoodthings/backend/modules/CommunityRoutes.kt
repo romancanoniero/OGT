@@ -101,8 +101,8 @@ private data class NearbyAnimalDto(
     val distanceMeters: Double,
 )
 
-fun Route.animalRoutes(db: Database, hub: RealtimeHub) {
-    val animals = AnimalSqlRepository(db)
+fun Route.animalRoutes(db: Database, hub: RealtimeHub, mediaForReading: (PostMediaItem) -> PostMediaItem = { it }) {
+    val animals = AnimalSqlRepository(db, mediaForReading)
     adoptionCatalogRoutes(db)
     val outcomes = OutcomeSqlRepository(db)
     post("/api/v1/animals/publish") {
@@ -283,7 +283,7 @@ internal fun animalWriteFrom(dataMap: Map<String, Any?>, home: Pair<Double, Doub
         require(!dataMap.optString("place").isNullOrBlank() && dataMap.optString("place")!!.length <= 200) { "Ingresá el barrio o localidad." }
         require(media.isNotEmpty()) { "Agregá al menos una foto o video." }
     }
-    require(media.size <= 10) { "Podés incluir hasta 10 archivos." }
+    require(media.size <= com.onlygoodthings.shared.domain.PostMediaRules.MAX_ITEMS) { "Podés incluir hasta 20 archivos." }
     media.forEach { item ->
         require(isPublishedAnimalMediaUrl(item.url) && item.posterUrl?.let(::isPublishedAnimalMediaUrl) != false) {
             "La foto o el video todavía no se subió. Volvé a intentarlo desde la publicación."

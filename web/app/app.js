@@ -2594,7 +2594,7 @@ const ANIMAL_SPECIES = [
 ];
 const ANIMAL_SIZES = [["SMALL", "Chico"], ["MEDIUM", "Mediano"], ["LARGE", "Grande"]];
 const ANIMAL_SEXES = [["HEMBRA", "Hembra"], ["MACHO", "Macho"]];
-const PUBLISH_MAX_FILES = 10;
+const PUBLISH_MAX_FILES = 20;
 const PUBLISH_MAX_BYTES = 8 * 1024 * 1024;
 
 let publishFiles = [];

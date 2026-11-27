@@ -7,6 +7,13 @@ class AnimalMediaValidationTest {
     private val draft = mapOf<String, Any?>("kind" to "ADOPTION", "species" to "CAT", "petName" to "Monchis QA", "description" to "Historia QA")
     private fun withMedia(url: String, poster: String? = null) = draft + ("media" to listOf(mapOf("url" to url, "posterUrl" to poster)))
 
+    @Test fun `twenty media remain in order and twenty one are rejected`() {
+        val rows = (0 until 20).map { mapOf("kind" to if(it%2==0)"IMAGE" else "VIDEO", "url" to "https://media.test/$it.jpg") }
+        val saved = animalWriteFrom(draft + ("media" to rows), null)
+        assertEquals(rows.map { it["url"] }, saved.media.map { it.url })
+        assertThrows(IllegalArgumentException::class.java) { animalWriteFrom(draft + ("media" to (rows + rows.first())), null) }
+    }
+
     @Test fun `device paths and unuploaded posters are rejected before database writes`() {
         for (url in listOf("file:///var/mobile/pet.jpg", "content://photos/1", "asset://pet.jpg", "data:image/jpeg;base64,a", "/cache/pet.jpg", "//device/pet.jpg", "https://", "https://media.test/a\n.jpg", "https://user:password@media.test/a.jpg")) {
             assertThrows(IllegalArgumentException::class.java) { animalWriteFrom(withMedia(url), null) }

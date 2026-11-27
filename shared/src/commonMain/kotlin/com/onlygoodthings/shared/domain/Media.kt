@@ -9,19 +9,26 @@ enum class MediaKind {
     VIDEO,
 }
 
-/** Instagram: 1 a 10 piezas; al menos una foto o un video. */
+/** Una publicación admite hasta 20 piezas, en el orden elegido. */
 object PostMediaRules {
     const val MIN_ITEMS = 1
-    const val MAX_ITEMS = 10
+    const val MAX_ITEMS = 20
 
     fun isValid(count: Int): Boolean = count in MIN_ITEMS..MAX_ITEMS
 }
 
 /**
- * Marco de la foto que ve el vecino en la tarjeta.
- * App: `aspectRatio(POST_FRAME_RATIO)`. Web: `.post.open .media-slot` en 16 / 9.
+ * Marco del editor de encuadre. Se conserva para los recortes guardados previamente.
  */
 const val POST_FRAME_RATIO = 16f / 9f
+
+/** Marco de lectura: la primera pieza fija la altura de todo el carrusel. */
+const val POST_READING_DEFAULT_RATIO = 4f / 5f
+fun postReadingRatio(width: Int?, height: Int?): Float =
+    if (width == null || height == null || width <= 0 || height <= 0) POST_READING_DEFAULT_RATIO
+    else postReadingRatio(width.toFloat() / height)
+fun postReadingRatio(ratio: Float): Float =
+    if (!ratio.isFinite() || ratio <= 0f) POST_READING_DEFAULT_RATIO else ratio.coerceIn(3f / 4f, 1.91f)
 
 /** Dónde queda la foto dentro del marco, en píxeles del marco. */
 data class PostFramePlacement(
@@ -125,6 +132,8 @@ data class PostMediaItem(
     val frameY: Double? = null,
     /** Acercamiento sobre el recorte que ya cubre el marco. 1 no acerca. */
     val frameZoom: Double? = null,
+    val pixelWidth: Int? = null,
+    val pixelHeight: Int? = null,
 )
 
 /**

@@ -261,7 +261,7 @@ fun Application.module() {
             crmStoryRoutes(db, verifier, stories, hub)
             storyRoutes(stories, hub) { com.onlygoodthings.backend.modules.DiscoverySettingsRepository(db).get() }
             parkingRoutes(ParkingSqlRepository(db), redis, hub, FootRoutingService.fromEnv(), parkingProximity)
-            socialRoutes(SocialSqlRepository(db), hub)
+            socialRoutes(SocialSqlRepository(db, mediaStore::forReading), hub)
             recognitionCategoryRoutes(db)
             nicknameRoutes(db)
             postInvitationRoutes(db,hub)
@@ -282,7 +282,7 @@ fun Application.module() {
             honorRoutes(honors)
             noticeRoutes(NoticeSqlRepository(db))
             referralRoutes(db)
-            animalRoutes(db, hub)
+            animalRoutes(db, hub, mediaStore::forReading)
             discoveryRoutes(db)
             geoRoutes()
             timebankRoutes(db)

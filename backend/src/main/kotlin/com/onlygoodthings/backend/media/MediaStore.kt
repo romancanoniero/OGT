@@ -74,6 +74,36 @@ class MediaStore(
         return name.takeIf { isSafeName(it) }
     }
 
+    private val dimensions = object : LinkedHashMap<String, Pair<Int, Int>>(128, .75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Pair<Int, Int>>?) = size > 2048
+    }
+
+    /** Lee solo la cabecera del archivo local inmutable; nunca descarga medios remotos. */
+    fun imageDimensions(url: String): Pair<Int, Int>? {
+        val name = storedName(url) ?: return null
+        synchronized(dimensions) { dimensions[name]?.let { return it } }
+        val file = resolvePublic(name) ?: return null
+        val result = runCatching {
+            javax.imageio.ImageIO.createImageInputStream(file.toFile())?.use { input ->
+                val readers = javax.imageio.ImageIO.getImageReaders(input)
+                if (!readers.hasNext()) return@use null
+                val reader = readers.next()
+                try {
+                    reader.input = input
+                    (reader.getWidth(0) to reader.getHeight(0)).takeIf { it.first > 0 && it.second > 0 }
+                } finally { reader.dispose() }
+            }
+        }.getOrNull() ?: return null
+        synchronized(dimensions) { dimensions[name] = result }
+        return result
+    }
+
+    fun forReading(item: com.onlygoodthings.shared.domain.PostMediaItem): com.onlygoodthings.shared.domain.PostMediaItem {
+        val source = if (item.kind == MediaKind.VIDEO) item.posterUrl else item.url
+        val size = source?.let(::imageDimensions) ?: return item
+        return item.copy(pixelWidth = size.first, pixelHeight = size.second)
+    }
+
     fun readLocal(url: String): ByteArray? {
         val file = storedName(url)?.let { resolvePublic(it) } ?: return null
         return Files.readAllBytes(file)

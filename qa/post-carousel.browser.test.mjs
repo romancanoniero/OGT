@@ -27,8 +27,11 @@ for (const engine of ['chrome', 'webkit']) test(`${engine}: media controls retai
     assert.equal(await count.textContent(),'1/3');assert.ok(counter.x<frame.x+frame.width/2 && counter.y<frame.y+40);
     assert.ok(expand.x>frame.x+frame.width/2 && expand.y<frame.y+20 && expand.width>=48 && expand.height>=48);
     const dots=await page.locator('.post-media-dots').boundingBox();assert.ok(dots.y>frame.y+frame.height-50 && dots.y+dots.height<=frame.y+frame.height);
+    await page.waitForFunction(()=>document.querySelector('[data-post-media]').style.getPropertyValue('--post-media-ratio') === '0.75');
+    const portraitFrame=await carousel.boundingBox();const imageFrame=await page.locator('[data-media-page="0"] .media-slot').boundingBox();assert.ok(Math.abs(imageFrame.width / imageFrame.height - .75)<.03);
     // Right half advances, video center plays inline, left half returns.
     await carousel.click({position:{x:350,y:150}});assert.equal(await count.textContent(),'2/3');
+    assert.ok(Math.abs((await carousel.boundingBox()).height-portraitFrame.height)<1);
     await page.locator('[data-video-play]').click();await page.waitForFunction(()=>document.querySelector('video').currentTime>0.05);
     assert.equal(await page.locator('video').evaluate(v=>v.controls),false);
     assert.equal(await page.locator('video').evaluate(v=>v.muted),false);
@@ -45,6 +48,18 @@ for (const engine of ['chrome', 'webkit']) test(`${engine}: media controls retai
     await dialog.locator('[data-media-go="2"]').click();assert.equal(await dialog.locator('video').evaluate(v=>v.paused),true);
     await dialog.locator('[aria-label="Cerrar visor"]').click();await dialog.waitFor({state:'detached'});assert.equal(await page.locator('dialog').count(),0);
     assert.equal(await count.textContent(),'2/3');
+    await page.evaluate(()=>{const card=document.querySelector('.post');card.innerHTML=OgtPostCarousel.html({media:Array.from({length:20},(_,i)=>({url:'/photo.svg?'+i,kind:'IMAGE',pixelWidth:1080,pixelHeight:1440}))});OgtPostCarousel.bind(card);});
+    const twentyFrame=await carousel.boundingBox(),twentyDots=await page.locator('.post-media-dots').boundingBox();
+    assert.equal(await page.locator('[data-media-go]').count(),20);
+    assert.ok(twentyDots.x>=twentyFrame.x && twentyDots.x+twentyDots.width<=twentyFrame.x+twentyFrame.width);
+    await page.locator('[data-media-go="19"]').click();assert.equal(await count.textContent(),'20/20');
+    await page.setViewportSize({width:320,height:850});
+    await page.locator('.post').evaluate(card=>card.style.width='calc(100vw - 40px)');
+    const smallImage=await page.locator('[data-media-page="19"] .media-slot').boundingBox();
+    const smallDots=await page.locator('.post-media-dots').boundingBox();
+    assert.ok(smallDots.x>=smallImage.x && smallDots.x+smallDots.width<=smallImage.x+smallImage.width);
+    const firstDot=await page.locator('[data-media-go="0"]').boundingBox(), lastDot=await page.locator('[data-media-go="19"]').boundingBox();
+    assert.ok(firstDot.x>=smallImage.x && lastDot.x+lastDot.width<=smallImage.x+smallImage.width);
     // A detail renderer receives the selected index; oversized/invalid values remain safe.
     assert.equal(await page.evaluate(()=>{const box=document.createElement('div');box.innerHTML=OgtPostCarousel.html(post,{initialIndex:1});return box.querySelector('[data-media-page]:not([hidden])').dataset.mediaPage;}),'1');
     assert.equal(await page.evaluate(()=>{const box=document.createElement('div');box.innerHTML=OgtPostCarousel.html(post,{initialIndex:999});return box.querySelector('.post-media-count').textContent;}),'3/3');

@@ -43,3 +43,15 @@ test('media metadata is escaped before becoming markup', () => {
   assert.ok(!html.includes('poster="poster.jpg" onerror='));
   assert.ok(html.includes('&quot; onerror=&quot;'));
 });
+
+
+test('reading frame follows the first file, preserves all twenty pages and escapes invalid dimensions', () => {
+  const media = Array.from({length:20}, (_,i) => ({kind: i%2 ? 'VIDEO':'IMAGE',url:`file-${i}.jpg`,pixelWidth:i ? 1920:1080,pixelHeight:i ? 1080:1440}));
+  const html=carousel.html({media},{initialIndex:19});
+  assert.ok(html.includes('--post-media-ratio:0.75'));
+  assert.equal((html.match(/data-media-go=/g)||[]).length,20);
+  assert.equal((html.match(/class="post-media-slide"/g)||[]).length,20);
+  assert.ok(html.includes('20/20'));
+  assert.ok(carousel.html({media:[{url:'a',pixelWidth:1080,pixelHeight:1080}]}).includes('--post-media-ratio:1'));
+  assert.ok(carousel.html({media:[{url:'a',pixelWidth:'onerror=',pixelHeight:1}]}).includes('--post-media-ratio:0.8'));
+});

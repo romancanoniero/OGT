@@ -169,6 +169,8 @@ data class LocalPostMedia(
     val frameX: Double? = null,
     val frameY: Double? = null,
     val frameZoom: Double? = null,
+    val pixelWidth: Int? = null,
+    val pixelHeight: Int? = null,
 )
 
 @Serializable
