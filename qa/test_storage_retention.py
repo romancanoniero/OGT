@@ -57,6 +57,25 @@ class StorageRetentionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'RECENT_VERIFIED_BACKUP_REQUIRED'):retention.plan(root)
             self.assertEqual(9,len(list((root/'releases').iterdir())))
 
+    def test_only_old_exact_ogt_image_tags_are_selected_and_container_rollback_and_manual_images_are_kept(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);self.fixture(root)
+            protected='sha256:'+'b'*64;running='sha256:'+'c'*64
+            manual=root/'backups/manual-keep';manual.mkdir();(manual/'image.txt').write_text(protected)
+            rows=[{'Repository':'ogt-backend','ID':'sha256:'+'a'*64,'Tag':'a'*40+'-20260901T000000Z'},
+                  {'Repository':'ogt-backend','ID':protected,'Tag':'before-'+'b'*40+'-20260901T000000Z'},
+                  {'Repository':'ogt-backend','ID':running,'Tag':'c'*40+'-20260901T000000Z'},
+                  {'Repository':'ogt-backend','ID':'sha256:'+'d'*64,'Tag':'manual'},
+                  {'Repository':'another-project','ID':'sha256:'+'e'*64,'Tag':'e'*40+'-20260901T000000Z'}]
+            with patch.object(retention,'docker_inventory',return_value=(rows,{running})):
+                result=retention.plan(root,docker=True)
+                self.assertEqual(['ogt-backend:'+'a'*40+'-20260901T000000Z'],[x['tag'] for x in result['removeImages']])
+                with patch.object(retention.subprocess,'run') as run:
+                    run.return_value.returncode=0;retention.apply(root,result)
+                commands=[call.args[0] for call in run.call_args_list]
+                self.assertIn(['docker','image','rm','--no-prune',result['removeImages'][0]['tag']],commands)
+                self.assertFalse(any('--force' in cmd or 'prune' in cmd for cmd in commands))
+
     def test_changed_plan_or_symlink_never_deletes_a_protected_target(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);self.fixture(root);reviewed=retention.plan(root)

@@ -44,7 +44,9 @@ class NoticeSqlRepository(private val db: Database) {
         return send(recipientId, title, body, "MENTION", postId, link)
     }
 
-    fun send(recipientId: String, title: String, body: String, kind: String, postId: String?, deepLink: String): Int {
+    fun send(recipientId: String, title: String, body: String, kind: String, postId: String?, deepLink: String, expiresAtEpochMs:Long?=null): Int {
+        val remaining=expiresAtEpochMs?.minus(System.currentTimeMillis())
+        if(remaining!=null && remaining<=0)return 0
         val settings = db.withConnection { com.onlygoodthings.backend.social.readAccountSettings(it,recipientId) }
         val presentation = settings.noticePresentation(kind,java.time.ZonedDateTime.now(java.time.ZoneId.of(settings.timeZone)).hour)
         if (!presentation.deliver) return 0
@@ -68,6 +70,7 @@ class NoticeSqlRepository(private val db: Database) {
                     .setAndroidConfig(
                         AndroidConfig.builder()
                             .setPriority(AndroidConfig.Priority.HIGH)
+                            .apply { if(remaining!=null)setTtl(remaining) }
                             .build(),
                     )
                     .setApnsConfig(
@@ -75,6 +78,7 @@ class NoticeSqlRepository(private val db: Database) {
                             .setAps(Aps.builder().setAlert(ApsAlert.builder().setTitle(title).setBody(body).build())
                                 .apply { if(presentation.sound)setSound("default") }.setBadge(1).build())
                             .putHeader("apns-priority", "10")
+                            .apply { if(expiresAtEpochMs!=null)putHeader("apns-expiration",(expiresAtEpochMs/1000).toString()) }
                             .build(),
                     )
                     .build()

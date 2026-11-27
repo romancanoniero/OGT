@@ -403,7 +403,8 @@ private fun noticeInbox(db: Database, userId: String): List<CommunityNotice> = d
             FROM action_outcomes o
             WHERE o.beneficiary_user_id = ?::uuid OR o.actor_user_id = ?::uuid
             UNION ALL
-            SELECT 'renewal:' || n.id::text, 'POST_EXPIRY', 'Tu publicación vence mañana',
+            SELECT 'renewal:' || n.id::text, 'POST_EXPIRY',
+                CASE WHEN n.expires_at<=now() THEN 'Tu publicación está archivada' ELSE 'Tu publicación vence mañana' END,
                 'Podés renovarla por 90 días. El contenido y los mensajes se conservan.',
                 n.post_id::text, NULL, NULL, EXTRACT(EPOCH FROM n.created_at)*1000
             FROM post_lifetime_notices n JOIN social_posts p ON p.id=n.post_id

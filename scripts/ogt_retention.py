@@ -67,7 +67,39 @@ def fresh_backup(root, now):
     raise ValueError('RECENT_VERIFIED_BACKUP_REQUIRED')
 
 
-def plan(root, now=None):
+def docker_inventory():
+    rows = subprocess.run(['docker','image','ls','--no-trunc','--format','{{json .}}','ogt-backend'],capture_output=True,text=True,check=True,timeout=30)
+    images = [json.loads(line) for line in rows.stdout.splitlines() if line.strip()]
+    containers = subprocess.run(['docker','container','ls','-aq'],capture_output=True,text=True,check=True,timeout=30).stdout.split()
+    used = set()
+    if containers:
+        used = set(subprocess.run(['docker','inspect','--format','{{.Image}}',*containers],capture_output=True,text=True,check=True,timeout=30).stdout.split())
+    return images, used
+
+
+def image_removals(root, keep, removals, now):
+    images, protected = docker_inventory()
+    discarded_archives = {item['path'] for item in removals if item['kind'] in ('backup','application-backup')}
+    for folder in (root/'backups').iterdir():
+        if folder.is_symlink() or not folder.is_dir() or str(folder.relative_to(root)) in discarded_archives:
+            continue
+        if not RELEASE.fullmatch(folder.name) or folder.name in keep or (folder/'application.tgz').is_file():
+            for name in ('previous-image.txt','image.txt'):
+                path=folder/name
+                if path.is_file() and not path.is_symlink():
+                    value=path.read_text().strip()
+                    if re.fullmatch('sha256:[a-f0-9]{64}',value):protected.add(value)
+    found=[]
+    for row in images:
+        if row.get('Repository')!='ogt-backend' or row.get('ID') in protected:
+            continue
+        tag=row.get('Tag','');release=tag.removeprefix('before-')
+        if RELEASE.fullmatch(release) and release not in keep and age(release,now)>=48*3600:
+            found.append({'tag':'ogt-backend:'+tag,'imageId':row['ID']})
+    return sorted(found,key=lambda item:item['tag'])
+
+
+def plan(root, now=None, docker=False):
     now = time.time() if now is None else now
     for name in ('releases', 'backups', 'operations'):
         if (root / name).is_symlink():
@@ -117,12 +149,13 @@ def plan(root, now=None):
             removals.append({'kind': 'application-backup', 'path': str(folder.relative_to(root)), 'files': {'application.tgz': digest(folder/'application.tgz')}})
     return {'schemaVersion': 1, 'activeSha': current, 'freshBackup': fresh.name, 'keptReleases': sorted(keep),
             'remove': removals, 'candidateBytes': sum((root/item['path']/name).stat().st_size for item in removals for name in item['files']),
+            'dockerIncluded':docker,'removeImages':image_removals(root,keep,removals,now) if docker else [],
             'mediaTouched': False}
 
 
 def apply(root, reviewed):
     # Fail closed if anything changed after review. Save the entire removal inventory before unlinking.
-    actual = plan(root)
+    actual = plan(root,docker=reviewed.get('dockerIncluded',False))
     if actual != reviewed:
         raise ValueError('RETENTION_PLAN_CHANGED')
     archive = root / 'backups' / actual['freshBackup'] / 'database.dump'
@@ -144,7 +177,12 @@ def apply(root, reviewed):
             for directory in sorted((p for p in folder.rglob('*') if p.is_dir()), key=lambda p: len(p.parts), reverse=True):
                 directory.rmdir()
             folder.rmdir()
-    return {'removedPackages': len(actual['remove']), 'removedBytes': actual['candidateBytes'], 'mediaTouched': False}
+    removed_tags=0
+    for image in actual['removeImages']:
+        # Exact OGT version tag only. No force, global prune, volumes, or other repositories.
+        result=subprocess.run(['docker','image','rm','--no-prune',image['tag']],capture_output=True,text=True,check=False,timeout=30)
+        if result.returncode==0:removed_tags+=1
+    return {'removedPackages': len(actual['remove']), 'removedBytes': actual['candidateBytes'], 'removedImageTags':removed_tags,'mediaTouched': False}
 
 
 def main():
@@ -160,7 +198,7 @@ def main():
             fcntl.flock(backup_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             return
-        reviewed = plan(root)
+        reviewed = plan(root,docker=True)
         print(json.dumps(apply(root, reviewed) if args.apply else reviewed), flush=True)
 
 

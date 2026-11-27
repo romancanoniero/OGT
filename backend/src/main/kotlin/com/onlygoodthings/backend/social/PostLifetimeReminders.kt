@@ -6,9 +6,11 @@ import com.onlygoodthings.shared.domain.postDeepLink
 
 /** Durable inbox entry and at most one push attempt per owner and expiry period. */
 class PostLifetimeReminders(private val db: Database,
-    private val deliver: (String,String) -> Int = { owner,post -> NoticeSqlRepository(db).send(owner,
+    private val deliver: (String,String) -> Int = { owner,post ->
+        val lifetime=PostLifetimes(db).own(owner,post,false)
+        if(lifetime?.expiresAtEpochMs==null || lifetime.archived)0 else NoticeSqlRepository(db).send(owner,
         "Tu publicación vence mañana", "Podés renovarla por 90 días. Si no, se archivará del feed y conservará su contenido y mensajes.",
-        "POST_EXPIRY",post,postDeepLink(post)) }) {
+        "POST_EXPIRY",post,postDeepLink(post),expiresAtEpochMs=lifetime.expiresAtEpochMs) }) {
     fun process(): Int {
         val claimed = db.withConnection { c ->
             c.createStatement().use { q -> q.executeQuery("""
@@ -29,6 +31,10 @@ class PostLifetimeReminders(private val db: Database,
             """.trimIndent()).use { r -> buildList { while(r.next()) add(Triple(r.getString(1),r.getString(2),r.getString(3))) } } }
         }
         for ((id,owner,post) in claimed) {
+            val stillCurrent=db.withConnection { c -> c.prepareStatement("""SELECT EXISTS(SELECT 1 FROM post_lifetime_notices n JOIN social_posts p ON p.id=n.post_id
+                JOIN users u ON u.id=n.recipient_user_id WHERE n.id=?::uuid AND p.feed_expires_at=n.expires_at AND p.feed_expires_at>now()
+                AND p.moderation_status='VISIBLE' AND u.status='ACTIVE' AND NOT u.publishing_blocked)""").use { q ->q.setString(1,id);q.executeQuery().use { r ->r.next();r.getBoolean(1) } } }
+            if(!stillCurrent)continue
             val sent=runCatching { deliver(owner,post)>0 }.getOrDefault(false)
             db.withConnection { c -> c.prepareStatement("UPDATE post_lifetime_notices SET push_sent=? WHERE id=?::uuid").use { q ->q.setBoolean(1,sent);q.setString(2,id);q.executeUpdate() } }
         }
