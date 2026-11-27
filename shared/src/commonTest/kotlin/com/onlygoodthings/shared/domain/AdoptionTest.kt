@@ -76,5 +76,11 @@ class AdoptionTest {
         db.upsertRemoteSocial(SocialPost("remote-post", AuthorKind.USER, me.id, me.displayName, body = remote.description, mediaUrls = emptyList(), impactCount = 6,
             commentCount = 3, isStory = false, createdAtEpochMs = 123, topic = "Adopción", animalListing = remote),silent=true)
         assertEquals(socialBefore,db.socialTick.value,"Identical metadata must not trigger new social recompositions")
+        val remoteIndex=db.posts.indexOfFirst { it.id==remote.postId }
+        db.posts[remoteIndex]=db.posts[remoteIndex].copy(viewerHasImpacted=true,viewerHasHearted=true,heartCount=1)
+        db.upsertRemoteAnimal(remote.copy(resolved=true))
+        val closed=db.post(remote.postId)
+        assertTrue(closed.viewerHasImpacted);assertTrue(closed.viewerHasHearted)
+        assertEquals(6,closed.impactCount);assertEquals(3,closed.commentCount);assertEquals(1,closed.heartCount)
     }
 }

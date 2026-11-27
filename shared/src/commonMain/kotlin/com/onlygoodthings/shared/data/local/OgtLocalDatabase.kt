@@ -1938,6 +1938,8 @@ class OgtLocalDatabase {
                 impactCount = maxOf(current.impactCount, post.impactCount),
                 commentCount = maxOf(current.commentCount, post.commentCount),
                 heartCount = current.heartCount,
+                viewerHasImpacted = current.viewerHasImpacted,
+                viewerHasHearted = current.viewerHasHearted,
             )
         } else {
             posts += post

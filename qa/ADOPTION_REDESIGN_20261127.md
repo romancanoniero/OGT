@@ -16,7 +16,7 @@ La migración 43 agrega una columna JSONB nullable y un catálogo versionado; no
 
 La nueva presentación vive separada del texto histórico de la ficha. Al actualizar una adopción se mantienen nombre/temperamento anteriores como datos de compatibilidad, fecha de publicación, identificadores y fechas de las fotos, originales, fuentes, encuadre, orden, duración y reacciones/comentarios. Los clientes anteriores pueden seguir publicando y editando sus campos sin borrar los detalles nuevos ni el título completo.
 
-El feed entrega los detalles animales en una consulta por página, también en publicaciones cerradas o accesibles por enlace directo fuera del primer lote. Los cambios de detalles se hidratan a partir del evento existente, sin polling ni loaders automáticos. Recibir dos veces los mismos detalles no genera un cambio social adicional.
+El feed entrega los detalles animales en una consulta por página, también en publicaciones cerradas o accesibles por enlace directo fuera del primer lote. Los cambios de detalles se hidratan a partir del evento existente, sin polling ni loaders automáticos. Cerrar una adopción conserva tanto los contadores como las marcas de reacción del usuario. Recibir dos veces los mismos detalles no genera un cambio social adicional.
 
 El catálogo se administra con la misma sesión privada, MFA reciente y roles OWNER/OPERATIONS del catálogo existente. Tiene control de versión, desactivación y auditoría; los anuncios anteriores conservan las etiquetas seleccionadas.
 
