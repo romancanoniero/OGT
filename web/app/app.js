@@ -2116,8 +2116,7 @@ function bindSocial(root, { onDetail = false } = {}) {
       const post = lastFeed.find(row => row.id === card.dataset.post);
       if (!post) return;
       const index = event.detail.index;
-      if (onDetail) globalThis.OgtPostCarousel.openViewer(post, {mediaUrl, frameOf: mediaFrameOf, initialIndex: index});
-      else location.hash = `#/p/${post.id}?media=${index}`;
+      globalThis.OgtPostCarousel.openViewer(post, {mediaUrl, frameOf: mediaFrameOf, initialIndex: index});
     });
   });
   root.querySelectorAll('[data-adoption-close]').forEach(button=>{

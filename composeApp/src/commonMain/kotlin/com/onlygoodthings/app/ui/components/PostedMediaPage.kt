@@ -39,7 +39,7 @@ fun pausePostedMediaPlayback() { PostedPlayback.activeId=null }
 fun PostedMediaPage(
     item:LocalPostMedia?, fallback:DrawableResource, description:String?,
     active:Boolean, multiple:Boolean, modifier:Modifier=Modifier, autoPlay:Boolean=false, inlineVideo:Boolean=true,
-    onPrevious:()->Unit, onNext:()->Unit, onOpen:(()->Unit)?=null, onAspect:((Float)->Unit)?=null,
+    onPrevious:()->Unit, onNext:()->Unit, onOpen:(()->Unit)?=null, onAspect:((Float)->Unit)?=null, onExpand:(()->Unit)?=onOpen,
 ) {
     val video=item?.kind==MediaKind.VIDEO
     val preview=LocalInspectionMode.current
@@ -110,8 +110,8 @@ fun PostedMediaPage(
                     if(PostedPlayback.muted)"Activar sonido" else "Silenciar video",size=18.dp,tint=Color.White)
             }
         }
-        if(onOpen!=null) Box(Modifier.align(Alignment.TopEnd).padding(top=8.dp,end=8.dp).size(48.dp).clip(CircleShape)
-            .background(Color.Black.copy(alpha=.42f)).clickable { onOpen() },contentAlignment=Alignment.Center) {
+        if(onExpand!=null) Box(Modifier.align(Alignment.TopEnd).padding(top=8.dp,end=8.dp).size(48.dp).clip(CircleShape)
+            .background(Color.Black.copy(alpha=.42f)).clickable { onExpand() },contentAlignment=Alignment.Center) {
             OgtStitchIcon(Res.drawable.qs_expand,"Ampliar archivo actual",size=24.dp,tint=Color.White)
         }
     }
@@ -132,7 +132,7 @@ fun PostMediaTypes(media:List<LocalPostMedia>,modifier:Modifier=Modifier) {
 fun PostedMediaCarousel(
     media:List<LocalPostMedia>,fallback:DrawableResource,description:String?,modifier:Modifier=Modifier,
     initialIndex:Int=0,onOpen:((Int)->Unit)?=null,autoPlay:Boolean=false,inlineVideo:Boolean=true,
-    onPageChanged:(Int)->Unit={}, fitFrameToMedia:Boolean=false,
+    onPageChanged:(Int)->Unit={}, fitFrameToMedia:Boolean=false, onExpand:((Int)->Unit)?=onOpen,
     overlay:@Composable BoxScope.()->Unit={},
 ) {
     val first = media.firstOrNull()
@@ -149,7 +149,8 @@ fun PostedMediaCarousel(
             PostedMediaPage(media.getOrNull(page),fallback,description,active=pager.currentPage==page && !pager.isScrollInProgress,
                 multiple=media.size>1,modifier=Modifier.fillMaxSize(),autoPlay=autoPlay,inlineVideo=inlineVideo,
                 onPrevious={go(page-1)},onNext={go(page+1)},onOpen=onOpen?.let { open -> { pageChanged(page);open(page) } },
-                onAspect={ ratio -> if(page==0 && first?.pixelWidth==null)readingRatio=com.onlygoodthings.shared.domain.postReadingRatio(ratio) })
+                onAspect={ ratio -> if(page==0 && first?.pixelWidth==null)readingRatio=com.onlygoodthings.shared.domain.postReadingRatio(ratio) },
+                onExpand=onExpand?.let { expand -> { pageChanged(page);expand(page) } })
         }
         overlay()
         MediaPagerIndicator(pager.currentPage,media.size,onPageSelected={go(it)})

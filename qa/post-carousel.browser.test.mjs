@@ -8,6 +8,10 @@ import {chromium, webkit} from 'playwright';
 for (const engine of ['chrome', 'webkit']) test(`${engine}: media controls retain selection without opening the card`, async () => {
   const server = http.createServer(async (req, res) => {
     if (req.url === '/fixture') { res.setHeader('Content-Type','text/html');res.end('<!doctype html><meta name="viewport" content="width=device-width"><link rel="stylesheet" href="/styles.css"><style>body{margin:0}.post{width:390px;margin:0;padding:0}.media-slot{position:relative;width:100%;aspect-ratio:4/3;overflow:hidden}</style><article class="post"></article><script src="/post-carousel.js"></script>');return; }
+    if (req.url === '/social-bind.js') {
+      const app=await readFile(new URL('../web/app/app.js',import.meta.url),'utf8');
+      res.setHeader('Content-Type','text/javascript');res.end(app.slice(app.indexOf('function bindSocial('),app.indexOf('async function loadSession()',app.indexOf('function bindSocial('))));return;
+    }
     if (req.url.startsWith('/photo.svg')) {res.setHeader('Content-Type','image/svg+xml');res.end('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="400"><rect width="200" height="400" fill="teal"/></svg>');return;}
     const file = req.url === '/video.mp4' ? new URL('./fixtures/post-carousel-audio.mp4', import.meta.url) : new URL(`../web/app/${req.url.slice(1)}`, import.meta.url);
     try { const body=await readFile(file);res.setHeader('Content-Type',req.url.endsWith('.js')?'text/javascript':req.url.endsWith('.css')?'text/css':'video/mp4');res.end(body); } catch {res.writeHead(404).end();}
@@ -63,5 +67,17 @@ for (const engine of ['chrome', 'webkit']) test(`${engine}: media controls retai
     // A detail renderer receives the selected index; oversized/invalid values remain safe.
     assert.equal(await page.evaluate(()=>{const box=document.createElement('div');box.innerHTML=OgtPostCarousel.html(post,{initialIndex:1});return box.querySelector('[data-media-page]:not([hidden])').dataset.mediaPage;}),'1');
     assert.equal(await page.evaluate(()=>{const box=document.createElement('div');box.innerHTML=OgtPostCarousel.html(post,{initialIndex:999});return box.querySelector('.post-media-count').textContent;}),'3/3');
+    // Exercise the real application binding, not just the gallery's emitted event.
+    await page.evaluate(()=>{
+      location.hash='#/inicio';window.mediaUrl=url=>url;window.mediaFrameOf=()=>({x:.5,y:.5,zoom:1});window.lastFeed=[{id:'qa-post',...post}];
+      const card=document.querySelector('.post');card.dataset.post='qa-post';card.dataset.open='qa-post';
+      card.innerHTML='<h2 class="honoree">Título de la publicación</h2>'+OgtPostCarousel.html(lastFeed[0],{initialIndex:1});
+    });
+    await page.addScriptTag({url:'/social-bind.js'});await page.evaluate(()=>bindSocial(document.body));
+    await page.locator('[data-media-expand]').click();await page.locator('dialog[open]').waitFor();
+    assert.ok(page.url().endsWith('#/inicio'));assert.equal(await page.locator('dialog .post-media-count').textContent(),'2/3');
+    await page.locator('dialog .post-media-viewer-close').click();await page.locator('dialog').waitFor({state:'detached'});
+    await page.locator('h2.honoree').click();assert.equal(await page.evaluate(()=>location.hash),'#/p/qa-post?media=1');
+
   } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}
 });

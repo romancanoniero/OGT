@@ -1198,3 +1198,10 @@ La capacidad autorizada sube de diez a veinte archivos en el selector, la valida
 Comparación física manual build20→21: 41→4 intervalos de CADisplayLink mayores a 50 ms, p95 18,01→16,81 ms, memoria registrada 476,9→319,0 MB. El máximo aislado fue 82,1→123,6 ms. Los recorridos manuales no fueron idénticos y no equivalen a FPS renderizados ni a un ensayo de carga concurrente. La inspección de disco confirmó los 544/544 archivos de contenido/posters del feed en el iPhone, incluidos archivos no mostrados.
 
 Validación de la 22: pruebas compartidas, backend, Android y compilación iOS correctas; 128 pruebas web correctas (incluidos Chrome y WebKit con audio, pausa, swipe, ampliación y veinte dots). La prueba de persistencia verifica las veinte piezas en orden en posts normales y adopciones, conserva comentarios/créditos/fechas anteriores y rechaza la pieza 21. La instalación de iPhone se realiza en el mismo contenedor, sin borrar datos.
+
+
+### Acciones de ampliación y apertura del post — iOS 23
+
+Tras confirmar el usuario que las fotos verticales de la 22 se ven más altas, se separaron las dos acciones del feed. El icono de ampliar abre directamente el visor de fotos/videos en el archivo seleccionado, sin navegar a la ficha. Tocar el título conserva la navegación al post y su índice seleccionado. El visor pausa la reproducción subyacente al abrirse y al cerrarse. El cambio se aplica a todas las clases de tarjeta, incluida adopción, y también a la web. Se conservan la reproducción inline, el formulario de adopción y los gestos del carrusel.
+
+Se comprobaron las dos acciones con el código real de navegación web en Chrome y WebKit: ampliar conserva la ruta del feed y abre el segundo archivo en un diálogo; cerrar y tocar el título abre el post con ese índice. También pasaron las pruebas Android y la compilación iOS. La actualización se instala sobre la app existente.

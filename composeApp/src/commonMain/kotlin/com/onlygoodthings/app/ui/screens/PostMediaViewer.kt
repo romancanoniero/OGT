@@ -41,6 +41,10 @@ fun PostMediaViewer(
     onClose: () -> Unit,
 ) {
     if (media.isEmpty()) return
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        com.onlygoodthings.app.ui.components.pausePostedMediaPlayback()
+        onDispose { com.onlygoodthings.app.ui.components.pausePostedMediaPlayback() }
+    }
     Dialog(
         onDismissRequest = onClose,
         properties = DialogProperties(usePlatformDefaultWidth = false),
