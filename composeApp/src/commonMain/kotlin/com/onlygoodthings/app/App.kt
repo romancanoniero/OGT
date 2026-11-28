@@ -134,6 +134,7 @@ fun App() {
         var noticeBack by remember { mutableStateOf(OgtRoute.Feed) }
         var editVehicleId by remember { mutableStateOf<String?>(null) }
         var editPostId by remember { mutableStateOf<String?>(null) }
+        var animalAlertKind by remember { mutableStateOf("LOST") }
         var animalPublishKind by remember {
             mutableStateOf(
                 when (storePreviewScreenName()?.lowercase()) {
@@ -181,6 +182,7 @@ fun App() {
             when (kind) {
                 FeedCardKind.LOST_PET -> {
                     animalPublishKind = ComposePostKind.LOST
+                    animalAlertKind = listing?.kind ?: "LOST"
                     reportBack = from
                     route = OgtRoute.ReportAnimal
                 }
@@ -629,8 +631,10 @@ fun App() {
                     )
                     OgtRoute.PetsMap -> PetsMapScreen(
                         onBack = { route = OgtRoute.Animals },
+                        onOpenPost = { id ->selectedPostId=id;selectedPostMediaIndex=0;route=OgtRoute.PostDetail },
                         onReport = {
                             animalPublishKind = ComposePostKind.LOST
+                            animalAlertKind = "LOST"
                             reportBack = OgtRoute.Animals
                             route = OgtRoute.ReportAnimal
                         },
@@ -639,6 +643,14 @@ fun App() {
                         onBack = { route = OgtRoute.Feed },
                         onReportLost = {
                             animalPublishKind = ComposePostKind.LOST
+                            animalAlertKind = "LOST"
+                            reportBack = OgtRoute.Animals
+                            route = OgtRoute.ReportAnimal
+                        },
+                        onReportFound = {
+                            editPostId = null
+                            animalPublishKind = ComposePostKind.LOST
+                            animalAlertKind = "FOUND"
                             reportBack = OgtRoute.Animals
                             route = OgtRoute.ReportAnimal
                         },
@@ -673,6 +685,7 @@ fun App() {
                     } else {
                         ReportAnimalScreen(
                             editPostId = editPostId,
+                            initialKind = animalAlertKind,
                             onDone = {
                                 editPostId = null
                                 route = reportBack
@@ -898,6 +911,7 @@ fun App() {
                                 ComposePostKind.LOST, ComposePostKind.ADOPT -> {
                                     editPostId = null
                                     animalPublishKind = kind
+                                    animalAlertKind = "LOST"
                                     reportBack = OgtRoute.Feed
                                     route = OgtRoute.ReportAnimal
                                 }

@@ -18,6 +18,7 @@ function isCompany() {
 const NAV = [
   ["inicio", "Inicio", "qs-feed"],
   ["buscar", "Buscar", "qs-lupa"],
+  ["mascotas", "Mascotas", "qs-paw"],
   ["ayuda", "Trueque", "qs-skills"],
   ["billetera", "Billetera", "qs-wallet"],
 ];
@@ -1089,13 +1090,13 @@ function isAnecdoteShare(post) {
 }
 
 function cardKind(post) {
-  const listing = String(post.listingKind || post.urgency || "").toUpperCase();
-  if (listing === "LOST") return "LOST_PET";
+  const listing = String(post.animalListing?.kind || post.listingKind || post.urgency || "").toUpperCase();
+  if (listing === "LOST" || listing === "FOUND") return "LOST_PET";
   if (listing === "ADOPTION") return "ADOPTION";
   if(post.publicationKind==="ACTION")return "COMMUNITY";
   if(post.publicationKind==="POST")return TERNURA_TAGS.has(tagOf(post)) ? "TERNURA" : "COMMUNITY";
   const t = tagOf(post);
-  if (t.includes("perdid")) return "LOST_PET";
+  if (t.includes("perdid") || t === "mascota encontrada") return "LOST_PET";
   if (t === "adopción" || t === "adopcion") return "ADOPTION";
   if (TERNURA_TAGS.has(t)) return "TERNURA";
   if (isAnecdoteShare(post) || HOMENAJE_TAGS.has(t)) return "HOMENAJE";
@@ -1469,7 +1470,7 @@ async function runAction(id, post, onDetail) {
       if (["LOST_PET", "ADOPTION"].includes(cardKind(post))) {
         const listingId = post.listingId || listingOf(post)?.listingId;
         if (listingId) {
-          location.hash = `#/publicar/${cardKind(post) === "ADOPTION" ? "adopcion" : "perdida"}?listing=${listingId}`;
+          location.hash = `#/publicar/${cardKind(post) === "ADOPTION" ? "adopcion" : lostState(post).found ? "encontrada" : "perdida"}?listing=${listingId}`;
           return;
         }
       }
@@ -1701,7 +1702,7 @@ function openMenu(btn, post, onDetail) {
   const kindLabel = {
     HOMENAJE: isAnecdoteShare(post) ? "Anécdota" : "Homenaje",
     NEWS: "Noticia",
-    LOST_PET: "Mascota perdida",
+    LOST_PET: lostState(post).found ? "Mascota encontrada" : "Mascota perdida",
     ADOPTION: "Adopción",
     PET_STORY: "Historia animal",
     TERNURA: "Ternura",
@@ -1955,7 +1956,7 @@ function postCard(post, { openable = true, previewStories = true, compose = fals
     : homage
       ? `<span class="pill">${escapeHtml(post.topic || "Homenaje")}</span>`
       : listing === "LOST_PET"
-        ? `<span class="stories-head">${icon("qs-paw")}<span class="pill">Mascota perdida</span></span>`
+          ? `<span class="stories-head">${icon("qs-paw")}<span class="pill">${lostState(post).found?'Mascota encontrada':'Mascota perdida'}</span></span>`
         : listing === "ADOPTION"
           ? `<span class="stories-head">${icon("qs-pets")}<span class="pill">Adopción</span></span>`
           : "";
@@ -2072,6 +2073,7 @@ function truequeActionsHtml(post) {
 function lostState(post) {
   const row = listingOf(post) || {};
   return {
+    found: (row.kind || post.listingKind) === "FOUND" || tagOf(post)==="mascota encontrada",
     resolved: Boolean(row.resolved || post.listingResolved),
     lastSeen: row.lastSeenPlace || post.lastSeenPlace || row.place || post.place || "",
     marks: row.marks || post.marks || "",
@@ -2091,13 +2093,13 @@ function lostExtrasHtml(post) {
   const kindLine = [speciesLabel(lost.species), sizeLabel(lost.size)].filter(Boolean).join(" ");
   return `<div class="lost-extras">
     <div class="pill-row">
-      <span class="pill lost">${lost.resolved ? "Ya está en casa" : "Perdido"}</span>
+      <span class="pill lost">${lost.resolved ? "Ya está en casa" : lost.found ? "Encontrado · busca a su familia" : "Perdido"}</span>
       ${!lost.resolved && lost.urgency === "HIGH" ? `<span class="pill lost">Urgente</span>` : ""}
     </div>
     ${kindLine ? `<p class="caption">${escapeHtml(kindLine)}</p>` : ""}
     ${lost.marks ? `<p class="caption">Señas · ${escapeHtml(lost.marks)}</p>` : ""}
-    ${lost.lastSeen ? `<p class="caption">Última vista en ${escapeHtml(lost.lastSeen)}</p>` : ""}
-    <p class="caption">Radio ${escapeHtml(formatAlertRadius(lost.radius))}</p>
+    ${lost.lastSeen ? `<p class="caption">${lost.found?'Encontrado en':'Última vista en'} ${escapeHtml(lost.lastSeen)}</p>` : ""}
+    ${lost.found?'':`<p class="caption">Radio ${escapeHtml(formatAlertRadius(lost.radius))}</p>`}
   </div>`;
 }
 
@@ -2108,7 +2110,7 @@ function lostMapHtml(post) {
   const lat = Number(lost.latitude);
   const lng = Number(lost.longitude);
   const pad = 0.008;
-  return `<iframe class="lost-map" title="Última vista" loading="lazy" src="https://www.openstreetmap.org/export/embed.html?bbox=${lng - pad},${lat - pad},${lng + pad},${lat + pad}&amp;layer=mapnik&amp;marker=${lat},${lng}"></iframe>`;
+  return `<iframe class="lost-map" title="${lost.found?'Lugar del encuentro':'Última vista'}" loading="lazy" src="https://www.openstreetmap.org/export/embed.html?bbox=${lng - pad},${lat - pad},${lng + pad},${lat + pad}&amp;layer=mapnik&amp;marker=${lat},${lng}"></iframe>`;
 }
 
 function lostActionsHtml(post, { onDetail = false } = {}) {
@@ -2116,8 +2118,9 @@ function lostActionsHtml(post, { onDetail = false } = {}) {
   const lost = lostState(post);
   if (lost.resolved || !lost.listingId) return "";
   if (isAuthor(post)) {
-    return `<button type="button" class="publish-cta" data-resolve="${escapeHtml(lost.listingId)}">${icon("qs-paw")} Lo encontramos</button>`;
+    return `<button type="button" class="publish-cta" data-resolve="${escapeHtml(lost.listingId)}">${icon("qs-paw")} ${lost.found?'Se reencontró con su familia':'Lo encontramos'}</button>`;
   }
+  if(lost.found)return `<button type="button" class="publish-cta" data-found-contact="${escapeHtml(post.id)}">${icon("qs-paw")} Contactar a quien lo encontró</button>`;
   return `<button type="button" class="publish-cta" data-saw="${escapeHtml(post.id)}">${icon("qs-paw")} Creo que lo vi</button>`;
 }
 
@@ -2195,6 +2198,14 @@ function bindSocial(root, { onDetail = false } = {}) {
       if (post) resolveListing(post);
     });
   });
+  root.querySelectorAll('[data-found-contact]').forEach(btn=>btn.addEventListener('click',async event=>{
+    event.preventDefault();event.stopPropagation();if(btn.disabled)return;
+    const owner=me.userId,post=lastFeed.find(p=>p.id===btn.dataset.foundContact),recipient=post&&(listingOf(post)?.reporterUserId||post.authorId);
+    if(!recipient)return;btn.disabled=true;
+    try {const thread=await api('/api/v1/timebank/start',{userId:recipient,tagSlug:'mensaje'});if(me.userId===owner)location.hash=`#/mensajes/${thread.matchId}`;}
+    catch {if(me.userId===owner)toast('No pudimos abrir la conversación. Volvé a intentarlo.');}
+    finally {if(btn.isConnected)btn.disabled=false;}
+  }));
   root.querySelectorAll("[data-saw]").forEach((btn) => {
     btn.addEventListener("click", (ev) => {
       ev.stopPropagation();
@@ -2609,6 +2620,7 @@ const PUBLISH_KINDS = [
   { id: "trueque", title: "Trueque", icon: "qs-skills", hint: "Pedí un saber o una tarea. Se publica en el tablero.", timebank: true },
   { id: "homenaje", title: "Homenaje", icon: "qs-invite", hint: "Una enseñanza, una anécdota o las gracias." },
   { id: "perdida", title: "Mascota perdida", icon: "qs-paw", hint: "Alerta con señas, última vista y el punto en el mapa.", animal: "LOST" },
+  { id: "encontrada", title: "Mascota encontrada", icon: "qs-paw", hint: "Avisá dónde la encontraste y ayudá a encontrar a su familia.", animal: "FOUND" },
   { id: "adopcion", title: "Adopción", icon: "qs-pets", hint: "Una ficha para que una familia postule.", animal: "ADOPTION" },
 ];
 const PUBLISH_TOPICS = {
@@ -2781,7 +2793,7 @@ function listingToPost(saved, base) {
     listingKind: saved.kind,
     listingResolved: Boolean(saved.resolved),
     listingUrgency: saved.urgency,
-    topic: lost ? "Mascota perdida" : "Adopción",
+    topic: saved.kind==='FOUND' ? "Mascota encontrada" : lost ? "Mascota perdida" : "Adopción",
     body: saved.adoptionDetails?.presentation || saved.description || existing.body,
     media: saved.media?.length ? saved.media : existing.media,
     honoreeName: saved.kind === "ADOPTION" ? adoptionTitle(saved) : saved.petName || existing.honoreeName,
@@ -2953,9 +2965,10 @@ function bindAnimalForm(kind, editing) {
   const spec = PUBLISH_KINDS.find((k) => k.id === kind);
   const form = document.getElementById("publish-form");
   if (!form || !spec?.animal) return;
-  const lost = spec.animal === "LOST";
+  const found = spec.animal === "FOUND";
+  const lost = spec.animal === "LOST" || found;
   let species = editing?.species || "";
-  let size = editing?.size || "";
+  let size = editing?.size || (editing && lost ? "UNKNOWN" : "");
   let sex = editing?.sex || "";
   let vaccinated = Boolean(editing?.vaccinated);
   let sterilized = Boolean(editing?.sterilized);
@@ -3000,7 +3013,7 @@ function bindAnimalForm(kind, editing) {
     const val = (name) => String(form.querySelector(`[name=${name}]`)?.value || "").trim();
     const bits = [];
     if (!publishFiles.length) bits.push("una foto");
-    if (!val("petName")) bits.push("el nombre");
+    if (!found && !val("petName")) bits.push("el nombre");
     if (!species) bits.push("la especie");
     if (!size) bits.push("el tamaño");
     if (lost) {
@@ -3050,12 +3063,12 @@ function bindAnimalForm(kind, editing) {
     submit.disabled = true;
     submit.textContent = editing ? "Guardando…" : "Publicando…";
     try {
-      const media = await uploadPublishMedia(lost ? "Mascota perdida" : "Adopción");
+      const media = await uploadPublishMedia(found ? "Mascota encontrada" : lost ? "Mascota perdida" : "Adopción");
       const body = {
         listingId: editing?.listingId,
         kind: spec.animal,
         species,
-        size,
+        size: size==='UNKNOWN'?'':size,
         sex: sex || undefined,
         petName,
         description,
@@ -3067,8 +3080,8 @@ function bindAnimalForm(kind, editing) {
         vaccinated: lost ? undefined : vaccinated,
         sterilized: lost ? undefined : sterilized,
         homeNeeds: lost ? undefined : homeNeeds,
-        urgency: lost ? "HIGH" : undefined,
-        title: lost ? `Se busca a ${petName}` : undefined,
+        urgency: found ? "MEDIUM" : lost ? "HIGH" : undefined,
+        title: found ? (petName ? `Mascota encontrada · ${petName}` : 'Mascota encontrada') : lost ? `Se busca a ${petName}` : undefined,
         latitude: lost ? pin.latitude : undefined,
         longitude: lost ? pin.longitude : undefined,
         media,
@@ -3347,7 +3360,8 @@ async function renderPublicar(kind) {
   const honor = kind === "homenaje";
   const main = document.getElementById("main");
   if (spec.animal) {
-    const lost = spec.animal === "LOST";
+    const found = spec.animal === "FOUND";
+    const lost = spec.animal === "LOST" || found;
     const listingId = route().query.listing;
     let editing = null;
     if (listingId) {
@@ -3375,13 +3389,13 @@ async function renderPublicar(kind) {
           <input type="file" data-file accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" multiple>
           <div class="media-thumbs" data-thumbs></div>
         </div>
-        <p class="field-label">${lost ? "2. ¿Cómo se llama?" : "Nombre"}</p>
+        <p class="field-label">${found ? "2. Nombre, si lo sabés" : lost ? "2. ¿Cómo se llama?" : "Nombre"}</p>
         <label class="field">
           <input name="petName" maxlength="40" placeholder="${lost ? "Oliver" : "Luna"}" value="${escapeHtml(editing?.petName || "")}">
         </label>
         <p class="field-label">${lost ? "3. Especie y tamaño" : "Especie, tamaño y sexo"}</p>
         ${chipGroup("species", ANIMAL_SPECIES)}
-        ${chipGroup("size", ANIMAL_SIZES)}
+        ${chipGroup("size", lost ? [...ANIMAL_SIZES,['UNKNOWN','No lo sé']] : ANIMAL_SIZES)}
         ${lost ? "" : chipGroup("sex", ANIMAL_SEXES)}
         ${lost ? `
           <p class="field-label">4. Señas particulares</p>
@@ -3389,7 +3403,7 @@ async function renderPublicar(kind) {
           <label class="field">
             <textarea name="marks" maxlength="160" placeholder="Collar rojo, oreja derecha caída, paso alegre">${escapeHtml(editing?.marks || "")}</textarea>
           </label>
-          <p class="field-label">5. Última vista</p>
+          <p class="field-label">${found?'5. Dónde la encontraste':'5. Última vista'}</p>
           <p class="hint">Buscá la calle. El mapa deja ajustar el punto. Sin GPS del dispositivo.</p>
           <label class="field">
             <input name="lastSeen" maxlength="120" placeholder="Plaza Italia, Palermo" value="${escapeHtml(editing?.lastSeenPlace || editing?.place || "")}" autocomplete="off">
@@ -3397,7 +3411,7 @@ async function renderPublicar(kind) {
           <div class="place-hits" data-place-hits></div>
           <p class="caption" data-place-status>Elegí una sugerencia o el mapa.</p>
           <div class="lost-map-edit" data-lost-map hidden></div>
-          <p class="field-label">6. Cómo es y qué hacer si lo ven</p>
+          <p class="field-label">${found?'6. Cómo es y cómo ayudar a encontrar a su familia':'6. Cómo es y qué hacer si lo ven'}</p>
           <label class="field">
             <textarea name="description" maxlength="400" placeholder="Mestizo grande. Responde a su nombre. No lo persigan.">${escapeHtml(editing?.description || "")}</textarea>
           </label>
@@ -3608,12 +3622,13 @@ function personRow(card) {
 
 function listingRow(row) {
   const lost = row.kind === "LOST";
+  const found = row.kind === "FOUND", alert=lost||found;
   const photo = row.media?.[0]?.url;
   const place = row.lastSeenPlace || row.place || "";
   return `<a class="listing" href="#/p/${escapeHtml(row.postId)}">
-    ${photo ? `<img src="${escapeHtml(mediaUrl(photo))}" alt="">` : `<span class="avatar">${icon(lost ? "qs-paw" : "qs-pets")}</span>`}
+    ${photo ? `<img src="${escapeHtml(mediaUrl(photo))}" alt="">` : `<span class="avatar">${icon(alert ? "qs-paw" : "qs-pets")}</span>`}
     <span class="copy">
-      <span class="stories-head">${icon(lost ? "qs-paw" : "qs-pets")}<span class="pill">${lost ? "Mascota perdida" : "Adopción"}</span></span>
+      <span class="stories-head">${icon(alert ? "qs-paw" : "qs-pets")}<span class="pill">${found ? "Encontrado · busca a su familia" : lost ? "Mascota perdida" : "Adopción"}</span></span>
       <strong>${escapeHtml(row.kind === "ADOPTION" ? adoptionTitle(row) : row.petName || row.title || "Mascota")}</strong>
       <span>${escapeHtml([speciesLabel(row.species), sizeLabel(row.size), place].filter(Boolean).join(" · "))}</span>
     </span>
@@ -3691,14 +3706,16 @@ async function renderMascotas() {
   const main = document.getElementById("main");
   main.innerHTML = `<h1>Mascotas</h1>
     <div class="page">
-      <p class="hint">Alertas y adopciones abiertas. El radio de 2 km lo define el CRM; el punto de última vista se marca al publicar.</p>
+      <p class="hint">Avisos de mascotas perdidas, encontradas y adopciones abiertas.</p>
       <div class="row-actions">
         <a class="publish-cta" href="#/publicar/perdida">${icon("qs-paw")} Emitir alerta</a>
+        <a class="publish-cta" href="#/publicar/encontrada">${icon("qs-paw")} Publicar encontrada</a>
         <a class="ghost-cta" href="#/publicar/adopcion">${icon("qs-pets")} Publicar adopción</a>
       </div>
       <div class="chips" id="pet-filter">
-        <button type="button" class="chip on" data-kind="">Todas</button>
+        <button type="button" class="chip on" data-kind="">Todos</button>
         <button type="button" class="chip" data-kind="LOST">Perdidos</button>
+        <button type="button" class="chip" data-kind="FOUND">Encontrados</button>
         <button type="button" class="chip" data-kind="ADOPTION">Adopción</button>
       </div>
       <div id="pet-list"><p class="empty">Cargando…</p></div>

@@ -41,14 +41,14 @@ import com.onlygoodthings.app.ui.components.OgtPrimaryButton
 import com.onlygoodthings.app.ui.components.OgtTopBar
 import com.onlygoodthings.app.ui.components.ScreenColumn
 import com.onlygoodthings.shared.data.local.LocalAnimalListing
-
-private enum class PetsFilter { ALL, ADOPTION, LOST }
+import com.onlygoodthings.shared.domain.PetListingFilter as PetsFilter
 
 @Composable
 fun AnimalsScreen(
     onReportLost: () -> Unit,
     onReportAdopt: () -> Unit,
     onPetsMap: () -> Unit,
+    onReportFound: () -> Unit = onReportLost,
     onOpenAdoption: (String) -> Unit = {},
     onEditAdoption: (String) -> Unit = {},
     onBack: (() -> Unit)? = null,
@@ -65,13 +65,7 @@ fun AnimalsScreen(
     }
     var filter by remember { mutableStateOf(PetsFilter.ALL) }
     val listings = remember(lostTick, filter, me.id) {
-        db.animals.filter { !it.resolved }.filter { animal ->
-            when (filter) {
-                PetsFilter.ALL -> animal.kind == "ADOPTION" || animal.kind == "LOST"
-                PetsFilter.ADOPTION -> animal.kind == "ADOPTION"
-                PetsFilter.LOST -> animal.kind == "LOST"
-            }
-        }.sortedWith(
+        db.animals.filter { filter.matches(it.kind,it.resolved) }.sortedWith(
             compareByDescending<LocalAnimalListing> { me.owns(it.reporterUserId) }
                 .thenByDescending { it.createdAtEpochMs },
         )
@@ -83,11 +77,13 @@ fun AnimalsScreen(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                FilterChip("Todas", filter == PetsFilter.ALL) { filter = PetsFilter.ALL }
+                FilterChip("Todos", filter == PetsFilter.ALL) { filter = PetsFilter.ALL }
+                FilterChip("Perdidos", filter == PetsFilter.LOST) { filter = PetsFilter.LOST }
+                FilterChip("Encontrados", filter == PetsFilter.FOUND) { filter = PetsFilter.FOUND }
                 FilterChip(copy.petsAdoption, filter == PetsFilter.ADOPTION) { filter = PetsFilter.ADOPTION }
-                FilterChip(copy.petsLost, filter == PetsFilter.LOST) { filter = PetsFilter.LOST }
             }
             OgtPrimaryButton(copy.petsLost) { onReportLost() }
+            OgtPrimaryButton("Publicar mascota encontrada") { onReportFound() }
             OgtPrimaryButton(copy.petsAdoption) { onReportAdopt() }
             OgtPrimaryButton(copy.petsMapCta) { onPetsMap() }
             listings.forEach { animal ->
@@ -131,6 +127,7 @@ private fun PetListingCard(
     val copy = LocalOgtCopy.current
     val db = LocalOgtDb.current
     val lost = animal.kind == "LOST"
+    val alert = com.onlygoodthings.shared.domain.isPetAlert(animal.kind)
     val postId = remember(animal.id) { db.posts.firstOrNull { it.listingId == animal.id }?.id }
     val cover = remember(animal.id) {
         postId?.let { db.mediaOf(it).firstOrNull() }
@@ -141,9 +138,9 @@ private fun PetListingCard(
     ).joinToString(" · ")
     OgtCard {
         OgtPill(
-            if (lost) copy.petsLost else copy.petsAdoption,
-            if (lost) OgtColors.sunset else OgtColors.sand,
-            if (lost) OgtColors.sunsetText else OgtColors.ink,
+            if (lost) copy.petsLost else if(alert) "Encontrado · busca a su familia" else copy.petsAdoption,
+            if (alert) OgtColors.sunset else OgtColors.sand,
+            if (alert) OgtColors.sunsetText else OgtColors.ink,
         )
         if (cover != null) {
             OgtPostImage(
@@ -161,10 +158,11 @@ private fun PetListingCard(
         }
         if (animal.adoptionDetails == null && species.isNotBlank()) OgtCaption(species)
         Text(animal.title, fontWeight = FontWeight.Bold)
-        if (!lost) AdoptionSummary(animal)
+        if (!alert) AdoptionSummary(animal)
         OgtCaption(animal.adoptionPresentation())
         if (!animal.place.isBlank()) OgtCaption(animal.place)
-        if (lost) {
+        if (alert) {
+            if(postId!=null) OgtPrimaryButton("Ver aviso") { onOpenAdoption(postId) }
             OgtPrimaryButton(copy.petsMapCta) { onMap() }
         } else if (postId != null) {
             if (mine) {

@@ -49,6 +49,7 @@ import com.onlygoodthings.shared.domain.titleCasePersonName
 fun ReportAnimalScreen(
     onDone: () -> Unit,
     editPostId: String? = null,
+    initialKind: String = "LOST",
 ) {
     val db = LocalOgtDb.current
     val session = LocalOgtSession.current
@@ -61,9 +62,11 @@ fun ReportAnimalScreen(
     val listing = remember(editPostId) {
         existing?.listingId?.let { id -> db.animals.firstOrNull { it.id == id } }
     }
+    var alertKind by remember(editPostId) { mutableStateOf(listing?.kind ?: initialKind) }
+    val found = alertKind == "FOUND"
     var name by remember { mutableStateOf(listing?.petName.orEmpty()) }
     var species by remember { mutableStateOf(listing?.species.orEmpty()) }
-    var size by remember { mutableStateOf(listing?.size.orEmpty()) }
+    var size by remember { mutableStateOf(listing?.size?.takeIf { it.isNotBlank() } ?: if(editing) "UNKNOWN" else "") }
     var marks by remember { mutableStateOf(listing?.marks.orEmpty()) }
     var lastSeen by remember { mutableStateOf(listing?.lastSeenPlace.orEmpty()) }
     var lastSeenPoint by remember {
@@ -84,7 +87,7 @@ fun ReportAnimalScreen(
     var publishError by remember { mutableStateOf<String?>(null) }
     val missing = buildList {
         if (draftMedia.isEmpty()) add("una foto")
-        if (name.isBlank()) add("el nombre")
+        if (!found && name.isBlank()) add("el nombre")
         if (species.isBlank()) add("la especie")
         if (size.isBlank()) add("el tamaño")
         if (marks.isBlank()) add("las señas")
@@ -92,23 +95,24 @@ fun ReportAnimalScreen(
         if (story.isBlank()) add("cómo es")
     }
     Column(Modifier.fillMaxSize().background(OgtColors.canvas).ogtDismissImeOnScroll().verticalScroll(rememberScrollState())) {
-        OgtTopBar(title = if (editing) "Editar alerta" else copy.petsLost, onBack = onDone)
+        OgtTopBar(title = if (editing) "Editar alerta" else if(found) "Mascota encontrada" else copy.petsLost, onBack = onDone)
         ScreenColumn {
-            OgtCaption("Lo que complete acá es lo que ve la comunidad en la alerta: señas y última vista. El radio lo define el CRM.")
+            if(!editing && pendingPostId==null) AnimalChoicePills(listOf("LOST" to "Perdida","FOUND" to "Encontrada"),alertKind,{ if(!saving)alertKind=it })
+            OgtCaption(if(found) "Completá las señas y el lugar donde la encontraste para ayudar a encontrar a su familia." else "Lo que complete acá es lo que ve la comunidad en la alerta: señas y última vista. El radio lo define el CRM.")
             Text("1. Foto clara", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
             AnimalMediaBlock(draftMedia, missing = triedPublish && draftMedia.isEmpty(), reorderEnabled = !saving)
-            Text("2. ¿Cómo se llama?", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
+            Text(if(found) "2. Nombre, si lo sabés" else "2. ¿Cómo se llama?", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
             OutlinedTextField(
                 value = name,
                 onValueChange = { if (it.length <= 40) name = it },
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Oliver", color = OgtColors.muted) },
                 shape = RoundedCornerShape(OgtDimens.buttonRadius),
-                colors = ogtOutlinedFieldColors(missing = triedPublish && name.isBlank()),
+                colors = ogtOutlinedFieldColors(missing = triedPublish && !found && name.isBlank()),
             )
             Text("3. Especie y tamaño", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
             AnimalChoicePills(AnimalSpecies, species, { species = it }, missing = triedPublish && species.isBlank())
-            AnimalChoicePills(AnimalSizes, size, { size = it }, missing = triedPublish && size.isBlank())
+            AnimalChoicePills(AnimalSizes + ("UNKNOWN" to "No lo sé"), size, { size = it }, missing = triedPublish && size.isBlank())
             Text("4. Señas particulares", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
             OgtCaption("Collar, mancha, oreja, paso. Es lo que se lee bajo “Última vista” en la card.")
             OutlinedTextField(
@@ -120,7 +124,7 @@ fun ReportAnimalScreen(
                 shape = RoundedCornerShape(OgtDimens.buttonRadius),
                 colors = ogtOutlinedFieldColors(missing = triedPublish && marks.isBlank()),
             )
-            Text("5. Última vista", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
+            Text(if(found) "5. Dónde lo encontraste" else "5. Última vista", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
             OgtCaption("Buscá la calle. El pin de ubicación marca dónde estás; el mapa deja ajustar el punto.")
             OgtPlaceSearchField(
                 query = lastSeen,
@@ -136,7 +140,7 @@ fun ReportAnimalScreen(
                 },
                 missing = triedPublish && (lastSeen.isBlank() || lastSeenPoint == null),
             )
-            Text("6. Cómo es y qué hacer si lo ven", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
+            Text(if(found) "6. Cómo es y cómo ayudar a encontrar a su familia" else "6. Cómo es y qué hacer si lo ven", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OgtColors.ink)
             OutlinedTextField(
                 value = story,
                 onValueChange = { if (it.length <= 400) story = it },
@@ -182,7 +186,7 @@ fun ReportAnimalScreen(
                 } else {
                     db.publishAnimalListing(
                         author = me,
-                        kind = "LOST",
+                        kind = alertKind,
                         petName = titleCasePersonName(name),
                         species = species,
                         size = size,
@@ -200,9 +204,9 @@ fun ReportAnimalScreen(
                 }
                 pendingPostId = post.id
                 if (db.mediaOf(post.id).isNotEmpty()) {
-                    db.replaceAnimalMedia(post.id, "Mascota perdida", draftMedia)
+                    db.replaceAnimalMedia(post.id, com.onlygoodthings.shared.domain.animalPostTopic(alertKind), draftMedia)
                 } else {
-                    db.attachAnimalMedia(post.id, "Mascota perdida", draftMedia)
+                    db.attachAnimalMedia(post.id, com.onlygoodthings.shared.domain.animalPostTopic(alertKind), draftMedia)
                 }
                 session.persistPublishedAnimals()
                 auth.ensureDevBearer()
@@ -211,7 +215,7 @@ fun ReportAnimalScreen(
                         kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
                             val live = persistAnimalOnServer(db, auth.animals, me, post, draftMedia, place, { session.currentUserId == me.id }, auth::uploadPostMedia)
                             if (editing) {
-                                runCatching { auth.feed.editPost(live.id, story, "Mascota perdida") }
+                                runCatching { auth.feed.editPost(live.id, story, com.onlygoodthings.shared.domain.animalPostTopic(alertKind)) }
                                     .onSuccess { db.upsertRemoteSocial(it) }
                             }
                             session.persistPublishedAnimals()

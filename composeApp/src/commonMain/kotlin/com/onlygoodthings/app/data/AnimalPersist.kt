@@ -167,6 +167,6 @@ private fun List<OgtPickedMedia>.toStored(postId: String, tag: String): List<Loc
             posterUrl = item.posterPath?.let { if (remote) it else "file://$it" },
             sortOrder = order,
             assetKey = if (item.fromDevice || remote) "" else item.path,
-            altText = if (tag == "LOST") "Mascota perdida" else "Adopción",
+            altText = com.onlygoodthings.shared.domain.animalPostTopic(tag),
         )
     }

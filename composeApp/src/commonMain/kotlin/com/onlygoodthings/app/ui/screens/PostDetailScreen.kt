@@ -170,7 +170,7 @@ fun PostDetailScreen(
     var sightingError by remember(postId) { mutableStateOf<String?>(null) }
     LaunchedEffect(listing?.id) {
         val id=listing?.id ?: return@LaunchedEffect
-        if (id.isUuid()) {
+        if (id.isUuid() && listing?.kind!="FOUND") {
             try { auth.refreshAnimalSightings(id) }
             catch(cancel:kotlinx.coroutines.CancellationException) { throw cancel }
             catch(_:Exception) { sightingError="No pudimos actualizar los avistajes. Volvé a abrir la ficha para reintentar." }
@@ -208,6 +208,8 @@ fun PostDetailScreen(
     val pageScroll = rememberScrollState()
     val commentList = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    var openingFoundContact by remember(post.id,me.id) { mutableStateOf(false) }
+    var foundContactError by remember(post.id,me.id) { mutableStateOf<String?>(null) }
     var lifetime by remember(post.id,me.id) { mutableStateOf<com.onlygoodthings.shared.domain.PostLifetime?>(null) }
     var renewing by remember(post.id,me.id) { mutableStateOf(false) }
     var lifetimeError by remember(post.id,me.id) { mutableStateOf<String?>(null) }
@@ -423,11 +425,44 @@ fun PostDetailScreen(
                                 val existing = listing?.let { db.mySighting(it.id, me.id) }
                                 if (existing != null) report = existing else sawOpen = true
                             },
-                            onFound = { listing?.let { db.resolveLostListing(me, it.id) } },
+                            onFound = { listing?.let { row ->
+                                if(row.kind!="FOUND" || !row.id.isUuid()) db.resolveLostListing(me,row.id)
+                                else if(!openingFoundContact) {
+                                    openingFoundContact=true;foundContactError=null
+                                    scope.launch {
+                                        try {
+                                            check(session.me().id==me.id)
+                                            auth.animals.resolve(row.id)
+                                            val saved=auth.animals.getListing(row.id)
+                                            check(session.me().id==me.id)
+                                            db.upsertRemoteAnimal(saved);session.persistPublishedAnimals()
+                                        } catch(cancel:kotlinx.coroutines.CancellationException) { throw cancel }
+                                        catch(_:Exception) { foundContactError="No pudimos guardar el reencuentro. Volvé a intentarlo." }
+                                        finally { openingFoundContact=false }
+                                    }
+                                }
+                            } },
                             onOpenSighting = { row -> report = row },
                             onExpandMap = { mapOpen = true },
                             onOpenMedia = { mediaPage = it },
                             initialMediaIndex = initialMediaIndex,
+                            contacting = openingFoundContact,
+                            contactError = foundContactError,
+                            onContact = {
+                                if(!openingFoundContact && listing!=null) {
+                                    openingFoundContact=true;foundContactError=null
+                                    scope.launch {
+                                        try {
+                                            check(session.me().id==me.id)
+                                            val thread=auth.account.startConversation(listing.reporterUserId,"mensaje")
+                                            check(session.me().id==me.id)
+                                            onOpenLostChat(thread.matchId)
+                                        } catch(cancel:kotlinx.coroutines.CancellationException) { throw cancel }
+                                        catch(_:Exception) { foundContactError="No pudimos abrir la conversación. Volvé a intentarlo." }
+                                        finally { openingFoundContact=false }
+                                    }
+                                }
+                            },
                         )
                         FeedCardKind.ADOPTION -> AdoptionDetail(
                             post = post,
@@ -848,7 +883,11 @@ private fun LostPetDetail(
     onExpandMap: () -> Unit,
     onOpenMedia: (Int) -> Unit,
     initialMediaIndex: Int,
+    onContact: () -> Unit = {},
+    contacting: Boolean = false,
+    contactError: String? = null,
 ) {
+    val found = listing?.kind=="FOUND"
     val resolved = listing?.resolved == true
     val petName = listing?.displayPetName()?.ifBlank { null } ?: post.tag
     val story = listing?.description?.ifBlank { null } ?: post.body.takeIf { it.isNotBlank() }
@@ -856,7 +895,7 @@ private fun LostPetDetail(
     val kindLine = lostSpeciesSize(listing)
     val marks = marksIfDistinct(listing?.marks, story)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OgtPill(if (resolved) "Ya está en casa" else "Perdido", OgtColors.sunset, OgtColors.sunsetText)
+        OgtPill(if (resolved) "Ya está en casa" else if(found) "Encontrado · busca a su familia" else "Perdido", OgtColors.sunset, OgtColors.sunsetText)
         if (listing?.urgency == "HIGH" && !resolved) {
             OgtPill("Urgente", OgtColors.sunset, OgtColors.sunsetText)
         }
@@ -870,9 +909,9 @@ private fun LostPetDetail(
     }
     marks?.let { OgtCaption("Señas · $it") }
     if (lastSeen.isNotBlank()) {
-        OgtCaption(listOfNotNull("Última vista en $lastSeen", post.timeLabel.takeIf { it.isNotBlank() }).joinToString(" · "))
+        OgtCaption(listOfNotNull(if(found)"Encontrado en $lastSeen" else "Última vista en $lastSeen", post.timeLabel.takeIf { it.isNotBlank() }).joinToString(" · "))
     }
-    listing?.let { row ->
+    listing?.takeUnless { found }?.let { row ->
         val radius = formatAlertRadius(row.alertRadiusM)
         val neighbors = row.neighborsAlerted.takeIf { it > 0 }?.let { "$it vecinos avisados" }
         OgtCaption(listOfNotNull("Radio $radius", neighbors).joinToString(" · "))
@@ -889,10 +928,12 @@ private fun LostPetDetail(
     }
     OgtCaption("Publicó $authorName")
     if (!resolved && isAuthor) {
-        OgtPrimaryButton("Lo encontramos", onClick = onFound)
+        OgtPrimaryButton(if(found && contacting)"Guardando…" else if(found)"Se reencontró con su familia" else "Lo encontramos", enabled=!contacting, onClick = onFound)
     } else if (!resolved && !isAuthor) {
-        OgtPrimaryButton("Creo que lo vi", onClick = onSaw)
+        if(found) OgtPrimaryButton(if(contacting)"Abriendo…" else "Contactar a quien lo encontró",enabled=!contacting,onClick=onContact)
+        else OgtPrimaryButton("Creo que lo vi", onClick = onSaw)
     }
+    contactError?.let { OgtCaption(it) }
     actions()
 }
 

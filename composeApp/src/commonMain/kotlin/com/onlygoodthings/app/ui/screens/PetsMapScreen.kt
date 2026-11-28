@@ -1,6 +1,10 @@
 package com.onlygoodthings.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,19 +38,20 @@ import com.onlygoodthings.app.ui.components.OgtSectionTitle
 import com.onlygoodthings.app.ui.components.OgtTopBar
 import com.onlygoodthings.app.ui.components.ScreenColumn
 
-/** Mapa solo de mascotas perdidas. No mezcla estacionamiento. */
+/** Lost and found alerts share a map; adoption remains in the pet listing screen. */
 @Composable
-fun PetsMapScreen(onBack: () -> Unit, onReport: () -> Unit) {
+fun PetsMapScreen(onBack: () -> Unit, onReport: () -> Unit, onOpenPost: (String) -> Unit = {}) {
     val db = LocalOgtDb.current
     val session = LocalOgtSession.current
     val auth = LocalAuth.current
     val copy = LocalOgtCopy.current
     val here = session.here()
     var selectedId by remember { mutableStateOf<String?>(null) }
+    var filter by remember { mutableStateOf(com.onlygoodthings.shared.domain.PetListingFilter.ALL) }
     val owner = session.me().id
     val socialTick by db.socialTick.collectAsState()
-    val lost = remember(owner, socialTick) { db.animals.filter { it.kind == "LOST" && !it.resolved } }
-    val remoteIds = lost.map { it.id }.filter {
+    val lost = remember(owner, socialTick,filter) { db.animals.filter { com.onlygoodthings.shared.domain.isPetAlert(it.kind) && filter.matches(it.kind,it.resolved) } }
+    val remoteIds = lost.filter { it.kind=="LOST" }.map { it.id }.filter {
         it.matches(Regex("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"))
     }.sorted()
     var sightingsError by remember(owner) { mutableStateOf(false) }
@@ -58,7 +63,7 @@ fun PetsMapScreen(onBack: () -> Unit, onReport: () -> Unit) {
             catch (_: Exception) { sightingsError = true }
         }
     }
-    val pins = db.mapPins.filter { it.kind == "ANIMAL" }
+    val pins = db.mapPins.filter { it.kind == "ANIMAL" && (filter==com.onlygoodthings.shared.domain.PetListingFilter.ALL || lost.any { row ->row.id==it.id }) }
     val markers = buildList {
         if (here != null) add(BarrioMarker("me", "ME", copy.mePin, here.latitude, here.longitude))
         pins.forEach { pin ->
@@ -98,9 +103,16 @@ fun PetsMapScreen(onBack: () -> Unit, onReport: () -> Unit) {
     val center = focus?.let { com.onlygoodthings.shared.domain.GeoPoint(it.latitude, it.longitude) } ?: here
 
     Column(Modifier.fillMaxSize().background(OgtColors.canvas)) {
-        OgtTopBar(title = copy.petsMapTitle, onBack = onBack)
+        OgtTopBar(title = "Perdidos y encontrados", onBack = onBack)
         ScreenColumn {
             OgtCaption(copy.petsMapHint)
+            Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                listOf(com.onlygoodthings.shared.domain.PetListingFilter.ALL to "Todos",com.onlygoodthings.shared.domain.PetListingFilter.LOST to "Perdidos",com.onlygoodthings.shared.domain.PetListingFilter.FOUND to "Encontrados").forEach { (value,label) ->
+                    androidx.compose.foundation.layout.Box(Modifier.clickable { filter=value;selectedId=null }) {
+                        OgtPill(label,if(filter==value)OgtColors.secondary else OgtColors.sand,if(filter==value)androidx.compose.ui.graphics.Color.White else OgtColors.ink)
+                    }
+                }
+            }
             if (sightingsError) OgtCaption("No pudimos actualizar todos los avistajes. Se conserva la última información disponible.")
             if (here == null) OgtGpsBanner()
         }
@@ -117,13 +129,17 @@ fun PetsMapScreen(onBack: () -> Unit, onReport: () -> Unit) {
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             ScreenColumn {
-                OgtSectionTitle(copy.petsMapTitle)
+                OgtSectionTitle("Perdidos y encontrados")
                 lost.forEach { animal ->
                     OgtCard {
+                        OgtPill(if(animal.kind=="FOUND")"Encontrado · busca a su familia" else "Perdido")
                         OgtPill(animal.urgency)
                         Text(animal.title, fontWeight = FontWeight.Bold)
                         OgtCaption(animal.description)
                         OgtCaption(animal.place)
+                        db.posts.firstOrNull { it.listingId==animal.id }?.let { post ->
+                            com.onlygoodthings.app.ui.components.OgtPrimaryButton("Ver aviso") { onOpenPost(post.id) }
+                        }
                     }
                 }
                 pins.forEach { pin ->

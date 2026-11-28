@@ -50,6 +50,7 @@ enum class OgtRoute(val title: String) {
 val OgtBottomTabs = listOf(
     OgtRoute.Feed,
     OgtRoute.Parking,
+    OgtRoute.Animals,
     OgtRoute.Skills,
 )
 

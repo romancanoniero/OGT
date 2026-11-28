@@ -2,6 +2,20 @@ package com.onlygoodthings.shared.domain
 
 import kotlinx.serialization.Serializable
 
+fun isPetAlert(kind: String?): Boolean = kind == "LOST" || kind == "FOUND"
+
+enum class PetListingFilter {
+    ALL, LOST, FOUND, ADOPTION;
+    fun matches(kind: String, resolved: Boolean = false): Boolean =
+        !resolved && kind in setOf("LOST","FOUND","ADOPTION") && (this==ALL || name==kind)
+}
+
+fun animalPostTopic(kind: String): String = when (kind) {
+    "LOST" -> "Mascota perdida"
+    "FOUND" -> "Mascota encontrada"
+    else -> "Adopción"
+}
+
 /** Ficha de mascota persistida en Postgres, con el post del feed. */
 @Serializable
 data class AnimalListingDto(

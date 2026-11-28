@@ -112,7 +112,7 @@ fun Route.animalRoutes(db: Database, hub: RealtimeHub, mediaForReading: (PostMed
         val write = animalWriteFrom(dataMap, animals.homeLocation(principal.userId), AdoptionTags(db).list(true))
         val saved = animals.publish(principal.userId, write)
         projectAnimal(db, hub, saved)
-        if (saved.kind == "LOST") broadcastLostAlert(hub, saved)
+        if (com.onlygoodthings.shared.domain.isPetAlert(saved.kind)) broadcastLostAlert(hub, saved)
         call.respond(ApiResponse.ok(saved, "Ficha grabada"))
     }
 
@@ -196,7 +196,7 @@ fun Route.animalRoutes(db: Database, hub: RealtimeHub, mediaForReading: (PostMed
         val rows = db.withConnection { connection ->
             connection.prepareStatement(
                 """
-                SELECT id, kind, species, size, urgency, title,
+                SELECT id, kind, species, COALESCE(size::text,'') AS size, urgency, title,
                        COALESCE(NULLIF(adoption_details->>'presentation',''),description) AS description,
                        ST_Y(location) AS lat, ST_X(location) AS lng, alert_radius_m,
                        ST_Distance(location::geography, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography) AS meters
@@ -242,22 +242,29 @@ fun Route.animalRoutes(db: Database, hub: RealtimeHub, mediaForReading: (PostMed
 }
 
 internal fun animalWriteFrom(dataMap: Map<String, Any?>, home: Pair<Double, Double>?, catalog: List<com.onlygoodthings.shared.domain.AdoptionTag> = emptyList(), previous: AnimalListingDto? = null): AnimalWrite {
-    val kind = (dataMap.optString("kind") ?: "LOST").uppercase()
+    val kind = (dataMap.optString("kind") ?: previous?.kind ?: "LOST").uppercase()
+    require(kind in setOf("LOST","FOUND","ADOPTION")) { "Tipo de ficha inválido" }
+    require(previous == null || previous.kind == kind) { "El tipo de la ficha no se puede cambiar al editar" }
     val petName = titleCasePersonName(dataMap.optString("petName").orEmpty())
     val age = dataMap.optString("ageLabel").orEmpty()
     val lost = kind == "LOST"
-    val adoption = if (!lost && dataMap["adoptionDetails"] != null) {
+    val alert = com.onlygoodthings.shared.domain.isPetAlert(kind)
+    val adoption = if (!alert && dataMap["adoptionDetails"] != null) {
         val parsed = JsonBody.objectMapper.convertValue(dataMap["adoptionDetails"], com.onlygoodthings.shared.domain.AdoptionDetails::class.java)
         val draft = parsed.copy(presentation = parsed.presentation.ifBlank { dataMap.reqString("description") }.trim())
         com.onlygoodthings.shared.domain.AdoptionRules.normalize(draft, catalog,
             previous?.adoptionDetails?.tags?.map { it.id }?.toSet()
                 ?: com.onlygoodthings.shared.domain.AdoptionRules.legacyTags(catalog, previous?.species.orEmpty(), previous?.size, previous?.sex.orEmpty(), previous?.vaccinated == true, previous?.sterilized == true).map { it.id }.toSet())
-    } else previous?.adoptionDetails?.takeUnless { lost }
-    val title = (if (!lost && previous?.adoptionDetails != null && dataMap["adoptionDetails"] == null) previous.title else dataMap.optString("title"))?.takeIf { it.isNotBlank() }
-        ?: if (lost) "Se busca a $petName" else listOf(petName, age).filter { it.isNotBlank() }.joinToString(" · ")
+    } else previous?.adoptionDetails?.takeUnless { alert }
+    val title = (if (!alert && previous?.adoptionDetails != null && dataMap["adoptionDetails"] == null) previous.title else dataMap.optString("title"))?.takeIf { it.isNotBlank() }
+        ?: when(kind) {
+            "LOST" -> "Se busca a $petName"
+            "FOUND" -> if(petName.isBlank()) "Mascota encontrada" else "Mascota encontrada · $petName"
+            else -> listOf(petName, age).filter { it.isNotBlank() }.joinToString(" · ")
+        }
     val marks = dataMap.optString("marks").orEmpty()
     val temperament = dataMap.optString("temperament") ?: previous?.temperament.orEmpty()
-    val description = if (!lost && dataMap["adoptionDetails"] != null) previous?.description ?: adoption!!.presentation else dataMap.reqString("description")
+    val description = if (!alert && dataMap["adoptionDetails"] != null) previous?.description ?: adoption!!.presentation else dataMap.reqString("description")
     val effectiveAdoption = if (adoption != null && dataMap["adoptionDetails"] == null && previous != null &&
         (description != previous.description || temperament != previous.temperament)) {
         adoption.copy(presentation = if (temperament.isNotBlank() && !description.contains(temperament, ignoreCase = true)) "$description\n\nCarácter: $temperament" else description)
@@ -270,13 +277,13 @@ internal fun animalWriteFrom(dataMap: Map<String, Any?>, home: Pair<Double, Doub
     val lng = dataMap.optDouble("longitude") ?: previous?.longitude?.takeIf { keepPoint }
     require((lat == null) == (lng == null)) { "Indicá ambas coordenadas del lugar" }
     require(lat == null || (lat.isFinite() && lat in -90.0..90.0 && lng!!.isFinite() && lng in -180.0..180.0)) { "Ubicación inválida" }
-    if (lost) {
+    if (alert) {
         require(marks.isNotBlank()) { "Campo requerido: marks" }
         require(lastSeenPlace.isNotBlank()) { "Campo requerido: lastSeenPlace" }
-        require(lat != null && lng != null) { "Falta el punto de última vista" }
+        require(lat != null && lng != null) { if(lost) "Falta el punto de última vista" else "Falta el punto del encuentro" }
     }
     val media = dataMap.optMediaItems()
-    if (!lost && adoption != null) {
+    if (!alert && adoption != null) {
         if (dataMap["adoptionDetails"] != null) require(!dataMap.optString("title").isNullOrBlank()) { "Ingresá el título del posteo." }
         require(title.trim().length in 1..com.onlygoodthings.shared.domain.AdoptionRules.MAX_TITLE) { "Ingresá un título de hasta 120 caracteres." }
         require(effectiveAdoption!!.presentation.trim().length in 1..com.onlygoodthings.shared.domain.AdoptionRules.MAX_PRESENTATION) { "Ingresá una presentación de hasta 1500 caracteres." }
@@ -290,10 +297,10 @@ internal fun animalWriteFrom(dataMap: Map<String, Any?>, home: Pair<Double, Doub
         }
     }
     return AnimalWrite(
-        kind = if (lost) "LOST" else "ADOPTION",
+        kind = kind,
         species = adoption?.tags?.firstOrNull { it.group == "SPECIES" }?.legacyValue?.ifBlank { "OTHER" } ?: dataMap.reqString("species"),
-        size = if (adoption != null) com.onlygoodthings.shared.domain.AdoptionRules.singleValue(adoption, "SIZE") else dataMap.optString("size") ?: "MEDIUM",
-        urgency = dataMap.optString("urgency") ?: if (lost) "HIGH" else "LOW",
+        size = if (adoption != null) com.onlygoodthings.shared.domain.AdoptionRules.singleValue(adoption, "SIZE") else if(alert) dataMap.optString("size").orEmpty().takeUnless { it=="UNKNOWN" }.orEmpty() else dataMap.optString("size") ?: "MEDIUM",
+        urgency = dataMap.optString("urgency") ?: if (lost) "HIGH" else if(alert) "MEDIUM" else "LOW",
         title = title,
         description = description,
         petName = if (adoption != null) previous?.petName?.takeIf { it.isNotBlank() } ?: petName.ifBlank { title.take(40) } else petName,
@@ -308,7 +315,7 @@ internal fun animalWriteFrom(dataMap: Map<String, Any?>, home: Pair<Double, Doub
         place = dataMap.optString("place") ?: lastSeenPlace,
         latitude = lat,
         longitude = lng,
-        alertRadiusM = if (lost) OgtCrmDefaults.LOST_ALERT_RADIUS_M else 0,
+        alertRadiusM = if (alert) OgtCrmDefaults.LOST_ALERT_RADIUS_M else 0,
         media = media,
         adoptionDetails = effectiveAdoption,
         attributionUrl = if (dataMap.containsKey("attributionUrl")) com.onlygoodthings.shared.domain.ContentAttribution.normalize(dataMap.optString("attributionUrl")) else previous?.attributionUrl,
@@ -363,7 +370,7 @@ private fun projectAnimal(db: Database, hub: RealtimeHub, saved: AnimalListingDt
                 impactCount = counters.second,
                 authorUserId = saved.reporterUserId,
                 body = saved.adoptionDetails?.presentation?.takeIf { it.isNotBlank() } ?: saved.description,
-                tag = if (saved.kind == "LOST") "Mascota perdida" else "Adopción",
+                tag = com.onlygoodthings.shared.domain.animalPostTopic(saved.kind),
                 place = saved.place,
                 createdAtEpochMs = saved.createdAtEpochMs,
                 listingId = saved.listingId,
@@ -381,7 +388,7 @@ private suspend fun broadcastLostAlert(hub: RealtimeHub, saved: AnimalListingDto
     val lng = saved.longitude ?: return
     val alert = ImpactAlertFrame(
         alertId = saved.listingId,
-        kind = ImpactKind.LOST_PET,
+        kind = if(saved.kind=="FOUND")ImpactKind.FOUND_PET else ImpactKind.LOST_PET,
         title = saved.title,
         body = saved.description,
         latitude = lat,

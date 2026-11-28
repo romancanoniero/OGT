@@ -82,5 +82,37 @@ class InstagramImportTests(unittest.TestCase):
             original['posts'][0]['media'][0]['file']='../outside.jpg'
             with self.assertRaises(ValueError):self.prepare(root,original)
 
+    def test_found_alert_uses_existing_test_author_and_protects_their_identity(self):
+        with tempfile.TemporaryDirectory() as root:
+            data=self.fixture(root);post=data['posts'][0]
+            data['existingAuthor']=dict(userId='63b014e0-2488-50ab-b106-f0199868297b',nickname='prueba_luna_94d98a',ownerUserId='94d98af5-2326-4641-acf1-1440ddd4e28f')
+            post.update(kind='FOUND',category='Mascota encontrada',sourceMediaCount=1,
+                animal=dict(title='Mascota encontrada',species='DOG',marks='Canela, collar azul',lastSeenPlace='Castelar'),
+                location=dict(label='Castelar (zona aproximada)',latitude=-34.66,longitude=-58.66,evidence='Zona declarada en flyer',sourceUrl=post['sourceUrl']))
+            prepared=self.prepare(root,data);sql=importer.make_sql(prepared)
+            self.assertEqual(prepared['userId'],data['existingAuthor']['userId'])
+            self.assertNotIn('INSERT INTO users',sql);self.assertNotIn('UPDATE users',sql)
+            self.assertIn('Existing test author collision or changed owner',sql)
+            self.assertIn("'FOUND','DOG',NULL,'MEDIUM'",sql)
+            self.assertIn('marks,last_seen_place',sql)
+            self.assertEqual(sql.count('ST_MakePoint(-58.66,-34.66)'),3)
+            snapshot=sql[sql.index('CREATE FUNCTION pg_temp.import_snapshot'):sql.index('INSERT INTO import_protected')]
+            self.assertNotIn(data['existingAuthor']['userId'],snapshot)
+            for change in [dict(post,location=None),dict(post,animal=dict(post['animal'],species=None)),dict(post,sourceMediaCount=2)]:
+                data['posts']=[change]
+                with self.assertRaises(ValueError):self.prepare(root,data)
+
+    def test_reviewed_dog_health_does_not_turn_unknowns_or_some_into_all(self):
+        with tempfile.TemporaryDirectory() as root:
+            data=self.fixture(root)
+            data['posts'][0]['animal'].update(species='DOG',size=None,sex='Macho',careReview=dict(vaccination='UNKNOWN',sterilization='SOME',adoptionMode='SEPARATE',availableCount=3))
+            sql=importer.make_sql(self.prepare(root,data))
+            self.assertIn("'ADOPTION','DOG',NULL,'LOW'",sql)
+            self.assertIn('vaccination-unknown',sql);self.assertIn('sterilization-some',sql)
+            self.assertIn('Reviewed adoption tag missing or inactive',sql)
+            for value in [0,101,True,'3']:
+                data['posts'][0]['animal']['careReview']['availableCount']=value
+                with self.assertRaises(ValueError):self.prepare(root,data)
+
 
 if __name__=='__main__':unittest.main()

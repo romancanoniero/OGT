@@ -1723,10 +1723,12 @@ class OgtLocalDatabase {
         val story = description.trim()
         val modern = adoptionDetails?.copy(presentation = adoptionDetails.presentation.ifBlank { story })
         val lost = kind == "LOST"
-        if (story.isEmpty() || species.isBlank() || (adoptionDetails == null && (name.isEmpty() || size.isBlank()))) return null
+        val alert = com.onlygoodthings.shared.domain.isPetAlert(kind)
+        if(kind !in setOf("LOST","FOUND","ADOPTION"))return null
+        if (story.isEmpty() || species.isBlank() || (lost && name.isEmpty()) || (!alert && adoptionDetails == null && (name.isEmpty() || size.isBlank()))) return null
         if (adoptionDetails != null && (kind != "ADOPTION" || title.isNullOrBlank() || title.length > 120 || story.length > 1500)) return null
-        if (lost && (marks.trim().isEmpty() || lastSeenPlace.trim().isEmpty())) return null
-        if (!lost && (place.trim().isEmpty() || (adoptionDetails == null && (ageLabel.trim().isEmpty() || temperament.trim().isEmpty())))) return null
+        if (alert && (marks.trim().isEmpty() || lastSeenPlace.trim().isEmpty())) return null
+        if (!alert && (place.trim().isEmpty() || (adoptionDetails == null && (ageLabel.trim().isEmpty() || temperament.trim().isEmpty())))) return null
         val now = currentEpochMs()
         val listingId = "animal-pub-$now"
         val postId = "post-pub-$now"
@@ -1735,14 +1737,14 @@ class OgtLocalDatabase {
         animals += LocalAnimalListing(
             id = listingId,
             reporterUserId = author.id,
-            kind = if (lost) "LOST" else "ADOPTION",
+            kind = kind,
             species = species,
-            size = size,
-            urgency = if (lost) "HIGH" else "LOW",
-            title = if (adoptionDetails != null) title!!.trim() else if (lost) "Se busca a $name" else listOf(name, ageLabel.trim()).filter { it.isNotBlank() }.joinToString(" · "),
+            size = size.takeUnless { it=="UNKNOWN" }.orEmpty(),
+            urgency = if (lost) "HIGH" else if(alert) "MEDIUM" else "LOW",
+            title = if (adoptionDetails != null) title!!.trim() else if (lost) "Se busca a $name" else if(alert) name.takeIf { it.isNotBlank() }?.let { "Mascota encontrada · $it" } ?: "Mascota encontrada" else listOf(name, ageLabel.trim()).filter { it.isNotBlank() }.joinToString(" · "),
             description = story,
-            place = if (lost) seen.ifBlank { barrio } else barrio,
-            alertRadiusM = if (lost) alertRadiusM else 0,
+            place = if (alert) seen.ifBlank { barrio } else barrio,
+            alertRadiusM = if (alert) alertRadiusM else 0,
             neighborsAlerted = if (lost) 0 else 0,
             resolved = false,
             petName = name,
@@ -1750,7 +1752,7 @@ class OgtLocalDatabase {
             lastSeenPlace = seen,
             latitude = latitude,
             longitude = longitude,
-            lastSeenAtEpochMs = if (lost) now else 0L,
+            lastSeenAtEpochMs = if (alert) now else 0L,
             ageLabel = ageLabel.trim(),
             sex = sex.trim(),
             temperament = temperament.trim(),
@@ -1765,9 +1767,9 @@ class OgtLocalDatabase {
             authorKind = AuthorKind.USER,
             authorUserId = author.id,
             authorCompanyId = null,
-            place = if (lost) seen.ifBlank { barrio } else barrio,
+            place = if (alert) seen.ifBlank { barrio } else barrio,
             timeLabel = "Ahora",
-            tag = if (lost) "Mascota perdida" else "Adopción",
+            tag = com.onlygoodthings.shared.domain.animalPostTopic(kind),
             body = modern?.presentation ?: story,
             impactCount = 0,
             commentCount = 0,
@@ -1814,7 +1816,7 @@ class OgtLocalDatabase {
         val story = description.trim()
         val modern = adoptionDetails?.copy(presentation = adoptionDetails.presentation.ifBlank { story })
         val barrio = place.trim()
-        if (story.isEmpty() || species.isBlank() || (adoptionDetails == null && (name.isEmpty() || size.isBlank()))) return null
+        if (story.isEmpty() || species.isBlank()) return null
         if (adoptionDetails != null && (title.isNullOrBlank() || title.length > 120 || story.length > 1500)) return null
         val postIdx = posts.indexOfFirst { it.id == postId }
         if (postIdx < 0) return null
@@ -1826,7 +1828,9 @@ class OgtLocalDatabase {
         val listing = animals[animalIdx]
         if (listing.reporterUserId !in author.aliases()) return null
         val lost = listing.kind == "LOST"
-        if (lost) {
+        val alert = com.onlygoodthings.shared.domain.isPetAlert(listing.kind)
+        if((lost && name.isEmpty()) || (!alert && adoptionDetails==null && (name.isEmpty() || size.isBlank())))return null
+        if (alert) {
             if (marks.trim().isEmpty() || lastSeenPlace.trim().isEmpty()) return null
         } else if (listing.kind != "ADOPTION") {
             return null
@@ -1836,25 +1840,25 @@ class OgtLocalDatabase {
         val seen = lastSeenPlace.trim()
         animals[animalIdx] = listing.copy(
             species = species,
-            size = size,
-            title = if (adoptionDetails != null) title!!.trim() else if (listing.adoptionDetails != null) listing.title else if (lost) "Se busca a $name" else listOf(name, ageLabel.trim()).filter { it.isNotBlank() }.joinToString(" · "),
+            size = size.takeUnless { it=="UNKNOWN" }.orEmpty(),
+            title = if (adoptionDetails != null) title!!.trim() else if (listing.adoptionDetails != null) listing.title else if (lost) "Se busca a $name" else if(alert) name.takeIf { it.isNotBlank() }?.let { "Mascota encontrada · $it" } ?: "Mascota encontrada" else listOf(name, ageLabel.trim()).filter { it.isNotBlank() }.joinToString(" · "),
             description = if (modern != null) listing.description else story,
-            place = if (lost) seen.ifBlank { barrio } else barrio,
+            place = if (alert) seen.ifBlank { barrio } else barrio,
             petName = name,
-            marks = if (lost) marks.trim() else listing.marks,
-            lastSeenPlace = if (lost) seen else listing.lastSeenPlace,
-            latitude = if (!lost && clearLocation) null else latitude ?: listing.latitude,
-            longitude = if (!lost && clearLocation) null else longitude ?: listing.longitude,
-            lastSeenAtEpochMs = if (lost) currentEpochMs() else listing.lastSeenAtEpochMs,
-            ageLabel = if (lost) listing.ageLabel else ageLabel.trim(),
-            sex = if (lost) listing.sex else sex.trim(),
-            temperament = if (lost) listing.temperament else temperament.trim(),
-            vaccinated = if (lost) listing.vaccinated else vaccinated,
-            sterilized = if (lost) listing.sterilized else sterilized,
-            homeNeeds = if (lost) listing.homeNeeds else homeNeeds.trim(),
-            adoptionDetails = if (lost) null else modern ?: listing.adoptionDetails,
+            marks = if (alert) marks.trim() else listing.marks,
+            lastSeenPlace = if (alert) seen else listing.lastSeenPlace,
+            latitude = if (!alert && clearLocation) null else latitude ?: listing.latitude,
+            longitude = if (!alert && clearLocation) null else longitude ?: listing.longitude,
+            lastSeenAtEpochMs = if (alert) currentEpochMs() else listing.lastSeenAtEpochMs,
+            ageLabel = if (alert) listing.ageLabel else ageLabel.trim(),
+            sex = if (alert) listing.sex else sex.trim(),
+            temperament = if (alert) listing.temperament else temperament.trim(),
+            vaccinated = if (alert) listing.vaccinated else vaccinated,
+            sterilized = if (alert) listing.sterilized else sterilized,
+            homeNeeds = if (alert) listing.homeNeeds else homeNeeds.trim(),
+            adoptionDetails = if (alert) null else modern ?: listing.adoptionDetails,
         )
-        val updated = post.copy(body = modern?.presentation ?: story, place = if (lost) seen.ifBlank { barrio } else barrio,
+        val updated = post.copy(body = modern?.presentation ?: story, place = if (alert) seen.ifBlank { barrio } else barrio,
             attributionUrl = if (attributionUrl == null) post.attributionUrl else com.onlygoodthings.shared.domain.ContentAttribution.normalize(attributionUrl),
             hashtags = adoptionDetails?.let(com.onlygoodthings.shared.domain.AdoptionRules::hashtags) ?: post.hashtags)
         posts[postIdx] = updated
@@ -1908,7 +1912,7 @@ class OgtLocalDatabase {
             authorUserId = localAuthorId,
             body = remote.adoptionDetails?.presentation?.takeIf { it.isNotBlank() } ?: remote.description,
             place = remote.place,
-            tag = if (remote.kind == "LOST") "Mascota perdida" else "Adopción",
+            tag = com.onlygoodthings.shared.domain.animalPostTopic(remote.kind),
             attributionUrl = remote.attributionUrl,
             hashtags = remote.hashtags.ifEmpty { remote.adoptionDetails?.let(com.onlygoodthings.shared.domain.AdoptionRules::hashtags) ?: old.hashtags },
         )
@@ -1937,7 +1941,7 @@ class OgtLocalDatabase {
             authorCompanyId = null,
             place = remote.place,
             timeLabel = "Ahora",
-            tag = if (remote.kind == "LOST") "Mascota perdida" else "Adopción",
+            tag = com.onlygoodthings.shared.domain.animalPostTopic(remote.kind),
             body = remote.adoptionDetails?.presentation?.takeIf { it.isNotBlank() } ?: remote.description,
             impactCount = 0,
             commentCount = 0,
@@ -1956,6 +1960,9 @@ class OgtLocalDatabase {
                 heartCount = current.heartCount,
                 viewerHasImpacted = current.viewerHasImpacted,
                 viewerHasHearted = current.viewerHasHearted,
+                viewerHasDiffused = current.viewerHasDiffused,
+                diffusedBy = current.diffusedBy,
+                feedExpiresAtEpochMs = current.feedExpiresAtEpochMs,
             )
         } else {
             posts += post
@@ -2004,7 +2011,7 @@ class OgtLocalDatabase {
         lastSeenPlace = remote.lastSeenPlace,
         latitude = remote.latitude,
         longitude = remote.longitude,
-        lastSeenAtEpochMs = if (remote.kind == "LOST") remote.createdAtEpochMs else 0L,
+        lastSeenAtEpochMs = if (com.onlygoodthings.shared.domain.isPetAlert(remote.kind)) remote.createdAtEpochMs else 0L,
         ageLabel = remote.ageLabel,
         sex = remote.sex,
         temperament = remote.temperament,

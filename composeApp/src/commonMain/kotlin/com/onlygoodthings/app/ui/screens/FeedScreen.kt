@@ -623,6 +623,7 @@ private fun LostPetFeedCard(
     val radius = listing?.alertRadiusM ?: 2000
     val lastSeen = listing?.lastSeenPlace?.ifBlank { null } ?: listing?.place?.ifBlank { post.place } ?: post.place
     val resolved = listing?.resolved == true
+    val found = listing?.kind == "FOUND"
     FeedArticle(onOpen = onOpen) {
         PostHeader(
             name = profile.fullName,
@@ -641,10 +642,10 @@ private fun LostPetFeedCard(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OgtStitchIcon(Res.drawable.qs_search, copy.petsLost, tint = OgtColors.secondary)
-                OgtPill(if (resolved) "Ya está en casa" else copy.petsLost, OgtColors.sunset, OgtColors.sunsetText)
+                OgtPill(if (resolved) "Ya está en casa" else if(found) "Encontrado · busca a su familia" else copy.petsLost, OgtColors.sunset, OgtColors.sunsetText)
                 ImpactTruthPills(post)
             }
-            OgtCaption("Última vista · $lastSeen · ${radius} m")
+            OgtCaption(if(found) "Encontrado en · $lastSeen" else "Última vista · $lastSeen · ${radius} m")
             listing?.marks?.takeIf { it.isNotBlank() }?.let { OgtCaption(it) }
             com.onlygoodthings.app.ui.components.PostMediaTypes(media)
             ListingPhotoStrip(media = media, fallback = profile.photo, onOpen = onOpen, onMediaPageChanged = onMediaPageChanged, onExpand = onExpand)

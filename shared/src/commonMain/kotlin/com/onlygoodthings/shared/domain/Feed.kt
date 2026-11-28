@@ -39,12 +39,12 @@ fun feedCardKind(
     publicationKind: String? = null,
 ): FeedCardKind {
     val kind = listingKind?.uppercase()
-    if (kind == "LOST") return FeedCardKind.LOST_PET
+    if (isPetAlert(kind)) return FeedCardKind.LOST_PET
     if (kind == "ADOPTION") return FeedCardKind.ADOPTION
     if(publicationKind=="ACTION")return FeedCardKind.COMMUNITY
     if(publicationKind=="POST")return if(isTernuraPost(tag))FeedCardKind.TERNURA else FeedCardKind.COMMUNITY
     val t = tag.trim().lowercase()
-    if (t.contains("perdid")) return FeedCardKind.LOST_PET
+    if (t.contains("perdid") || t == "mascota encontrada") return FeedCardKind.LOST_PET
     if (t in TERNURA_TAGS) return FeedCardKind.TERNURA
     if (t in HOMENAJE_TAGS) return FeedCardKind.HOMENAJE
     if (t in PET_STORY_TAGS) return FeedCardKind.PET_STORY

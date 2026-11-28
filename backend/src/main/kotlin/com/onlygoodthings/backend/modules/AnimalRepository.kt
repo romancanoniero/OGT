@@ -180,7 +180,7 @@ class AnimalSqlRepository(private val db: Database, private val mediaForReading:
             """
             SELECT a.id AS listing_id, p.id AS post_id,
                    a.reporter_user_id::text AS reporter_id, u.firebase_uid,
-                   a.kind::text, a.species::text, CASE WHEN a.adoption_details IS NULL THEN COALESCE(a.size::text, 'MEDIUM') ELSE COALESCE(a.size::text, '') END AS size,
+                   a.kind::text, a.species::text, COALESCE(a.size::text, '') AS size,
                    a.urgency::text, a.title, a.description, a.place_label, a.adoption_details, p.attribution_url, p.hashtags,
                    a.alert_radius_m, a.resolved, a.pet_name, a.age_label, a.sex,
                    a.temperament, a.vaccinated, a.sterilized, a.home_needs,
@@ -346,7 +346,7 @@ class AnimalSqlRepository(private val db: Database, private val mediaForReading:
             """
             SELECT a.id AS listing_id, p.id AS post_id,
                    a.reporter_user_id::text AS reporter_id, u.firebase_uid,
-                   a.kind::text, a.species::text, CASE WHEN a.adoption_details IS NULL THEN COALESCE(a.size::text, 'MEDIUM') ELSE COALESCE(a.size::text, '') END AS size,
+                   a.kind::text, a.species::text, COALESCE(a.size::text, '') AS size,
                    a.urgency::text, a.title, a.description, a.place_label, a.adoption_details, p.attribution_url, p.hashtags,
                    a.alert_radius_m, a.resolved, a.pet_name, a.age_label, a.sex,
                    a.temperament, a.vaccinated, a.sterilized, a.home_needs,
@@ -474,5 +474,5 @@ class AnimalSqlRepository(private val db: Database, private val mediaForReading:
         }
     }
 
-    private fun topicOf(kind: String): String = if (kind == "LOST") "Mascota perdida" else "Adopción"
+    private fun topicOf(kind: String): String = com.onlygoodthings.shared.domain.animalPostTopic(kind)
 }
