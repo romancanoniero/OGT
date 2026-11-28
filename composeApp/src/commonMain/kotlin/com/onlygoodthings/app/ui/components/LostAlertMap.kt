@@ -1,6 +1,7 @@
 package com.onlygoodthings.app.ui.components
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -26,9 +28,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.onlygoodthings.app.data.LocalOgtDb
 import com.onlygoodthings.app.resources.Res
 import com.onlygoodthings.app.resources.qs_expand
+import com.onlygoodthings.app.resources.qs_gps
+import androidx.compose.material3.Text
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.shared.data.local.LocalAnimalListing
 import com.onlygoodthings.shared.data.local.LocalSighting
@@ -68,14 +73,20 @@ fun LostAlertMap(
     val cutoff = stops.getOrNull(dayIndex)?.dayEndEpochMs ?: Long.MAX_VALUE
     val visible = if (fill && stops.isNotEmpty()) sightingsUntil(sightings, cutoff) else sightings
     val route = if (fill) movementRoute(listing, visible) else emptyList()
-    val fitPoints = if (fill) {
+    var fitVersion by remember(listing.id) { mutableStateOf(0) }
+    val fitPoints = remember(listing.id, visible, here != null, fitVersion) {
         buildList {
             add(GeoPoint(originLat, originLng))
             visible.forEach { add(GeoPoint(it.latitude, it.longitude)) }
+            here?.let { add(it) }
         }
-    } else {
-        emptyList()
     }
+    val photo = remember(listing.id, socialTick) {
+        db.posts.firstOrNull { it.listingId == listing.id }?.let { db.mediaOf(it.id).firstOrNull() }
+    }
+    val selectedSighting = visible.firstOrNull { it.id == selectedId }
+    val distance = petMapDistance(here, selectedSighting?.let { GeoPoint(it.latitude, it.longitude) }
+        ?: GeoPoint(originLat, originLng))
     LaunchedEffect(visible.map { it.id }.joinToString()) {
         if (selectedId != listing.id && visible.none { it.id == selectedId }) {
             selectedId = visible.lastOrNull()?.id ?: listing.id
@@ -89,6 +100,7 @@ fun LostAlertMap(
                 label = listing.petName.ifBlank { "Última vista" },
                 latitude = originLat,
                 longitude = originLng,
+                petPhoto = photo,
             ),
         )
         visible.forEach { row ->
@@ -108,7 +120,7 @@ fun LostAlertMap(
             )
         }
         if (here != null) {
-            add(BarrioMarker("me", "ME", "Vos", here.latitude, here.longitude))
+            add(BarrioMarker("me", "LOCATION", "Tu ubicación actual", here.latitude, here.longitude))
         }
     }
     Column(
@@ -130,6 +142,25 @@ fun LostAlertMap(
                 interactive = interactive,
                 route = route,
                 fitPoints = fitPoints,
+                fitRequest = fitVersion,
+            )
+            if (distance != null) {
+                val destination = if (selectedSighting != null) "del avistamiento" else if (listing.kind == "FOUND") "del encuentro" else "del lugar de la pérdida"
+                Text("A $distance $destination · línea recta",
+                    modifier = Modifier.align(Alignment.TopStart)
+                        .then(if (fill) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier)
+                        .padding(start = 10.dp, top = 10.dp, end = 64.dp)
+                        .background(OgtColors.surface, androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                        .padding(8.dp), color = OgtColors.ink,
+                    fontSize = 11.sp)
+            }
+            if (here != null && interactive) CircleIconButton(
+                art = Res.drawable.qs_gps, label = "Ver mi ubicación y la mascota",
+                onClick = { fitVersion++ },
+                modifier = Modifier.align(Alignment.TopEnd)
+                    .then(if (fill) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier)
+                    .padding(end = 10.dp, top = if (fill || onExpand != null) 66.dp else 10.dp),
+                filled = true,
             )
             if (onExpand != null) {
                 CircleIconButton(

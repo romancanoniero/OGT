@@ -45,6 +45,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -53,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import com.onlygoodthings.app.resources.Res
 import com.onlygoodthings.app.resources.qs_comment
 import com.onlygoodthings.app.resources.qs_eye
+import com.onlygoodthings.app.resources.publish_photo
 import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.app.ui.components.BarrioMarker
 import com.onlygoodthings.app.ui.components.OgtStitchIcon
@@ -132,6 +135,7 @@ fun OgtLibreMap(
     headingTo: GeoPoint? = null,
     /** Si no está vacío, al cambiar recuadra estos puntos (origen + avistajes del día). */
     fitPoints: List<GeoPoint> = emptyList(),
+    fitRequest: Int = 0,
 ) {
     val cam = remember {
         MapCamera(center.latitude, center.longitude, zoomForRadiusMeters(radiusMeters).toFloat().coerceIn(3f, 19f))
@@ -173,7 +177,7 @@ fun OgtLibreMap(
     val fitKey = remember(fitPoints) {
         fitPoints.joinToString(";") { "${it.latitude},${it.longitude}" }
     }
-    LaunchedEffect(fitKey, viewport.width, viewport.height) {
+    LaunchedEffect(fitKey, viewport.width, viewport.height, fitRequest) {
         if (fitPoints.isEmpty() || viewport.width < 8 || viewport.height < 8) return@LaunchedEffect
         val frame = cameraToFit(fitPoints, viewport)
         cam.lat = frame.lat
@@ -225,9 +229,9 @@ fun OgtLibreMap(
                     cam.followGps = false
                     if (zoomChange != 1f) zoomAt(centroid, zoomChange)
                     if (pan != Offset.Zero) {
-                        val mpp = metersPerPixel(cam.lat, cam.zoom)
-                        cam.lng += (pan.x * mpp) / (111_320.0 * cos(cam.lat * PI / 180.0)).coerceAtLeast(1.0)
-                        cam.lat -= (pan.y * mpp) / 110_540.0
+                        val next = cameraAfterPan(GeoPoint(cam.lat, cam.lng), pan, cam.zoom, cam.viewport)
+                        cam.lat = next.latitude
+                        cam.lng = next.longitude
                     }
                     publishCamera()
                     onCameraInteract?.invoke()
@@ -309,11 +313,15 @@ fun OgtLibreMap(
             val pos = screenOffset(marker.longitude, marker.latitude, viewLng, viewLat, zoom, viewport, tileZ)
             if (pos == null) return@forEach
             val selected = marker.id == selectedId
-            val pinDp = if (selected) 36.dp else 30.dp
+            val pinDp = when {
+                marker.kind == "LOCATION" -> 36.dp
+                marker.petPhoto != null -> if (selected) 56.dp else 48.dp
+                else -> if (selected) 36.dp else 30.dp
+            }
             val pinPx = with(density) { pinDp.roundToPx() }
             Box(
                 Modifier
-                    .offset { IntOffset(pos.x - pinPx / 2, pos.y - pinPx) }
+                    .offset { IntOffset(pos.x - pinPx / 2, pos.y - if (marker.kind == "LOCATION") pinPx / 2 else pinPx) }
                     .clickable(enabled = marker.id != "me") { onSelect(marker.id) },
                 contentAlignment = Alignment.BottomCenter,
             ) {
@@ -325,6 +333,25 @@ fun OgtLibreMap(
 
 @Composable
 private fun MapPin(marker: BarrioMarker, selected: Boolean) {
+    if (marker.kind == "LOCATION") {
+        val blue = Color(0xFF1677F0)
+        Box(Modifier.size(36.dp).semantics { contentDescription = marker.label }
+            .background(blue.copy(alpha = .18f), CircleShape), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(16.dp).shadow(3.dp, CircleShape).background(blue, CircleShape)
+                .border(2.dp, Color.White, CircleShape))
+        }
+        return
+    }
+    marker.petPhoto?.let { photo ->
+        val pin = if (selected) 56.dp else 48.dp
+        com.onlygoodthings.app.ui.screens.OgtPostImage(
+            item = photo, fallback = Res.drawable.publish_photo, contentDescription = marker.label,
+            modifier = Modifier.size(pin).shadow(6.dp, CircleShape).clip(CircleShape)
+                .border(if (selected) 3.dp else 2.dp, OgtColors.secondary, CircleShape),
+            contentScale = ContentScale.Crop, wholeMedia = false,
+        )
+        return
+    }
     val fill = when {
         marker.kind == "SIGHT" -> OgtColors.sunset
         selected || marker.kind == "CAR" || marker.kind == "ME" || marker.kind == "PARKING" || marker.kind == "ORIGIN" -> OgtColors.secondary
@@ -531,6 +558,13 @@ internal fun screenToGeo(
     return GeoPoint(yToLat(worldY, tileZ), xToLon(worldX, tileZ))
 }
 
+/** The geography under the finger moves by the same screen delta as the gesture. */
+internal fun cameraAfterPan(center: GeoPoint, pan: Offset, zoom: Float, viewport: IntSize): GeoPoint {
+    if (viewport.width <= 0 || viewport.height <= 0) return center
+    return screenToGeo(viewport.width / 2f - pan.x, viewport.height / 2f - pan.y,
+        center.longitude, center.latitude, zoom, viewport)
+}
+
 private fun lonToX(lon: Double, zoom: Int): Double {
     val n = (1 shl zoom).toDouble()
     return (lon + 180.0) / 360.0 * n * TILE_PX
@@ -546,10 +580,10 @@ private fun latToY(lat: Double, zoom: Int): Double {
 private fun metersPerPixel(lat: Double, zoom: Float): Double =
     156543.03392 * cos(lat * PI / 180.0) / 2.0.pow(zoom.toDouble())
 
-private data class FittedCamera(val lat: Double, val lng: Double, val zoom: Float)
+internal data class FittedCamera(val lat: Double, val lng: Double, val zoom: Float)
 
 /** Centro y zoom para que todos los puntos quepan, con aire para chrome y ficha. */
-private fun cameraToFit(points: List<GeoPoint>, viewport: IntSize): FittedCamera {
+internal fun cameraToFit(points: List<GeoPoint>, viewport: IntSize): FittedCamera {
     val lats = points.map { it.latitude }
     val lngs = points.map { it.longitude }
     val minLat = lats.minOrNull() ?: 0.0
@@ -574,7 +608,7 @@ private fun cameraToFit(points: List<GeoPoint>, viewport: IntSize): FittedCamera
         val z = ln(156543.03392 * cos(lat * PI / 180.0) / mpp) / ln(2.0)
         return z.toFloat()
     }
-    val zoom = min(zoomForSpan(spanLngM, usableW), zoomForSpan(spanLatM, usableH)).coerceIn(10f, 18f)
+    val zoom = min(zoomForSpan(spanLngM, usableW), zoomForSpan(spanLatM, usableH)).coerceIn(3f, 18f)
     return FittedCamera(lat, lng, zoom)
 }
 

@@ -420,7 +420,7 @@ fun PostDetailScreen(
                             actions = actions,
                             sightings = sightings,
                             isAuthor = me.owns(listing?.reporterUserId),
-                            here = here,
+                            here = auth.discoveryDevicePoint(),
                             onSaw = {
                                 val existing = listing?.let { db.mySighting(it.id, me.id) }
                                 if (existing != null) report = existing else sawOpen = true
@@ -846,7 +846,7 @@ fun PostDetailScreen(
                 LostAlertMap(
                     listing = listing,
                     sightings = sightings,
-                    here = here,
+                    here = auth.discoveryDevicePoint(),
                     height = 220.dp,
                     fill = true,
                     reportBadges = true,

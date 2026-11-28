@@ -34,6 +34,8 @@ data class BarrioMarker(
     val wrote: Boolean = false,
     /** En mapa ampliado, los avistajes muestran badges y no el nombre. */
     val badgesInsteadOfName: Boolean = false,
+    /** Foto de la mascota en su ubicación; los demás mapas conservan sus iconos. */
+    val petPhoto: com.onlygoodthings.shared.data.local.LocalPostMedia? = null,
 )
 
 private val MapWell = OgtColors.sand
@@ -58,6 +60,7 @@ fun OgtBarrioMap(
     route: List<GeoPoint> = emptyList(),
     headingTo: GeoPoint? = null,
     fitPoints: List<GeoPoint> = emptyList(),
+    fitRequest: Int = 0,
 ) {
     Box(
         modifier
@@ -79,6 +82,7 @@ fun OgtBarrioMap(
             route = route,
             headingTo = headingTo,
             fitPoints = fitPoints,
+            fitRequest = fitRequest,
         )
         Text(
             "© Esri · OpenStreetMap",

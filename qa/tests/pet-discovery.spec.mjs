@@ -84,6 +84,7 @@ test('pet previews match the main feed frame for portrait, square and landscape 
  await fixture(page,'granted',null,true);
  const previews=page.locator('.pet-feed .pet-listing-media');
  await expect(previews).toHaveCount(3);
+ await expect.poll(()=>previews.locator('img').evaluateAll(images=>images.every(img=>img.complete&&img.naturalWidth>0))).toBe(true);
  const ratios=[.75,1,1.91];
  for(let index=0;index<ratios.length;index++) {
   const preview=previews.nth(index),image=preview.locator('img');

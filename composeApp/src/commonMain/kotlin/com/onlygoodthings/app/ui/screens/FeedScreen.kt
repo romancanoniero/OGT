@@ -671,7 +671,7 @@ private fun LostPetFeedCard(
                 LostAlertMap(
                     listing = listing,
                     sightings = sightings,
-                    here = session.here(),
+                    here = LocalAuth.current.discoveryDevicePoint(),
                     height = 148.dp,
                     onSelectSighting = { onOpen() },
                     interactive = false,

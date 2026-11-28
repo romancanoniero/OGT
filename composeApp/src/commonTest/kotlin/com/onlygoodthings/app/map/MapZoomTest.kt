@@ -1,6 +1,8 @@
 package com.onlygoodthings.app.map
 
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.geometry.Offset
+import com.onlygoodthings.shared.domain.GeoPoint
 import kotlin.math.PI
 import kotlin.math.asinh
 import kotlin.math.floor
@@ -57,5 +59,39 @@ class MapZoomTest {
         assertEquals(3, visibleTiles(lat, lng, 3f, viewport).first().z)
         assertEquals(15, visibleTiles(lat, lng, 15.5f, viewport).first().z)
         assertTrue(visibleTiles(lat, lng, 19f, IntSize.Zero).isEmpty())
+    }
+
+    @Test fun geographyFollowsTheFingerInBothAxesAtEveryZoom() {
+        val center = GeoPoint(lat, lng)
+        for (zoom in listOf(3f, 12.25f, 16f, 18.5f, 19f)) {
+            val landmark = screenToGeo(590f, 850f, lng, lat, zoom, viewport)
+            for (pan in listOf(Offset(120f, 0f), Offset(-120f, 0f), Offset(0f, 180f), Offset(0f, -180f), Offset(120f, -90f))) {
+                val moved = cameraAfterPan(center, pan, zoom, viewport)
+                val pixel = screenOffset(landmark.longitude, landmark.latitude, moved.longitude, moved.latitude,
+                    zoom, viewport, rasterTileZoom(zoom), clip = false)!!
+                assertEquals((590 + pan.x).toInt(), pixel.x)
+                assertEquals((850 + pan.y).toInt(), pixel.y)
+                val restored = cameraAfterPan(moved, -pan, zoom, viewport)
+                assertEquals(center.latitude, restored.latitude, 1e-8)
+                assertEquals(center.longitude, restored.longitude, 1e-8)
+            }
+        }
+        assertEquals(center, cameraAfterPan(center, Offset(100f, 100f), 16f, IntSize.Zero))
+    }
+
+    @Test fun initialFrameIncludesTheViewerOriginAndSightingsEvenForDistantOwnPosts() {
+        for (points in listOf(
+            listOf(GeoPoint(-34.62, -58.44), GeoPoint(-34.65, -58.63), GeoPoint(-34.64, -58.60)),
+            listOf(GeoPoint(-34.62, -58.44), GeoPoint(-31.42, -64.19)),
+        )) {
+            val frame = cameraToFit(points, viewport)
+            points.forEach { point ->
+                val pixel = screenOffset(point.longitude, point.latitude, frame.lng, frame.lat, frame.zoom,
+                    viewport, rasterTileZoom(frame.zoom), clip = false)!!
+                assertTrue(pixel.x in 40..viewport.width - 40)
+                assertTrue(pixel.y in 40..viewport.height - 40)
+            }
+        }
+        assertEquals(15.5f, cameraToFit(listOf(GeoPoint(lat, lng)), viewport).zoom)
     }
 }

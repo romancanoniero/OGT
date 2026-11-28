@@ -3644,7 +3644,7 @@ function listingRow(row) {
   const ratio = globalThis.OgtPostCarousel.readingRatio(cover?.pixelWidth, cover?.pixelHeight);
   const place = row.lastSeenPlace || row.place || "";
   return `<a class="listing" href="#/p/${escapeHtml(row.postId)}">
-    ${photo ? `<span class="pet-listing-media" style="--post-media-ratio:${ratio}"><img src="${escapeHtml(mediaUrl(photo))}" alt="" loading="lazy" decoding="async" onload="this.parentElement.style.setProperty('--post-media-ratio',window.OgtPostCarousel.readingRatio(this.naturalWidth,this.naturalHeight))"></span>` : `<span class="avatar">${icon(alert ? "qs-paw" : "qs-pets")}</span>`}
+    ${photo ? `<span class="pet-listing-media" style="--post-media-ratio:${ratio}"><img src="${escapeHtml(mediaUrl(photo))}" alt="" onload="this.parentElement.style.setProperty('--post-media-ratio',window.OgtPostCarousel.readingRatio(this.naturalWidth,this.naturalHeight))"></span>` : `<span class="avatar">${icon(alert ? "qs-paw" : "qs-pets")}</span>`}
     <span class="copy">
       <span class="stories-head">${icon(alert ? "qs-paw" : "qs-pets")}<span class="pill">${found ? "Encontrado · busca a su familia" : lost ? "Mascota perdida" : "Adopción"}</span></span>
       <strong>${escapeHtml(row.kind === "ADOPTION" ? adoptionTitle(row) : row.petName || row.title || "Mascota")}</strong>

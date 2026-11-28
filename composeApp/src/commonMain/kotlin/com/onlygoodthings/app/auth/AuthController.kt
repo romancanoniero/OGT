@@ -177,8 +177,8 @@ class AuthController(
     val postInvitations = com.onlygoodthings.shared.data.remote.RestPostInvitations(createPlatformHttpClient(), session)
     init { stories.onDiscoverySettings={ feedTimeline.applyDiscoverySettings(it) } }
 
-    private var discoveryFix:com.onlygoodthings.shared.domain.GeoPoint?=null
-    private var discoveryFixAt=0L
+    private var discoveryFix by mutableStateOf<com.onlygoodthings.shared.domain.GeoPoint?>(null)
+    private var discoveryFixAt by mutableStateOf(0L)
     fun discoveryDevicePoint():com.onlygoodthings.shared.domain.GeoPoint? = com.onlygoodthings.shared.domain.PetDiscovery.device(
         preview.gpsEnabled && preview.locationGranted && preview.locationServicesEnabled,
         discoveryFix,discoveryFixAt,com.onlygoodthings.shared.realtime.currentEpochMs())
