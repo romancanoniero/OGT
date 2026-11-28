@@ -85,7 +85,7 @@ fun seedPetSightings(db:Database,batch:PetFixtureBatch,apply:Boolean):JsonObject
                     val metadata=buildJsonObject {
                         put("petSightingFixture",buildJsonObject { put("seedId",batch.seedId);put("ownerUserId",batch.ownerUserId);put("fictitious",true) })
                         put("bio","Perfil ficticio de QA. Foto ilustrativa de stock; la persona retratada no participa del avistamiento.")
-                        put("barrio",p.place)
+                        put("settings",buildJsonObject { put("barrio",p.place);put("language","es");put("timeZone","America/Argentina/Buenos_Aires") })
                         put("photoCredit",buildJsonObject { put("source",p.photoSource);put("author",p.photoAuthor);put("license","https://www.pexels.com/license/") })
                     }
                     c.prepareStatement("""INSERT INTO users(id,firebase_uid,email,display_name,nickname,photo_url,invite_code,home_location,metadata)

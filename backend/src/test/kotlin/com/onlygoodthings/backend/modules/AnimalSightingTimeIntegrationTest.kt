@@ -84,6 +84,14 @@ class AnimalSightingTimeIntegrationTest {
             val observations=targets.flatMap { target ->profiles.mapIndexed { index,p ->PetFixtureObservation(p.key,target.listingId,"PRUEBA FICTICIA de avistamiento",-34.6201,-58.4401,now-(index+1)*86_400_000L) } }
             val batch=PetFixtureBatch("pet-sightings-20261128",owner,author,profiles,observations)
             seedPetSightings(db,batch,false);seedPetSightings(db,batch,true)
+            profiles.forEach { profile ->
+                db.withConnection { c ->c.prepareStatement("SELECT display_name,nickname,email::text,photo_url,invite_code,ST_Y(home_location),ST_X(home_location),metadata->'settings'->>'barrio' FROM users WHERE id=?::uuid").use { q ->
+                    q.setString(1,petFixtureId(batch.seedId,profile.key));q.executeQuery().use { r ->
+                        assertTrue(r.next());assertEquals(profile.name,r.getString(1));assertEquals(profile.nickname,r.getString(2));assertEquals(profile.email,r.getString(3))
+                        assertEquals(profile.photoUrl,r.getString(4));assertFalse(r.getString(5).isBlank());assertEquals(profile.latitude,r.getDouble(6));assertEquals(profile.longitude,r.getDouble(7));assertEquals(profile.place,r.getString(8))
+                    }
+                } }
+            }
             val contacts=AnimalContacts(db);val snapshots=targets.associate { it.listingId to contacts.sightings(author,it.listingId) }
             seedPetSightings(db,batch,true)
             targets.forEach { target ->assertEquals(4,snapshots.getValue(target.listingId).size);assertEquals(snapshots.getValue(target.listingId),contacts.sightings(author,target.listingId)) }
