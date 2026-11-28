@@ -1562,7 +1562,7 @@ class OgtLocalDatabase {
         sightings.removeAll { it.listingId == listingId && it.id.startsWith("remote:") && it.id !in ids }
         rows.forEach { row ->
             applyUserLive(row.userId,row.displayName,row.photoUrl)
-            val local = LocalSighting("remote:${row.id}",listingId,row.postId,row.userId,row.note,row.latitude,row.longitude,"SEEN",row.matchId.orEmpty(),com.onlygoodthings.shared.domain.relativeTimeLabel(row.createdAtEpochMs,currentEpochMs()),row.createdAtEpochMs)
+            val local = LocalSighting("remote:${row.id}",listingId,row.postId,row.userId,row.note,row.latitude,row.longitude,"SEEN",row.matchId.orEmpty(),com.onlygoodthings.shared.domain.relativeTimeLabel(row.createdAtEpochMs,currentEpochMs()),row.createdAtEpochMs,row.observedAtEpochMs)
             val index = sightings.indexOfFirst { it.id == local.id }
             if (index < 0) sightings.add(local) else sightings[index] = local
         }
@@ -1572,7 +1572,7 @@ class OgtLocalDatabase {
 
     fun sightingsOf(listingId: String): List<LocalSighting> =
         sightings.filter { it.listingId == listingId && it.status != "DISMISSED" }
-            .sortedByDescending { it.createdAtEpochMs }
+            .sortedWith(com.onlygoodthings.shared.domain.sightingChronology.reversed())
 
     fun sightingOfMatch(matchId: String): LocalSighting? =
         sightings.firstOrNull { it.matchId == matchId }
@@ -1592,7 +1592,9 @@ class OgtLocalDatabase {
         longitude: Double,
         timeLabel: String = "Ahora",
         createdAtEpochMs: Long = currentEpochMs(),
+        observedAtEpochMs: Long? = null,
     ): LocalSighting? {
+        observedAtEpochMs?.let { com.onlygoodthings.shared.domain.validateSightingObservedAt(it,createdAtEpochMs) }
         val existing = mySighting(listingId, viewer.id)
         if (existing != null) return existing
         val post = posts.firstOrNull { it.id == postId } ?: return null
@@ -1614,6 +1616,7 @@ class OgtLocalDatabase {
             matchId = matchId,
             timeLabel = timeLabel,
             createdAtEpochMs = createdAtEpochMs,
+            observedAtEpochMs = observedAtEpochMs,
         )
         sightings += row
         if (matches.none { it.id == matchId }) {

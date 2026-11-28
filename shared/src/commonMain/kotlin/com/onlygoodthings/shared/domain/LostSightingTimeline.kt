@@ -23,6 +23,13 @@ private val MonthsEs = listOf(
     "jul", "ago", "sep", "oct", "nov", "dic",
 )
 
+/** Historical reports retain their creation time as a clearly labeled fallback. */
+fun sightingEventEpochMs(sighting: LocalSighting): Long =
+    sighting.observedAtEpochMs?.takeIf { it > 0 } ?: sighting.createdAtEpochMs
+
+val sightingChronology: Comparator<LocalSighting> =
+    compareBy<LocalSighting> { sightingEventEpochMs(it) }.thenBy { it.createdAtEpochMs }.thenBy { it.id }
+
 fun lostTimelineStops(
     listing: LocalAnimalListing,
     sightings: List<LocalSighting>,
@@ -30,7 +37,7 @@ fun lostTimelineStops(
     timeZone: TimeZone = TimeZone.currentSystemDefault(),
 ): List<LostTimelineStop> {
     val originMs = listing.lastSeenAtEpochMs.takeIf { it > 0 }
-        ?: sightings.minOfOrNull { it.createdAtEpochMs }
+        ?: sightings.minOfOrNull { sightingEventEpochMs(it) }
         ?: nowEpochMs
     val origin = LostTimelineStop(
         dayStartEpochMs = dayStartMs(originMs, timeZone),
@@ -38,7 +45,7 @@ fun lostTimelineStops(
         label = if (listing.kind == "FOUND") "Encuentro" else "Pérdida",
         isOrigin = true,
     )
-    val days = sightings.map { dayStartMs(it.createdAtEpochMs, timeZone) }.distinct().sorted()
+    val days = sightings.map { dayStartMs(sightingEventEpochMs(it), timeZone) }.distinct().sorted()
     return listOf(origin) + days.map { start ->
         LostTimelineStop(
             dayStartEpochMs = start,
@@ -49,16 +56,23 @@ fun lostTimelineStops(
 }
 
 fun sightingsUntil(sightings: List<LocalSighting>, untilEpochMs: Long): List<LocalSighting> =
-    sightings.filter { it.createdAtEpochMs <= untilEpochMs }.sortedBy { it.createdAtEpochMs }
+    sightings.filter { sightingEventEpochMs(it) <= untilEpochMs }.sortedWith(sightingChronology)
 
 /** El origen no incluye avistamientos, aunque hayan ocurrido el mismo día. */
 fun sightingsAtTimelineStop(sightings: List<LocalSighting>, stop: LostTimelineStop): List<LocalSighting> =
     if (stop.isOrigin) emptyList() else sightingsUntil(sightings, stop.dayEndEpochMs)
 
-/** Hora del reporte conocido; una fecha ausente no se reemplaza con la del aviso. */
+/** Observation time when supplied, otherwise the stored report time. UI labels the fallback. */
 fun sightingMomentLabel(sighting: LocalSighting, nowEpochMs: Long, timeZone: TimeZone = TimeZone.currentSystemDefault()): String? {
-    if (sighting.createdAtEpochMs <= 0) return null
-    val date = Instant.fromEpochMilliseconds(sighting.createdAtEpochMs).toLocalDateTime(timeZone)
+    return sightingMomentLabelAt(sightingEventEpochMs(sighting), nowEpochMs, timeZone)
+}
+
+fun sightingReportMomentLabel(sighting: LocalSighting, nowEpochMs: Long, timeZone: TimeZone = TimeZone.currentSystemDefault()): String? =
+    sightingMomentLabelAt(sighting.createdAtEpochMs, nowEpochMs, timeZone)
+
+fun sightingMomentLabelAt(epochMs: Long, nowEpochMs: Long, timeZone: TimeZone = TimeZone.currentSystemDefault()): String? {
+    if (epochMs <= 0) return null
+    val date = Instant.fromEpochMilliseconds(epochMs).toLocalDateTime(timeZone)
     val year = Instant.fromEpochMilliseconds(nowEpochMs).toLocalDateTime(timeZone).year
     val yearLabel = if (date.year == year) "" else " ${date.year}"
     return "${date.dayOfMonth} ${MonthsEs[date.monthNumber - 1]}$yearLabel · ${date.hour.toString().padStart(2, '0')}:${date.minute.toString().padStart(2, '0')}"
@@ -72,7 +86,7 @@ fun movementRoute(
     val originLng = listing.longitude ?: return emptyList()
     return buildList {
         add(GeoPoint(originLat, originLng))
-        visible.forEach { add(GeoPoint(it.latitude, it.longitude)) }
+        visible.sortedWith(sightingChronology).forEach { add(GeoPoint(it.latitude, it.longitude)) }
     }
 }
 
@@ -81,10 +95,10 @@ fun headingAfter(
     all: List<LocalSighting>,
     visible: List<LocalSighting>,
 ): GeoPoint? {
-    val last = visible.lastOrNull() ?: return all.minByOrNull { it.createdAtEpochMs }?.let {
+    val last = visible.maxWithOrNull(sightingChronology) ?: return all.minWithOrNull(sightingChronology)?.let {
         GeoPoint(it.latitude, it.longitude)
     }
-    val next = all.filter { it.createdAtEpochMs > last.createdAtEpochMs }.minByOrNull { it.createdAtEpochMs }
+    val next = all.filter { sightingChronology.compare(it,last)>0 }.minWithOrNull(sightingChronology)
     return next?.let { GeoPoint(it.latitude, it.longitude) }
 }
 

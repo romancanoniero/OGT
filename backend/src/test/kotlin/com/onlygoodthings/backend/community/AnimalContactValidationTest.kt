@@ -18,4 +18,15 @@ class AnimalContactValidationTest {
         for(invalid in listOf(request.copy(latitude=null),request.copy(longitude=Double.NaN),request.copy(latitude=91.0),request.copy(form=form),request.copy(kind="ADMIN")))
             assertThrows(IllegalArgumentException::class.java) { validateAnimalContact(invalid) }
     }
+    @Test fun actualObservationTimeIsOptionalForOlderClientsAndValidatedForNewReports() {
+        val now=1_800_000_000_000L
+        val request=AnimalContactRequest("listing","SIGHTING",latitude=-34.6,longitude=-58.4)
+        validateAnimalContact(request,now)
+        validateAnimalContact(request.copy(observedAtEpochMs=now-86_400_000),now)
+        validateAnimalContact(request.copy(observedAtEpochMs=now+300_000),now)
+        for(at in listOf(0L,-1L,now+300_001))assertThrows(IllegalArgumentException::class.java) {
+            validateAnimalContact(request.copy(observedAtEpochMs=at),now)
+        }
+        assertThrows(IllegalArgumentException::class.java) { validateAnimalContact(AnimalContactRequest("listing","ADOPTION",form,observedAtEpochMs=now),now) }
+    }
 }

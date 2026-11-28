@@ -326,6 +326,7 @@ data class LocalSighting(
     val matchId: String,
     val timeLabel: String,
     val createdAtEpochMs: Long,
+    val observedAtEpochMs: Long? = null,
 ) {
     /** Dejó un mensaje además de marcar que lo vio. */
     fun wroteNote(): Boolean = note.isNotBlank()

@@ -1329,15 +1329,27 @@ function renderEdit(post) {
 
 function renderSaw(post) {
   const who = post.honoreeName || "esta mascota";
+  const owner=me.userId,at=location.hash;
   openDialog(`
     <h2>Creo que lo vi</h2>
-    <p>Dejá una nota para quien busca a ${escapeHtml(who)}. El avistaje con pin vive también en la ficha.</p>
-    <textarea id="saw-note" maxlength="180" placeholder="Lo vi cerca de… hora aproximada, señas"></textarea>
+    <p>El lugar, el horario y la nota podrán verse en la ficha de ${escapeHtml(who)}. Se abrirá una conversación con quien publicó.</p>
+    <form data-sighting-form>
+    <label class="field">Notas (opcional)<textarea id="saw-note" maxlength="180" placeholder="Lo vi cerca de… hora aproximada, señas"></textarea></label>
+    <div data-sighting-fields><p role="status">Cargando lugar y horario…</p></div>
+    <p role="alert" data-sighting-error></p>
     <div class="row">
-      <button class="ghost" data-close-dialog>Cancelar</button>
-      <button class="primary" data-saw-send="${escapeHtml(post.id)}">Enviar</button>
+      <button type="button" class="ghost" data-close-dialog>Cancelar</button>
+      <button type="button" class="ghost" data-saw-send="${escapeHtml(post.id)}">Publicar solo comentario</button>
+      <button type="submit" class="primary" data-sighting-submit disabled>Confirmar avistamiento</button>
     </div>
+    </form>
   `);
+  const form=document.querySelector('[data-sighting-form]');
+  import('./sightings.js?v=20261128-observed-37').then(module=>{
+    if(!form.isConnected||owner!==me.userId||at!==location.hash)return;
+    module.bindSightingForm(form,{api,listingId:post.listingId||listingOf(post)?.listingId,isCurrent:()=>owner===me.userId&&at===location.hash,
+      onSaved:async()=>{closeDialog();toast('Avistamiento registrado');if(route().page==='p')await renderPost(post.id);}});
+  }).catch(()=>{if(form.isConnected)form.querySelector('[data-sighting-error]').textContent='No pudimos cargar el formulario. Podés reintentarlo o publicar solo un comentario.';});
 }
 
 async function resolveListing(post) {
@@ -2124,14 +2136,20 @@ function lostActionsHtml(post, { onDetail = false } = {}) {
   if (!onDetail || cardKind(post) !== "LOST_PET") return "";
   const lost = lostState(post);
   if (lost.resolved || !lost.listingId) return "";
+  const history=`<section data-sighting-history="${escapeHtml(lost.listingId)}"><p class="hint">Cargando avistamientos…</p></section>`;
   if (isAuthor(post)) {
-    return `<button type="button" class="publish-cta" data-resolve="${escapeHtml(lost.listingId)}">${icon("qs-paw")} ${lost.found?'Se reencontró con su familia':'Lo encontramos'}</button>`;
+    return `<button type="button" class="publish-cta" data-resolve="${escapeHtml(lost.listingId)}">${icon("qs-paw")} ${lost.found?'Se reencontró con su familia':'Lo encontramos'}</button>${history}`;
   }
-  if(lost.found)return `<button type="button" class="publish-cta" data-found-contact="${escapeHtml(post.id)}">${icon("qs-paw")} Contactar a quien lo encontró</button>`;
-  return `<button type="button" class="publish-cta" data-saw="${escapeHtml(post.id)}">${icon("qs-paw")} Creo que lo vi</button>`;
+  if(lost.found)return `<button type="button" class="publish-cta" data-found-contact="${escapeHtml(post.id)}">${icon("qs-paw")} Contactar a quien lo encontró</button>${history}`;
+  return `<button type="button" class="publish-cta" data-saw="${escapeHtml(post.id)}">${icon("qs-paw")} Creo que lo vi</button>${history}`;
 }
 
 function bindSocial(root, { onDetail = false } = {}) {
+  if(onDetail)root.querySelectorAll('[data-sighting-history]').forEach(host=>{
+    const owner=me.userId;
+    import('./sightings.js?v=20261128-observed-37').then(module=>module.mountSightingHistory(host,{api,listingId:host.dataset.sightingHistory,mediaUrl,isCurrent:()=>me.userId===owner}))
+      .catch(()=>{if(host.isConnected&&me.userId===owner)host.textContent='No pudimos cargar los avistamientos. Volvé a abrir la ficha para reintentar.';});
+  });
   globalThis.OgtPostCarousel.bind(root);
   root.querySelectorAll('[data-post]').forEach(card => {
     if (card.dataset.mediaOpenBound) return;

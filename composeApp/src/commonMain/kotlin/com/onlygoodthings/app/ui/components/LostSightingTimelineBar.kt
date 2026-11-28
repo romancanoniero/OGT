@@ -100,7 +100,7 @@ fun LostSightingTimelineBar(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            if (stops[safeIndex].isOrigin) "Línea de tiempo" else "Flechas: orden de los reportes",
+            if (stops[safeIndex].isOrigin) "Línea de tiempo" else "Flechas: orden de avistamientos",
             color = OgtColors.ink,
             fontWeight = FontWeight.SemiBold,
             fontSize = 13.sp,

@@ -114,6 +114,7 @@ fun LostAlertMap(
                     latitude = row.latitude,
                     longitude = row.longitude,
                     avatar = neighborAvatarArt(row.userId),
+                    photoUrl = who?.photoUrl,
                     saw = true,
                     wrote = row.wroteNote(),
                     badgesInsteadOfName = reportBadges,
@@ -184,7 +185,8 @@ fun LostAlertMap(
                         }
                     },
                     eventLabel = visible.lastOrNull()?.let {
-                        "Punteado: último reporte visible · ${sightingMomentLabel(it, now) ?: "fecha no informada"}"
+                        if (it.observedAtEpochMs != null) "Punteado: visto el ${sightingMomentLabel(it, now)}"
+                        else "Punteado: carga ${sightingMomentLabel(it, now) ?: "sin fecha"} · hora del avistamiento no informada"
                     },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)

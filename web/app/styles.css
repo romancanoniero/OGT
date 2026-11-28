@@ -958,6 +958,10 @@ span.avatar svg { width: 18px; height: 18px; }
   border-radius: 12px;
   background: var(--sand);
 }
+.sighting-history { padding-left: 20px; }
+.sighting-history li { padding: 12px 0; border-bottom: 1px solid var(--hairline); }
+.sighting-history li > .avatar { float: left; margin: 0 10px 8px 0; }
+.sighting-history p { margin: 6px 0; overflow-wrap: anywhere; }
 .pet-feed .listing { flex-direction: column; align-items: stretch; }
 .pet-feed .pet-listing-media {
   display: block;

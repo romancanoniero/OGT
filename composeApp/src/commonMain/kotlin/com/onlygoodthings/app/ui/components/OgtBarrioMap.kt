@@ -36,6 +36,7 @@ data class BarrioMarker(
     val badgesInsteadOfName: Boolean = false,
     /** Foto de la mascota en su ubicación; los demás mapas conservan sus iconos. */
     val petPhoto: com.onlygoodthings.shared.data.local.LocalPostMedia? = null,
+    val photoUrl: String? = null,
 )
 
 private val MapWell = OgtColors.sand

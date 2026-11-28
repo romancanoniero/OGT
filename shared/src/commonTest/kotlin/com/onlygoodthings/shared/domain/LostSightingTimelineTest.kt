@@ -118,4 +118,30 @@ class LostSightingTimelineTest {
     companion object {
         private const val DAY = 86_400_000L
     }
+
+    @Test fun unReporteCargadoTardeSeOrdenaPorCuandoOcurrioSinAlterarLaCarga() {
+        val oldObservation=sight("a",now).copy(observedAtEpochMs=now-3*DAY)
+        val recentObservation=sight("c",now-3_600_000).copy(observedAtEpochMs=now-DAY)
+        val rows=listOf(recentObservation,oldObservation)
+        val stops=lostTimelineStops(listing(now-4*DAY),rows,now,tz)
+        assertEquals(3,stops.size)
+        assertEquals(listOf("a"),sightingsAtTimelineStop(rows,stops[1]).map { it.id })
+        val all=sightingsAtTimelineStop(rows,stops.last())
+        assertEquals(listOf("a","c"),all.map { it.id })
+        assertEquals(now,all.first().createdAtEpochMs)
+        assertEquals(now-3*DAY,all.first().observedAtEpochMs)
+        assertEquals(GeoPoint(recentObservation.latitude,recentObservation.longitude),movementRoute(listing(now),rows).last())
+        assertEquals("15 sep · 15:00",sightingMomentLabel(oldObservation,now,tz))
+        assertEquals("18 sep · 15:00",sightingReportMomentLabel(oldObservation,now,tz))
+        assertEquals(GeoPoint(recentObservation.latitude,recentObservation.longitude),headingAfter(rows,listOf(oldObservation)))
+    }
+
+    @Test fun losHorariosAnterioresUsanLaCargaComoReferenciaSinInventarUnaObservacion() {
+        val legacy=sight("old",now-DAY)
+        val actual=sight("new",now).copy(observedAtEpochMs=now-2*DAY)
+        val ordered=sightingsUntil(listOf(legacy,actual),now)
+        assertEquals(listOf("new","old"),ordered.map { it.id })
+        assertNull(legacy.observedAtEpochMs)
+        assertEquals(now-DAY,legacy.createdAtEpochMs)
+    }
 }

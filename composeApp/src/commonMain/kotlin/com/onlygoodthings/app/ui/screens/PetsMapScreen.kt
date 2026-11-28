@@ -104,6 +104,7 @@ fun PetsMapScreen(onBack: () -> Unit, onReport: () -> Unit, onOpenPost: (String)
                         row.latitude,
                         row.longitude,
                         avatar = com.onlygoodthings.app.ui.components.neighborAvatarArt(row.userId),
+                        photoUrl = db.userOrNull(row.userId)?.photoUrl,
                     ),
                 )
             }

@@ -761,12 +761,14 @@ fun PostDetailScreen(
         )
     }
     if (sawOpen && listing != null && !listing.resolved) {
+        var observedAt by remember(listing.id) { mutableStateOf(currentEpochMs()) }
         Dialog(onDismissRequest = { sawOpen = false }) {
             Column(
                 Modifier
                     .clip(RoundedCornerShape(16.dp))
                     .background(OgtColors.surface)
-                    .padding(20.dp),
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text("Creo que lo vi", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = OgtColors.ink)
@@ -781,6 +783,8 @@ fun PostDetailScreen(
                 )
                 var point by remember(listing.id) { mutableStateOf(here ?: listing.latitude?.let { lat -> listing.longitude?.let { lng -> com.onlygoodthings.shared.domain.GeoPoint(lat,lng) } }) }
                 var sendingSighting by remember { mutableStateOf(false) }
+                com.onlygoodthings.app.ui.components.SightingMomentField(observedAt,
+                    onChange = { observedAt = it; sightingError = null }, enabled = !sendingSighting)
                 val center=point ?: com.onlygoodthings.shared.domain.GeoPoint(-34.6037,-58.3816)
                 OgtCaption("Mové el mapa para elegir dónde la viste y confirmá el pin.")
                 com.onlygoodthings.app.map.OgtLibreMap(
@@ -791,13 +795,15 @@ fun PostDetailScreen(
                 )
                 sightingError?.let { Text(it,color=OgtColors.error) }
                 OgtPrimaryButton(if(sendingSighting) "Enviando…" else "Confirmar avistaje",enabled=!sendingSighting && point!=null) {
+                    try { com.onlygoodthings.shared.domain.validateSightingObservedAt(observedAt, currentEpochMs()) }
+                    catch (e: IllegalArgumentException) { sightingError = e.message; return@OgtPrimaryButton }
                     val chosen=point ?: return@OgtPrimaryButton
                     val lat=chosen.latitude
                     val lng=chosen.longitude
                     if (listing.id.isUuid()) {
                         sendingSighting=true;sightingError=null
                         val owner=me.id
-                        val request=com.onlygoodthings.shared.domain.AnimalContactRequest(listing.id,"SIGHTING",note=sawNote,latitude=lat,longitude=lng)
+                        val request=com.onlygoodthings.shared.domain.AnimalContactRequest(listing.id,"SIGHTING",note=sawNote,latitude=lat,longitude=lng,observedAtEpochMs=observedAt)
                         scope.launch {
                             try {
                                 check(session.me().id==owner)
@@ -819,6 +825,7 @@ fun PostDetailScreen(
                         note = sawNote,
                         latitude = lat,
                         longitude = lng,
+                        observedAtEpochMs = observedAt,
                     )
                     sawOpen = false
                     if (row != null) report = row

@@ -33,6 +33,9 @@ import com.onlygoodthings.app.ui.components.OgtPill
 import com.onlygoodthings.app.ui.components.OgtPrimaryButton
 import com.onlygoodthings.app.ui.components.OgtStitchIcon
 import com.onlygoodthings.shared.data.local.LocalSighting
+import com.onlygoodthings.shared.domain.sightingMomentLabel
+import com.onlygoodthings.shared.domain.sightingReportMomentLabel
+import com.onlygoodthings.shared.realtime.currentEpochMs
 
 /** Ficha del avistaje: quién lo reportó y qué dijo. No abre el perfil. */
 @Composable
@@ -74,6 +77,10 @@ fun SightingReportDialog(
                 OgtPill("Lo vio")
                 if (wrote) OgtPill("Escribió")
             }
+            val now = currentEpochMs()
+            OgtCaption(if (sighting.observedAtEpochMs != null) "Visto el ${sightingMomentLabel(sighting, now)}"
+                else "Horario real del avistamiento no informado")
+            OgtCaption("Reporte cargado el ${sightingReportMomentLabel(sighting, now) ?: "fecha no informada"}")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 OgtStitchIcon(Res.drawable.qs_eye, "Lo vio", tint = OgtColors.secondary)
                 if (wrote) OgtStitchIcon(Res.drawable.qs_comment, "Escribió", tint = OgtColors.secondary)

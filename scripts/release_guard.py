@@ -22,6 +22,7 @@ REQUIRED = (
     "database/migrations/24_post_media_frame.sql",
     "database/migrations/48_post_lifetime.sql",
     "database/migrations/49_media_trim_metrics.sql",
+    "database/migrations/50_sighting_observed_at.sql", "web-app/sightings.js",
     "database/migrations/25_post_media_original.sql",
     "database/migrations/26_crm_publication_index.sql",
     "database/migrations/28_crm_user_moderation.sql",

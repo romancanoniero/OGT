@@ -403,7 +403,13 @@ private fun MapPin(marker: BarrioMarker, selected: Boolean) {
             contentAlignment = Alignment.Center,
         ) {
             val art = marker.avatar
-            if (art != null) {
+            if (!marker.photoUrl.isNullOrBlank()) {
+                com.onlygoodthings.app.ui.screens.OgtPostImage(
+                    url = marker.photoUrl, assetKey = "", fallback = art ?: Res.drawable.publish_photo,
+                    contentDescription = marker.label, modifier = Modifier.size(pin).clip(CircleShape),
+                    contentScale = ContentScale.Crop,
+                )
+            } else if (art != null) {
                 Image(
                     painter = painterResource(art),
                     contentDescription = marker.label,

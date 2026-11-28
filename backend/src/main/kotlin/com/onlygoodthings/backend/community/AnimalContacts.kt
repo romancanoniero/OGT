@@ -19,7 +19,7 @@ import java.util.UUID
 class AnimalContacts(private val db: Database) {
     fun open(actor: String, incoming: AnimalContactRequest): TimebankThread {
         val request = incoming.copy(listingId = UUID.fromString(incoming.listingId).toString())
-        validateAnimalContact(request)
+        validateAnimalContact(request, System.currentTimeMillis())
         ensureMensajeTag(db)
         val matchId = guardedContactWrite { db.withConnection { connection ->
             connection.autoCommit = false
@@ -57,8 +57,9 @@ class AnimalContacts(private val db: Database) {
                     connection.prepareStatement("INSERT INTO timebank_messages(id,match_id,sender_id,body) VALUES (?::uuid,?::uuid,?::uuid,?)").use { q ->
                         q.setString(1,messageId);q.setString(2,id);q.setString(3,actor);q.setString(4,body);q.executeUpdate()
                     }
-                    connection.prepareStatement("INSERT INTO animal_contacts(match_id,listing_id,applicant_user_id,kind,listing_title,request_payload,initial_message_id) VALUES (?::uuid,?::uuid,?::uuid,?,?,?::jsonb,?::uuid)").use { q ->
-                        q.setString(1,id);q.setString(2,request.listingId);q.setString(3,actor);q.setString(4,request.kind);q.setString(5,listing.second);q.setString(6,Json.encodeToString(request));q.setString(7,messageId);q.executeUpdate()
+                    connection.prepareStatement("INSERT INTO animal_contacts(match_id,listing_id,applicant_user_id,kind,listing_title,request_payload,initial_message_id,observed_at) VALUES (?::uuid,?::uuid,?::uuid,?,?,?::jsonb,?::uuid,?)").use { q ->
+                        q.setString(1,id);q.setString(2,request.listingId);q.setString(3,actor);q.setString(4,request.kind);q.setString(5,listing.second);q.setString(6,Json.encodeToString(request));q.setString(7,messageId)
+                        q.setTimestamp(8,request.observedAtEpochMs?.let { java.sql.Timestamp(it) });q.executeUpdate()
                     }
                 }
                 connection.commit()
@@ -74,20 +75,22 @@ class AnimalContacts(private val db: Database) {
         return db.withConnection { connection ->
             connection.prepareStatement("""SELECT a.public_id::text,a.match_id::text,a.listing_id::text,a.applicant_user_id::text,a.request_payload::text,
                 u.display_name,u.photo_url,(extract(epoch FROM a.created_at)*1000)::bigint AS created_ms,
+                (extract(epoch FROM a.observed_at)*1000)::bigint AS observed_ms,
                 (SELECT id::text FROM social_posts WHERE listing_id=a.listing_id AND moderation_status='VISIBLE' ORDER BY created_at LIMIT 1) AS post_id,
                 m.provider_id::text FROM animal_contacts a JOIN users u ON u.id=a.applicant_user_id
                 JOIN animal_listings l ON l.id=a.listing_id JOIN timebank_matches m ON m.id=a.match_id
                 WHERE a.listing_id=?::uuid AND a.kind='SIGHTING' AND NOT l.resolved
                 AND ${interactionSql(viewer,"a.applicant_user_id")} AND ${interactionSql(viewer,"l.reporter_user_id")}
                 AND EXISTS(SELECT 1 FROM social_posts p WHERE p.listing_id=l.id AND p.moderation_status='VISIBLE')
-                ORDER BY a.created_at DESC LIMIT 200""".trimIndent()).use { q ->
+                ORDER BY COALESCE(a.observed_at,a.created_at) DESC,a.created_at DESC,a.public_id DESC LIMIT 200""".trimIndent()).use { q ->
                 q.setString(1,listingId)
                 q.executeQuery().use { r ->buildList {
                     while(r.next()) {
                         val request=Json.decodeFromString<AnimalContactRequest>(r.getString("request_payload"))
                         val actor=r.getString("applicant_user_id")
                         add(AnimalSightingDto(r.getString("public_id"),listingId,r.getString("post_id"),actor,r.getString("display_name"),r.getString("photo_url"),request.note,request.latitude!!,request.longitude!!,
-                            r.getString("match_id").takeIf { viewer==actor || viewer==r.getString("provider_id") },r.getLong("created_ms")))
+                            r.getString("match_id").takeIf { viewer==actor || viewer==r.getString("provider_id") },r.getLong("created_ms"),
+                            (r.getObject("observed_ms") as? Number)?.toLong()))
                     }
                 } }
             }
