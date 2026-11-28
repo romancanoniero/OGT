@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -41,6 +42,7 @@ import com.onlygoodthings.app.ui.components.OgtPrimaryButton
 import com.onlygoodthings.app.ui.components.OgtTopBar
 import com.onlygoodthings.app.ui.components.ScreenColumn
 import com.onlygoodthings.shared.data.local.LocalAnimalListing
+import com.onlygoodthings.shared.domain.postReadingRatio
 import com.onlygoodthings.shared.domain.PetListingFilter as PetsFilter
 
 @Composable
@@ -137,6 +139,9 @@ private fun PetListingCard(
     val cover = remember(animal.id) {
         postId?.let { db.mediaOf(it).firstOrNull() }
     }
+    var coverRatio by remember(cover?.id, cover?.url, cover?.pixelWidth, cover?.pixelHeight) {
+        mutableStateOf(postReadingRatio(cover?.pixelWidth, cover?.pixelHeight))
+    }
     val species = listOfNotNull(
         animalSpeciesLabel(animal.species),
         animalSizeLabel(animal.size),
@@ -152,8 +157,11 @@ private fun PetListingCard(
                 item = cover,
                 fallback = Res.drawable.publish_photo,
                 contentDescription = animal.title,
-                modifier = Modifier.ogtBleedHorizontal(16.dp).height(140.dp),
-                contentScale = ContentScale.Crop,
+                modifier = Modifier.ogtBleedHorizontal(16.dp).aspectRatio(coverRatio),
+                contentScale = ContentScale.Fit,
+                onAspect = { ratio ->
+                    if (cover.pixelWidth == null) coverRatio = postReadingRatio(ratio)
+                },
             )
         } else {
             Box(Modifier.ogtBleedHorizontal(16.dp).height(140.dp).background(OgtColors.sand))

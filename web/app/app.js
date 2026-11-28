@@ -3639,10 +3639,12 @@ function personRow(card) {
 function listingRow(row) {
   const lost = row.kind === "LOST";
   const found = row.kind === "FOUND", alert=lost||found;
-  const photo = row.media?.[0]?.url;
+  const cover = row.media?.[0];
+  const photo = cover?.kind === 'VIDEO' ? cover.posterUrl : cover?.url;
+  const ratio = globalThis.OgtPostCarousel.readingRatio(cover?.pixelWidth, cover?.pixelHeight);
   const place = row.lastSeenPlace || row.place || "";
   return `<a class="listing" href="#/p/${escapeHtml(row.postId)}">
-    ${photo ? `<img src="${escapeHtml(mediaUrl(photo))}" alt="">` : `<span class="avatar">${icon(alert ? "qs-paw" : "qs-pets")}</span>`}
+    ${photo ? `<span class="pet-listing-media" style="--post-media-ratio:${ratio}"><img src="${escapeHtml(mediaUrl(photo))}" alt="" loading="lazy" decoding="async" onload="this.parentElement.style.setProperty('--post-media-ratio',window.OgtPostCarousel.readingRatio(this.naturalWidth,this.naturalHeight))"></span>` : `<span class="avatar">${icon(alert ? "qs-paw" : "qs-pets")}</span>`}
     <span class="copy">
       <span class="stories-head">${icon(alert ? "qs-paw" : "qs-pets")}<span class="pill">${found ? "Encontrado · busca a su familia" : lost ? "Mascota perdida" : "Adopción"}</span></span>
       <strong>${escapeHtml(row.kind === "ADOPTION" ? adoptionTitle(row) : row.petName || row.title || "Mascota")}</strong>
@@ -3735,7 +3737,7 @@ async function renderMascotas() {
         <button type="button" class="chip" data-kind="ADOPTION">Adopción</button>
       </div>
       <div data-discovery-prompt></div>
-      <div id="pet-list"><p class="empty">Cargando…</p></div>
+      <div id="pet-list" class="pet-feed"><p class="empty">Cargando…</p></div>
     </div>`;
   let kind = "",requestVersion=0;
   const box = document.getElementById("pet-list");

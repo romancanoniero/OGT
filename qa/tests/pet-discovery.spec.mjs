@@ -6,7 +6,7 @@ const code=[part('async function primeDiscoveryScope(', '\nfunction nearbyInHome
  part('async function renderMascotas(', '\nfunction skillCatalog('),part('function applyDiscoverySettings(', '\nfunction nearbyInHome('),
  part("window.addEventListener('ogt-discovery-device'", '\nasync function mountDiscoveryPrompt('),part('async function mountDiscoveryPrompt(', '\nasync function mountDiscoveryPlaceProfile(')].join('\n');
 
-async function fixture(page,gps='denied',existingArea=null) {
+async function fixture(page,gps='denied',existingArea=null,withMedia=false) {
  let area=existingArea,radius=20,version=1;const calls=[];
  const rows=[
   {kind:'LOST',postId:'lost-near',title:'Perdido cercano',species:'CAT',reporterUserId:'other',latitude:-34.61,longitude:-58.44},
@@ -14,6 +14,14 @@ async function fixture(page,gps='denied',existingArea=null) {
   {kind:'FOUND',postId:'found-far',title:'Encontrado lejano',species:'DOG',reporterUserId:'other',latitude:-34.95,longitude:-58.44},
   {kind:'LOST',postId:'own-far',title:'Mi aviso',species:'CAT',reporterUserId:'viewer',latitude:-34.95,longitude:-58.44},
   {kind:'ADOPTION',postId:'adopt-near',title:'Busca hogar',species:'CAT',reporterUserId:'other',latitude:-34.61,longitude:-58.44}];
+ if(withMedia) {
+  const dimensions=[[1080,1920],[1080,1080],[3200,1000]];
+  for(const [index,row] of [rows[0],rows[1],rows[4]].entries()) {
+   const [pixelWidth,pixelHeight]=dimensions[index];
+   row.media=[{id:row.postId,kind:'IMAGE',url:`/qa-pet-${index}.svg`,...(index?{pixelWidth,pixelHeight}:{})}];
+   await page.route(`**/qa-pet-${index}.svg`,route=>route.fulfill({contentType:'image/svg+xml',body:`<svg xmlns="http://www.w3.org/2000/svg" width="${pixelWidth}" height="${pixelHeight}"><rect width="100%" height="100%" fill="#78a49a"/></svg>`}));
+  }
+ }
  await page.addInitScript(state=>{
   window.gpsCalls=0;window.permission=Object.assign(new EventTarget(),{state});
   Object.defineProperty(navigator,'permissions',{configurable:true,value:{query:async()=>window.permission}});
@@ -29,7 +37,7 @@ async function fixture(page,gps='denied',existingArea=null) {
   else throw Error('Unexpected API request '+path);
   await route.fulfill({json:{success:true,data}});
  });
- await page.route('**/qa-pet-discovery',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mascotas cercanas</title><link rel="stylesheet" href="/styles.css"><main id="main"></main><script src="/discovery-location.js"></script><script src="/adoption-proximity.js"></script></html>'}));
+ await page.route('**/qa-pet-discovery',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mascotas cercanas</title><link rel="stylesheet" href="/styles.css"><main id="main"></main><script src="/discovery-location.js"></script><script src="/adoption-proximity.js"></script><script src="/post-carousel.js"></script></html>'}));
  await page.goto('/qa-pet-discovery');
  await page.evaluate(code=>{
   Object.assign(window,{API:'',authToken:()=> 'synthetic-qa-token',me:{userId:'viewer'},feedLocation:null,discoveryScopeReady:false,adoptionRadiusKm:20,discoverySettingsVersion:0,refreshPetDiscovery:null,
@@ -70,4 +78,34 @@ test('an existing manual area loads without requesting GPS even when permission 
  await expect(page.locator('.listing')).toHaveCount(4);
  expect(await page.evaluate(()=>gpsCalls)).toBe(0);
  await expect(page.getByRole('heading',{name:'Elegí tu zona',exact:true})).toHaveCount(0);
+});
+
+test('pet previews match the main feed frame for portrait, square and landscape photos without cropping or changing links',async({page},info)=>{
+ await fixture(page,'granted',null,true);
+ const previews=page.locator('.pet-feed .pet-listing-media');
+ await expect(previews).toHaveCount(3);
+ const ratios=[.75,1,1.91];
+ for(let index=0;index<ratios.length;index++) {
+  const preview=previews.nth(index),image=preview.locator('img');
+  await image.scrollIntoViewIfNeeded();
+  await expect.poll(()=>image.evaluate(img=>img.complete&&img.naturalWidth>0)).toBe(true);
+  await expect(image).toHaveCSS('object-fit','contain');
+  await expect(preview).toHaveCSS('background-color','rgb(17, 18, 19)');
+  const bounds=await preview.boundingBox();
+  expect(bounds.width/bounds.height).toBeCloseTo(ratios[index],2);
+  const referenceRatio=await image.evaluate(img=>{
+   const reference=document.createElement('article');reference.className='post';
+   reference.innerHTML=OgtPostCarousel.html({media:[{kind:'IMAGE',url:img.src,pixelWidth:img.naturalWidth,pixelHeight:img.naturalHeight}]},{expandable:false});
+   document.querySelector('main').append(reference);
+   const bounds=reference.querySelector('.media-slot').getBoundingClientRect();reference.remove();return bounds.width/bounds.height;
+  });
+  expect(bounds.width/bounds.height).toBeCloseTo(referenceRatio,2);
+ }
+ await expect(page.locator('[href="#/p/lost-near"]')).toContainText('Perdido cercano');
+ await expect(page.locator('[href="#/p/found-near"]')).toContainText('Encontrado cercano');
+ await expect(page.locator('[href="#/p/adopt-near"]')).toContainText('Busca hogar');
+ await page.getByRole('button',{name:'Encontrados',exact:true}).click();
+ await expect(page.locator('.listing')).toHaveCount(1);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+ await page.screenshot({path:info.outputPath('mascotas-formato-feed.png'),fullPage:true});
 });

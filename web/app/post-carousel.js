@@ -165,5 +165,5 @@
       show(next, retained >= 0 ? retained : oldIndex);
     }
   }
-  scope.OgtPostCarousel = {rows, html, bind, update, typesHtml, openViewer};
+  scope.OgtPostCarousel = {rows, html, bind, update, typesHtml, openViewer, readingRatio};
 })(globalThis);
