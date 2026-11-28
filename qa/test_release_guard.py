@@ -1,6 +1,9 @@
 import importlib.util
 import json
+import os
 from pathlib import Path
+import re
+import subprocess
 import tempfile
 import unittest
 
@@ -12,6 +15,21 @@ SHA = 'a' * 40
 
 
 class ReleaseGuardTests(unittest.TestCase):
+    def test_packaged_migrations_cover_activation_and_release_requirements(self):
+        deploy = (ROOT / 'scripts/deploy-ogt-vps.sh').read_text()
+        activation = (ROOT / 'scripts/activate-ogt-release.sh').read_text()
+        copy = next(line for line in deploy.splitlines() if line.startswith('cp database/migrations/'))
+        activated = set(re.findall(r'\$RELEASE/(database/migrations/[A-Za-z0-9_]+\.sql)', activation))
+        required = {path for path in guard.REQUIRED if path.startswith('database/migrations/')}
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp) / 'release/database/migrations'
+            target.mkdir(parents=True)
+            subprocess.run(['bash', '-c', copy], cwd=ROOT, env=dict(os.environ, WORK=temp), check=True)
+            packaged = {'database/migrations/' + path.name for path in target.iterdir()}
+            self.assertTrue(activated)
+            self.assertFalse((activated | required) - packaged)
+            self.assertTrue(all(int(Path(path).name[:2]) >= 23 for path in packaged))
+
     def env(self):
         return dict(OGT_ENV='production', OGT_ALLOW_DEV_TOKENS='false',
                     OGT_FIREBASE_CREDENTIALS='/run/secrets/admin.json',
