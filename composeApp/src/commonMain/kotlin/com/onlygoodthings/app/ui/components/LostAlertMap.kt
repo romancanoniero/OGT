@@ -40,7 +40,8 @@ import com.onlygoodthings.shared.data.local.LocalSighting
 import com.onlygoodthings.shared.domain.GeoPoint
 import com.onlygoodthings.shared.domain.lostTimelineStops
 import com.onlygoodthings.shared.domain.movementRoute
-import com.onlygoodthings.shared.domain.sightingsUntil
+import com.onlygoodthings.shared.domain.sightingsAtTimelineStop
+import com.onlygoodthings.shared.domain.sightingMomentLabel
 import com.onlygoodthings.app.ui.screens.OgtNeighborAvatar
 import com.onlygoodthings.shared.realtime.currentEpochMs
 
@@ -69,9 +70,9 @@ fun LostAlertMap(
     var selectedId by remember(listing.id) { mutableStateOf(listing.id) }
     val now = remember { currentEpochMs() }
     val stops = remember(listing.id, sightings, now) { lostTimelineStops(listing, sightings, now) }
-    var dayIndex by remember(listing.id, stops.size) { mutableStateOf(stops.lastIndex.coerceAtLeast(0)) }
-    val cutoff = stops.getOrNull(dayIndex)?.dayEndEpochMs ?: Long.MAX_VALUE
-    val visible = if (fill && stops.isNotEmpty()) sightingsUntil(sightings, cutoff) else sightings
+    var dayIndex by remember(listing.id) { mutableStateOf(0) }
+    val stopIndex = dayIndex.coerceIn(stops.indices)
+    val visible = if (fill) sightingsAtTimelineStop(sightings, stops[stopIndex]) else sightings
     val route = if (fill) movementRoute(listing, visible) else emptyList()
     var fitVersion by remember(listing.id) { mutableStateOf(0) }
     val fitPoints = remember(listing.id, visible, here != null, fitVersion) {
@@ -143,6 +144,7 @@ fun LostAlertMap(
                 route = route,
                 fitPoints = fitPoints,
                 fitRequest = fitVersion,
+                latestSegmentDashed = fill,
             )
             if (distance != null) {
                 val destination = if (selectedSighting != null) "del avistamiento" else if (listing.kind == "FOUND") "del encuentro" else "del lugar de la pérdida"
@@ -174,8 +176,16 @@ fun LostAlertMap(
             if (fill && stops.isNotEmpty()) {
                 LostSightingTimelineBar(
                     stops = stops,
-                    selectedIndex = dayIndex,
-                    onSelect = { dayIndex = it },
+                    selectedIndex = stopIndex,
+                    onSelect = { index ->
+                        stops.getOrNull(index)?.let { stop ->
+                            dayIndex = index
+                            selectedId = sightingsAtTimelineStop(sightings, stop).lastOrNull()?.id ?: listing.id
+                        }
+                    },
+                    eventLabel = visible.lastOrNull()?.let {
+                        "Punteado: último reporte visible · ${sightingMomentLabel(it, now) ?: "fecha no informada"}"
+                    },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .windowInsetsPadding(WindowInsets.navigationBars)

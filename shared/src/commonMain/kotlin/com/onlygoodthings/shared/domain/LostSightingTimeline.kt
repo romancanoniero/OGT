@@ -10,11 +10,12 @@ import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 
-/** Un día de la línea de tiempo del aviso. */
+/** Punto de partida o día de avistamientos de la línea de tiempo del aviso. */
 data class LostTimelineStop(
     val dayStartEpochMs: Long,
     val dayEndEpochMs: Long,
     val label: String,
+    val isOrigin: Boolean = false,
 )
 
 private val MonthsEs = listOf(
@@ -31,11 +32,14 @@ fun lostTimelineStops(
     val originMs = listing.lastSeenAtEpochMs.takeIf { it > 0 }
         ?: sightings.minOfOrNull { it.createdAtEpochMs }
         ?: nowEpochMs
-    val days = buildSet {
-        add(dayStartMs(originMs, timeZone))
-        sightings.forEach { add(dayStartMs(it.createdAtEpochMs, timeZone)) }
-    }.sorted()
-    return days.map { start ->
+    val origin = LostTimelineStop(
+        dayStartEpochMs = dayStartMs(originMs, timeZone),
+        dayEndEpochMs = originMs,
+        label = if (listing.kind == "FOUND") "Encuentro" else "Pérdida",
+        isOrigin = true,
+    )
+    val days = sightings.map { dayStartMs(it.createdAtEpochMs, timeZone) }.distinct().sorted()
+    return listOf(origin) + days.map { start ->
         LostTimelineStop(
             dayStartEpochMs = start,
             dayEndEpochMs = dayEndMs(start, timeZone),
@@ -46,6 +50,19 @@ fun lostTimelineStops(
 
 fun sightingsUntil(sightings: List<LocalSighting>, untilEpochMs: Long): List<LocalSighting> =
     sightings.filter { it.createdAtEpochMs <= untilEpochMs }.sortedBy { it.createdAtEpochMs }
+
+/** El origen no incluye avistamientos, aunque hayan ocurrido el mismo día. */
+fun sightingsAtTimelineStop(sightings: List<LocalSighting>, stop: LostTimelineStop): List<LocalSighting> =
+    if (stop.isOrigin) emptyList() else sightingsUntil(sightings, stop.dayEndEpochMs)
+
+/** Hora del reporte conocido; una fecha ausente no se reemplaza con la del aviso. */
+fun sightingMomentLabel(sighting: LocalSighting, nowEpochMs: Long, timeZone: TimeZone = TimeZone.currentSystemDefault()): String? {
+    if (sighting.createdAtEpochMs <= 0) return null
+    val date = Instant.fromEpochMilliseconds(sighting.createdAtEpochMs).toLocalDateTime(timeZone)
+    val year = Instant.fromEpochMilliseconds(nowEpochMs).toLocalDateTime(timeZone).year
+    val yearLabel = if (date.year == year) "" else " ${date.year}"
+    return "${date.dayOfMonth} ${MonthsEs[date.monthNumber - 1]}$yearLabel · ${date.hour.toString().padStart(2, '0')}:${date.minute.toString().padStart(2, '0')}"
+}
 
 fun movementRoute(
     listing: LocalAnimalListing,

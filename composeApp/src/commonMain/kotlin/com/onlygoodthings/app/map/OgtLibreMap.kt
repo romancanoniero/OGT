@@ -136,6 +136,7 @@ fun OgtLibreMap(
     /** Si no está vacío, al cambiar recuadra estos puntos (origen + avistajes del día). */
     fitPoints: List<GeoPoint> = emptyList(),
     fitRequest: Int = 0,
+    latestSegmentDashed: Boolean = false,
 ) {
     val cam = remember {
         MapCamera(center.latitude, center.longitude, zoomForRadiusMeters(radiusMeters).toFloat().coerceIn(3f, 19f))
@@ -298,7 +299,7 @@ fun OgtLibreMap(
                 center = mid,
                 style = Stroke(width = 2.5f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f))),
             )
-            drawMovement(route, headingTo, viewLng, viewLat, zoom, viewport, tileZ)
+            drawMovement(route, headingTo, viewLng, viewLat, zoom, viewport, tileZ, latestSegmentDashed)
         }
         if (!firstTile) {
             Text(
@@ -478,6 +479,7 @@ private fun DrawScope.drawMovement(
     zoom: Float,
     viewport: IntSize,
     tileZ: Int,
+    latestSegmentDashed: Boolean = false,
 ) {
     fun point(geo: GeoPoint): Offset? {
         val off = screenOffset(geo.longitude, geo.latitude, viewLng, viewLat, zoom, viewport, tileZ, clip = false)
@@ -486,15 +488,23 @@ private fun DrawScope.drawMovement(
     }
     val pts = route.mapNotNull { point(it) }
     if (pts.size >= 2) {
+        val solid = if (latestSegmentDashed) pts.dropLast(1) else pts
         val path = Path().apply {
-            moveTo(pts.first().x, pts.first().y)
-            pts.drop(1).forEach { lineTo(it.x, it.y) }
+            moveTo(solid.first().x, solid.first().y)
+            solid.drop(1).forEach { lineTo(it.x, it.y) }
         }
         drawPath(
             path,
             color = RadiusStroke,
             style = Stroke(width = 4.5f, cap = StrokeCap.Round, join = StrokeJoin.Round),
         )
+        if (latestSegmentDashed) {
+            val from = pts[pts.lastIndex - 1]
+            val to = pts.last()
+            drawPath(Path().apply { moveTo(from.x, from.y); lineTo(to.x, to.y) }, RadiusStroke,
+                style = Stroke(width = 4.5f, cap = StrokeCap.Round,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(14f, 10f))))
+        }
         pts.zipWithNext { from, to -> drawArrowHead(from, to, RadiusStroke) }
     }
     val from = pts.lastOrNull() ?: return

@@ -61,6 +61,7 @@ fun OgtBarrioMap(
     headingTo: GeoPoint? = null,
     fitPoints: List<GeoPoint> = emptyList(),
     fitRequest: Int = 0,
+    latestSegmentDashed: Boolean = false,
 ) {
     Box(
         modifier
@@ -83,6 +84,7 @@ fun OgtBarrioMap(
             headingTo = headingTo,
             fitPoints = fitPoints,
             fitRequest = fitRequest,
+            latestSegmentDashed = latestSegmentDashed,
         )
         Text(
             "© Esri · OpenStreetMap",

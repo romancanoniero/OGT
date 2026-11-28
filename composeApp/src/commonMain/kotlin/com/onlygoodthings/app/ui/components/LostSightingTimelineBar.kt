@@ -23,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -54,9 +55,12 @@ fun LostSightingTimelineBar(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    eventLabel: String? = null,
 ) {
     if (stops.isEmpty()) return
     val safeIndex = selectedIndex.coerceIn(stops.indices)
+    val currentSelection by rememberUpdatedState(safeIndex)
+    val select by rememberUpdatedState(onSelect)
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = safeIndex)
     val snap = rememberSnapFlingBehavior(lazyListState = listState)
     val density = LocalDensity.current
@@ -71,7 +75,7 @@ fun LostSightingTimelineBar(
                 abs((item.offset + item.size / 2) - center)
             }?.index
         }.distinctUntilChanged().collect { index ->
-            if (index != null && index != selectedIndex) onSelect(index)
+            if (index != null && index != currentSelection) select(index)
         }
     }
     LaunchedEffect(safeIndex, viewportPx) {
@@ -96,12 +100,13 @@ fun LostSightingTimelineBar(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            "Línea de tiempo",
+            if (stops[safeIndex].isOrigin) "Línea de tiempo" else "Flechas: orden de los reportes",
             color = OgtColors.ink,
             fontWeight = FontWeight.SemiBold,
             fontSize = 13.sp,
         )
-        OgtCaption("Hasta ${stops[safeIndex].label} · girá la rueda")
+        OgtCaption(if (stops[safeIndex].isOrigin) "${stops[safeIndex].label} · punto de partida"
+            else eventLabel ?: "Hasta ${stops[safeIndex].label} · girá la rueda")
         Box(
             Modifier
                 .fillMaxWidth()
@@ -115,7 +120,7 @@ fun LostSightingTimelineBar(
                 contentPadding = PaddingValues(horizontal = sidePad),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                items(stops.size, key = { stops[it].dayStartEpochMs }) { index ->
+                items(stops.size, key = { "${stops[it].isOrigin}:${stops[it].dayStartEpochMs}" }) { index ->
                     val info = listState.layoutInfo
                     val center = (info.viewportStartOffset + info.viewportEndOffset) / 2f
                     val item = info.visibleItemsInfo.find { it.index == index }
