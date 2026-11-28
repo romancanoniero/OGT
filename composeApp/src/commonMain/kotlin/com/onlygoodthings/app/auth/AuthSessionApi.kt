@@ -6,6 +6,7 @@ import com.onlygoodthings.shared.domain.ApiResponse
 import com.onlygoodthings.shared.domain.UserProfile
 import io.ktor.client.call.body
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -127,6 +128,7 @@ class AuthSessionApi(
         }
         val response: ApiResponse<com.onlygoodthings.shared.domain.UploadedMedia> =
             client.post("${session.apiBaseUrl}/api/v1/media/upload") {
+                timeout { requestTimeoutMillis=120_000;socketTimeoutMillis=120_000 }
                 contentType(ContentType.Application.Json)
                 header("Authorization", "Bearer $token")
                 setBody(buildJsonObject {

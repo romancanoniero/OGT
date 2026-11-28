@@ -57,6 +57,19 @@ class StorageRetentionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'RECENT_VERIFIED_BACKUP_REQUIRED'):retention.plan(root)
             self.assertEqual(9,len(list((root/'releases').iterdir())))
 
+    def test_incomplete_or_staged_uploads_cannot_displace_verified_rollback_versions(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);self.fixture(root)
+            for i in range(6):
+                folder=root/'releases'/('a'*40+f'-20261127T18000{i}Z');folder.mkdir();(folder/'partial').write_text('still uploading')
+            result=retention.plan(root)
+            for number in range(5,9):self.assertIn(str(number)*40+f'-202610{number+10:02}T000000Z',result['keptReleases'])
+            # Explicitly prepared packages also cannot replace the last published rollback set.
+            old=root/'releases'/('1'*40+'-20261011T000000Z')
+            saved=root/'backups'/old.name;saved.mkdir()
+            (saved/'published-release.json').write_text(json.dumps({'sourceSha':'1'*40,'scope':'app-backend-crms'}))
+            self.assertIn(old.name,retention.plan(root)['keptReleases'])
+
     def test_only_old_exact_ogt_image_tags_are_selected_and_container_rollback_and_manual_images_are_kept(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);self.fixture(root)

@@ -3,6 +3,7 @@ package com.onlygoodthings.shared.data.remote
 import com.onlygoodthings.shared.data.SessionStore
 import com.onlygoodthings.shared.domain.*
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.timeout
 import io.ktor.client.call.body
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -12,6 +13,7 @@ class RestStoriesRepository(private val client: HttpClient, private val session:
     private suspend inline fun <reified T> post(path: String, data: JsonObject): T {
         val token=session.firebaseJwt ?: error("Iniciá sesión para ver historias")
         val response=client.post("${session.apiBaseUrl}/api/v1/stories/$path") {
+            if(path=="publish")timeout {requestTimeoutMillis=120_000;socketTimeoutMillis=120_000}
             contentType(ContentType.Application.Json);header(HttpHeaders.Authorization,"Bearer $token");setBody(data)
         }
         if(response.status==HttpStatusCode.NotFound) error("Las historias todavía no están disponibles. Intentá nuevamente más tarde.")

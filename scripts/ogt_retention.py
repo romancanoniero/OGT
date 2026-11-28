@@ -109,8 +109,18 @@ def plan(root, now=None, docker=False):
         raise ValueError('INVALID_CURRENT_RELEASE')
     fresh = fresh_backup(root, now)
     candidates = sorted((p for p in (root / 'releases').iterdir() if RELEASE.fullmatch(p.name) and not p.is_symlink() and p.is_dir()), key=lambda p: p.name[-16:], reverse=True)
-    # Always keep five newest packages, every package from the last 48h, and the active SHA.
-    keep = {p.name for p in candidates[:5]} | {p.name for p in candidates if p.name.startswith(current + '-') or age(p.name, now) < 48 * 3600}
+    verified = [p for p in candidates if sealed(p)]
+    published = []
+    for folder in verified:
+        receipt = root/'backups'/folder.name/'published-release.json'
+        if receipt.is_file() and not receipt.is_symlink():
+            try:
+                value=json.loads(receipt.read_text())
+                if value.get('sourceSha')==folder.name[:40] and value.get('scope')=='app-backend-crms':published.append(folder)
+            except (OSError,ValueError):
+                pass
+    # Incomplete/staged uploads must never displace the five recoverable published versions.
+    keep = {p.name for p in verified[:5]} | {p.name for p in published[:5]} | {p.name for p in candidates if p.name.startswith(current + '-') or age(p.name, now) < 48 * 3600}
     pins = root / 'operations/retention-pins.json'
     if pins.exists():
         if pins.is_symlink():
@@ -119,11 +129,11 @@ def plan(root, now=None, docker=False):
         if not isinstance(pinned, list) or any(not isinstance(x, str) or not RELEASE.fullmatch(x) for x in pinned):
             raise ValueError('INVALID_RETENTION_PINS')
         keep.update(pinned)
-    if not any(p.name.startswith(current + '-') and sealed(p) for p in candidates):
+    if not any(p.name.startswith(current + '-') for p in verified):
         raise ValueError('SEALED_CURRENT_RELEASE_REQUIRED')
     removals = []
-    for folder in candidates:
-        if folder.name not in keep and sealed(folder):
+    for folder in verified:
+        if folder.name not in keep:
             removals.append({'kind': 'release', 'path': str(folder.relative_to(root)), 'files': {
                 str(p.relative_to(folder)): digest(p) for p in folder.rglob('*') if p.is_file()}})
     for folder in (root / 'backups').iterdir():
