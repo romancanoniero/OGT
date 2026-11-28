@@ -10,6 +10,7 @@ import datetime as dt
 import fcntl
 import hashlib
 import io
+import inspect
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -45,9 +46,67 @@ COMMIT;"""
 # pg_dump supplies its own consistent transaction while users keep writing.
 # Only schema names and media fingerprints are compared around capture: normal
 # views, location updates and other account writes must not block a valid dump.
+def logical_media(source):
+    """Expand only safe same-namespace hard links; exclude the private dedup index."""
+    members = source.getmembers()
+    index = {}
+    for item in members:
+        p = PurePosixPath(item.name)
+        if p.is_absolute() or '..' in p.parts or not p.parts or p.parts[0] != 'media' or not (item.isdir() or item.isfile() or item.islnk()):
+            raise ValueError('MEDIA_PATH')
+        if item.name in index:
+            raise ValueError('DUPLICATE_MEMBER')
+        if item.size < 0 or item.size > 512 * 1024 * 1024:
+            raise ValueError('MEMBER_SIZE_LIMIT')
+        index[item.name] = item
+    total = 0
+    for item in members:
+        p = PurePosixPath(item.name)
+        if item.name == 'media/stories-private/.signing-key':
+            continue
+        pool = len(p.parts) >= 3 and p.parts[1] in ('u', 'stories-private') and p.parts[2] == '.objects'
+        if pool:
+            if len(p.parts) == 3 and item.isdir():
+                continue
+            if len(p.parts) == 4 and re.fullmatch(r'[a-f0-9]{64}|\.lock|\.pending-\d+\.tmp',p.parts[3]):
+                continue
+            raise ValueError('UNKNOWN_PRIVATE_MEDIA')
+        if any(part.startswith('.') for part in p.parts):
+            raise ValueError('UNKNOWN_PRIVATE_MEDIA')
+        if item.isdir():
+            yield item.name, True, None
+            continue
+        current = item; visited = set(); pool_hash = None
+        while current.islnk():
+            origin = PurePosixPath(item.name)
+            target = PurePosixPath(current.linkname)
+            if len(origin.parts) != 3 or origin.parts[1] not in ('u','stories-private'):
+                raise ValueError('UNSAFE_MEDIA_HARDLINK')
+            valid_name = r'[0-9a-fA-F-]{36}\.(?:jpg|jpeg|png|webp|mp4|webm)' if origin.parts[1]=='u' else r'[0-9a-fA-F-]{36}(?:-poster)?\.bin'
+            if not re.fullmatch(valid_name,origin.name) or target.is_absolute() or '..' in target.parts or target.parts[:2] != origin.parts[:2]:
+                raise ValueError('UNSAFE_MEDIA_HARDLINK')
+            if len(target.parts)==4 and target.parts[2]=='.objects' and re.fullmatch('[a-f0-9]{64}',target.name):
+                pool_hash=target.name
+            elif len(target.parts)!=3 or not re.fullmatch(valid_name,target.name):
+                raise ValueError('UNSAFE_MEDIA_HARDLINK')
+            if current.name in visited or current.linkname not in index:
+                raise ValueError('UNSAFE_MEDIA_HARDLINK')
+            visited.add(current.name);current=index[current.linkname]
+        if not current.isfile():
+            raise ValueError('UNSAFE_MEDIA_HARDLINK')
+        value = source.extractfile(current).read()
+        if pool_hash is not None and hashlib.sha256(value).hexdigest()!=pool_hash:
+            raise ValueError('MEDIA_OBJECT_HASH_MISMATCH')
+        total += len(value)
+        if total > 512 * 1024 * 1024:
+            raise ValueError('ARCHIVE_SIZE_LIMIT')
+        yield item.name, False, value
+
+
 SOURCE_STATE = r'''
-import hashlib,io,json,subprocess,tarfile
+import hashlib,io,json,re,subprocess,tarfile
 from pathlib import PurePosixPath
+''' + inspect.getsource(logical_media) + r'''
 sql=['docker','exec','-e','PGOPTIONS=-c timezone=UTC','ogt-postgres','psql','-X','-qAt','-v','ON_ERROR_STOP=1','-U','ogt','-d','onlygoodthings']
 def query(q):return json.loads(subprocess.check_output(sql+['-c',q],timeout=120))
 tables=query("SELECT json_agg(tablename ORDER BY tablename) FROM pg_tables WHERE schemaname='public'")
@@ -55,12 +114,8 @@ raw=subprocess.check_output(['docker','cp','ogt-api:/app/media','-'],timeout=180
 if len(raw)>536870912:raise ValueError('MEDIA_SIZE_LIMIT')
 files={}
 with tarfile.open(fileobj=io.BytesIO(raw),mode='r:') as source:
- for item in source:
-  p=PurePosixPath(item.name)
-  if p.is_absolute() or '..' in p.parts or not p.parts or p.parts[0]!='media' or not(item.isdir() or item.isfile()):raise ValueError('MEDIA_PATH')
-  if item.name=='media/stories-private/.signing-key':continue
-  if any(part.startswith('.') for part in p.parts):raise ValueError('UNKNOWN_PRIVATE_MEDIA')
-  if item.isfile():files[item.name]=hashlib.sha256(source.extractfile(item).read()).hexdigest()
+ for name,directory,value in logical_media(source):
+  if not directory:files[name]=hashlib.sha256(value).hexdigest()
 image=subprocess.check_output(['docker','inspect','ogt-postgres','--format','{{.Config.Image}}'],text=True).strip()
 print(json.dumps({'databaseSchema':tables,'media':files,'postgresImage':image}))
 '''
@@ -154,23 +209,16 @@ def pack(media, dump, metadata, manifest):
     total = 0
     with tarfile.open(fileobj=out, mode='w:gz') as target:
         with tarfile.open(fileobj=io.BytesIO(media), mode='r:') as source:
-            for item in source:
-                p = safe_member(item)
-                if p.parts[0] != 'media':
-                    raise BackupError('MEDIA_PREFIX')
-                if item.name == SIGNING_KEY:
-                    continue
-                if any(part.startswith('.') for part in p.parts):
-                    raise BackupError('UNKNOWN_PRIVATE_MEDIA')
-                total += item.size
-                if total > LIMIT:
-                    raise BackupError('ARCHIVE_SIZE_LIMIT')
-                # Normalize metadata; never restore Docker ownership or file modes.
-                saved = tarfile.TarInfo(item.name)
-                saved.type = tarfile.DIRTYPE if item.isdir() else tarfile.REGTYPE
-                saved.mode = 0o700 if item.isdir() else 0o600
-                saved.size = item.size
-                target.addfile(saved, source.extractfile(item) if item.isfile() else None)
+            try:
+                for name,directory,value in logical_media(source):
+                    # Preserve the original portable format: logical files, no internal pool or links.
+                    saved=tarfile.TarInfo(name)
+                    saved.type=tarfile.DIRTYPE if directory else tarfile.REGTYPE
+                    saved.mode=0o700 if directory else 0o600
+                    saved.size=0 if directory else len(value)
+                    target.addfile(saved,None if directory else io.BytesIO(value))
+            except ValueError as error:
+                raise BackupError(str(error)) from error
         for name, data in [('database.dump', dump), ('database-backup.json', metadata),
                            ('offsite-manifest.json', json.dumps(manifest, sort_keys=True).encode())]:
             saved = tarfile.TarInfo(name); saved.size = len(data); saved.mode = 0o600

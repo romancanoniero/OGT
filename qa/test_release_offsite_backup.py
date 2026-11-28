@@ -104,6 +104,42 @@ class OffsiteTests(unittest.TestCase):
             with self.assertRaises(offsite.BackupError):
                 offsite.pack(media_tar(name, link=link), b'PGDMPx', b'{}', {})
 
+    def test_deduplicated_media_backups_keep_all_logical_files_and_the_original_portable_format(self):
+        data=b'shared video bytes';digest=hashlib.sha256(data).hexdigest();raw=io.BytesIO()
+        names=['media/u/10000000-0000-4000-8000-000000000001.mp4','media/u/10000000-0000-4000-8000-000000000002.mp4']
+        with tarfile.open(fileobj=raw,mode='w') as source:
+            folder=tarfile.TarInfo('media/u/.objects');folder.type=tarfile.DIRTYPE;source.addfile(folder)
+            blob=tarfile.TarInfo('media/u/.objects/'+digest);blob.size=len(data);source.addfile(blob,io.BytesIO(data))
+            lock=tarfile.TarInfo('media/u/.objects/.lock');source.addfile(lock,io.BytesIO())
+            for name in names:
+                item=tarfile.TarInfo(name);item.type=tarfile.LNKTYPE;item.linkname=blob.name;source.addfile(item)
+            secret=tarfile.TarInfo(offsite.SIGNING_KEY);secret.size=6;source.addfile(secret,io.BytesIO(b'secret'))
+        dump=b'PGDMPfixture';manifest={'media':{name:digest for name in names},'databaseDumpSha256':hashlib.sha256(dump).hexdigest()}
+        payload=offsite.pack(raw.getvalue(),dump,b'{}',manifest);offsite.verify_payload(payload,manifest)
+        with tarfile.open(fileobj=io.BytesIO(payload),mode='r:gz') as archive:
+            self.assertFalse(any('.objects' in name for name in archive.getnames()))
+            self.assertNotIn(offsite.SIGNING_KEY,archive.getnames())
+            for name in names:
+                self.assertTrue(archive.getmember(name).isfile());self.assertEqual(data,archive.extractfile(name).read())
+
+    def test_hardlinks_cannot_export_a_secret_cross_namespaces_or_follow_cycles(self):
+        public='media/u/10000000-0000-4000-8000-000000000001.mp4'
+        private='media/stories-private/10000000-0000-4000-8000-000000000002.bin'
+        for name,target in [(private,offsite.SIGNING_KEY),(public,private),(public,'media/u/.objects/'+'a'*64),(public,public)]:
+            raw=io.BytesIO()
+            with tarfile.open(fileobj=raw,mode='w') as source:
+                item=tarfile.TarInfo(name);item.type=tarfile.LNKTYPE;item.linkname=target;source.addfile(item)
+                secret=tarfile.TarInfo(offsite.SIGNING_KEY);secret.size=6;source.addfile(secret,io.BytesIO(b'secret'))
+            with self.assertRaises(offsite.BackupError):offsite.pack(raw.getvalue(),b'PGDMPfixture',b'{}',{})
+
+    def test_incorrect_pool_content_hash_is_rejected(self):
+        raw=io.BytesIO()
+        with tarfile.open(fileobj=raw,mode='w') as source:
+            blob=tarfile.TarInfo('media/u/.objects/'+'a'*64);blob.size=5;source.addfile(blob,io.BytesIO(b'wrong'))
+            alias=tarfile.TarInfo('media/u/10000000-0000-4000-8000-000000000001.mp4');alias.type=tarfile.LNKTYPE;alias.linkname=blob.name;source.addfile(alias)
+        with self.assertRaisesRegex(offsite.BackupError,'MEDIA_OBJECT_HASH_MISMATCH'):
+            offsite.pack(raw.getvalue(),b'PGDMPfixture',b'{}',{})
+
     def test_media_change_during_capture_prevents_completed_receipt(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp); config, state, replies = self.fixture(root)

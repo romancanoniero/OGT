@@ -41,7 +41,7 @@ internal class DeduplicatedFiles(private val directory: Path) {
             check(Files.isRegularFile(blob, NOFOLLOW_LINKS) && Files.size(blob) == bytes.size.toLong() &&
                 MessageDigest.isEqual(Files.readAllBytes(blob), bytes)) { "Stored media integrity mismatch" }
         }
-        val alias = Files.createTempFile(directory, ".upload-", ".tmp")
+        val alias = Files.createTempFile(objects, ".pending-", ".tmp")
         try {
             Files.delete(alias)
             Files.createLink(alias, blob)
