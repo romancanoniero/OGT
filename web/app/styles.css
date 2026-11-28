@@ -1770,6 +1770,7 @@ body.desk .center {
 .post-media-type.has { color:var(--secondary);opacity:1; }
 
 .post-diffuse { width:40px;min-width:40px;height:40px; }
+.post-diffuse:disabled { cursor:default; }
 .post-diffusion-credit {margin:8px 20px 0;}
 
 .ogt-share-sheet {box-sizing:border-box;position:fixed;inset:auto 0 0;margin:0 auto;width:min(100%,560px);max-width:100%;max-height:88dvh;overflow:auto;border:1px solid var(--line);border-radius:24px 24px 0 0;padding:12px 20px calc(20px + env(safe-area-inset-bottom));background:var(--surface,#fff);color:var(--ink);box-shadow:0 -12px 48px #103f5026;}

@@ -38,7 +38,11 @@ actual fun sharePostWithApp(app:PostShareApp,text:String,url:String):Boolean {
         else -> {
             val target=postShareAppUri(app.id,text,url)?.let { NSURL.URLWithString(it) } ?: return false
             if(!UIApplication.sharedApplication.canOpenURL(target))return false
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW,200_000_000L),dispatch_get_main_queue()) { UIApplication.sharedApplication.openURL(target) }
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW,200_000_000L),dispatch_get_main_queue()) {
+                UIApplication.sharedApplication.openURL(target,options=emptyMap<Any?,Any>(),completionHandler={ opened ->
+                    if(!opened)sharePlainText(text)
+                })
+            }
             return true
         }
     }

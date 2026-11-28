@@ -1409,9 +1409,10 @@ class OgtLocalDatabase {
         val index = posts.indexOfFirst { it.id == postId && !it.isStory }
         require(index >= 0) { "La publicación no está disponible" }
         val post = posts[index]
+        if(!enabled || post.viewerHasDiffused)return post
         val existing = post.diffusedBy.firstOrNull { it.userId == viewer.id }
-        val people = post.diffusedBy.filterNot { it.userId == viewer.id } + if(enabled) listOf(existing ?: com.onlygoodthings.shared.domain.PostDiffusion(viewer.id,viewer.displayName,currentEpochMs())) else emptyList()
-        return post.copy(viewerHasDiffused=enabled,diffusedBy=people).also { posts[index]=it;bumpFeed();bumpSocial() }
+        val people = post.diffusedBy.filterNot { it.userId == viewer.id } + listOf(existing ?: com.onlygoodthings.shared.domain.PostDiffusion(viewer.id,viewer.displayName,currentEpochMs()))
+        return post.copy(viewerHasDiffused=true,diffusedBy=people).also { posts[index]=it;bumpFeed();bumpSocial() }
     }
 
     fun repostAnecdote(viewer: LocalUser, anecdoteId: String): LocalSocialPost? {

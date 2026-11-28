@@ -728,9 +728,8 @@ class SocialSqlRepository(private val db: Database, private val mediaForReading:
         return anecdoteById(anecdoteId, userId) ?: error("Anécdota inexistente")
     }
 
-    fun setDiffusion(userId:String,postId:String,enabled:Boolean) {
+    fun setDiffusion(userId:String,postId:String,enabled:Boolean):Boolean =
         PostDiffusions(db).set(userId,postId,enabled)
-    }
 
     fun repostAnecdote(anecdoteId: String, userId: String): SocialPost {
         val anecdote = anecdoteById(anecdoteId, userId) ?: error("Anécdota inexistente")

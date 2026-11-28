@@ -441,7 +441,7 @@ function paintPost(post) {
     if (count && count.classList.contains("count")) count.textContent = post.impactCount || 0;
   }
   const diffuse=card.querySelector(':scope > .actions [data-diffuse]');
-  if(diffuse){diffuse.classList.toggle('on',Boolean(post.viewerHasDiffused));diffuse.setAttribute('aria-pressed',String(Boolean(post.viewerHasDiffused)));diffuse.setAttribute('aria-label',post.viewerHasDiffused?'Dejar de difundir':'Difundir a tus seguidores');}
+  if(diffuse){diffuse.classList.toggle('on',Boolean(post.viewerHasDiffused));diffuse.disabled=Boolean(post.viewerHasDiffused);diffuse.setAttribute('aria-pressed',String(Boolean(post.viewerHasDiffused)));diffuse.setAttribute('aria-label',post.viewerHasDiffused?'Ya difundido':'Difundir a tus seguidores');}
   const diffusion=card.querySelector(':scope > .post-diffusion-credit'),creditBox=document.createElement('div');creditBox.innerHTML=diffusionCredit(post);
   if(diffusion)creditBox.firstElementChild?diffusion.replaceWith(creditBox.firstElementChild):diffusion.remove();
   else if(creditBox.firstElementChild)card.querySelector(':scope > .actions')?.before(creditBox.firstElementChild);
@@ -1188,7 +1188,7 @@ function actionsFor(post, { onDetail = false } = {}) {
   }
   items.push(["copy", "Copiar enlace"]);
   items.push(["share", "Compartir"]);
-  items.push(["diffuse", post.viewerHasDiffused ? "Dejar de difundir" : "Difundir"]);
+  if(!post.viewerHasDiffused)items.push(["diffuse", "Difundir"]);
   if (!mine && post.authorId && !following.has(post.authorId)) {
     items.push(["follow", `Seguir a ${post.authorName || "esta persona"}`]);
   }
@@ -1928,13 +1928,13 @@ function paintAdoption(card,post) {
 const pendingDiffusions=new Set();
 const diffuseIcon='<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V5h14l-3-3m3 3-3 3m5 7v4H6l3 3m-3-3 3-3"/></svg>';
 function diffusionCredit(post){
-  const person=(post.diffusedBy||[]).find(p=>p.userId!==me.userId)||(post.diffusedBy||[])[0];
-  return person?`<p class="meta post-diffusion-credit">${escapeHtml(person.userId===me.userId?'Difundido por vos':`${person.displayName} difundió`)}</p>`:'';
+  const person=(post.diffusedBy||[]).find(p=>p.userId!==me.userId);
+  return person?`<p class="meta post-diffusion-credit">${escapeHtml(`${person.displayName} difundió`)}</p>`:'';
 }
 async function diffusePost(id){
   const owner=me.userId,key=owner+':'+id,before=lastFeed.find(p=>p.id===id);
-  if(!before||pendingDiffusions.has(key))return;
-  pendingDiffusions.add(key);const desired=!before.viewerHasDiffused;
+  if(!before||before.viewerHasDiffused||pendingDiffusions.has(key))return;
+  pendingDiffusions.add(key);const desired=true;
   const oldPerson=(before.diffusedBy||[]).find(p=>p.userId===owner),people=(before.diffusedBy||[]).filter(p=>p.userId!==owner);
   if(desired)people.unshift(oldPerson||{userId:owner,displayName:me.displayName||'Vos',createdAtEpochMs:Date.now()});
   const optimistic=mergePost({...before,viewerHasDiffused:desired,diffusedBy:people});paintPost(optimistic);persistFeedCache();
@@ -1996,7 +1996,7 @@ function postCard(post, { openable = true, previewStories = true, compose = fals
       <button class="act" aria-label="Comentar">${icon("qs-comment")}</button>
       <span class="count">${post.commentCount || 0}</span>
       <button class="act" data-share="${escapeHtml(post.id)}" aria-label="Compartir">${icon("qs-share")}</button>
-      <button type="button" class="act post-diffuse${post.viewerHasDiffused?' on':''}" data-diffuse="${escapeHtml(post.id)}" aria-pressed="${Boolean(post.viewerHasDiffused)}" aria-label="${post.viewerHasDiffused?'Dejar de difundir':'Difundir a tus seguidores'}">${diffuseIcon}</button>
+      <button type="button" class="act post-diffuse${post.viewerHasDiffused?' on':''}" data-diffuse="${escapeHtml(post.id)}" aria-pressed="${Boolean(post.viewerHasDiffused)}" aria-label="${post.viewerHasDiffused?'Ya difundido':'Difundir a tus seguidores'}"${post.viewerHasDiffused?' disabled':''}>${diffuseIcon}</button>
     </div>
     ${storiesBlock(post, { preview: previewStories, compose })}
     ${lostActionsHtml(post, { onDetail: compose && !openable })}

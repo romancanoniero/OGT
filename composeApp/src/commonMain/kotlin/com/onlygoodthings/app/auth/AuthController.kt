@@ -45,13 +45,13 @@ class AuthController(
     private val diffusionScope=kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob()+kotlinx.coroutines.Dispatchers.Main)
     private val diffusing=mutableSetOf<Pair<String,String>>()
     var diffusionError by mutableStateOf<String?>(null)
-    /** Explicit set/unset is retry-safe. The request uses the account/token captured on tap. */
+    /** One diffusion per account; retries retain the original activity timestamp. */
     fun diffusePost(postId:String,enabled:Boolean?=null) {
         val owner=preview.currentUserId;val key=owner to postId
         val before=db.posts.firstOrNull { it.id==postId } ?: return
         val bearer=session.firebaseJwt ?: return
-        if(owner.isBlank() || key in diffusing)return
-        val desired=enabled ?: !before.viewerHasDiffused
+        if(owner.isBlank() || key in diffusing || before.viewerHasDiffused || enabled==false)return
+        val desired=true
         val oldPerson=before.diffusedBy.firstOrNull { it.userId==owner }
         val people=before.diffusedBy.filterNot { it.userId==owner } + if(desired)listOf(oldPerson ?: com.onlygoodthings.shared.domain.PostDiffusion(owner,preview.me().displayName,com.onlygoodthings.shared.realtime.currentEpochMs())) else emptyList()
         val optimistic=before.copy(viewerHasDiffused=desired,diffusedBy=people)

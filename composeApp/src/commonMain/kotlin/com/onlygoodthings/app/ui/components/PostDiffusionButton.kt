@@ -22,8 +22,8 @@ fun PostDiffusionButton(postId:String) {
     val post=remember(postId,tick) { db.posts.firstOrNull { it.id==postId } } ?: return
     val active=post.viewerHasDiffused
     val color=if(active)OgtColors.expressionOn else OgtColors.expressionIdle
-    Box(Modifier.size(48.dp).semantics { selected=active;contentDescription=if(active)"Dejar de difundir" else "Difundir a tus seguidores" }
-        .clickable { auth.diffusePost(postId) },contentAlignment=Alignment.Center) {
+    Box(Modifier.size(48.dp).semantics { selected=active;contentDescription=if(active)"Ya difundido" else "Difundir a tus seguidores" }
+        .clickable(enabled=!active) { auth.diffusePost(postId) },contentAlignment=Alignment.Center) {
         OgtStitchIcon(Res.drawable.qs_diffuse,"",tint=color)
     }
 }
@@ -34,6 +34,6 @@ fun PostDiffusionCredit(postId:String) {
     val me=com.onlygoodthings.app.data.LocalOgtSession.current.me()
     val tick by db.socialTick.collectAsState()
     val post=remember(postId,tick) { db.posts.firstOrNull { it.id==postId } }
-    val person=post?.diffusedBy?.firstOrNull { it.userId!=me.id } ?: post?.diffusedBy?.firstOrNull() ?: return
-    Text(if(person.userId==me.id)"Difundido por vos" else "${person.displayName} difundió",fontSize=12.sp,color=OgtColors.muted,modifier=Modifier.padding(horizontal=12.dp,vertical=4.dp))
+    val person=post?.diffusedBy?.firstOrNull { it.userId!=me.id } ?: return
+    Text("${person.displayName} difundió",fontSize=12.sp,color=OgtColors.muted,modifier=Modifier.padding(horizontal=12.dp,vertical=4.dp))
 }

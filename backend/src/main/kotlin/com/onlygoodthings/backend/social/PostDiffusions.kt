@@ -8,9 +8,9 @@ import java.util.UUID
 
 /** Idempotent public diffusion of an original post; all reads retain original visibility and author. */
 class PostDiffusions(private val db: Database) {
-    fun set(user: String, post: String, enabled: Boolean) {
+    fun set(user: String, post: String, enabled: Boolean): Boolean {
         UUID.fromString(user);UUID.fromString(post)
-        db.withConnection { c ->
+        return db.withConnection { c ->
             c.autoCommit=false
             try {
                 // Same pair lock as blocking/following. Moderation holds the original row lock.
@@ -18,9 +18,10 @@ class PostDiffusions(private val db: Database) {
                 c.prepareStatement("SELECT id FROM social_posts WHERE id=?::uuid AND NOT is_story AND moderation_status='VISIBLE' AND ${interactionSql(user,"author_user_id")} FOR SHARE").use { q ->
                     q.setString(1,post);q.executeQuery().use { require(it.next()) { "La publicación no está disponible para difundir." } }
                 }
-                if(enabled)c.prepareStatement("INSERT INTO post_diffusions(post_id,user_id) VALUES(?::uuid,?::uuid) ON CONFLICT DO NOTHING").use { q ->q.setString(1,post);q.setString(2,user);q.executeUpdate() }
-                else c.prepareStatement("DELETE FROM post_diffusions WHERE post_id=?::uuid AND user_id=?::uuid").use { q ->q.setString(1,post);q.setString(2,user);q.executeUpdate() }
+                // Keep the first timestamp: retries and older clients cannot withdraw/re-boost it.
+                val changed=enabled && c.prepareStatement("INSERT INTO post_diffusions(post_id,user_id) VALUES(?::uuid,?::uuid) ON CONFLICT DO NOTHING").use { q ->q.setString(1,post);q.setString(2,user);q.executeUpdate()>0 }
                 c.commit()
+                changed
             } catch(error:Exception) {c.rollback();throw error} finally {c.autoCommit=true}
         }
     }

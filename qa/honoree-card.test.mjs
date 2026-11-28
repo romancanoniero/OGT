@@ -47,5 +47,7 @@ test('the diffusion footer is an icon with an accessible action and no visible l
  const html=sandbox.postCard({...base,viewerHasDiffused:true});
  const button=html.match(/<button[^>]*data-diffuse="post"[^>]*>([\s\S]*?)<\/button>/);
  assert.ok(button);assert.ok(!button[1].includes('Difundido')&&!button[1].includes('Difundir'));
- assert.ok(html.includes('aria-label="Dejar de difundir"'));
+ assert.ok(html.includes('aria-label="Ya difundido"'));
+ assert.ok(/class="act post-diffuse on"[^>]* disabled/.test(html));
+ assert.ok(!sandbox.postCard(base).match(/data-diffuse="post"[^>]* disabled/));
 });

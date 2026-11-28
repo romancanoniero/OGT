@@ -505,9 +505,9 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
         val principal=call.principal<AuthPrincipal>() ?: return@post call.respond(HttpStatusCode.Unauthorized)
         val data=JsonBody.receiveMap(call);val id=data.reqString("postId")
         val enabled=data["enabled"] as? Boolean ?: return@post call.respond(HttpStatusCode.BadRequest,ApiResponse.fail<Unit>("Acción inválida","BAD_REQUEST"))
-        repository.setDiffusion(principal.userId,id,enabled)
+        val changed=repository.setDiffusion(principal.userId,id,enabled)
         val saved=repository.byId(id,principal.userId) ?: return@post call.respond(HttpStatusCode.NotFound)
-        hub.projectSocialPost(id,WsCodec.json.encodeToString(SocialLiveCounters.serializer(),SocialLiveCounters(id,saved.commentCount,saved.impactCount,diffusionChanged=true)))
+        if(changed)hub.projectSocialPost(id,WsCodec.json.encodeToString(SocialLiveCounters.serializer(),SocialLiveCounters(id,saved.commentCount,saved.impactCount,diffusionChanged=true)))
         call.respond(ApiResponse.ok(saved))
     }
 
