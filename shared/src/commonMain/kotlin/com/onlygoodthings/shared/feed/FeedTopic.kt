@@ -83,7 +83,7 @@ fun FeedShowReason.labelEs(): String = when (this) {
 
 private val PET_TAGS = setOf(
     "perros", "gatos",
-    "adopción", "rescate animal", "tránsito animal", "mascotas", "fauna", "mascota perdida",
+    "adopción", "rescate animal", "tránsito animal", "mascotas", "fauna", "mascota perdida", "mascota encontrada",
     "cría", "cria", "llegó a casa", "llego a casa", "historia tierna", "ternura",
 )
 

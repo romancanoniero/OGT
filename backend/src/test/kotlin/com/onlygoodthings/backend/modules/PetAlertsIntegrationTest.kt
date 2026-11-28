@@ -29,6 +29,7 @@ class PetAlertsIntegrationTest {
             val social=posts.byId(found.postId,viewer)!!
             assertEquals("Mascota encontrada",social.topic);assertEquals("FOUND",social.animalListing!!.kind)
             assertTrue(posts.feed(viewer,FeedMode.HOME,200,null).any { it.id==found.postId })
+            assertTrue(posts.feed(viewer,FeedMode.HOME,200,null,family=com.onlygoodthings.shared.domain.FeedTopicFamily.PETS).any { it.id==found.postId })
             assertTrue(animals.open().any { it.listingId==found.listingId && !it.resolved })
             posts.clap(found.postId,viewer);posts.addComment(found.postId,viewer,"Aviso de prueba",null)
             val edited=animals.update(owner,found.listingId,animalWriteFrom(draft+mapOf("marks" to "Canela, collar y chapa"),null,previous=found))

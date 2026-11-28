@@ -15,6 +15,7 @@ class PetAlertsTest {
         }
         assertFalse(PetListingFilter.ALL.matches("UNKNOWN"))
         assertEquals(FeedCardKind.LOST_PET,feedCardKind("Mascota encontrada","FOUND"))
+        assertEquals(FeedTopicFamily.PETS,com.onlygoodthings.shared.feed.feedTopicFamily("Mascota encontrada"))
         assertEquals(FeedCardKind.ADOPTION,feedCardKind("Adopción","ADOPTION"))
         assertEquals(FeedCardKind.PET_STORY,feedCardKind("Adopción",sourceUrl="https://example.test/news"))
     }
