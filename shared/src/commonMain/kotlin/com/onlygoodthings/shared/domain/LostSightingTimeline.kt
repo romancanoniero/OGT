@@ -10,12 +10,13 @@ import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 
-/** Punto de partida o día de avistamientos de la línea de tiempo del aviso. */
+/** Origin, grouped day, or individual observation in the notice timeline. */
 data class LostTimelineStop(
     val dayStartEpochMs: Long,
     val dayEndEpochMs: Long,
     val label: String,
     val isOrigin: Boolean = false,
+    val sightingId: String? = null,
 )
 
 private val MonthsEs = listOf(
@@ -55,12 +56,45 @@ fun lostTimelineStops(
     }
 }
 
+/** The expanded map advances one observation at a time, including same-day reports. */
+fun lostTimelineEvents(
+    listing: LocalAnimalListing,
+    sightings: List<LocalSighting>,
+    nowEpochMs: Long,
+    timeZone: TimeZone = TimeZone.currentSystemDefault(),
+): List<LostTimelineStop> = listOf(lostTimelineStops(listing, sightings, nowEpochMs, timeZone).first()) +
+    sightings.sortedWith(sightingChronology).map { row ->
+        val at = sightingEventEpochMs(row)
+        val local = Instant.fromEpochMilliseconds(at).toLocalDateTime(timeZone)
+        val year = Instant.fromEpochMilliseconds(nowEpochMs).toLocalDateTime(timeZone).year
+        val day = formatDayLabel(at, nowEpochMs, timeZone) + if (local.year != year) " ${local.year}" else ""
+        val time = "${local.hour.toString().padStart(2, '0')}:${local.minute.toString().padStart(2, '0')}"
+        LostTimelineStop(dayStartMs(at, timeZone), at,
+            "$day\n${if (row.observedAtEpochMs == null) "Carga " else ""}$time", sightingId = row.id)
+    }
+
+data class LostTimelineFrame(
+    val markers: List<LocalSighting>,
+    val routeSightings: List<LocalSighting>,
+    val selectedSightingId: String?,
+)
+
+/** Selection changes emphasis and the historical route, never marker visibility. */
+fun lostTimelineFrame(sightings: List<LocalSighting>, stop: LostTimelineStop): LostTimelineFrame =
+    LostTimelineFrame(sightings.sortedWith(sightingChronology), sightingsAtTimelineStop(sightings, stop),
+        stop.sightingId?.takeIf { id -> sightings.any { it.id == id } })
+
 fun sightingsUntil(sightings: List<LocalSighting>, untilEpochMs: Long): List<LocalSighting> =
     sightings.filter { sightingEventEpochMs(it) <= untilEpochMs }.sortedWith(sightingChronology)
 
 /** El origen no incluye avistamientos, aunque hayan ocurrido el mismo día. */
-fun sightingsAtTimelineStop(sightings: List<LocalSighting>, stop: LostTimelineStop): List<LocalSighting> =
-    if (stop.isOrigin) emptyList() else sightingsUntil(sightings, stop.dayEndEpochMs)
+fun sightingsAtTimelineStop(sightings: List<LocalSighting>, stop: LostTimelineStop): List<LocalSighting> {
+    if (stop.isOrigin) return emptyList()
+    if (stop.sightingId == null) return sightingsUntil(sightings, stop.dayEndEpochMs)
+    val ordered = sightings.sortedWith(sightingChronology)
+    val index = ordered.indexOfFirst { it.id == stop.sightingId }
+    return if (index >= 0) ordered.take(index + 1) else emptyList()
+}
 
 /** Observation time when supplied, otherwise the stored report time. UI labels the fallback. */
 fun sightingMomentLabel(sighting: LocalSighting, nowEpochMs: Long, timeZone: TimeZone = TimeZone.currentSystemDefault()): String? {

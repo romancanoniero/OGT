@@ -3,6 +3,7 @@ package com.onlygoodthings.app.ui.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -44,6 +46,10 @@ import com.onlygoodthings.app.theme.OgtDimens
 import com.onlygoodthings.shared.domain.LostTimelineStop
 import kotlin.math.abs
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.Role
 
 /**
  * Rueda horizontal estilo iOS: las fechas giran bajo un triángulo fijo al centro.
@@ -61,6 +67,7 @@ fun LostSightingTimelineBar(
     val safeIndex = selectedIndex.coerceIn(stops.indices)
     val currentSelection by rememberUpdatedState(safeIndex)
     val select by rememberUpdatedState(onSelect)
+    val scope = rememberCoroutineScope()
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = safeIndex)
     val snap = rememberSnapFlingBehavior(lazyListState = listState)
     val density = LocalDensity.current
@@ -107,6 +114,7 @@ fun LostSightingTimelineBar(
         )
         OgtCaption(if (stops[safeIndex].isOrigin) "${stops[safeIndex].label} · punto de partida"
             else eventLabel ?: "Hasta ${stops[safeIndex].label} · girá la rueda")
+        OgtCaption("Todos visibles · tocá o deslizá para resaltar")
         Box(
             Modifier
                 .fillMaxWidth()
@@ -120,7 +128,7 @@ fun LostSightingTimelineBar(
                 contentPadding = PaddingValues(horizontal = sidePad),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                items(stops.size, key = { "${stops[it].isOrigin}:${stops[it].dayStartEpochMs}" }) { index ->
+                items(stops.size, key = { stops[it].sightingId ?: "${stops[it].isOrigin}:${stops[it].dayStartEpochMs}" }) { index ->
                     val info = listState.layoutInfo
                     val center = (info.viewportStartOffset + info.viewportEndOffset) / 2f
                     val item = info.visibleItemsInfo.find { it.index == index }
@@ -132,6 +140,10 @@ fun LostSightingTimelineBar(
                         Modifier
                             .width(itemWidth)
                             .fillMaxHeight()
+                            .semantics { selected = index == safeIndex }
+                            .clickable(role = Role.Button) {
+                                scope.launch { listState.animateScrollToItem(index) }
+                            }
                             .graphicsLayer {
                                 rotationY = t * 42f
                                 scaleX = 1f - 0.16f * depth
@@ -157,7 +169,7 @@ fun LostSightingTimelineBar(
                             fontSize = if (index == safeIndex) 13.sp else 11.sp,
                             fontWeight = if (index == safeIndex) FontWeight.SemiBold else FontWeight.Medium,
                             textAlign = TextAlign.Center,
-                            maxLines = 1,
+                            maxLines = 2,
                         )
                     }
                 }

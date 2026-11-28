@@ -37,6 +37,8 @@ data class BarrioMarker(
     /** Foto de la mascota en su ubicación; los demás mapas conservan sus iconos. */
     val petPhoto: com.onlygoodthings.shared.data.local.LocalPostMedia? = null,
     val photoUrl: String? = null,
+    /** Timeline pins stay visible; only the current event is emphasized. */
+    val timelineMarker: Boolean = false,
 )
 
 private val MapWell = OgtColors.sand

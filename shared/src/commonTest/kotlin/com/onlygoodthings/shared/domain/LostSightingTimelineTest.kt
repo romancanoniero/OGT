@@ -144,4 +144,54 @@ class LostSightingTimelineTest {
         assertNull(legacy.observedAtEpochMs)
         assertEquals(now-DAY,legacy.createdAtEpochMs)
     }
+
+    @Test fun cadaAvistamientoTieneUnPasoConDiaYHoraInclusoEnElMismoDia() {
+        val a=sight("a",now).copy(observedAtEpochMs=now-DAY-3_600_000L)
+        val b=sight("b",now-1000).copy(observedAtEpochMs=now-DAY)
+        val c=sight("c",now-2000).copy(observedAtEpochMs=now-3_600_000L)
+        val stops=lostTimelineEvents(listing(now-2*DAY),listOf(c,b,a),now,tz)
+        assertEquals(listOf(null,"a","b","c"),stops.map { it.sightingId })
+        assertTrue(stops.first().isOrigin)
+        assertEquals(listOf("Pérdida","Ayer\n14:00","Ayer\n15:00","Hoy\n14:00"),stops.map { it.label })
+    }
+
+    @Test fun todosLosMarcadoresSiguenVisiblesYElPasoSoloCambiaElResaltadoYElRecorrido() {
+        val origin=listing(now-2*DAY)
+        val rows=listOf(sight("c",now-1000),sight("a",now-DAY),sight("b",now-2000))
+        val stops=lostTimelineEvents(origin,rows,now,tz)
+        stops.forEachIndexed { index,stop ->
+            val frame=lostTimelineFrame(rows,stop)
+            assertEquals(listOf("a","b","c"),frame.markers.map { it.id })
+            assertEquals(listOf("a","b","c").take(index),frame.routeSightings.map { it.id })
+            assertEquals(stop.sightingId,frame.selectedSightingId)
+            assertEquals(index+1,movementRoute(origin,frame.routeSightings).size)
+        }
+        val backToOrigin=lostTimelineFrame(rows,stops.first())
+        assertEquals(3,backToOrigin.markers.size)
+        assertNull(backToOrigin.selectedSightingId)
+        assertTrue(backToOrigin.routeSightings.isEmpty())
+        assertEquals(3,rows.size)
+    }
+
+    @Test fun dosReportesConIgualHoraSeSeleccionanIndividualmenteYLaCargaHistoricaSeIdentifica() {
+        val rows=listOf(sight("b",now).copy(observedAtEpochMs=now-DAY),sight("a",now).copy(observedAtEpochMs=now-DAY),sight("old",now))
+        val stops=lostTimelineEvents(listing(now-2*DAY),rows,now,tz)
+        assertEquals(listOf(null,"a","b","old"),stops.map { it.sightingId })
+        assertEquals(listOf("a"),lostTimelineFrame(rows,stops[1]).routeSightings.map { it.id })
+        assertEquals(listOf("a","b"),lostTimelineFrame(rows,stops[2]).routeSightings.map { it.id })
+        assertEquals("Hoy\nCarga 15:00",stops.last().label)
+        assertNull(rows.last().observedAtEpochMs)
+        assertEquals(now,rows.last().createdAtEpochMs)
+    }
+
+    @Test fun laSeleccionPermaneceEnElMismoReporteCuandoLlegaUnoAnterior() {
+        val origin=listing(now-3*DAY);val selected=sight("selected",now-DAY)
+        val initial=lostTimelineEvents(origin,listOf(selected),now,tz).last()
+        val rows=listOf(selected,sight("late",now).copy(observedAtEpochMs=now-2*DAY))
+        val refreshed=lostTimelineEvents(origin,rows,now,tz).single { it.sightingId==initial.sightingId }
+        val frame=lostTimelineFrame(rows,refreshed)
+        assertEquals("selected",frame.selectedSightingId)
+        assertEquals(listOf("late","selected"),frame.routeSightings.map { it.id })
+        assertEquals(2,frame.markers.size)
+    }
 }

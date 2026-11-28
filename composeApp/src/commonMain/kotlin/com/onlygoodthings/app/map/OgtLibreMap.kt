@@ -29,9 +29,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
@@ -323,6 +325,9 @@ fun OgtLibreMap(
             Box(
                 Modifier
                     .offset { IntOffset(pos.x - pinPx / 2, pos.y - if (marker.kind == "LOCATION") pinPx / 2 else pinPx) }
+                    .then(if (marker.timelineMarker) Modifier
+                        .zIndex(if (selected) 1f else 0f)
+                        .graphicsLayer { alpha = if (selected) 1f else .68f } else Modifier)
                     .clickable(enabled = marker.id != "me") { onSelect(marker.id) },
                 contentAlignment = Alignment.BottomCenter,
             ) {
@@ -354,6 +359,7 @@ private fun MapPin(marker: BarrioMarker, selected: Boolean) {
         return
     }
     val fill = when {
+        marker.timelineMarker && selected -> OgtColors.secondary
         marker.kind == "SIGHT" -> OgtColors.sunset
         selected || marker.kind == "CAR" || marker.kind == "ME" || marker.kind == "PARKING" || marker.kind == "ORIGIN" -> OgtColors.secondary
         else -> OgtColors.tertiary
@@ -399,7 +405,7 @@ private fun MapPin(marker: BarrioMarker, selected: Boolean) {
                 .shadow(6.dp, CircleShape, ambientColor = Color(0x140A0A0B))
                 .clip(CircleShape)
                 .background(fill)
-                .then(if (marker.avatar != null) Modifier.border(2.dp, fill, CircleShape) else Modifier),
+                .then(if (marker.avatar != null || !marker.photoUrl.isNullOrBlank()) Modifier.border(if (marker.timelineMarker && selected) 3.dp else 2.dp, fill, CircleShape) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
             val art = marker.avatar

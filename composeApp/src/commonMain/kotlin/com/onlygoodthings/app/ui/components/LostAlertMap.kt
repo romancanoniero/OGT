@@ -38,9 +38,9 @@ import com.onlygoodthings.app.theme.OgtColors
 import com.onlygoodthings.shared.data.local.LocalAnimalListing
 import com.onlygoodthings.shared.data.local.LocalSighting
 import com.onlygoodthings.shared.domain.GeoPoint
-import com.onlygoodthings.shared.domain.lostTimelineStops
+import com.onlygoodthings.shared.domain.lostTimelineEvents
+import com.onlygoodthings.shared.domain.lostTimelineFrame
 import com.onlygoodthings.shared.domain.movementRoute
-import com.onlygoodthings.shared.domain.sightingsAtTimelineStop
 import com.onlygoodthings.shared.domain.sightingMomentLabel
 import com.onlygoodthings.app.ui.screens.OgtNeighborAvatar
 import com.onlygoodthings.shared.realtime.currentEpochMs
@@ -69,28 +69,29 @@ fun LostAlertMap(
     if (originLat == null || originLng == null) return
     var selectedId by remember(listing.id) { mutableStateOf(listing.id) }
     val now = remember { currentEpochMs() }
-    val stops = remember(listing.id, sightings, now) { lostTimelineStops(listing, sightings, now) }
-    var dayIndex by remember(listing.id) { mutableStateOf(0) }
-    val stopIndex = dayIndex.coerceIn(stops.indices)
-    val visible = if (fill) sightingsAtTimelineStop(sightings, stops[stopIndex]) else sightings
-    val route = if (fill) movementRoute(listing, visible) else emptyList()
+    val stops = remember(listing, sightings, now) { lostTimelineEvents(listing, sightings, now) }
+    val stopIndex = stops.indexOfFirst { it.sightingId == selectedId || (it.isOrigin && selectedId == listing.id) }.coerceAtLeast(0)
+    val frame = lostTimelineFrame(sightings, stops[stopIndex])
+    val mapSightings = if (fill) frame.markers else sightings
+    val activeId = if (fill) frame.selectedSightingId ?: listing.id else selectedId
+    val route = if (fill) movementRoute(listing, frame.routeSightings) else emptyList()
     var fitVersion by remember(listing.id) { mutableStateOf(0) }
-    val fitPoints = remember(listing.id, visible, here != null, fitVersion) {
+    val fitPoints = remember(listing.id, sightings, here != null, fitVersion) {
         buildList {
             add(GeoPoint(originLat, originLng))
-            visible.forEach { add(GeoPoint(it.latitude, it.longitude)) }
+            sightings.forEach { add(GeoPoint(it.latitude, it.longitude)) }
             here?.let { add(it) }
         }
     }
     val photo = remember(listing.id, socialTick) {
         db.posts.firstOrNull { it.listingId == listing.id }?.let { db.mediaOf(it.id).firstOrNull() }
     }
-    val selectedSighting = visible.firstOrNull { it.id == selectedId }
+    val selectedSighting = sightings.firstOrNull { it.id == activeId }
     val distance = petMapDistance(here, selectedSighting?.let { GeoPoint(it.latitude, it.longitude) }
         ?: GeoPoint(originLat, originLng))
-    LaunchedEffect(visible.map { it.id }.joinToString()) {
-        if (selectedId != listing.id && visible.none { it.id == selectedId }) {
-            selectedId = visible.lastOrNull()?.id ?: listing.id
+    LaunchedEffect(sightings.map { it.id }.joinToString()) {
+        if (selectedId != listing.id && sightings.none { it.id == selectedId }) {
+            selectedId = listing.id
         }
     }
     val markers = buildList {
@@ -102,9 +103,10 @@ fun LostAlertMap(
                 latitude = originLat,
                 longitude = originLng,
                 petPhoto = photo,
+                timelineMarker = fill,
             ),
         )
-        visible.forEach { row ->
+        mapSightings.forEach { row ->
             val who = knownFaces[row.id]
             add(
                 BarrioMarker(
@@ -115,6 +117,7 @@ fun LostAlertMap(
                     longitude = row.longitude,
                     avatar = neighborAvatarArt(row.userId),
                     photoUrl = who?.photoUrl,
+                    timelineMarker = fill,
                     saw = true,
                     wrote = row.wroteNote(),
                     badgesInsteadOfName = reportBadges,
@@ -134,10 +137,10 @@ fun LostAlertMap(
                 center = GeoPoint(originLat, originLng),
                 radiusMeters = listing.alertRadiusM,
                 markers = markers,
-                selectedId = selectedId,
+                selectedId = activeId,
                 onSelect = { id ->
                     selectedId = id
-                    visible.firstOrNull { it.id == id }?.let(onSelectSighting)
+                    sightings.firstOrNull { it.id == id }?.let(onSelectSighting)
                 },
                 height = height,
                 fill = fill,
@@ -180,11 +183,10 @@ fun LostAlertMap(
                     selectedIndex = stopIndex,
                     onSelect = { index ->
                         stops.getOrNull(index)?.let { stop ->
-                            dayIndex = index
-                            selectedId = sightingsAtTimelineStop(sightings, stop).lastOrNull()?.id ?: listing.id
+                            selectedId = stop.sightingId ?: listing.id
                         }
                     },
-                    eventLabel = visible.lastOrNull()?.let {
+                    eventLabel = frame.routeSightings.lastOrNull()?.let {
                         if (it.observedAtEpochMs != null) "Punteado: visto el ${sightingMomentLabel(it, now)}"
                         else "Punteado: carga ${sightingMomentLabel(it, now) ?: "sin fecha"} · hora del avistamiento no informada"
                     },
