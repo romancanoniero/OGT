@@ -108,9 +108,9 @@ class FeedTimeline(
     private fun nearbyAllowed(query:FeedQuery,post:LocalSocialPost):Boolean {
         if(query.mode!=FeedMode.HOME)return true
         val animal=post.listingId?.let { id -> db.animals.firstOrNull { it.id==id } }
-        if(animal?.kind!="ADOPTION" && !post.tag.equals("Adopción",true))return true
+        if(!PetDiscovery.requiresLocation(animal?.kind,post.tag))return true
         val me=db.userOrNull(owner)
-        val here=if(locationChecked)viewerLocation else me?.let { AdoptionProximity.point(it.latitude,it.longitude)?.takeUnless { it.latitude==0.0 && it.longitude==0.0 } }
+        val here=viewerLocation.takeIf { locationChecked }
         return AdoptionProximity.allows(db.isOwnPost(post,db.viewerAliases(owner)),here,
             AdoptionProximity.point(animal?.latitude,animal?.longitude),presentation.adoptionRadiusKm)
     }

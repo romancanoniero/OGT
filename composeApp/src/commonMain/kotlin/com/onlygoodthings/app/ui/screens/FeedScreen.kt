@@ -252,6 +252,9 @@ fun FeedScreen(
             item(key = "chrome-family") {
                 FeedFamilyRow(family = feedFamily, onFamily = { presentation.family = it }, copy = copy)
             }
+            if(feedMode==FeedMode.HOME && timeline.locationChecked && timeline.viewerLocation==null) {
+                item(key="discovery-zone") { com.onlygoodthings.app.ui.components.ScreenColumn { com.onlygoodthings.app.ui.components.DiscoveryPlacePrompt() } }
+            }
             if (refreshing || pullPx > 16f) {
                 item(key = "chrome-refresh") {
                     Box(Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {

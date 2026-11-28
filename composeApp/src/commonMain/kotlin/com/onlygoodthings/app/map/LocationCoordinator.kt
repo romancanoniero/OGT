@@ -22,6 +22,9 @@ fun LocationCoordinator(ui:LocationUiState,session:OgtPreviewSession,auth:AuthCo
         session.locationAccuracy = location.fix?.accuracyMeters
         session.deviceLocation = location.fix?.toGeoPoint()
     }
+    LaunchedEffect(session.gpsEnabled,location.permission,location.servicesEnabled,location.fix) {
+        auth.updateDiscoveryDevice(session.gpsEnabled && location.canTrack,location.fix?.toGeoPoint(),location.fix?.epochMs ?: 0L)
+    }
     LaunchedEffect(Unit) {
         OgtLocationSync.bind { lat, lng, acc ->
             auth.updateMyLocation(lat, lng, acc)

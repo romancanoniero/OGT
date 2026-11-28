@@ -59,13 +59,17 @@ fun AnimalsScreen(
     val auth = LocalAuth.current
     val copy = LocalOgtCopy.current
     val lostTick = db.lostEpoch
-    LaunchedEffect(Unit) {
-        auth.hydratePublishedAnimals(db)
-        session.persistPublishedAnimals()
+    val viewer=auth.feedTimeline.viewerLocation
+    val radius=auth.feedTimeline.presentation.adoptionRadiusKm
+    LaunchedEffect(me.id) { auth.hydratePublishedAnimals(db);session.persistPublishedAnimals() }
+    LaunchedEffect(me.id,radius,viewer) {
+        runCatching { auth.refreshDiscoveryScope();auth.refreshAnimalListings(db) }
     }
     var filter by remember { mutableStateOf(PetsFilter.ALL) }
-    val listings = remember(lostTick, filter, me.id) {
-        db.animals.filter { filter.matches(it.kind,it.resolved) }.sortedWith(
+    val listings = remember(lostTick, filter, me.id,viewer,radius) {
+        db.animals.filter { filter.matches(it.kind,it.resolved) && (!com.onlygoodthings.shared.domain.PetDiscovery.requiresLocation(it.kind) ||
+            com.onlygoodthings.shared.domain.PetDiscovery.allows(me.owns(it.reporterUserId),viewer,
+                com.onlygoodthings.shared.domain.AdoptionProximity.point(it.latitude,it.longitude),radius)) }.sortedWith(
             compareByDescending<LocalAnimalListing> { me.owns(it.reporterUserId) }
                 .thenByDescending { it.createdAtEpochMs },
         )
@@ -73,6 +77,7 @@ fun AnimalsScreen(
     Column(Modifier.fillMaxSize().background(OgtColors.canvas).verticalScroll(rememberScrollState())) {
         OgtTopBar(title = copy.petsTitle, onBack = onBack)
         ScreenColumn {
+            com.onlygoodthings.app.ui.components.DiscoveryPlacePrompt()
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),

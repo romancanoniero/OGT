@@ -5,6 +5,15 @@ import com.onlygoodthings.backend.http.*
 import com.onlygoodthings.shared.domain.DiscoverySettings
 import com.onlygoodthings.shared.domain.FeedDiscoveryScope
 import com.onlygoodthings.shared.domain.AdoptionProximity
+import com.onlygoodthings.shared.domain.GeoPoint
+import com.onlygoodthings.shared.domain.PetDiscovery
+
+internal fun discoveryDevicePoint(data:Map<String,Any?>):GeoPoint? {
+    val lat=data.optDouble("latitude");val lng=data.optDouble("longitude")
+    require((lat==null)==(lng==null)) { "Indicá ambas coordenadas de la ubicación actual." }
+    if(lat==null)return null
+    return AdoptionProximity.point(lat,lng) ?: throw IllegalArgumentException("Ubicación actual inválida.")
+}
 
 class DiscoverySettingsRepository(private val db:Database) {
     fun get():DiscoverySettings=db.withConnection { c ->c.createStatement().use { q ->q.executeQuery("SELECT adoption_radius_km,version FROM discovery_settings WHERE singleton").use { r ->
@@ -21,20 +30,22 @@ class DiscoverySettingsRepository(private val db:Database) {
                     }
                 }
                 c.prepareStatement("INSERT INTO crm_audit_events(actor_user_id,action,target_type,target_id,reason,outcome) VALUES(?::uuid,'DISCOVERY_SETTINGS_SAVE','discovery_settings','global',?,'SUCCESS')").use { q ->
-                    q.setString(1,actor);q.setString(2,"Adopciones: $radius km; versión ${saved.version}");q.executeUpdate()
+                    q.setString(1,actor);q.setString(2,"Descubrimiento de mascotas: $radius km; versión ${saved.version}");q.executeUpdate()
                 }
                 c.commit();saved
             } catch(e:Exception) { c.rollback();throw e } finally { c.autoCommit=true }
         }
     }
 
-    fun scope(user:String):FeedDiscoveryScope {
+    fun scope(user:String,device:GeoPoint?=null):FeedDiscoveryScope {
         val settings=get()
-        return db.withConnection { c ->c.prepareStatement("SELECT ST_Y(COALESCE(discovery_location,home_location)),ST_X(COALESCE(discovery_location,home_location)),discovery_place FROM users WHERE id=?::uuid").use { q ->
+        return db.withConnection { c ->c.prepareStatement("SELECT ST_Y(discovery_location),ST_X(discovery_location),discovery_place FROM users WHERE id=?::uuid").use { q ->
             q.setString(1,user);q.executeQuery().use { r ->
                 if(!r.next()) FeedDiscoveryScope(settings=settings) else {
                     val lat=r.getObject(1) as? Number;val lng=r.getObject(2) as? Number
-                    FeedDiscoveryScope(lat?.toDouble(),lng?.toDouble(),settings,r.getString(3))
+                    val manual=AdoptionProximity.point(lat?.toDouble(),lng?.toDouble())
+                    val point=PetDiscovery.reference(manual,device)
+                    FeedDiscoveryScope(point?.latitude,point?.longitude,settings,r.getString(3)?.takeIf { manual!=null })
                 }
             }
         } }

@@ -45,12 +45,15 @@ fun PetsMapScreen(onBack: () -> Unit, onReport: () -> Unit, onOpenPost: (String)
     val session = LocalOgtSession.current
     val auth = LocalAuth.current
     val copy = LocalOgtCopy.current
-    val here = session.here()
+    val here = auth.feedTimeline.viewerLocation
+    val radius=auth.feedTimeline.presentation.adoptionRadiusKm
     var selectedId by remember { mutableStateOf<String?>(null) }
     var filter by remember { mutableStateOf(com.onlygoodthings.shared.domain.PetListingFilter.ALL) }
     val owner = session.me().id
     val socialTick by db.socialTick.collectAsState()
-    val lost = remember(owner, socialTick,filter) { db.animals.filter { com.onlygoodthings.shared.domain.isPetAlert(it.kind) && filter.matches(it.kind,it.resolved) } }
+    val lost = remember(owner, socialTick,filter,here,radius) { db.animals.filter { com.onlygoodthings.shared.domain.isPetAlert(it.kind) && filter.matches(it.kind,it.resolved) &&
+        com.onlygoodthings.shared.domain.PetDiscovery.allows(session.me().owns(it.reporterUserId),here,com.onlygoodthings.shared.domain.AdoptionProximity.point(it.latitude,it.longitude),radius) } }
+    LaunchedEffect(owner,radius,here) { runCatching { auth.refreshDiscoveryScope();auth.refreshAnimalListings(db) } }
     val remoteIds = lost.filter { it.kind=="LOST" }.map { it.id }.filter {
         it.matches(Regex("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"))
     }.sorted()
@@ -63,9 +66,9 @@ fun PetsMapScreen(onBack: () -> Unit, onReport: () -> Unit, onOpenPost: (String)
             catch (_: Exception) { sightingsError = true }
         }
     }
-    val pins = db.mapPins.filter { it.kind == "ANIMAL" && (filter==com.onlygoodthings.shared.domain.PetListingFilter.ALL || lost.any { row ->row.id==it.id }) }
+    val pins = db.mapPins.filter { it.kind == "ANIMAL" && com.onlygoodthings.shared.domain.PetDiscovery.allows(false,here,com.onlygoodthings.shared.domain.GeoPoint(it.latitude,it.longitude),radius) && (filter==com.onlygoodthings.shared.domain.PetListingFilter.ALL || lost.any { row ->row.id==it.id }) }
     val markers = buildList {
-        if (here != null) add(BarrioMarker("me", "ME", copy.mePin, here.latitude, here.longitude))
+        if (here != null) add(BarrioMarker("me", "ME", if(auth.feedTimeline.viewerUsesManualPlace)"Tu zona" else copy.mePin, here.latitude, here.longitude))
         pins.forEach { pin ->
             add(BarrioMarker(pin.id, "ANIMAL", pin.title, pin.latitude, pin.longitude))
         }
@@ -114,7 +117,7 @@ fun PetsMapScreen(onBack: () -> Unit, onReport: () -> Unit, onOpenPost: (String)
                 }
             }
             if (sightingsError) OgtCaption("No pudimos actualizar todos los avistajes. Se conserva la última información disponible.")
-            if (here == null) OgtGpsBanner()
+            com.onlygoodthings.app.ui.components.DiscoveryPlacePrompt()
         }
         if (center != null) {
             OgtBarrioMap(

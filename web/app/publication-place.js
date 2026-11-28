@@ -12,7 +12,7 @@ export function publicationPlaceHtml({optional=true,name='publicationPlace',labe
     </div></section>`;
 }
 
-export function bindPublicationPlace(root,{api,geolocation=globalThis.navigator?.geolocation,initialPoint=null}={}) {
+export function bindPublicationPlace(root,{api,geolocation=globalThis.navigator?.geolocation,initialPoint=null,autoLocate=true}={}) {
   if(!root)return {value:()=>undefined};
   const input=root.querySelector('input:not([type=checkbox])'),toggle=root.querySelector('input[type=checkbox]');
   const editor=root.querySelector('[data-place-editor]'),button=root.querySelector('[data-current-place]');
@@ -54,7 +54,7 @@ export function bindPublicationPlace(root,{api,geolocation=globalThis.navigator?
     if(toggle.checked && !input.value.trim())locate();
     else message('');
   });
-  input.addEventListener('focus',()=>{openOptions();if(!toggle && !initialized && !input.value.trim())locate();});
+  input.addEventListener('focus',()=>{openOptions();if(autoLocate && !toggle && !initialized && !input.value.trim())locate();});
   input.addEventListener('blur',hideOptions);
   input.addEventListener('keydown',event=>{
     if(event.key==='Escape'){hideOptions();return;}

@@ -60,10 +60,11 @@ class SocialSqlRepository(private val db: Database, private val mediaForReading:
         cursor: String?,
         family: com.onlygoodthings.shared.domain.FeedTopicFamily? = null,
         adoptionRadiusKm: Int = com.onlygoodthings.backend.modules.DiscoverySettingsRepository(db).get().adoptionRadiusKm,
+        device: com.onlygoodthings.shared.domain.GeoPoint? = null,
     ): List<SocialPost> {
         require(adoptionRadiusKm in 0..20_000) { "Radio de adopciones inválido" }
         val offset = cursor?.toIntOrNull() ?: 0
-        val viewer = loadViewer(userId)
+        val viewer = loadViewer(userId,device)
         val excluded=blocks.excluded(userId)
         val preferred=viewer.events.filter { it.kind in setOf(FeedEventKind.CLAP,FeedEventKind.HEART,FeedEventKind.COMMENT,FeedEventKind.SHARE) }
             .flatMap { it.hashtags }.distinctBy { it.interestKey }.take(12)
@@ -866,11 +867,11 @@ class SocialSqlRepository(private val db: Database, private val mediaForReading:
     fun byId(postId: String, viewerId: String): SocialPost? =
         hydratePosts(listOf(postId), viewerId).firstOrNull()
 
-    private fun loadViewer(userId: String): ViewerContext = db.withConnection { connection ->
+    private fun loadViewer(userId: String,device:com.onlygoodthings.shared.domain.GeoPoint?=null): ViewerContext = db.withConnection { connection ->
         var lat: Double? = null
         var lng: Double? = null
         connection.prepareStatement(
-            "SELECT ST_Y(COALESCE(discovery_location,home_location)) AS lat, ST_X(COALESCE(discovery_location,home_location)) AS lng FROM users WHERE id = ?::uuid",
+            "SELECT ST_Y(discovery_location) AS lat, ST_X(discovery_location) AS lng FROM users WHERE id = ?::uuid",
         ).use { stmt ->
             stmt.setString(1, userId)
             stmt.executeQuery().use { rs ->
@@ -880,6 +881,7 @@ class SocialSqlRepository(private val db: Database, private val mediaForReading:
                 }
             }
         }
+        if(lat==null || lng==null) { lat=device?.latitude;lng=device?.longitude }
         val followed = connection.prepareStatement(
             "SELECT followed_id FROM follows WHERE follower_id = ?::uuid",
         ).use { stmt ->
@@ -927,14 +929,14 @@ class SocialSqlRepository(private val db: Database, private val mediaForReading:
         ViewerContext(userId, followed, events, lat, lng, offeredTagIds = offered)
     }
 
-    fun feedScope(userId:String)=com.onlygoodthings.backend.modules.DiscoverySettingsRepository(db).scope(userId)
+    fun feedScope(userId:String,device:com.onlygoodthings.shared.domain.GeoPoint?=null)=com.onlygoodthings.backend.modules.DiscoverySettingsRepository(db).scope(userId,device)
 
     private fun loadCandidates(preferred:List<PostHashtag> = emptyList(),graphIds:Set<String>?=null,viewer:ViewerContext?=null,adoptionRadiusKm:Int=0,ids:Set<String>?=null): List<FeedCandidate> = db.withConnection { connection ->
         val idFilter=if(ids==null)"" else " AND p.id IN ("+ids.joinToString(",") { "'$it'::uuid" }+")" // IDs originate only from the UUID database column.
         val topicFilter=if(preferred.isEmpty())"" else " AND ("+preferred.joinToString(" OR ") { "p.hashtags @> ?::jsonb" }+")"
         val graphFilter=if(graphIds==null)"" else " AND (p.author_user_id=ANY(?::uuid[]) OR EXISTS(SELECT 1 FROM post_people fp WHERE fp.post_id=p.id AND fp.role='PROTAGONIST' AND fp.user_id=ANY(?::uuid[])))"
         val nearby=viewer!=null && adoptionRadiusKm>0
-        val proximityFilter=if(!nearby)"" else " AND (a.kind IS DISTINCT FROM 'ADOPTION' OR p.author_user_id=?::uuid OR ST_DWithin(a.location::geography,ST_SetSRID(ST_MakePoint(?::float8,?::float8),4326)::geography,?::float8))"
+        val proximityFilter=if(!nearby)"" else " AND (a.kind NOT IN ('ADOPTION','LOST','FOUND') OR a.kind IS NULL OR p.author_user_id=?::uuid OR ST_DWithin(a.location::geography,ST_SetSRID(ST_MakePoint(?::float8,?::float8),4326)::geography,?::float8))"
         connection.prepareStatement(
             """
             SELECT p.id, p.author_user_id, p.author_company_id, p.hashtags, COALESCE(p.topic, '') AS topic,

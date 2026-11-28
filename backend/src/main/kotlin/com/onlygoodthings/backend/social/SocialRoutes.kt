@@ -63,7 +63,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
     }
     post("/api/v1/social/feed-scope") {
         val principal=call.principal<AuthPrincipal>() ?: return@post call.respond(HttpStatusCode.Unauthorized)
-        call.respond(ApiResponse.ok(repository.feedScope(principal.userId)))
+        call.respond(ApiResponse.ok(repository.feedScope(principal.userId,com.onlygoodthings.backend.modules.discoveryDevicePoint(JsonBody.receiveMap(call)))))
     }
     post("/api/v1/social/feed") {
         val principal = call.principal<AuthPrincipal>() ?: return@post call.respond(
@@ -85,7 +85,7 @@ fun Route.socialRoutes(repository: SocialSqlRepository, hub: RealtimeHub) {
                 else -> runCatching { com.onlygoodthings.shared.domain.FeedTopicFamily.valueOf(key) }.getOrNull()
             }
         }
-        call.respond(ApiResponse.ok(repository.feed(principal.userId, mode, pageSize, cursor, family)))
+        call.respond(ApiResponse.ok(repository.feed(principal.userId, mode, pageSize, cursor, family,device=com.onlygoodthings.backend.modules.discoveryDevicePoint(dataMap))))
     }
 
     post("/api/v1/social/post/get") {

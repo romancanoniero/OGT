@@ -35,8 +35,8 @@ class RestAnimalsRepository(
     suspend fun update(body: JsonObject): AnimalListingDto =
         post("/api/v1/animals/update", body)
 
-    suspend fun openListings(): List<AnimalListingDto> =
-        post("/api/v1/animals/open", buildJsonObject {})
+    suspend fun openListings(device:com.onlygoodthings.shared.domain.GeoPoint?=null): List<AnimalListingDto> =
+        post("/api/v1/animals/open", buildJsonObject { device?.let { put("latitude",kotlinx.serialization.json.JsonPrimitive(it.latitude));put("longitude",kotlinx.serialization.json.JsonPrimitive(it.longitude)) } })
 
     suspend fun resolve(listingId: String): AnimalResolveResult =
         post("/api/v1/animals/resolve", buildJsonObject {

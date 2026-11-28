@@ -174,8 +174,8 @@ fun Route.animalRoutes(db: Database, hub: RealtimeHub, mediaForReading: (PostMed
     }
 
     post("/api/v1/animals/open") {
-        requireUser(call) ?: return@post
-        call.respond(ApiResponse.ok(animals.open()))
+        val me=requireUser(call) ?: return@post
+        call.respond(ApiResponse.ok(animals.open(me.userId,discoveryDevicePoint(JsonBody.receiveMap(call)))))
     }
 
     post("/api/v1/animals/get") {
@@ -187,12 +187,13 @@ fun Route.animalRoutes(db: Database, hub: RealtimeHub, mediaForReading: (PostMed
     }
 
     post("/api/v1/animals/nearby") {
-        requireUser(call) ?: return@post
+        val me=requireUser(call) ?: return@post
         val objectMapper = JsonBody.objectMapper
         val dataMap = objectMapper.readValue(call.receiveText(), object : com.fasterxml.jackson.core.type.TypeReference<Map<String, Any?>>() {})
-        val lat = dataMap.reqDouble("latitude")
-        val lng = dataMap.reqDouble("longitude")
-        val radius = dataMap.optInt("radius", 3000)
+        val scope=DiscoverySettingsRepository(db).scope(me.userId,discoveryDevicePoint(dataMap))
+        val lat=scope.latitude ?: return@post call.respond(ApiResponse.ok(emptyList<NearbyAnimalDto>()))
+        val lng=scope.longitude ?: return@post call.respond(ApiResponse.ok(emptyList<NearbyAnimalDto>()))
+        val radius=scope.settings.adoptionRadiusKm*1000
         val rows = db.withConnection { connection ->
             connection.prepareStatement(
                 """

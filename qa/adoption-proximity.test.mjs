@@ -17,6 +17,12 @@ test('nearby adoptions require a confirmed point; radius can expand and own/prof
  assert.equal(adoptionNearby(post,{kind:'ADOPTION'},{radiusKm:0}),true);
  assert.equal(adoptionNearby({authorId:'viewer'},far,scope),true);
  assert.equal(adoptionNearby(post,far,{...scope,mode:'FOLLOWING'}),true);
- assert.equal(adoptionNearby(post,{kind:'LOST'},scope),true);
+ assert.equal(adoptionNearby(post,{kind:'LOST'},scope),false);
+ for(const kind of ['LOST','FOUND']) {
+  assert.equal(adoptionNearby(post,{...nearby,kind},scope),true);
+  assert.equal(adoptionNearby(post,{...far,kind},scope),false);
+  assert.equal(adoptionNearby(post,{...far,kind},{...scope,radiusKm:100}),true);
+  assert.equal(adoptionNearby({authorId:'viewer'},{...far,kind},scope),true);
+ }
  assert.equal(adoptionNearby(post,null,scope),true);
 });

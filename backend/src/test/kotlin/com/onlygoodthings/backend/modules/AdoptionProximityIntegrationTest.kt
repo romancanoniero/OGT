@@ -20,6 +20,7 @@ class AdoptionProximityIntegrationTest {
                     q.setString(1,id);q.setString(2,"geo-$id");q.setString(3,"$id@example.test");q.setString(4,id);q.executeUpdate()
                 }
             }
+            db.withConnection { c -> c.createStatement().use { it.execute("UPDATE users SET discovery_location=home_location,discovery_place='Zona QA' WHERE id='$viewer'::uuid") } }
             val animals=AnimalSqlRepository(db);val posts=SocialSqlRepository(db)
             val draft=mapOf<String,Any?>("kind" to "ADOPTION","species" to "CAT","petName" to "Gato QA","description" to "Busca hogar","place" to "Zona QA")
             fun publish(lat:Double?,lng:Double?,author:String=owner)=animals.publish(author,animalWriteFrom(draft+mapOf("latitude" to lat,"longitude" to lng),null))
@@ -42,7 +43,7 @@ class AdoptionProximityIntegrationTest {
             assertTrue(posts.feed(viewer,FeedMode.HOME,200,null,adoptionRadiusKm=0).any { it.animalListing?.latitude == -31.42 })
             assertTrue(posts.feed(viewer,FeedMode.FOLLOWING,200,null).any { it.animalListing?.latitude == -31.42 })
             assertNotNull(posts.byId(far.postId,viewer));assertNotNull(posts.byId(unknown.postId,viewer))
-            db.withConnection { c -> c.createStatement().use { it.execute("UPDATE users SET home_location=NULL WHERE id='$viewer'::uuid") } }
+            db.withConnection { c -> c.createStatement().use { it.execute("UPDATE users SET home_location=NULL,discovery_location=NULL,discovery_place=NULL WHERE id='$viewer'::uuid") } }
             assertTrue(posts.feed(viewer,FeedMode.HOME,200,null).filter { it.animalListing!=null }.all { it.authorId==viewer })
         }
     }

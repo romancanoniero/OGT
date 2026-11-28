@@ -15,11 +15,11 @@ import kotlinx.coroutines.launch
     val auth=LocalAuth.current;val scope=rememberCoroutineScope()
     var place by remember { mutableStateOf("") };var point by remember { mutableStateOf<GeoPoint?>(null) }
     var busy by remember { mutableStateOf(false) };var message by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) { runCatching { auth.feed.discoveryScope() }.getOrNull()?.let { saved ->
+    LaunchedEffect(Unit) { runCatching { auth.refreshDiscoveryScope() }.getOrNull()?.let { saved ->
         place=saved.place.orEmpty();if(saved.place!=null)point=AdoptionProximity.point(saved.latitude,saved.longitude)
     } }
     Column(Modifier.fillMaxWidth().padding(vertical=12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-        Text("Tu zona para adopciones")
+        Text("Tu zona para mascotas")
         Text("Si no usás GPS, elegí tu barrio o localidad. Usamos una ubicación aproximada.",style=MaterialTheme.typography.bodySmall)
         PublicationPlaceField(place,{place=it;message=null},label="Barrio o localidad",enabled=!busy,onPointChange={point=it})
         Button(enabled=!busy&&point!=null,onClick={val chosen=point ?: return@Button;busy=true;scope.launch {
@@ -34,5 +34,14 @@ import kotlinx.coroutines.launch
             finally { busy=false }
         } }) { Text(if(busy)"Guardando…" else "Guardar zona") }
         message?.let { Text(it,style=MaterialTheme.typography.bodySmall) }
+    }
+}
+
+/** Inline request: other app features remain available while the user chooses an area. */
+@Composable fun DiscoveryPlacePrompt() {
+    val timeline=LocalAuth.current.feedTimeline
+    if(timeline.locationChecked && timeline.viewerLocation==null) {
+        Text("Elegí tu barrio o localidad para ver mascotas cercanas.")
+        DiscoveryPlaceSettings()
     }
 }

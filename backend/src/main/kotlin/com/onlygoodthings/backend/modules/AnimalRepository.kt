@@ -175,7 +175,10 @@ class AnimalSqlRepository(private val db: Database, private val mediaForReading:
         loadByListing(connection, listingId)
     }
 
-    fun open(): List<AnimalListingDto> = db.withConnection { connection ->
+    fun open(userId:String?=null,device:com.onlygoodthings.shared.domain.GeoPoint?=null): List<AnimalListingDto> {
+        val scope=userId?.let { DiscoverySettingsRepository(db).scope(it,device) }
+        val nearby=if(scope==null)"" else "AND (a.kind NOT IN ('ADOPTION','LOST','FOUND') OR a.reporter_user_id=?::uuid OR ST_DWithin(a.location::geography,ST_SetSRID(ST_MakePoint(?::float8,?::float8),4326)::geography,?::float8))"
+        return db.withConnection { connection ->
         connection.prepareStatement(
             """
             SELECT a.id AS listing_id, p.id AS post_id,
@@ -192,15 +195,18 @@ class AnimalSqlRepository(private val db: Database, private val mediaForReading:
             JOIN social_posts p ON p.listing_id = a.id
                 AND p.moderation_status = 'VISIBLE'
             WHERE a.resolved = FALSE
+            $nearby
             ORDER BY a.created_at DESC
             LIMIT 80
             """.trimIndent(),
         ).use { stmt ->
+            if(scope!=null) { stmt.setString(1,userId);stmt.setObject(2,scope.longitude);stmt.setObject(3,scope.latitude);stmt.setInt(4,scope.settings.adoptionRadiusKm*1000) }
             stmt.executeQuery().use { rs ->
                 val rows = buildList { while (rs.next()) add(rs.toDto()) }
                 val media = loadMedia(connection, rows.map { it.postId }.filter { it.isNotBlank() })
                 rows.map { it.copy(media = media[it.postId].orEmpty()) }
             }
+        }
         }
     }
 

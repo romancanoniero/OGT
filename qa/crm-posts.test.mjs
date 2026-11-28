@@ -63,11 +63,11 @@ test('publicaciones abre el listado y no el tablero de resumen', () => {
   assert.match(runtime, /id: 'publicaciones', label: 'Publicaciones', icon: 'qs_anecdote\.svg', view: 'listing'/);
   assert.doesNotMatch(runtime, /id: 'publicaciones'[^}]*keys:/);
   assert.match(runtime, /crm-ui\.js\?v=[a-zA-Z0-9_-]+/);
-  assert.match(html, /crm\.js\?v=media-audit-1/);
+  assert.match(html, /crm\.js\?v=20261128-discovery-33/);
   assert.match(runtime, /publicationImage\(post\.imageUrl\)/);
   assert.match(runtime, /publicationImage\(post\.editorUrl\)/);
   assert.match(runtime, /imageUrl: saved\.imageUrl/);
-  assert.match(html, /crm\.css\?v=media-audit-1/);
+  assert.match(html, /crm\.css\?v=20261128-discovery-33/);
   assert.match(runtime, /icon: 'qs_trash\.png', label: 'Quitar selección'/);
   assert.match(runtime, /platform\/posts\/reassign/);
   assert.match(runtime, /platform\/users\/search/);
@@ -189,8 +189,8 @@ test('la rueda del CRM web acerca arriba y aleja abajo', () => {
   assert.match(css, /\.crm-frame \{[^}]*overscroll-behavior: none/s);
   const empresas = readFileSync(new URL('../web/app/crm/empresas/index.html', import.meta.url), 'utf8');
   const control = readFileSync(new URL('../web/app/crm/control/index.html', import.meta.url), 'utf8');
-  assert.match(empresas, /crm\.js\?v=media-audit-1/);
-  assert.match(control, /crm\.js\?v=media-audit-1/);
+  assert.match(empresas, /crm\.js\?v=20261128-discovery-33/);
+  assert.match(control, /crm\.js\?v=20261128-discovery-33/);
   assert.doesNotMatch(css, /crm-frame-zoom/);
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_in.png', import.meta.url)));
   assert.ok(existsSync(new URL('../web/app/crm/icons/qs_zoom_out.png', import.meta.url)));
@@ -333,7 +333,7 @@ test('animal post titles are indexed, searchable and visible in CRM across platf
   assert.match(runtime, /post\.animalTitle/);
   assert.match(publicApp, /\/api\/v1\/social\/feed/);
   assert.match(mobile, /\/api\/v1\/social\/feed/);
-  const openMethod = animals.split('fun open(): List<AnimalListingDto>')[1].split('fun homeLocation')[0];
+  const openMethod = animals.split(/fun open\(/)[1].split('fun homeLocation')[0];
   assert.match(openMethod, /JOIN social_posts p ON p\.listing_id = a\.id/);
   assert.match(openMethod, /p\.moderation_status = 'VISIBLE'/);
   assert.doesNotMatch(openMethod, /LEFT JOIN social_posts p/);

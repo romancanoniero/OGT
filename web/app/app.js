@@ -1051,7 +1051,11 @@ function isAuthExpired(err, status, errorCode) {
   return /token firebase vencido|token requerido|token inválido|token invalido|unauthenticated/i.test(msg);
 }
 
-async function api(path, body) {
+async function api(path, body, useDevice=true) {
+  if(useDevice && ['/api/v1/social/feed','/api/v1/social/feed-scope','/api/v1/animals/open'].includes(path)) {
+    const device=feedLocation?.place ? {} : await globalThis.OgtDiscoveryLocation?.payload() || {};
+    body={...body,...device};
+  }
   const bearer = window.OgtAuth?.getToken ? await window.OgtAuth.getToken() : authToken();
   const res = await fetch(`${API}${path}`, {
     method: "POST",
@@ -1071,6 +1075,9 @@ async function api(path, body) {
     const err = new Error(json.message || "Error");
     if (isAuthExpired(err, res.status, json.errorCode)) await expireSession();
     throw err;
+  }
+  if(path==='/api/v1/social/feed-scope' && !json.data?.place && !globalThis.OgtDiscoveryLocation?.current()) {
+    return {...json.data,latitude:null,longitude:null};
   }
   return json.data;
 }
@@ -2421,13 +2428,22 @@ let feedRequestVersion = 0;
 let adoptionRadiusKm = 20;
 let feedLocation = null;
 let discoverySettingsVersion=0;
+let refreshPetDiscovery=null;
+let discoveryScopeReady=false;
 function applyDiscoverySettings(settings,reload=true){
  if(!settings||!Number.isInteger(settings.adoptionRadiusKm)||settings.adoptionRadiusKm<1||settings.adoptionRadiusKm>500||Number(settings.version)<discoverySettingsVersion)return;
  discoverySettingsVersion=Number(settings.version);const changed=adoptionRadiusKm!==settings.adoptionRadiusKm;adoptionRadiusKm=settings.adoptionRadiusKm;
+ if(changed&&reload)refreshPetDiscovery?.();
  if(changed&&reload&&document.getElementById('feed-list')){paintFeedList();void loadFeed(feedType).then(paintFeedList).catch(()=>{});}
 }
 window.addEventListener('ogt-discovery-settings',event=>applyDiscoverySettings(event.detail));
-function nearbyInHome(post) { return globalThis.OgtAdoptionNearby(post,post.animalListing || listingOf(post) || (cardKind(post)==="ADOPTION"?{kind:"ADOPTION"}:null),{mode:feedMode,radiusKm:adoptionRadiusKm,viewer:feedLocation,ownerId:me.userId}); }
+async function primeDiscoveryScope() {
+ if(discoveryScopeReady)return;
+ const owner=me.userId,saved=await api('/api/v1/social/feed-scope',{},false).catch(()=>null);
+ if(owner!==me.userId || discoveryScopeReady)return;
+ if(saved?.place){feedLocation=saved;discoveryScopeReady=true;applyDiscoverySettings(saved.settings,false);}
+}
+function nearbyInHome(post) { return globalThis.OgtAdoptionNearby(post,post.animalListing || listingOf(post) || ({ADOPTION:{kind:"ADOPTION"},LOST_PET:{kind:lostState(post).found?"FOUND":"LOST"}}[cardKind(post)]),{mode:feedMode,radiusKm:adoptionRadiusKm,viewer:feedLocation,ownerId:me.userId}); }
 
 function familyOfFeedType(type) {
   if (!type) return "";
@@ -2454,9 +2470,10 @@ async function loadFeed(type) {
   const payload = { pageSize: 200, mode: feedMode };
   const family = familyOfFeedType(next);
   if (family) payload.family = family;
+  await primeDiscoveryScope();
   const [posts,scope] = await Promise.all([api("/api/v1/social/feed", payload),api("/api/v1/social/feed-scope",{}).catch(()=>null)]);
   if(owner!==me.userId)return lastFeed;
-  if(version===feedRequestVersion){feedLocation=scope;applyDiscoverySettings(scope?.settings,false);}
+  if(version===feedRequestVersion){feedLocation=scope;discoveryScopeReady=scope!=null;applyDiscoverySettings(scope?.settings,false);}
   if(version!==feedRequestVersion)return lastFeed;
   const current=new Map(lastFeed.map(post=>[post.id,post]));
   lastFeed = (Array.isArray(posts) ? posts : posts?.items || []).filter((p) => !hiddenIds.has(p.id)).map(post=>current.has(post.id)&&current.get(post.id)!==before.get(post.id)?current.get(post.id):post);
@@ -2481,7 +2498,7 @@ async function loadListings() {
 }
 
 function adoptionRadiusHtml() {
- return `<div data-adoption-location-box ${feedMode==='HOME'?'':'hidden'}><p class="hint" data-adoption-location></p><button type="button" class="ghost" data-feed-location>Usar mi ubicación para adopciones</button></div>`;
+ return `<div data-adoption-location-box ${feedMode==='HOME'?'':'hidden'}><p class="hint" data-adoption-location></p><div data-discovery-prompt></div><button type="button" class="ghost" data-feed-location>Usar mi ubicación</button></div>`;
 }
 function feedPillsHtml() {
   return `<div class="chips feed-pills" aria-label="Selección del feed">${[["HOME","Para vos"],["FOLLOWING","Siguiendo"]].map(([mode,label])=>`<button type="button" class="chip${mode===feedMode?" on":""}" data-feed-mode="${mode}" aria-pressed="${mode===feedMode}">${label}</button>`).join("")}</div><div class="chips feed-pills" id="feed-type" role="tablist" aria-label="Tipo de publicación">
@@ -2493,7 +2510,8 @@ function paintFeedList() {
   const box = document.getElementById("feed-list");
   if (!box) return;
   const scope=document.querySelector('[data-adoption-location-box]');if(scope)scope.hidden=feedMode!=='HOME';
-  const hint=document.querySelector('[data-adoption-location]');if(hint)hint.textContent=feedLocation?.latitude==null?'Elegí tu barrio en el perfil o compartí tu ubicación para ver adopciones cercanas.':'';
+  const hint=document.querySelector('[data-adoption-location]');if(hint)hint.textContent=feedLocation?.latitude==null?'Elegí tu barrio o localidad para ver mascotas cercanas.':'';
+  void mountDiscoveryPrompt(document.querySelector('[data-discovery-prompt]'),async()=>{await loadFeed(feedType);paintFeedList();});
   const list = visibleFeed(feedType);
   if(!list.length){box.innerHTML=`<p class="empty">No hay publicaciones de este tipo.</p>`;return;}
   box.querySelector(':scope > .empty')?.remove();
@@ -2512,11 +2530,9 @@ function bindFeedPills() {
   document.querySelector('[data-feed-location]')?.addEventListener('click',async event=>{
     const button=event.currentTarget;button.disabled=true;
     try {
-      if(!navigator.geolocation)throw new Error('Este navegador no ofrece ubicación. Elegí tu barrio en el perfil.');
-      const fix=await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{timeout:10000,maximumAge:120000}));
-      await api('/api/v1/me/location',{latitude:fix.coords.latitude,longitude:fix.coords.longitude,accuracyMeters:fix.coords.accuracy});
+      await globalThis.OgtDiscoveryLocation.useDevice();
       await loadFeed(feedType);paintFeedList();
-    }catch{toast('No pudimos obtener tu ubicación. Revisá el permiso o elegí Sin límite.');}finally{button.disabled=false;}
+    }catch{toast('Elegí tu barrio o localidad para ver mascotas cercanas.');await mountDiscoveryPrompt(document.querySelector('[data-discovery-prompt]'),async()=>{await loadFeed(feedType);paintFeedList();});}finally{button.disabled=false;}
   });
   document.querySelectorAll('[data-feed-mode]').forEach(button=>button.addEventListener('click',async()=>{
     if(feedMode===button.dataset.feedMode)return;
@@ -3354,7 +3370,7 @@ async function renderPublicar(kind) {
     catch(e){document.getElementById("main").innerHTML=`<h1>Publicar</h1><p role="alert">${escapeHtml(e.message)}</p><a href="#/publicar">Volver a intentar</a>`;return;}
   }
   if(kind==="accion"){await renderUnifiedPublication(catalog,invitationsModule,initialTag);return;}
-  const placeModule=await import('./publication-place.js?v=20261127-location');
+  const placeModule=await import('./publication-place.js?v=20261128-discovery-33');
   const {publicationPlaceHtml}=placeModule;
   const topics = PUBLISH_TOPICS[kind] || [];
   const honor = kind === "homenaje";
@@ -3509,7 +3525,7 @@ async function renderPublicar(kind) {
 
 async function renderUnifiedPublication(catalog,invitationsModule,initialTag=null) {
   const {hashtagKey}=await import('./hashtags.js');
-  const {publicationPlaceHtml,bindPublicationPlace}=await import('./publication-place.js?v=20261127-location');
+  const {publicationPlaceHtml,bindPublicationPlace}=await import('./publication-place.js?v=20261128-discovery-33');
   const main=document.getElementById('main');
   const selected=new Map();
   const officialKey=category=>category.tagKey||hashtagKey(category.label);
@@ -3542,7 +3558,7 @@ async function renderUnifiedPublication(catalog,invitationsModule,initialTag=nul
   const form=document.getElementById('publish-form'),name=form.elements.honoree,account=form.elements.recognitionAccount;
   form.noValidate=true;
   const error=form.querySelector('[data-publication-error]'),submit=form.querySelector('[data-submit]');
-  const publicationPlace=bindPublicationPlace(form.querySelector('[data-publication-place]'),{api});
+  const publicationPlace=bindPublicationPlace(form.querySelector('[data-publication-place]'),{api,autoLocate:false});
   let person=null,searchVersion=0,busy=false,attemptKey='',requestId='',uploaded=null;
   const invitationDrafts=invitationsModule.bindInvitationDrafts(form,{honoreeName:()=>name.value,honoreeId:()=>person?.userId});
   const recognition=()=>[...selected.values()].some(tag=>tag.category?.requiresRecognition!==false && tag.category);
@@ -3718,14 +3734,21 @@ async function renderMascotas() {
         <button type="button" class="chip" data-kind="FOUND">Encontrados</button>
         <button type="button" class="chip" data-kind="ADOPTION">Adopción</button>
       </div>
+      <div data-discovery-prompt></div>
       <div id="pet-list"><p class="empty">Cargando…</p></div>
     </div>`;
-  let kind = "";
+  let kind = "",requestVersion=0;
   const box = document.getElementById("pet-list");
   async function paint() {
+    const version=++requestVersion,owner=me.userId;
     try {
-      const rows = await api("/api/v1/animals/open", {});
-      const list = (Array.isArray(rows) ? rows : []).filter((r) => !kind || r.kind === kind);
+      await primeDiscoveryScope();
+      const [rows,scope] = await Promise.all([api("/api/v1/animals/open", {}),api("/api/v1/social/feed-scope",{})]);
+      if(!box.isConnected || version!==requestVersion || owner!==me.userId)return;
+      feedLocation=scope;discoveryScopeReady=true;applyDiscoverySettings(scope.settings,false);
+      await mountDiscoveryPrompt(main.querySelector('[data-discovery-prompt]'),paint);
+      const list = (Array.isArray(rows) ? rows : []).filter((r) => (!kind || r.kind === kind) &&
+        (!['ADOPTION','LOST','FOUND'].includes(r.kind) || globalThis.OgtAdoptionNearby({authorId:r.reporterUserId},r,{viewer:feedLocation,ownerId:me.userId,radiusKm:adoptionRadiusKm})));
       box.innerHTML = list.length
         ? list.map(listingRow).join("")
         : `<p class="empty">No hay fichas abiertas.</p>`;
@@ -3740,6 +3763,7 @@ async function renderMascotas() {
       paint();
     });
   });
+  refreshPetDiscovery=()=>{if(box.isConnected)void paint();};
   await paint();
 }
 
@@ -4766,14 +4790,39 @@ const COMMUNITY_RULES = {
   ],
 };
 
+window.addEventListener('ogt-discovery-device',()=>{
+ if(!feedLocation?.place)feedLocation=null;
+ paintFeedList();refreshPetDiscovery?.();
+ if(document.getElementById('feed-list'))void loadFeed(feedType).then(paintFeedList).catch(()=>{});
+});
+
+async function mountDiscoveryPrompt(container,onSaved) {
+ if(!container || !discoveryScopeReady)return;
+ if(feedLocation?.latitude!=null){container.replaceChildren();delete container.dataset.mounted;return;}
+ if(container.dataset.mounted)return;container.dataset.mounted='true';
+ const owner=me.userId;
+ try {
+  const {publicationPlaceHtml,bindPublicationPlace}=await import('./publication-place.js?v=20261128-discovery-33');
+  if(!container.isConnected||me.userId!==owner)return;
+  container.innerHTML=`<form class="profile-edit"><h2>Elegí tu zona</h2><p class="hint">Con tu barrio o localidad podemos mostrarte mascotas cercanas.</p>${publicationPlaceHtml({optional:false,name:'petDiscoveryPlace',label:'Barrio o localidad'})}<button type="submit" class="publish-cta">Guardar zona</button><p role="status"></p></form>`;
+  const form=container.querySelector('form'),selector=bindPublicationPlace(form.querySelector('[data-publication-place]'),{api,autoLocate:false});
+  form.addEventListener('submit',async event=>{
+   event.preventDefault();const point=selector.point(),status=form.querySelector('[role=status]'),button=form.querySelector('[type=submit]');
+   if(!point){status.textContent='Elegí una zona de las sugerencias.';return;}if(me.userId!==owner||button.disabled)return;button.disabled=true;
+   try{const scope=await api('/api/v1/users/discovery-place',{place:selector.value(),...point});if(me.userId!==owner)return;feedLocation=scope;applyDiscoverySettings(scope.settings,false);container.replaceChildren();delete container.dataset.mounted;await onSaved();}
+   catch{status.textContent='No pudimos guardar la zona. Volvé a intentarlo.';button.disabled=false;}
+  });
+ } catch{container.textContent='Elegí tu barrio o localidad desde tu perfil.';delete container.dataset.mounted;}
+}
+
 async function mountDiscoveryPlaceProfile(main) {
  const owner=me.userId;
  try {
-  const [{publicationPlaceHtml,bindPublicationPlace},saved]=await Promise.all([import('./publication-place.js?v=20261127-location'),api('/api/v1/social/feed-scope',{})]);
+  const [{publicationPlaceHtml,bindPublicationPlace},saved]=await Promise.all([import('./publication-place.js?v=20261128-discovery-33'),api('/api/v1/social/feed-scope',{},false)]);
   const profile=main.querySelector('#profile-form');if(!profile||me.userId!==owner)return;
-  const form=document.createElement('form');form.className='profile-edit';form.innerHTML=`<h2>Tu zona para adopciones</h2><p class="hint">Si no usás GPS, elegí tu barrio o localidad. Usamos una ubicación aproximada.</p>${publicationPlaceHtml({optional:false,name:'discoveryPlace',label:'Barrio o localidad para adopciones'})}<button class="publish-cta" type="submit">Guardar zona</button><p role="status" data-zone-status></p>`;
+  const form=document.createElement('form');form.className='profile-edit';form.innerHTML=`<h2>Tu zona para mascotas</h2><p class="hint">Si no usás GPS, elegí tu barrio o localidad. Usamos una ubicación aproximada.</p>${publicationPlaceHtml({optional:false,name:'discoveryPlace',label:'Barrio o localidad para mascotas'})}<button class="publish-cta" type="submit">Guardar zona</button><p role="status" data-zone-status></p>`;
   profile.after(form);const input=form.querySelector('[name=discoveryPlace]');input.value=saved.place||'';
-  const selector=bindPublicationPlace(form.querySelector('[data-publication-place]'),{api,initialPoint:saved.place?{latitude:saved.latitude,longitude:saved.longitude}:null});
+  const selector=bindPublicationPlace(form.querySelector('[data-publication-place]'),{api,autoLocate:false,initialPoint:saved.place?{latitude:saved.latitude,longitude:saved.longitude}:null});
   form.addEventListener('submit',async event=>{event.preventDefault();if(me.userId!==owner)return;const point=selector.point(),status=form.querySelector('[data-zone-status]'),button=form.querySelector('[type=submit]');if(!point){status.textContent='Elegí una zona de las sugerencias para confirmar su ubicación.';return;}button.disabled=true;
    try{const scope=await api('/api/v1/users/discovery-place',{place:selector.value(),...point});if(me.userId!==owner)return;feedLocation=scope;applyDiscoverySettings(scope.settings);status.textContent='Zona guardada.';}
    catch(e){status.textContent=e.message;}finally{button.disabled=false;}
@@ -4867,7 +4916,7 @@ async function clearClientSession() {
   lastFeed = [];
   pendingClaps.clear();pendingDiffusions.clear();clearTimeout(feedCacheTimer);discoverySettingsVersion=0;
   for(const key of Object.keys(sessionStorage))if(key.startsWith('ogt.feed.'))sessionStorage.removeItem(key);
-  adoptionRadiusKm=20;feedLocation=null;feedRequestVersion++;
+  adoptionRadiusKm=20;feedLocation=null;feedRequestVersion++;discoveryScopeReady=false;refreshPetDiscovery=null;globalThis.OgtDiscoveryLocation?.clear(false);
   lastRanking = [];
   following.clear();
   realtime = null;

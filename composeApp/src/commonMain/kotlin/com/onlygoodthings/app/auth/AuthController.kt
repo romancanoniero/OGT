@@ -162,11 +162,11 @@ class AuthController(
         },
         load={ query ->
             val owner=preview.currentUserId
-            val scope=feed.discoveryScope()
+            val scope=feed.discoveryScope(discoveryDevicePoint())
             check(owner.isNotBlank() && preview.currentUserId==owner) { "La sesión cambió" }
             feedTimeline.applyDiscoverySettings(scope.settings)
-            feedTimeline.confirmViewerLocation(com.onlygoodthings.shared.domain.AdoptionProximity.point(scope.latitude,scope.longitude),manual=scope.place!=null)
-            feed.loadNearbyFeed("0",200,query.mode,query.family,scope.settings.adoptionRadiusKm)
+            applyDiscoveryScope(scope)
+            feed.loadNearbyFeed("0",200,query.mode,query.family,scope.settings.adoptionRadiusKm,device=discoveryDevicePoint())
         },
         visible=feed::visiblePostIds,
         loadPost=feed::getPost,
@@ -177,6 +177,35 @@ class AuthController(
     val postInvitations = com.onlygoodthings.shared.data.remote.RestPostInvitations(createPlatformHttpClient(), session)
     init { stories.onDiscoverySettings={ feedTimeline.applyDiscoverySettings(it) } }
 
+    private var discoveryFix:com.onlygoodthings.shared.domain.GeoPoint?=null
+    private var discoveryFixAt=0L
+    fun discoveryDevicePoint():com.onlygoodthings.shared.domain.GeoPoint? = com.onlygoodthings.shared.domain.PetDiscovery.device(
+        preview.gpsEnabled && preview.locationGranted && preview.locationServicesEnabled,
+        discoveryFix,discoveryFixAt,com.onlygoodthings.shared.realtime.currentEpochMs())
+    fun updateDiscoveryDevice(allowed:Boolean,point:com.onlygoodthings.shared.domain.GeoPoint?,epochMs:Long) {
+        val before=discoveryDevicePoint()
+        discoveryFix=point.takeIf { allowed };discoveryFixAt=epochMs
+        val next=discoveryDevicePoint()
+        if(!feedTimeline.viewerUsesManualPlace && (before!=null || next!=null || feedTimeline.viewerLocation!=null)) {
+            val moved=before==null || next==null || com.onlygoodthings.shared.domain.GeoMath.haversineMeters(before,next)>=200
+            if(moved) {
+                feedTimeline.confirmViewerLocation(next)
+                if(signedIn.value)feedTimeline.refresh(feedTimeline.presentation.query,force=true)
+            }
+        }
+    }
+    private fun applyDiscoveryScope(scope:com.onlygoodthings.shared.domain.FeedDiscoveryScope) {
+        val point=com.onlygoodthings.shared.domain.AdoptionProximity.point(scope.latitude,scope.longitude)
+        feedTimeline.confirmViewerLocation(point.takeIf { scope.place!=null || discoveryDevicePoint()!=null },manual=scope.place!=null)
+    }
+    suspend fun refreshDiscoveryScope():com.onlygoodthings.shared.domain.FeedDiscoveryScope {
+        val owner=preview.currentUserId
+        val saved=feed.discoveryScope(discoveryDevicePoint())
+        check(owner.isNotBlank() && owner==preview.currentUserId) { "La sesión cambió" }
+        feedTimeline.applyDiscoverySettings(saved.settings);applyDiscoveryScope(saved)
+        return saved
+    }
+
     suspend fun updateMyLocation(latitude: Double, longitude: Double, accuracyMeters: Double?) {
         val ok = api.updateLocation(latitude, longitude, accuracyMeters)
         if (!ok) return
@@ -185,7 +214,7 @@ class AuthController(
         val idx = db.users.indexOfFirst { it.id == me.id }
         if (idx >= 0) db.users[idx] = updated
         preview.overlayUser = updated
-        if(!feedTimeline.viewerUsesManualPlace)feedTimeline.confirmViewerLocation(com.onlygoodthings.shared.domain.GeoPoint(latitude,longitude))
+        if(!feedTimeline.viewerUsesManualPlace && discoveryDevicePoint()!=null)feedTimeline.confirmViewerLocation(com.onlygoodthings.shared.domain.GeoPoint(latitude,longitude))
         feedTimeline.localChanged()
         feedTimeline.refresh(feedTimeline.presentation.query,force=true)
     }
@@ -498,14 +527,20 @@ class AuthController(
         if (!allowDevTokens && !_signedIn.value) return
         val me = preview.me()
         db.claimPublishedAnimals(me.aliases() + me.id, me.id)
-        runCatching { animals.openListings() }.getOrNull().orEmpty().forEach { remote ->
-            db.upsertRemoteAnimal(remote)
-        }
+        runCatching { refreshAnimalListings(db) }
         db.unpublishedAnimalPosts().forEach { post ->
             runCatching {
                 persistUnpublishedAnimal(db, animals, me, post, { preview.currentUserId == me.id }, ::uploadPostMedia)
             }
         }
+    }
+
+    suspend fun refreshAnimalListings(db:OgtLocalDatabase) {
+        if(!allowDevTokens && !_signedIn.value)return
+        val owner=preview.currentUserId
+        val rows=animals.openListings(discoveryDevicePoint())
+        check(owner.isNotBlank() && preview.currentUserId==owner) { "La sesión cambió" }
+        rows.forEach { db.upsertRemoteAnimal(it) }
     }
 
     suspend fun refreshAnimalSightings(listingId: String) {

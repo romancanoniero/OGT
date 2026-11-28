@@ -17,7 +17,7 @@ REQUIRED = (
     "web-app/crm/control/index.html", "web-app/crm/empresas/index.html",
     "web-app/crm/crm.js", "web-app/crm/crm-core.js",
     "web-app/crm/crm-auth.js", "web-app/crm/crm-runtime.js",
-    "web-app/app.js", "web-app/auth.js",
+    "web-app/app.js", "web-app/auth.js", "web-app/discovery-location.js", "web-app/adoption-proximity.js",
     "database/migrations/23_crm_foundations.sql",
     "database/migrations/24_post_media_frame.sql",
     "database/migrations/48_post_lifetime.sql",

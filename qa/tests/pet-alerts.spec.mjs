@@ -8,14 +8,14 @@ const functions=['function listingRow(', 'async function renderMascotas('].map(p
 }).join('\n');
 
 test('Mascotas filters lost and found separately, preserves adoption and opens the same post',async({page},info)=>{
- await page.route('**/qa-pet-alerts',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"><title>Mascotas QA</title><main id="main"></main></html>'}));
+ await page.route('**/qa-pet-alerts',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"><title>Mascotas QA</title><main id="main"></main><script src="/adoption-proximity.js"></script></html>'}));
  await page.goto('/qa-pet-alerts');
  await page.evaluate(code=>{
-  Object.assign(window,{loadSession:async()=>{},icon:()=>'',escapeHtml:value=>String(value),mediaUrl:value=>value,speciesLabel:value=>value,sizeLabel:value=>value,adoptionTitle:row=>row.title,
-   api:async()=>[
-    {kind:'LOST',postId:'lost-original',title:'Luna perdida',species:'CAT',lastSeenPlace:'Lanús'},
-    {kind:'FOUND',postId:'found-original',title:'Perro encontrado',species:'DOG',lastSeenPlace:'Castelar'},
-    {kind:'ADOPTION',postId:'adoption-original',title:'Buscan hogar',species:'CAT',place:'Caballito'}]});
+  Object.assign(window,{me:{userId:'viewer'},feedLocation:null,adoptionRadiusKm:20,refreshPetDiscovery:null,mountDiscoveryPrompt:async()=>{},primeDiscoveryScope:async()=>{},applyDiscoverySettings:()=>{},loadSession:async()=>{},icon:()=>'',escapeHtml:value=>String(value),mediaUrl:value=>value,speciesLabel:value=>value,sizeLabel:value=>value,adoptionTitle:row=>row.title,
+   api:async path=>path.endsWith('feed-scope')?{latitude:-34.62,longitude:-58.44,settings:{adoptionRadiusKm:20,version:1}}:[
+    {kind:'LOST',postId:'lost-original',title:'Luna perdida',species:'CAT',lastSeenPlace:'Lanús',latitude:-34.61,longitude:-58.44},
+    {kind:'FOUND',postId:'found-original',title:'Perro encontrado',species:'DOG',lastSeenPlace:'Castelar',latitude:-34.61,longitude:-58.44},
+    {kind:'ADOPTION',postId:'adoption-original',title:'Buscan hogar',species:'CAT',place:'Caballito',latitude:-34.61,longitude:-58.44}]});
   window.eval(code+'\nwindow.renderPetAlerts=renderMascotas;');
  },functions);
  await page.evaluate(()=>window.renderPetAlerts());

@@ -85,18 +85,19 @@ class RestFeedRepository(
         family: FeedTopicFamily?,
     ): List<SocialPost> = loadNearbyFeed(cursor,pageSize,mode,family,com.onlygoodthings.shared.domain.AdoptionProximity.DEFAULT_RADIUS_KM)
 
-    suspend fun feedLocation():com.onlygoodthings.shared.domain.GeoPoint? {
-        val data:JsonObject=post("/api/v1/social/feed-scope",buildJsonObject {})
+    suspend fun feedLocation(device:com.onlygoodthings.shared.domain.GeoPoint?=null):com.onlygoodthings.shared.domain.GeoPoint? {
+        val data:JsonObject=post("/api/v1/social/feed-scope",buildJsonObject { device?.let { put("latitude",it.latitude);put("longitude",it.longitude) } })
         return com.onlygoodthings.shared.domain.AdoptionProximity.point((data["latitude"] as? JsonPrimitive)?.doubleOrNull,(data["longitude"] as? JsonPrimitive)?.doubleOrNull)
     }
 
-    suspend fun discoveryScope():com.onlygoodthings.shared.domain.FeedDiscoveryScope = post("/api/v1/social/feed-scope",buildJsonObject {})
+    suspend fun discoveryScope(device:com.onlygoodthings.shared.domain.GeoPoint?=null):com.onlygoodthings.shared.domain.FeedDiscoveryScope = post("/api/v1/social/feed-scope",buildJsonObject { device?.let { put("latitude",it.latitude);put("longitude",it.longitude) } })
     suspend fun saveDiscoveryPlace(place:String,point:com.onlygoodthings.shared.domain.GeoPoint):com.onlygoodthings.shared.domain.FeedDiscoveryScope =
         post("/api/v1/users/discovery-place",buildJsonObject { put("place",place);put("latitude",point.latitude);put("longitude",point.longitude) })
 
-    suspend fun loadNearbyFeed(cursor:String?,pageSize:Int,mode:FeedMode,family:FeedTopicFamily?,adoptionRadiusKm:Int):List<SocialPost> =
+    suspend fun loadNearbyFeed(cursor:String?,pageSize:Int,mode:FeedMode,family:FeedTopicFamily?,adoptionRadiusKm:Int,device:com.onlygoodthings.shared.domain.GeoPoint?=null):List<SocialPost> =
         post("/api/v1/social/feed", buildJsonObject {
             put("adoptionRadiusKm",JsonPrimitive(adoptionRadiusKm))
+            device?.let { put("latitude",it.latitude);put("longitude",it.longitude) }
             put("pageSize", JsonPrimitive(pageSize))
             put("mode", JsonPrimitive(mode.name))
             cursor?.let { put("cursor", JsonPrimitive(it)) }

@@ -46,7 +46,10 @@ class FeedTimelineTest {
             fun adoption(n:Int,lat:Double?,lng:Double?)=post(n).copy(topic="Adopción",animalListing=AnimalListingDto(
                 id(n+100),id(n),"neighbor","firebase-neighbor","ADOPTION","CAT","SMALL","LOW","Gato","Busca hogar","Zona",0,false,latitude=lat,longitude=lng))
             f.rows=listOf(adoption(1,-34.60,-58.45),adoption(2,-34.92,-57.95),adoption(3,null,null),post(4))
-            f.start();f.timeline.confirmViewerLocation(GeoPoint(-34.62,-58.44));f.load()
+            f.db.users+=LocalUser("viewer","viewer",null,null,"QA",null,UserRole.USER,0,"QA","Zona antigua","","",-34.62,-58.44)
+            f.start();f.load()
+            assertEquals(listOf(id(4)),f.page().posts.map { it.id }) // Saved profile/GPS coordinates are not current consent.
+            f.timeline.confirmViewerLocation(GeoPoint(-34.62,-58.44),manual=true);f.timeline.localChanged();f.load()
             assertEquals(setOf(id(1),id(4)),f.page().posts.map { it.id }.toSet())
             f.timeline.applyDiscoverySettings(DiscoverySettings(100,2))
             val wide=FeedQuery(adoptionRadiusKm=100);f.load(wide)
@@ -75,6 +78,27 @@ class FeedTimelineTest {
             assertEquals(order,f.page().posts.map { it.id })
             f.timeline.refresh(home,force=true,reveal=true)!!.join()
             assertEquals(listOf(id(1),id(2)),f.page().posts.map { it.id })
+        } finally { f.close() }
+    }
+
+    @Test fun lostAndFoundCacheRespectManualAreaCrmChangesAndGpsRemovalWithoutRemovingTheOriginalPosts()=runBlocking {
+        val f=Fixture()
+        try {
+            fun alert(n:Int,kind:String,lat:Double,author:String="neighbor")=post(n,author).copy(topic=animalPostTopic(kind),animalListing=AnimalListingDto(
+                id(n+100),id(n),author,"firebase-$author",kind,"CAT","","MEDIUM","Alerta","Aviso","Zona",2000,false,latitude=lat,longitude=-58.44))
+            f.rows=listOf(alert(1,"LOST",-34.60),alert(2,"FOUND",-34.61),alert(3,"LOST",-34.95),alert(4,"FOUND",-34.95),alert(5,"FOUND",-34.95,"viewer"),post(6))
+            f.start();f.load()
+            assertEquals(setOf(id(5),id(6)),f.page().posts.map { it.id }.toSet())
+            f.timeline.confirmViewerLocation(GeoPoint(-34.62,-58.44),manual=true)
+            assertEquals(setOf(id(1),id(2),id(5),id(6)),f.page().posts.map { it.id }.toSet())
+            f.timeline.applyDiscoverySettings(DiscoverySettings(100,2));val wide=FeedQuery(adoptionRadiusKm=100);f.load(wide)
+            assertEquals(6,f.page(wide).posts.size)
+            f.timeline.applyDiscoverySettings(DiscoverySettings(20,3));f.load()
+            f.signal(SocialLiveCounters(id(4),9,1,body="Aviso actualizado"))
+            assertFalse(f.page().posts.any { it.id==id(4) })
+            assertTrue(f.db.posts.any { it.id==id(4) })
+            f.timeline.confirmViewerLocation(null)
+            assertEquals(setOf(id(5),id(6)),f.page().posts.map { it.id }.toSet())
         } finally { f.close() }
     }
 
